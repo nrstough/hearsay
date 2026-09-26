@@ -175,7 +175,7 @@ Nathan first held it (09:25) because the previous rule was the file planned for 
 | 0.45–0.90 | ambiguous | don't flip; fall back to M1b alone |
 | 0.95–1.00 | NSA's code reads our scores inverted | ship the pre-flipped twin |
 
-_Pending: the returned number and the action taken (`docs/reports/2026-09-26_sponsor-questions.md`)._
+**Sent** Saturday 12:30 by Discord DM (team Cross Exam): `CrossExam_predictions.tsv`, a copy of `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv` (sha256 `fb783076…`, `submissions/log.csv` row 12:30:37). _Pending: the returned minDCF and the action taken (`docs/reports/2026-09-26_sponsor-questions.md`)._
 
 ---
 
