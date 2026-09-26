@@ -3,8 +3,8 @@
 One invocation trains one model: `--fold k` (validation = core fold k, out-of-fold export) or
 `--fold full` (all inner folds; exports holdout + test). Selection is wall-clock fixed
 (`--steps`), never a checkpoint pick on the validation fold. Every exported score uses the
-deployment transform (whole trimmed clip up to 14 s, fp32); test-length crops and the
-augmented holdout slice are diagnostics only.
+deployment transform (whole trimmed clip up to 8 s, band-matched, fp32); test-length crops,
+whole clips up to 14 s and the augmented holdout slice are diagnostics only.
 
 Refuses: no CUDA (unless --cpu-smoke), bundle tree-sha or XLS-R config sha mismatch, any
 trivial-feature shortcut AUC > --shortcut-max on THIS model's training rows.
@@ -154,9 +154,16 @@ def collate_batch(items):
 # --- helpers --------------------------------------------------------------------------------
 
 
-def rclone_push(src: Path, dst: str) -> None:
+def rclone_push(src: Path, dst: str, tries: int = 3) -> bool:
+    """Push with bounded retries; the caller decides whether a failure is fatal (a checkpoint
+    push that silently fails would void the recovery guarantee; Codex audit round 2)."""
     assert dst.startswith(R2_PREFIX), dst
-    subprocess.run(["rclone", "copy", str(src), dst, "--transfers", "8"], check=False)
+    for _ in range(tries):
+        r = subprocess.run(["rclone", "copy", str(src), dst, "--transfers", "8"], check=False)
+        if r.returncode == 0:
+            return True
+        time.sleep(5)
+    return False
 
 
 def rclone_pull(src: str, dst: Path) -> bool:
@@ -338,8 +345,9 @@ def main() -> None:
         torch.save({"model": net.state_dict(), "opt": opt.state_dict(),
                     "sched": sched.state_dict(), "step": step,
                     "sampler_seed": int(sampler.rng.integers(1 << 30))}, ck)  # fmt: skip
-        if args.r2_prefix:
-            rclone_push(out / "ckpt", args.r2_prefix.rstrip("/") + "/ckpt")
+        if args.r2_prefix and not rclone_push(out / "ckpt", args.r2_prefix.rstrip("/") + "/ckpt"):
+            jlog(event="checkpoint_push_failed", step=step)
+            sys.exit("FATAL: checkpoint push to R2 failed after retries")
 
     def evaluate(tag: str) -> dict:
         logits = np.full(len(va), np.nan)
@@ -502,8 +510,8 @@ def main() -> None:
                 "aug_rates": rates, "shortcut_gate": gate, "hashes": hashes,
                 "n_train": len(tr), "val": va_note}  # fmt: skip
     (out / "run_meta.json").write_text(json.dumps(run_meta, indent=2))
-    if args.r2_prefix:
-        rclone_push(out, args.r2_prefix.rstrip("/"))
+    if args.r2_prefix and not rclone_push(out, args.r2_prefix.rstrip("/")):
+        sys.exit("FATAL: final push of the run directory to R2 failed after retries")
     jlog(event="DONE", seconds=round(time.time() - t0))
     print("DONE")
 

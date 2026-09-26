@@ -205,3 +205,53 @@ def test_e7_nan_loss_aborts():
     assert not torch.isfinite(loss)
     src = TRAIN.read_text()
     assert "if not torch.isfinite(loss):" in src and 'sys.exit("FATAL: non-finite loss")' in src
+
+
+def test_g4_checkpoint_push_failure_aborts(bundle, tmp_path, monkeypatch):
+    """A failed R2 checkpoint push must stop the run, not let it print DONE (Codex round 2)."""
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "rclone").write_text("#!/bin/bash\nexit 1\n")
+    (fake / "rclone").chmod(0o755)
+    import os
+
+    env = {**os.environ, "PATH": f"{fake}:{os.environ['PATH']}"}
+    cmd = [sys.executable, str(TRAIN), "--bundle", str(bundle), "--fold", "0", "--steps", "2",
+           "--eval-every", "2", "--steps-per-epoch", "2", "--eval-n", "6", "--workers", "0",
+           "--cpu-smoke", "--out", str(tmp_path / "push"), "--config",
+           '{"batch_size": 4, "keep_layers": 2}', "--r2-prefix",
+           "r2:pa-source/hearsay/runs/_test_push_failure"]  # fmt: skip
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode != 0 and "checkpoint push" in (r.stderr + r.stdout)
+    assert "DONE" not in r.stdout
+
+
+def test_g4_resume_pulls_from_r2_via_rclone(bundle, tmp_path):
+    """--resume with --r2-prefix and no local checkpoint calls rclone to pull it; a fake rclone
+    that restores a checkpoint makes the run continue from it."""
+    out = tmp_path / "r2res"
+    r = _run(bundle, out, steps=2)
+    assert r.returncode == 0, r.stderr[-2000:]
+    stash = tmp_path / "stash"
+    import shutil
+
+    shutil.copytree(out / "ckpt", stash)
+    shutil.rmtree(out / "ckpt")
+    fake = tmp_path / "bin2"
+    fake.mkdir()
+    (fake / "rclone").write_text(f"#!/bin/bash\n# fake R2: 'copy <src> <dst>' restores the stash\n"
+                                 f"if [ \"$1\" = copy ] && [[ \"$2\" == r2:* ]]; then mkdir -p \"$3\"; "
+                                 f"cp {stash}/* \"$3\"/; fi\nexit 0\n")
+    (fake / "rclone").chmod(0o755)
+    import os
+
+    env = {**os.environ, "PATH": f"{fake}:{os.environ['PATH']}"}
+    cmd = [sys.executable, str(TRAIN), "--bundle", str(bundle), "--fold", "0", "--steps", "4",
+           "--eval-every", "2", "--steps-per-epoch", "2", "--eval-n", "6", "--workers", "0",
+           "--cpu-smoke", "--out", str(out), "--config", '{"batch_size": 4, "keep_layers": 2}',
+           "--resume", "--r2-prefix", "r2:pa-source/hearsay/runs/_test_resume"]  # fmt: skip
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode == 0, r.stderr[-2000:]
+    events = [json.loads(line) for line in (out / "train_log.jsonl").read_text().splitlines()]
+    resumed = [e for e in events if e["event"] == "resumed"]
+    assert resumed and resumed[-1]["step"] == 2

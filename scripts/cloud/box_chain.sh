@@ -42,6 +42,8 @@ run_jobs() {
         [ -n "$CFG64" ] && CFG=$(echo "$CFG64" | base64 -d)
         EXTRA=$(echo "$spec" | tr ':' '\n' | sed -n 's/^extra=//p')
         NAME=$(echo "$spec" | tr ':' '\n' | sed -n 's/^name=//p'); NAME=${NAME:-fold${FOLD}_${ARM}}
+        RESUME=$(echo "$spec" | tr ':' '\n' | sed -n 's/^resume=//p')
+        if [ "$RESUME" = 1 ]; then rm -rf "$LOGDIR/$NAME/ckpt"; EXTRA="$EXTRA --resume"; fi  # forces the R2 restore
         status "RUNNING $NAME"
         [ -f /root/m5/bundle/codecs/codec_manifest.csv ] || rclone copy "${HEARSAY_R2_PREFIX}bundle/v1/codecs" /root/m5/bundle/codecs --transfers 16 2>/dev/null || true
         # shellcheck disable=SC2086
