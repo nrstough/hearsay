@@ -92,6 +92,7 @@ Post these in writing (NSA x HexLabs Discord) and record the answers below.
 |---|--------|---------------|
 | metric | MinDCF, false alarm ×4, label 1 = synthetic, not log-loss | kickoff slides, Fri Sep 25; confirmed by Nathan |
 | format | TSV `filename<TAB>cm-score`, probability, no LLR | kickoff slides |
+| direction | **1.0 = synthetic** ("Output a synthetic probability score (0.0 to 1.0), 1.0 means synthetic"). We submit this and never flip; the sponsor's ASVspoof5 code treats higher = bona fide, so the draft review doubles as a check (a strong model scoring near 1.0 → raise it with NSA) | NSA brief; reaffirmed by Nathan, Sat Sep 26 |
 | balance | 70/30 real/synthetic said aloud; slide reads ~50/50; verify on NSA train labels | presenter, per Nathan |
 | 1 | Yes: the brief lists ASVspoof 2019/2021/5, WaveFake, In-the-Wild, MLAAD, ADD, VCTK, LibriSpeech, VOiCES for training/calibration | `docs/nsa-challenge.md` |
 | 2 | Yes: "any open-source or commercial tools"; AASIST, RawNet, wav2vec 2.0/WavLM/Whisper front ends suggested | `docs/nsa-challenge.md` |

@@ -34,8 +34,7 @@ A frozen and then fine-tuned XLS-R carries the detection score. The engineered d
 - **Final DM by 8 AM Sunday.**
 
 **Score direction is an open blocker.** The sponsor's evaluation code (ASVspoof5 `compute_det_curve`, unmodified) treats a *higher* cm-score as **bona fide**, the opposite of the instructions. Fed as-is, a good detector with 1.0 = synthetic scores minDCF 1.0, the worst possible; the same scores flipped score about 0.32. The code also uses `Pspoof = 0.5, Cmiss = 1, Cfa = 4` with Cfa on *accepted spoofs*.
-- Until the sponsor answers: submit 1.0 = synthetic as instructed.
-- `write_submission` gets a one-flag flip in the next change.
+- **Decision (Nathan, Sat Sep 26): submit 1.0 = synthetic, never flip.** The mismatch is the sponsor's to handle; if a strong model scores near 1.0 in the draft review, raise it with NSA.
 - The draft review is the tripwire: a strong model scoring near 1.0 means the direction is flipped.
 
 **Metric readings.** Every candidate is logged under four readings, plus EER:
