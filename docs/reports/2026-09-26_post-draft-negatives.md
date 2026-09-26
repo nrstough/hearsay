@@ -93,6 +93,13 @@ On a log scale between the holdout and In-the-Wild, the test sits at 0.68 for mi
 
 **What it shows.** Weight 0.4 improves In-the-Wild by 0.028 (brief) and 0.031 (averse) with the holdout unchanged, and makes inner worse by 0.002 (brief) and 0.037 (averse). The mechanism is M5's lower false-alarm rate on wild audio. It passes our standing four-condition rule. It fails the stricter gate adopted tonight: rule 3 requires inner to improve by 0.010 with no averse regression. It is post hoc, because its numbers were seen before it became a candidate.
 
+**The bake-off.** Nathan ruled at about 17:40 that, because its proxy numbers were already seen, W4 must pass a bake-off on fresh evidence, declared before any of it was computed (`docs/reports/2026-09-26_post-draft-manifest.md`, "The W4 bake-off", commit 141b254). To be ratifiable it has to pass all three tests:
+- **The standing rule.** It already passes.
+- **Perturbation robustness.** The cohort is the channel lane's 500 holdout clips under five kinds of change: none, MP3 64 kbps, 20 dB white noise, ±2% speed, and a one-sample shift. In each of the 10 kind × cost cells, W4 may be no more than 0.010 worse than the shipped rule.
+- **A gain that is not noise.** We resample In-the-Wild by speaker, 2,000 times with seed 0. The 5th percentile of W4's gain must be above zero under each cost separately.
+
+If it fails any of the three, it becomes a measured negative: post hoc, and it did not survive fresh evidence.
+
 Whether it ships is the gate chat's recommendation and Nathan's decision at 19:30 (`docs/reports/2026-09-26_post-draft-sweep.md`). This section will be updated with the outcome by 21:30 either way.
 
 ---
