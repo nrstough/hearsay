@@ -39,6 +39,21 @@ Rule (main chat + oversight + consult): M5 replaces M1 as the primary deep detec
 
 ## Results
 
+### Pilot and ablation (inner folds, out-of-fold, 8 s deployment transform, π = 0.3)
+
+M1 per-fold OOF recomputed from its saved embeddings (`outputs/m5_runs/m1_v{2,3}_oof_by_fold.json`); M5 rows from the run logs under `outputs/m5_runs/`.
+
+| Fold (held-out generators) | M1 v3 (bar) | M5 NSA-only, 2,500 steps | M5 NSA+extra, 2,500 steps |
+|---|---|---|---|
+| 0: grad_tts + unit_speech | 0.524 | 0.528 (EER 20.0%) | TBD |
+| 4: elevenlabs | 0.415 | 0.762 (EER 19.1%) | **0.410 (EER 8.8%)** |
+| pooled (5 folds) | 0.257 | | |
+
+- **Pilot** (fold 4, 600 steps, LR decayed to zero): 0.81; throughput ~190 clips/s at 3.4 s crops on an A100 40 GB, 2,500 steps ≈ 16–20 min including evals and checkpoint pushes.
+- **The extra pools are the difference on the unseen commercial generator**: ASV19 bona fide (40 VCTK speakers) + the 2.5k A01–A06 anchor + MLAAD at 12% of the spoof side take fold 4 from 0.76 to 0.41. NSA-only fine-tuning fits the seen generators (training loss near the label-smoothing floor) and does not transfer.
+- Realized augmentation rates per source × label: 0.646–0.655 in every cell (class-blind confirmed).
+- Conservative recipes on fold 4 (frozen backbone + learned pooling head; top-3 layers at LR 5e-6): TBD.
+
 _TBD: pilot throughput; ablation (NSA-only vs NSA+extra, folds 0 and 4); holdout clean / augmented-slice / test-length-crop / 14 s readouts; per generator, per bona fide source, per length bucket, per augmentation op; both sponsor-code readings; MLAAD probe verdict; CPU parity; spend._
 
 ## What worked, what didn't
