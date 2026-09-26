@@ -82,7 +82,7 @@ except Exception: print("")')
   # rclone + creds: the creds travel on stdin (not argv, not the box's shell history)
   printf 'access_key_id=%s\nsecret_access_key=%s\nendpoint=https://%s.r2.cloudflarestorage.com\n' "$AK" "$SK" "$ACCT" \
     | $SSH 'set -e; cd /root; (command -v rclone >/dev/null) || (curl -sS -m 60 -O https://downloads.rclone.org/rclone-current-linux-amd64.deb && dpkg -i rclone-current-linux-amd64.deb >/dev/null);
-      mkdir -p /root/.config/rclone; { echo "[r2]"; echo "type = s3"; echo "provider = Cloudflare"; cat; } > /root/.config/rclone/rclone.conf; chmod 600 /root/.config/rclone/rclone.conf;
+      mkdir -p /root/.config/rclone; { echo "[r2]"; echo "type = s3"; echo "provider = Cloudflare"; echo "no_check_bucket = true"; cat; } > /root/.config/rclone/rclone.conf; chmod 600 /root/.config/rclone/rclone.conf;
       rclone lsd r2:pa-source/hearsay/ >/dev/null && echo RCLONE-OK' | grep -q RCLONE-OK \
     || { echo "  rclone setup failed -> destroy"; kill_ "$CID"; CID=""; continue; }
   # ship the box scripts, start the chain detached

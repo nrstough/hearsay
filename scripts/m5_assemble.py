@@ -29,11 +29,23 @@ from hearsay.m5_data import FOLDS, INNER_FOLDS, check_folds_file
 from hearsay.metrics import eer, min_cost, report
 
 REPO = Path(__file__).resolve().parents[1]
-def newest_m1_dir() -> Path:
-    """The M1 bar moves as the main chat re-extracts (band-matched v3 due ~05:15): always read
-    the newest models/m1_* meta.json unless --m1-dir is given."""
-    ds = sorted((REPO / "models").glob("m1_*"), key=lambda p: p.stat().st_mtime)
-    return ds[-1] if ds else REPO / "models" / "m1_missing"
+def _m1_dirs() -> list[tuple[Path, dict]]:
+    out = []
+    for d in sorted((REPO / "models").glob("m1_*"), key=lambda p: p.stat().st_mtime):
+        mp = d / "meta.json"
+        if mp.exists():
+            out.append((d, json.loads(mp.read_text())))
+    return out
+
+
+def newest_m1_dir(nsa_only: bool = True) -> Path:
+    """The bar is M1, the NSA-only probe (oversight chat, 04:40): the newest models/m1_* whose
+    `train` is a single NSA sample set (no comma-separated extra sets). M1b (with ASV19) is
+    reported beside it, never gated on. --m1-dir overrides."""
+    cands = [(d, m) for d, m in _m1_dirs()
+             if (m.get("train", "").startswith("nsa_train_sample") and "," not in m.get("train", ""))
+             == nsa_only]
+    return cands[-1][0] if cands else REPO / "models" / "m1_missing"
 
 
 M1_DIR = newest_m1_dir()
@@ -51,6 +63,19 @@ def find_runs(root: Path, arm: str) -> dict[str, Path]:
             continue
         out[str(meta["fold"])] = d
     return out
+
+
+def _m1b_comparison(val_clean: dict, oof_pooled: dict | None, itw: dict | None) -> dict | None:
+    """M1b (NSA + ASV19 bona fide) beside the gate, for the fusion decision; never gated on."""
+    d = newest_m1_dir(nsa_only=False)
+    if not (d / "meta.json").exists():
+        return None
+    m = json.loads((d / "meta.json").read_text())
+    return {"model_dir": d.name, "train": m.get("train"), "m1b_holdout_min_dcf": m.get("val_min_dcf"),
+            "m5_holdout_min_dcf": val_clean["min_dcf"],
+            "m1b_itw_pfa": (m.get("stress") or {}).get("p_fa_at_inner_thr"),
+            "m5_itw_pfa": None if itw is None else itw["pfa"],
+            "m5_oof_pooled_min_dcf": None if oof_pooled is None else oof_pooled["min_dcf"]}
 
 
 def by_group(dv: pd.DataFrame, yv: np.ndarray, s: np.ndarray, pi: float = 0.3) -> tuple[dict, dict]:
@@ -157,6 +182,10 @@ def main() -> None:
                         oof.logit.to_numpy()) if have_all_folds else None
     m1 = json.loads((args.m1_dir / "meta.json").read_text()) if args.m1_dir.exists() else {}
     m1_bar = m1.get("val_min_dcf")
+    # M1's ITW real P_FA comes from the same meta.json (train_probe --stress block); the flag is
+    # only the fallback, so the gate never compares against a stale bar (oversight chat, 04:35)
+    m1_itw_pfa = (m1.get("stress") or {}).get("p_fa_at_inner_thr", args.m1_itw_pfa)
+    m1_itw_src = "meta.json stress block" if (m1.get("stress") or {}).get("p_fa_at_inner_thr") is not None else "--m1-itw-pfa flag"
     # In-the-Wild real-speech false-alarm rate at the OOF minDCF threshold (eval-only)
     itw = None
     if have_all_folds and args.itw_scores and args.itw_scores.exists():
@@ -171,8 +200,8 @@ def main() -> None:
         it = it[it.flag.fillna("") == ""]
         pfa = float((it.logit.to_numpy() > thr).mean())
         itw = {"n_bonafide": len(it), "oof_threshold_logit": round(thr, 4),
-               "pfa": round(pfa, 4), "m1_pfa": args.m1_itw_pfa,
-               "passed": pfa <= args.m1_itw_pfa}
+               "pfa": round(pfa, 4), "m1_pfa": m1_itw_pfa, "m1_pfa_source": m1_itw_src,
+               "passed": pfa <= m1_itw_pfa}
     gate = {
         "m1_holdout_min_dcf": m1_bar,
         "m5_holdout_min_dcf": val_clean["min_dcf"],
@@ -209,7 +238,9 @@ def main() -> None:
         "val_diagnostics": diag,
         "test": {"n": len(tst), "score_mean": round(float(tst.score.mean()), 4),
                  "frac_above_half": round(float((tst.score > 0.5).mean()), 4)},
-        "m1_bar": {"val_min_dcf": m1_bar, "model_dir": str(args.m1_dir.name)},
+        "m1_bar": {"val_min_dcf": m1_bar, "model_dir": str(args.m1_dir.name),
+                   "m1_train": m1.get("train"), "m1_itw_pfa": m1_itw_pfa},
+        "m1b_comparison": _m1b_comparison(val_clean, oof_pooled, itw),
         "gate": gate, "aug_rates": run_meta.get("aug_rates"),
         "shortcut_gate": run_meta.get("shortcut_gate"), "hashes": run_meta.get("hashes"),
         "spend_usd": args.spend_usd, "scores": str(scores_path.relative_to(REPO)),
