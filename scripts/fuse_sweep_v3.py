@@ -3,7 +3,7 @@
 Implements docs/reports/2026-09-26_post-draft-manifest.md (141b254; clarifications b877760; P_wl
 "with room" amendment ae9c4c4) as specified in docs/specs/2026-09-26_post-draft-gate-sweep.md.
 Candidates T2 (second M3 tier), W4 (M5 weight 0.4; judged by its fresh-evidence bake-off), P_wl
-(WavLM Large probe as a fourth column) and H_noise (handcrafted v6; withdrawn). A missing export is
+(WavLM Large probe as a fourth column) and H_noise (handcrafted v6; judged with --hnoise-evidence). A missing export is
 NOT RUN; an export that fails validation is INVALID; neither stops the other candidates.
 
 Always writes outputs/fusion/sweep_v3_report.json (with the sha256 of every input). Nothing under

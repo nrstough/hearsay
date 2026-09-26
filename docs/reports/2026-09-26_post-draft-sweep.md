@@ -66,7 +66,7 @@ Replacing M1b halves the ITW misses but quadruples the ITW false alarms, and a f
 
 ## Decision rule applied
 
-There are no passers, so rule 7 does not arise. The decision is **KEEP**: `submissions/CrossExam_predictions.tsv`, sha256 `fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607`, is final unless H_noise passes at ~20:30. Nothing was tuned after the table: no weight, threshold or seat changed after 19:08.
+There are no passers, so rule 7 does not arise. The decision is **KEEP**: `submissions/CrossExam_predictions.tsv`, sha256 `fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607`, was final unless H_noise passed (the 19:08 state; H_noise failed in Run 2, below). Nothing was tuned after the table: no weight, threshold or seat changed after 19:08.
 
 ## What goes in the README (for the README chat)
 

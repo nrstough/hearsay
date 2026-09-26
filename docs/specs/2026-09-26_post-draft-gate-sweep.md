@@ -206,3 +206,22 @@ The results are unchanged: the re-run reproduces the final report `354502ca…` 
 4. **Model-export identity.** Accepted as residual risk (C6); moot because no candidate passes.
 
 The re-run reproduces the final report `354502ca…` byte for byte. `tests/test_fuse_sweep_v3.py`: 107 passed, 1 skipped.
+
+## Codex audit, round 3 (19:28): **Overall Acceptable**
+
+| Dimension | Grade |
+|---|---|
+| Plan adherence | Excellent |
+| Scope discipline | Excellent |
+| Test coverage | Acceptable |
+| Review compliance | Acceptable |
+| Freeze integrity | Acceptable |
+| Regression check | Acceptable |
+| Documentation | Acceptable |
+
+Why the Acceptable grades:
+- **Test coverage and regression:** Codex's read-only sandbox could not run the temporary-write tests; 92 ran and passed.
+- **Review compliance:** C6 is an accepted residual risk. The model directory is not tied to the export by bytes, which is moot because nothing passes.
+- **Documentation:** its two cosmetic items, the script docstring's "withdrawn" and the sweep report's historical "unless H_noise passes" sentence, are fixed in the closing commit.
+
+Claude pre-audit: round 1 Fail, round 2 Needs-work; every finding fixed as recorded above. Full suite at close: 770 passed, 1 skipped; ruff clean. The KEEP log row follows Nathan's ruling, or the 20:00 default.
