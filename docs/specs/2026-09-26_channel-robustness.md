@@ -85,6 +85,24 @@ Review: `docs/reports/2026-09-26_channel-robustness-plan-review.md`. Every findi
 
 **D9 revised (E verdict).** "At risk" if (a) M3's mean |ΔAUC| over the four perturbations exceeds twice M1b's and 0.02, or (c) the shipped rule damps more than 5% of unseen MLAAD spoof (`e_applied`), or (d) under any perturbation the step raises the fused holdout minDCF by more than 0.01. "Inconclusive" on any missing number; "kept" otherwise.
 
-## Results
+## Results (13:20)
 
-_Appended at execution._
+Report: `docs/reports/2026-09-26_channel-robustness.md`. Commits: a0018a8 (A), 32d6402 (B, λ̂ correction, E script), and the E commit.
+
+| # | Outcome |
+|---|---|
+| A | λ̂ = 0.51 (95% CI 0.12–0.64), identifiable, but only just (VCTK control 24.7% vs a 25% limit). The first run's 0.947 is withdrawn: `clip_floor_db` read the 7–8 kHz stopband and was added to the >7 kHz drop list (a deviation from D1's feature list, made under D1's own rule). |
+| B | No codec match (Kaiser 1.081, best codec 1.045: 3% where D5 needs 20% and both hole statistics). |
+| C | Not run: B negative. The laundering path was built and smoke-tested, then removed unused (`scripts/channel_launder.py` is not committed). |
+| D | Not attempted (time box, frozen P1). |
+| E | **Kept** under D9 revised: M3 mean \|ΔAUC\| 0.0008 vs M1b 0.0041; MLAAD damped 1.2%; the M3 step never raised fused minDCF (it lowered it by 0.008–0.020 in 4 of 5 conditions). Agreement gap 0.175 (descriptive). New: 20 dB noise drops handcrafted v5 to AUC 0.64 and the shipped rule to 0.269 holdout minDCF. |
+
+Acceptance criteria:
+1. λ̂, both estimators and intervals, sent to oversight first (12:33), with the correction at 12:57. Grouped CV tested.
+2. B's grid table and D5 verdict are in the report.
+3. E's three probes, the D9 verdict and the model-card check are in the report.
+4. C and D dispositions are recorded.
+5. Tests: `tests/test_channel_robustness.py`, 42 passing. Full-suite and lint results are recorded at commit.
+6. Report, STATUS row and CLAUDE.md bullet are done.
+
+**No TSV and no `submissions/log.csv` row:** this rung is diagnostic only (plan-review disposition 9).

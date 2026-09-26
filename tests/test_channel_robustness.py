@@ -314,3 +314,15 @@ def test_variant_grid_has_every_codec_alone_and_with_the_kaiser_pass():
     codecs = [v for v in g if v not in ("raw", "kaiser") and not v.endswith("+kaiser")]
     assert g[:2] == ["raw", "kaiser"] and len(codecs) == 16
     assert all(f"{c}+kaiser" in g for c in codecs)
+
+
+def test_perturb_readout_survives_a_one_class_slice():
+    import pandas as pd
+
+    rows = []
+    for i in range(6):
+        for k in m3p.PERTURBATIONS:
+            rows.append({"key": f"p{i}|{k}|0", "path": f"p{i}", "kind": k, "label": "bonafide",
+                         **{c: float(i) for c in (*m3p.MODELS, "fused_base", "fused")}, "e_applied": 0.0})
+    r = m3p.perturb_readout(pd.DataFrame(rows))
+    assert r["n_spoof"] == 0 and np.isnan(r["m1b_v3"]["none"]["eer"])

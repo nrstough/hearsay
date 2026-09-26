@@ -278,8 +278,10 @@ def perturb_readout(d: pd.DataFrame) -> dict:
         for k in PERTURBATIONS:
             s = m[k].to_numpy(float)
             ok = np.isfinite(s)
-            res[c][k] = {"auc": round(auc(y, s), 4), "min_dcf": round(min_cost(y[ok], s[ok]), 4),
-                         "eer": round(eer(y[ok], s[ok]), 4)}  # fmt: skip
+            two = len(np.unique(y[ok])) == 2  # a one-class slice has no EER or minDCF
+            res[c][k] = {"auc": round(auc(y, s), 4),
+                         "min_dcf": round(min_cost(y[ok], s[ok]), 4) if two else float("nan"),
+                         "eer": round(eer(y[ok], s[ok]), 4) if two else float("nan")}  # fmt: skip
             if k != "none":
                 res[c][k]["d_auc"] = round(delta_auc(y, m["none"].to_numpy(float), s), 4)
                 res[c][k]["spearman_vs_clean"] = round(float(pd.Series(s).corr(pd.Series(m["none"].to_numpy(float)),
