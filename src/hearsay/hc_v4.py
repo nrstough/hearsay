@@ -7,7 +7,7 @@ Each family is a function of a context dict (`x`, `Z` complex STFT, `S` power ST
 `voiced` frame mask, `rms_db`, `f0`) returning a flat {name: float}; `FAMILIES` maps names to
 functions and `features(..., families=(...))` appends them. Rules from the brief: nothing above
 7 kHz (the test set is low-passed there), no level, no duration, no onset/offset cues; means,
-stds, percentiles and rates only. Column prefixes: `lfcc`, `gd_`, `pc_`.
+stds, percentiles and rates only. Column prefixes: `lfcc`, `gd_`, `pc_`, `cqcc`, `mod_`, `breath_`.
 """
 
 from __future__ import annotations
@@ -166,4 +166,79 @@ def phase(ctx: dict) -> dict[str, float]:
     return group_delay(ctx) | peak_coherence(ctx)
 
 
-FAMILIES: dict[str, Callable[[dict], dict[str, float]]] = {"lfcc": lfcc, "phase": phase}
+# --- 8.3 CQCC: constant-Q cepstral coefficients, 65 Hz - 7 kHz -----------------------------
+
+CQT_FMIN, CQT_BINS, CQT_BPO, CQT_HOP, N_CQCC = 65.0, 162, 24, 256, 24  # fmax ~ 6,994 Hz
+
+
+def cqcc(ctx: dict) -> dict[str, float]:
+    import librosa
+    from scipy.fft import dct
+
+    C = np.abs(librosa.cqt(ctx["x"], sr=SR, fmin=CQT_FMIN, n_bins=CQT_BINS,
+                           bins_per_octave=CQT_BPO, hop_length=CQT_HOP)) ** 2  # fmt: skip
+    c = dct(np.log(C + 1e-10), type=2, norm="ortho", axis=0)[:N_CQCC]
+    d = np.diff(c, axis=1) if c.shape[1] > 1 else np.zeros((N_CQCC, 1))
+    f: dict[str, float] = {}
+    for i in range(N_CQCC):
+        f[f"cqcc{i}_mean"] = float(c[i].mean())
+        f[f"cqcc{i}_std"] = float(c[i].std())
+        f[f"cqcc{i}_dstd"] = float(d[i].std())
+    return f
+
+
+# --- 8.4 Rhythm / modulation spectrum of the loudness envelope --------------------------------
+
+MOD_BANDS = ((1.0, 2.0), (2.0, 4.0), (4.0, 8.0), (8.0, 16.0))
+FRAME_RATE = SR / HOP  # 100 envelope samples per second
+MOD_NFFT = 2048  # 0.05 Hz bins; zero-padded so the band edges are fixed for any clip length
+
+
+def modulation(ctx: dict) -> dict[str, float]:
+    e = np.asarray(ctx["rms_db"], dtype=np.float64)
+    e = e - e.mean()
+    if e.size < 8:
+        e = np.pad(e, (0, 8 - e.size))
+    n_fft = max(MOD_NFFT, 1 << (e.size - 1).bit_length())  # fixed grid: band edges do not move
+    P = np.abs(np.fft.rfft(e * np.hanning(e.size), n_fft)) ** 2
+    fr = np.fft.rfftfreq(n_fft, d=1.0 / FRAME_RATE)
+    inb = (fr >= 1.0) & (fr < 16.0)
+    tot = float(P[inb].sum()) + 1e-12
+    f: dict[str, float] = {}
+    for lo, hi in MOD_BANDS:
+        f[f"mod_{int(lo)}_{int(hi)}"] = float(P[(fr >= lo) & (fr < hi)].sum() / tot)
+    f["mod_peak_hz"] = float(fr[inb][np.argmax(P[inb])]) if inb.any() else 0.0
+    q = P[inb] / tot
+    f["mod_entropy"] = float(-(q[q > 0] * np.log(q[q > 0])).sum() / np.log(max(q.size, 2)))
+    return f
+
+
+# --- 8.6 Breath: the between-speech material ------------------------------------------------
+
+BREATH_LO_DB, BREATH_HI_DB = -35.0, -20.0
+
+
+def breath(ctx: dict) -> dict[str, float]:
+    S, freqs, rms_db = ctx["S"], ctx["freqs"], np.asarray(ctx["rms_db"])
+    voiced = np.asarray(ctx["voiced"], dtype=bool)
+    n = min(S.shape[1], rms_db.size, voiced.size)
+    band = freqs <= FMAX
+    Sb = S[band][:, :n] + 1e-12
+    cent = (freqs[band][:, None] * Sb).sum(axis=0) / Sb.sum(axis=0)
+    flat = np.exp(np.log(Sb).mean(axis=0)) / Sb.mean(axis=0)
+    mid = (rms_db[:n] > BREATH_LO_DB) & (rms_db[:n] < BREATH_HI_DB) & ~voiced[:n]
+    v = voiced[:n]
+    f = {"breath_frac": float(mid.mean()) if n else 0.0}
+    if mid.sum() >= 3 and v.sum() >= 3:
+        f["breath_centroid_ratio"] = float(cent[mid].mean() / (cent[v].mean() + 1e-12))
+        f["breath_flatness_ratio"] = float(flat[mid].mean() / (flat[v].mean() + 1e-12))
+        f["breath_flatness"] = float(flat[mid].mean())
+    else:
+        f["breath_centroid_ratio"] = f["breath_flatness_ratio"] = 1.0
+        f["breath_flatness"] = 0.0
+    return f
+
+
+FAMILIES: dict[str, Callable[[dict], dict[str, float]]] = {
+    "lfcc": lfcc, "phase": phase, "cqcc": cqcc, "modulation": modulation, "breath": breath,
+}

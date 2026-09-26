@@ -11,7 +11,7 @@ import pytest
 
 from hearsay import SR
 from hearsay.handcrafted import features
-from hearsay.hc_v4 import FAMILIES, N_LFCC
+from hearsay.hc_v4 import FAMILIES, N_CQCC, N_LFCC
 
 
 def _harmonic(seed: int = 0, dur: float = 3.0) -> np.ndarray:
@@ -37,6 +37,9 @@ EXPECTED = {
         "gd_iqr_p10", "gd_iqr_p90", "pc_err_median", "pc_err_mean", "pc_err_p90",
         "pc_frac_incoherent",
     },
+    "cqcc": {f"cqcc{i}_{s}" for i in range(N_CQCC) for s in ("mean", "std", "dstd")},
+    "modulation": {"mod_1_2", "mod_2_4", "mod_4_8", "mod_8_16", "mod_peak_hz", "mod_entropy"},
+    "breath": {"breath_frac", "breath_centroid_ratio", "breath_flatness_ratio", "breath_flatness"},
 }
 
 
@@ -73,6 +76,13 @@ def test_lfcc_first_coefficient_tracks_spectral_tilt():
     h = features(_harmonic(), crop_mode="first4s", families=("lfcc",))
     n = features(_noise(), crop_mode="first4s", families=("lfcc",))
     assert abs(h["lfcc1_mean"] - n["lfcc1_mean"]) > 0.5
+
+
+def test_modulation_band_fractions_sum_to_one_and_peak_tracks_the_envelope():
+    f = features(_harmonic(), crop_mode="first4s", families=("modulation",))
+    assert math.isclose(sum(f[k] for k in ("mod_1_2", "mod_2_4", "mod_4_8", "mod_8_16")), 1.0,
+                        abs_tol=1e-6)  # fmt: skip
+    assert 1.0 <= f["mod_peak_hz"] < 16.0 and 0.0 <= f["mod_entropy"] <= 1.0
 
 
 def test_unknown_family_raises():

@@ -69,7 +69,20 @@ LABELS |= {
     "pc_err_mean": "phase-vs-magnitude disagreement at harmonics (mean, Hz)",
     "pc_err_p90": "phase-vs-magnitude disagreement at harmonics (90th pct, Hz)",
     "pc_frac_incoherent": "share of harmonics with incoherent phase",
+    "mod_1_2": "loudness modulation, 1-2 Hz share",
+    "mod_2_4": "loudness modulation, 2-4 Hz share (syllable rate)",
+    "mod_4_8": "loudness modulation, 4-8 Hz share",
+    "mod_8_16": "loudness modulation, 8-16 Hz share",
+    "mod_peak_hz": "dominant loudness-modulation rate",
+    "mod_entropy": "spread of the loudness-modulation spectrum",
+    "breath_frac": "share of between-speech frames",
+    "breath_centroid_ratio": "brightness of between-speech frames vs voiced speech",
+    "breath_flatness_ratio": "noisiness of between-speech frames vs voiced speech",
+    "breath_flatness": "noisiness of between-speech frames",
 }
+LABELS |= {f"cqcc{i}_mean": f"CQCC {i} mean" for i in range(24)}
+LABELS |= {f"cqcc{i}_std": f"CQCC {i} variability" for i in range(24)}
+LABELS |= {f"cqcc{i}_dstd": f"CQCC {i} frame-to-frame change" for i in range(24)}
 
 __all__ = ["LABELS", "NAME", "HandcraftedDetector", "contributions", "latest_model_dir"]
 
