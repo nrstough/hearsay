@@ -3,7 +3,8 @@ docs/specs/2026-09-26_channel-stopband.md)
 
 NSA test files arrive already low-passed at ~7.2 kHz and every detector applies
 hearsay.handcrafted.band_limit once more; training clips pass it once. Scoring band_limit(x)
-instead of x for the same clip reproduces the test condition. Same 500 outer-holdout clips,
+instead of x for the same clip approximates the test condition: it matches the floor depth,
+not the test wall's transition-band shape (see the run spec's Review). Same 500 outer-holdout clips,
 crops and scoring path as action E (scripts/m3_probes.py), fused with fusion_v2.
 
 Usage:

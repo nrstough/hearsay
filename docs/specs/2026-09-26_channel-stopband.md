@@ -1,10 +1,10 @@
-# Run spec: does the double low-pass stopband move any detector? (Sat Sep 26, 2026, 14:35)
+# Run spec: does the double low-pass stopband move any detector? (Sat Sep 26, 2026, 14:26)
 
 **Go:** Nathan, in the channel-robustness chat ("go stop band"), after oversight scoped it as measurement only. Follows the open shortcut-ledger entry "Double low-pass stopband" (`docs/architecture.md` §11) and `docs/reports/2026-09-26_channel-robustness.md` (A). Short path (sub-hour, measurement only): this spec, one script, hermetic tests, one Claude critique. No TSV, no rule change, no refit.
 
 ## Question
 
-Every detector applies `hearsay.handcrafted.band_limit` once inside its own path: M1b in `prepare_segment`, M3 in `prepare_input`, M5 in `deploy_transform`, handcrafted in `_crop`. NSA test files arrive already low-passed at ~7.2 kHz, so at test time they are filtered twice, while training clips are filtered once. Scoring `band_limit(x)` instead of `x` for the same clip reproduces the test condition. The difference is the detectors' response to the stopband depth alone.
+Every detector applies `hearsay.handcrafted.band_limit` once inside its own path: M1b in `prepare_segment`, M3 in `prepare_input`, M5 in `deploy_transform`, handcrafted in `_crop`. NSA test files arrive already low-passed at ~7.2 kHz, so at test time they are filtered twice, while training clips are filtered once. Scoring `band_limit(x)` instead of `x` for the same clip approximates the test condition. It matches the floor depth but not the wall's transition-band shape (see Review). The difference is the detectors' response to the stopband depth alone.
 
 ## Design (fixed before any result)
 
@@ -53,4 +53,21 @@ Every detector applies `hearsay.handcrafted.band_limit` once inside its own path
 - **Verdict flips:** 0 at P 0.5; 2 at the `once` argmin threshold.
 - **M3 step:** fires on 2.0% of clips under both conditions.
 - **Ledger:** the entry in `architecture.md` §11 is closed; no refit.
-- **Tests:** `tests/test_channel_stopband.py`, 13 passing.
+- **Tests:** `tests/test_channel_stopband.py`, 61 passing after the review (full suite 645).
+
+## Review
+
+**Claude critique (14:55, on f268f35): Overall Acceptable.**
+- Verified:
+  - one band-limit pass in `once` for every detector path, and two in `twice`
+  - `once` equals E's clean scores exactly
+  - the monkeypatched scorer ran, and E's cache is untouched
+  - the reading rule matches this spec
+  - `stopband.json` rebuilds identically from the cache
+- Findings, all fixed in the follow-up commit:
+  1. The ledger row called the 95th percentile a maximum. Reworded, and the single-clip maxima are now stated.
+  2. "Reproduces the test condition" was an overclaim. The extra pass matches floor depth but not the transition band (about 9 dB) or the 7.5–8 kHz stopband (about 11 dB). The conclusion is now scoped to stopband depth, and the shape is recorded as an unprobed residual in the ledger.
+  3. Test gaps: a sweep over every column with non-finite values, single-responder ledgers (one detector, or fused only), zero or NaN IQR through `readout`, and exact boundaries. Tests added.
+  4. The fused row mixed probability and logit units. Footnoted.
+  5. The header time was wrong (the file was created 14:26, before the run started at 14:27). Corrected, and this critique is recorded here.
+- Not fixed (out of scope): the STATUS "Tests" row predates this change.

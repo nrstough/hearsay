@@ -51,11 +51,12 @@ def _frame(n_real=3, n_spoof=3, shift=0.0):
     return pd.DataFrame(rows)
 
 
+@pytest.mark.parametrize("col", sb.COLS)
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
 @pytest.mark.parametrize("kind", sb.KINDS)
-def test_a_non_finite_value_under_either_condition_drops_the_clip(bad, kind):
+def test_a_non_finite_value_under_either_condition_drops_the_clip(bad, kind, col):
     d = _frame()
-    d.loc[(d.path == "p4") & (d.kind == kind), "spectra_aasist"] = bad
+    d.loc[(d.path == "p4") & (d.kind == kind), col] = bad
     once, twice, _y = sb.paired(d)
     assert len(once) == 5 and "p4" not in once.index and list(once.index) == list(twice.index)
 
@@ -100,3 +101,49 @@ def test_error_only_frame_is_inconclusive():
                       "label": "spoof", "error": "DecodeError('x')"})  # fmt: skip
     r = sb.readout(d, iqr_of=lambda c: 1.0)
     assert r["n_paired"] == 0 and r["ledger"] == "inconclusive"
+
+
+def _frame_shift(cols, shift, n=6):
+    d = _frame(n_real=n // 2, n_spoof=n // 2)
+    for c in cols:
+        d.loc[d.kind == "twice", c] += shift
+    return d
+
+
+def test_one_detector_alone_makes_the_ledger_respond(monkeypatch):
+    monkeypatch.setattr(sb, "N_EXPECTED", 6)
+    r = sb.readout(_frame_shift(["handcrafted_v5"], 0.5), iqr_of=lambda c: 1.0)
+    assert r["verdicts"]["handcrafted_v5"] == "responds" and r["ledger"] == "responds: handcrafted_v5"
+    assert r["verdicts"]["m1b_v3"] == "no response"
+
+
+def test_the_fused_rule_alone_makes_the_ledger_respond(monkeypatch):
+    monkeypatch.setattr(sb, "N_EXPECTED", 6)
+    d = _frame()
+    d.loc[(d.kind == "twice") & (d.label == "bonafide"), "p_fused"] += 5.0  # real clips jump above spoof
+    r = sb.readout(d, iqr_of=lambda c: 1.0)
+    assert r["verdicts"]["fused_rule"] == "responds" and r["ledger"] == "responds: fused_rule"
+
+
+@pytest.mark.parametrize("iqr", [0.0, float("nan")])
+def test_a_zero_or_nan_iqr_through_readout_is_inconclusive(monkeypatch, iqr):
+    monkeypatch.setattr(sb, "N_EXPECTED", 6)
+    r = sb.readout(_frame(), iqr_of=lambda c: iqr)
+    assert r["ledger"] == "inconclusive"
+
+
+def test_the_thresholds_are_strict():
+    assert sb.responds(0.1, 1.0) == "no response"  # equal to 10% of the IQR: not a response
+    assert sb.fused_responds(0.0, 0.037) == "no response"  # exactly one false alarm: not a response
+    assert sb.fused_responds(0.0, 0.0371) == "responds"
+
+
+def test_inner_iqr_reads_only_the_inner_oof_rows(tmp_path, monkeypatch):
+    import pandas as pd
+
+    (tmp_path / "outputs" / "detector_scores").mkdir(parents=True)
+    pd.DataFrame({"path": list("abcdefgh"), "split": ["inner_oof"] * 4 + ["holdout"] * 4,
+                  "logit": [0.0, 1.0, 2.0, 3.0, 100.0, 200.0, 300.0, 400.0]}).to_csv(
+        tmp_path / "outputs" / "detector_scores" / "m1b_v3.csv", index=False)  # fmt: skip
+    monkeypatch.setattr(sb, "REPO", tmp_path)
+    assert sb.inner_iqr("m1b_v3") == pytest.approx(1.5)

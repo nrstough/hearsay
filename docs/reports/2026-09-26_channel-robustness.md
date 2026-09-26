@@ -228,7 +228,7 @@ The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any per
 
 **Setup.**
 - Test files are low-passed twice (their own ~7.2 kHz wall, then each detector's `band_limit`); training clips are low-passed once.
-- On the same 500 outer-holdout clips and crops as E, each clip was scored as-is (`once`) and after one extra `band_limit` pass (`twice`, the test condition). Scoring used the runner's own paths, fused with fusion_v2.
+- On the same 500 outer-holdout clips and crops as E, each clip was scored as-is (`once`) and after one extra `band_limit` pass (`twice`), which approximates the test condition. Scoring used the runner's own paths, fused with fusion_v2. The `once` scores equal E's clean scores exactly (maximum difference 0.0 on all four detectors).
 - Pre-declared rule: a detector responds if its 95th-percentile |Δlogit| exceeds 10% of its inner-OOF logit IQR; the fused rule responds if its holdout minDCF moves by more than 0.037.
 
 | Detector | Mean Δlogit (real / spoof) | 95th pct \|Δ\| | Max \|Δ\| | Threshold | Holdout minDCF once → twice |
@@ -237,12 +237,20 @@ The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any per
 | Handcrafted v5 | +0.113 / +0.055 | 0.466 | 0.860 | 0.886 | 0.048 → 0.056 |
 | M5 | −0.023 / −0.025 | 0.099 | 0.467 | 0.732 | 0.433 → 0.429 |
 | M3 | −0.012 / −0.085 | 0.301 | 0.905 | 1.684 | 0.000 → 0.000 |
-| **Fused (P)** | −0.0007 / −0.0002 | 0.011 | 0.048 | — | **0.012 → 0.016** (limit 0.037) |
+| **Fused (P)**¹ | −0.0007 / −0.0002 | 0.011 | 0.048 | — | **0.012 → 0.016** (limit 0.037) |
+
+¹ The fused row's deltas are in probability, not logit.
 
 - **Verdict flips:** 0 of 500 at P = 0.5, and 2 of 500 at the `once` scores' brief-cost argmin threshold (0.795).
 - **The M3 step** fires on 2.0% of clips under both conditions.
-- **Reading.** The extra stopband depth moves every detector by a small fraction of its own score spread. Handcrafted v5 comes closest: 53% of its threshold, with a small upward drift on real clips (+0.11 logit, toward "synthetic"). The minDCF changes (at most 0.008) are below one holdout false alarm.
-- **Conclusion.** The ledger entry in `architecture.md` §11 is closed as "measured, no response", and no refit is needed.
+- **Reading.** The decision-level evidence comes first: 0 verdict flips at P 0.5, and fused minDCF moves by 0.004, one miss.
+- Per detector, the 95th-percentile shift is at most 53% of the threshold (handcrafted v5). The largest single-clip moves go higher: handcrafted 97%, M5 64%, M3 54%.
+- Handcrafted v5 also drifts slightly upward on real clips (+0.11 logit, toward "synthetic").
+- The threshold (10% of an inner-OOF IQR that is mostly class separation, about 1 logit) is lenient, but it was declared before the run.
+- **What was and was not tested.**
+  - The extra pass reproduces the test files' **floor depth**: the whole-spectrogram 1st percentile is −159 dB for the extra pass against −157 dB for test files (20 clips each, relative to 300–3,000 Hz).
+  - It does **not** reproduce the wall's shape: the 6.8–7.25 kHz transition band is −14.8 dB against −23.9 dB, and the 7.5–8 kHz band −88 dB against −99 dB (partly content, since these are different clips).
+- **Conclusion.** For stopband *depth*, the ledger entry closes as "measured, no response", and no refit is needed for it. The transition-band shape is recorded as an unprobed residual in the same ledger row.
 
 ## C and D
 
