@@ -1,7 +1,9 @@
 #!/bin/bash
 # Image smoke test (run spec T6): three files (WAV, MP3, FLAC) and a reversed template through
 # the image with --network none; the TSV must have three rows in template order; a second run
-# must be byte-identical; the in-image self-checks must pass. Everything lives under
+# must agree within 1e-6 (x86 multithreaded BLAS is not guaranteed bit-exact; it was identical on
+# the recorded builds); a run without the offline variables must be refused; the in-image
+# self-checks must pass. Everything lives under
 # $PWD/outputs/docker/smoke because Colima bind-mounts only paths under $HOME.
 # Usage: bash docker/smoke.sh [image]   (default hearsay:latest)
 set -euo pipefail
