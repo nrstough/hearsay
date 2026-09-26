@@ -109,3 +109,25 @@ Found by the plan critique (Claude) and the Codex plan review (`docs/reports/202
 5. **Rule 7 across row sets.** If two candidates pass, the Pareto comparison re-scores every passer on the intersection of their row sets, so the six cells compare the same rows.
 6. **Invalid inputs.** A candidate whose export fails validation is INVALID: an inverted direction (inner AUC < 0.5), duplicate paths, split or fold disagreement with `splits/nsa_folds.csv`, non-finite logits, incomplete test or ITW coverage, or a non-finite Spearman. INVALID is recorded per candidate; it never passes and never stops the other candidates from being evaluated.
 7. **Rounding in the bake-off.** Perturbation cells are rounded to 4 decimals before the Δ ≥ −0.010 comparison, as in the gate. The bootstrap percentile uses `np.percentile` (linear) on the unrounded replicate Δs.
+
+## Amendment: P_wl ships only "with room" (ruled by Nathan in the gate chat; pre-data)
+
+Ruled by Nathan in this chat, relayed from his 18:30 and 18:55 instructions. `outputs/detector_scores/wavlm_l.csv` does not exist at commit time, and no W4 bake-off cell has been computed.
+
+**P_wl is ratifiable only if all of the following hold:**
+1. It passes the full seven-rule gate above, including its diagnostic (≥ 16 new catches and a corrective share > 0.5).
+2. **Room:** In-the-Wild brief Δ ≥ **0.030** and In-the-Wild averse Δ ≥ **0.030**. That is, it improves under both costs, not the gate's 0.020 / −0.002. The gate's inner (≥ 0.010 better, averse no worse) and holdout (≤ 0.010 worse) conditions are unchanged. If rule 6 doubles the gate's ITW brief threshold to 0.040, the larger one applies.
+3. **Catch bar:** `wavlm_l` alone, at its own inner-OOF brief threshold, flags ≥ **19** of CURRENT's ITW misses at CURRENT's inner-OOF threshold (122 misses; for scale M1b 1, M5 19, Spectra-AASIST 79). That is, it adds at least as much as M5 did.
+
+**Outcomes:**
+- **Passes the gate but not the room or the catch bar:** a README bake-off row ("tested, not shipped"). The shipped file stands.
+- **Fails the gate:** a README negative. The shipped file stands.
+
+**Clock** (Nathan, 18:55; the outer bound for any ratified candidate):
+- P_wl is judged whenever `wavlm_l` lands, not skipped if it is later than 19:15. The 19:30 packet time stays the target for T2, W4 and H_noise.
+- Integration may **start as late as 23:00**.
+- The full 1,671-file run and parity must be done by **00:30**.
+- Nathan ratifies the parity result by **01:00**. If not, it lapses to KEEP.
+- The shipped TSV and `submissions/CrossExam_predictions.tsv` stay untouched until parity passes.
+
+**Unchanged:** W4 is still governed only by its bake-off (Nathan, ~17:40). Rule 7's one-candidate-per-packet rule and the pre-data clarifications (`b877760`) stand.
