@@ -55,7 +55,16 @@ At 0.05 the flags fall on LibriSpeech real 11.7%, LJ real 6.7%, fakes 1.9%, same
 
 These are single-statistic AUCs on a 340-clip inner sample, not a validated detector; they say the direction, and they mark "speaker-embedding consistency" as a candidate v4-style feature family (`spk_*`, four columns, 0.25 s per clip) for whoever reopens the feature lane. Not pursued here: the lane is closed and the column would need the ECAPA encoder inside every extraction worker.
 
-_(export summaries: filled in below.)_
+**Export summaries** (`scripts/score_detector.py`, all 21,671 rows, no failures; gate 405 s on 6 workers, drift 2,043 s on 4 threads).
+
+| | NSA test (1,671) | DiffSSD spoof (10,000) | LibriSpeech real (4,000) | LJ real (6,000) |
+|---|---|---|---|---|
+| Gate: files gated | **0** | 43 (all "stationary noise") | 41 (all "stationary noise") | 0 |
+| Drift: files flagged (min cosine < 0.05) | **16.1%** (269) | 1.4% | 8.7% | 6.0% |
+| Drift: median minimum cosine | 0.27 | 0.28 | 0.21 | 0.18 |
+| Drift: median windows per clip | 6 | 13 | 10 | 13 |
+
+The 84 gated training clips are very noisy recordings and very noisy vocoder output (spectral flatness above 0.5); none of the test set is. The drift rate on the test set (16%) is above every training corpus; per generator in training the rule fires on 0–4% of fakes and 7% of real clips, so on a 70%-real test set with phone and field recordings a rate in the teens is what "drift marks real speakers and harder conditions" predicts. That is one more reason it is a routing and evidence detector, not a fusion column: fused, it would push 16% of the test set, mostly real, toward synthetic.
 
 ## 5. Exports and where they plug in
 
