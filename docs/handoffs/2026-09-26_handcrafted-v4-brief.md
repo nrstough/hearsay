@@ -59,7 +59,7 @@ So inside `features()` you receive `x`: float32, 16 kHz mono, band-limited to ~7
 
 The correction to the explainer: the 7 kHz wall is on **every** test file, real and fake alike, and on **no** training file of either class. It never showed up in fold validation (train and validation were both full-band). It showed up as the v2 detector calling 90% of the test set synthetic. Your fold numbers cannot catch this class of shortcut; only the test-set score distribution can (section 7).
 
-**Cost budget.** Extraction is 0.63 s per clip; 20,000 clips take about 8 minutes on 6 workers. Keep any new family under about 0.2 s per clip. Use at most **6 workers**; the main chat's GPU job needs the other cores for decoding.
+**Cost budget.** Extraction of the 75 v3 features is 0.14 worker-seconds per clip; 20,000 clips take about 8 minutes on 6 workers. All six v4 families together add about 0.06 s per clip. Keep any new family under about 0.05 s per clip. Use at most **6 workers**; the main chat's GPU job needs the other cores for decoding.
 
 ## 3. Where to plug in
 

@@ -1,4 +1,4 @@
-# Consult: fusion, selection, false alarms and the "default answer" (Sat Sep 26, 2026, ~03:30 EDT; updated ~04:30 with In-the-Wild and band-limit findings)
+# Consult: fusion, selection, false alarms and the "default answer" (Sat Sep 26, 2026, ~03:30 EDT; updated ~04:30 with In-the-Wild and band-limit findings; ~05:50 with the band-matched v3 numbers, M3 and the fusion v0 readout)
 
 **Target:** a frontier LLM, for strategic and technical opinion.
 **Scope:** everything **except** the M5 fine-tune recipe, which has its own consult: `2026-09-26_m5-extra-data-finetune_CONSULTATION.md`.
@@ -10,7 +10,7 @@ Copy below the line.
 
 ## Your role
 
-You are an applied researcher in audio deepfake detection and in detection-cost evaluation (ASVspoof, NIST SRE-style DCF). Push back hard on any wrong premise. We have about 28 hours left in a hackathon. Practical beats ideal.
+You are an applied researcher in audio deepfake detection and in detection-cost evaluation (ASVspoof, NIST SRE-style DCF). Push back hard on any wrong premise. We have about 26 hours left in a hackathon (final TSV due in about 23). Practical beats ideal.
 
 ## The problem
 
@@ -102,6 +102,20 @@ The sample is 2,000 real clips from 54 speakers plus 1,000 fakes, web-sourced ce
 | **M3 Spectra-AASIST** (pretrained, frozen, band-matched) | pending (~06:00) | **0.065** | **0.0%** (0 of 2,000) | 26.5% (200-clip pilot) |
 | Handcrafted v4 (234 features, LightGBM) | 0.170 | 1.00 (AUC 0.76) | 0.65% | 41% |
 
+**Fusion v0 readout (05:32; rules pre-declared, nothing fit on holdout, In-the-Wild or test). Inputs: M1b v3 and handcrafted v4.** Each detector's logit is standardized on its inner out-of-fold rows. `zmean` = mean of standardized logits; `rankmean` = mean of per-detector ECDF ranks; `stack_nonlj` = logistic stacker fit on inner rows with LJ real speech excluded (one speaker on both sides of every fold), so its inner number is in-sample and not shown.
+
+| Rule | Inner OOF | Holdout | Holdout LibriSpeech real | ITW minDCF | ITW real P_FA | ITW P_miss | Test share > 0.5 |
+|---|---|---|---|---|---|---|---|
+| M1b v3 alone | 0.301 (folds include the extra real rows) | 0.072 | 0.102 | 0.342 | 0.8% | 27.8% | 26.8% |
+| handcrafted v4 alone | 0.434 | 0.170 | 0.217 | 1.00 | 0.65% | 97% | 56% |
+| zmean | 0.259 | **0.018** | 0.022 | 0.387 | **0.15%** | 58.5% | **39.6%** |
+| rankmean | 0.254 | **0.015** | 0.015 | 0.379 | **0.15%** | 59.5% | 31.8% |
+| stack_nonlj | (in-sample) | 0.044 | 0.066 | **0.317** | 0.7% | 31.6% | 27.5% |
+
+Reading: fusing the two cuts the holdout by 4× and In-the-Wild false alarms by 5×, but doubles In-the-Wild misses and pushes the test-set share of files called synthetic from 27% to 32–40%, against a 30% prior. The handcrafted column contributes almost no real-world detection (ITW P_miss 97%), so its In-the-Wild "gain" is a threshold effect. The stacker sits between.
+
+**Diagnosis of the test-share rise (05:55).** The handcrafted column carries a residual train-to-test shift that band matching did not remove: the test recordings are darker below 7 kHz, codec-like. Its 234 columns tell train from test at AUC 0.99 (the 75 v3 columns alone: 0.97), and 84% of the shifted columns move in the "fake" direction, so under a 0.3-prior Platt map it calls 56% of the test set synthetic (v3: 49%; the deep models: 27%). No single feature family is responsible (leave-one-family-out: 54–57%), and pruning the shifted columns makes it worse (60–68%; the survivors still separate train from test at 0.98). Training-side augmentation as fit-only extra rows (codec round-trips, random tilt and low-pass; "v5b") helps partially: clean holdout 0.137 (v4 0.170), holdout-real false alarms at the calibrated threshold 6.3% (from 9.1%), In-the-Wild real P_FA 0.40% (from 0.65%), test share 51% (from 56%), at an inner-fold cost (0.418 → 0.469; pro_diff 0.30 → 0.63). So the fusion rules' test-share rise is this column's offset, not the deep models'. The remaining remedy on the table is re-centering that detector's logit on the unlabeled test distribution before fusion, or down-weighting it.
+
 **Spectra-AASIST's training data is undisclosed.** Its card reports 1.46% EER on In-the-Wild, and it separates our NSA inner rows perfectly (AUC 1.0). So its In-the-Wild and inner-fold numbers may be in-sample. Band matching fixed the test-distribution shift but left the M1 In-the-Wild gap unchanged. **New question: how should we weight a detector whose validation rows may be in its training data?**
 
 - **Both models are 3–5× worse on real-world audio** than on the NSA-domain holdout. The brief says the test's real audio may include smartphone, telephony and field recordings.
@@ -120,6 +134,8 @@ For each question: your recommendation, a concrete procedure we can run in under
      - The handcrafted inner OOF is weak on grad_tts and pro_diff (1.0).
    - Would rank averaging, per-fold weight stability, a constrained stacker (non-negative weights, a shrink toward equal weights) or nested CV of the fusion rule resolve it without peeking at the holdout?
    - Is it acceptable to use the one-time draft review to choose between two candidates? Which two should we send?
+   - **With the fusion v0 table above:** the unfitted rules (zmean, rankmean) win the holdout and In-the-Wild false alarms by a wide margin but raise In-the-Wild misses from 28% to 59% and the test share above 0.5 from 27% to 32–40%. The stacker fit on non-LJ rows is in between on everything. Which of the four do we ship at 14:00? The rising test share is now diagnosed as the handcrafted column's domain offset (above): is re-centering one detector's logit on the unlabeled test set's own mean and spread legitimate under our no-pseudo-label rule, and if so, per column or only for columns with a measured train-to-test shift?
+   - **Weighting a pretrained detector whose validation rows may be in-sample.** M3 (Spectra-AASIST) separates our inner rows perfectly (AUC 1.0) and reports In-the-Wild real P_FA 0.0%, but its training data is undisclosed and LJ, LibriSpeech, DiffSSD and In-the-Wild are all public. A stacker fit on inner rows will give it all the weight. How should its weight be set: holdout only, rank mean with equal weight, a cap, or excluded from stacking and used only as a gate?
 2. **The "default answer" / game-theory hint.**
    - With a rank-based MinDCF at π = 0.3 and C_FA = 4, where should files we "cannot determine" sit in the ranking? Examples: decode failures, non-speech, detector disagreement, low confidence.
    - Is there a smarter policy than the prior?
@@ -143,7 +159,7 @@ For each question: your recommendation, a concrete procedure we can run in under
    - just document them honestly as "no effect"?
    - What would a judge value for "agentic orchestration" beyond rule-based routing?
 5. **The non-speech failure.** Silence and music score about 1.0. What is the right gate (a VAD threshold on voiced fraction, a speech/music classifier), and what score should gated files get, given question 2?
-6. **Time allocation.** About 28 h remain, and one person owns the deep models, fusion, TSV and Docker; three teammates own the engineered detectors. What would you cut, and what single change do you expect to move holdout minDCF the most?
+6. **Time allocation.** About 26 h remain (23 to the final TSV), and one person owns the deep models, fusion, TSV and the draft review; a fine-tune, a pretrained-detector scoring run and the engineered detectors run in parallel lanes; Docker is unowned. What would you cut, and what single change do you expect to move holdout minDCF the most?
 
 ## Hard lines
 

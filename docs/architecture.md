@@ -17,79 +17,11 @@ Legend for every diagram: green = built, amber = in flight, dashed grey = planne
 
 ## 2. System flow
 
-```mermaid
-flowchart TB
-  F["audio file - any container or codec"]
-  P["probe_audio - format, codec, rate, tags"]
-  L["load_audio - FFmpeg to 16 kHz mono float32, decoded once"]
-  C["ClipContext - read-only audio, probe facts, per-clip memo cache"]
-  O["Orchestrator, M4 - rule-based routing on probe facts and early findings, routing log per file"]
-  M1["M1 - frozen XLS-R layer 7 + logistic probe"]
-  M3["M3 - Spectra-AASIST off-the-shelf score stream"]
-  M5["M5 - fine-tuned XLS-R, 12 layers, attentive pooling"]
-  HC["handcrafted - 75 spectral + prosody features to trees"]
-  CP["compression - 19 codec-trace features to trees"]
-  CT["container - header facts, tag rules"]
-  EN["enf - 50 and 60 Hz hum stability"]
-  SP["splice - clicks, DC jumps"]
-  SD["speaker drift - ECAPA windows"]
-  R["DetectorResult per detector - score 0 to 1 with 1 = synthetic, evidence sentence, features, status"]
-  FU["Fusion, M4 - logistic stacker on exported logit columns, fit fold-locally on inner out-of-fold rows"]
-  TSV["teamName_predictions.tsv - write_submission validates, never overwrites"]
-  LOG["submissions/log.csv - rung, holdout minDCF, EER, notes"]
-  EXP["explanation report per file - top detectors, evidence, routing log"]
+![System flow: ingest, orchestrator, deep and engineered detectors, fusion, outputs](img/architecture-flow.svg)
 
-  F --> P
-  F --> L
-  P --> C
-  L --> C
-  C --> O
-  O --> M1
-  O --> M3
-  O --> M5
-  O --> HC
-  O --> CP
-  O --> CT
-  O --> EN
-  O --> SP
-  O --> SD
-  M1 --> R
-  M3 --> R
-  M5 --> R
-  HC --> R
-  CP --> R
-  CT --> R
-  EN --> R
-  SP --> R
-  SD --> R
-  R --> FU
-  FU --> TSV
-  FU --> LOG
-  FU --> EXP
+_Rendered from [img/architecture-flow.mmd](img/architecture-flow.mmd); edit that file and re-render if the flow changes._
 
-  subgraph deep["Deep detectors"]
-    M1
-    M3
-    M5
-  end
-  subgraph eng["Engineered detectors, CPU only"]
-    HC
-    CP
-    CT
-    EN
-    SP
-    SD
-  end
-
-  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
-  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
-  classDef planned fill:#f1f3f4,stroke:#5f6368,color:#111,stroke-dasharray:5
-  class F,P,L,C,M1,HC,CP,CT,EN,SP,R,TSV,LOG built
-  class M3,M5 flight
-  class O,SD,FU,EXP planned
-```
-
-Today's logged TSV bypasses the orchestrator and fusion: `scripts/make_probe_csv.py` runs M1 alone (load_audio → prepare_segment → embed_segment → probe LLR → posterior at π = 0.3). That is the rollback path if fusion is cut.
+Since 08:35 the runner (`scripts/run_pipeline.py`) is the whole path: audio → every detector → the frozen fusion rule from `models/fusion_v1/constants.json` → the non-speech policy → TSV plus one explanation JSON per file with a routing log. M5 is not run live; its exported column exists for the stacker only. The rollback path is `--detectors m1b`, the M1b probe alone through its own Platt map.
 
 ## 3. Components
 
@@ -105,10 +37,11 @@ Today's logged TSV bypasses the orchestrator and fusion: `scripts/make_probe_csv
 | M5 fine-tune (bundle, model, trainer, scorer, assembler) | `src/hearsay/m5_{bundle,data,model}.py`, `scripts/m5_*.py`, `scripts/cloud/` to come | in flight | M5 (vast.ai only) |
 | Handcrafted features + v4 families + trainer + export | `src/hearsay/handcrafted.py`, `src/hearsay/hc_v4.py`, `scripts/extract_handcrafted.py`, `scripts/train_handcrafted.py` | built (v3); v4 families landing | CPU / teammate |
 | Compression features + laundering | `src/hearsay/compression.py`, `scripts/extract_compression.py` | built | CPU |
-| Rule-based detectors + exporter | `src/hearsay/detectors/{container,enf,splice}.py`, `scripts/score_detector.py` | built | CPU |
+| Rule-based detectors + exporter | `src/hearsay/detectors/{container,enf,splice,speech_gate,speaker_drift}.py`, `scripts/score_detector.py` | built | CPU |
 | Learned-detector wrapper, numpy trees | `src/hearsay/detectors/_learned.py`, `src/hearsay/trees.py` | built | CPU |
-| Orchestrator, fusion, explanation report | not yet in `src/` | planned (M4, after detector scores land Sat 19:00; frozen Sat 22:00) | main |
-| Docker image | no `Dockerfile` yet; design in `docs/plan.md` "Docker" | planned (first amd64 image Sat 14:00) | unassigned (plan says Teammate C) |
+| Fusion | `scripts/fuse.py`, `scripts/fuse_sweep.py` → `models/fusion_v1/constants.json` (rank references, α = 0.2, M3 false-alarm suppression, Platt at the 0.3 prior); `fusion_v0` retained for zmean / stack_nonlj | rule frozen by pre-declared sweep at 08:13 (`docs/reports/2026-09-26_fusion-sweep-predeclared.md`); final freeze Sat 22:00 | main |
+| End-to-end runner, per-file explanation JSON, API | `src/hearsay/pipeline.py`, `scripts/run_pipeline.py`, `src/hearsay/api.py` | built (routing log from detector features; orchestrator v1 is static rules) | oversight chat's agent |
+| Docker image | `Dockerfile`, `.dockerignore`, `docker/{build.sh,entrypoint.sh,assets.py}`, `tests/test_docker_image.py` | built and verified 07:56 (`hearsay:20260926-0753`, source 0963ed8): amd64, 2.66 GB compressed, offline-enforced, in-image 50-file parity max diff 1.4e-4, sha manifest of 70 shipped files checked at start | Docker chat |
 | Submission writer + log | `src/hearsay/submission.py` | built | main |
 
 ## 4. Invariants (the rules the code enforces)
@@ -230,6 +163,8 @@ flowchart LR
 
 **Compression forensics (built).** 19 features in 3–7 kHz: spectral holes (deep and local), hole flicker and runs, floor depth, effective bandwidth, high-band tilt. Trained with laundering equalization (a random half of both classes re-encoded through MP3/AAC) so "lossy = ElevenLabs/PlayHT" cannot be learned. It detects codec history well (AUC 0.90–0.94) and the class barely (holdout 0.90). The test set reads as laundered throughout, so this is routing and evidence, not a fusion column, unless leave-one-out says otherwise.
 
+**Non-speech gate and speaker drift (built ~06:10, rule-based; report `docs/reports/2026-09-26_gate-and-drift.md`).** `speech_gate` decides `is_speech` from five cues (not silent, voiced ≥ 5% of frames, log-F0 std ≥ 0.02, loudness std ≥ 3 dB, spectral flatness < 0.5), each threshold set beyond the extreme of the full NSA test set, so 0 of 1,671 test files are gated; its score stays 0.5 and fusion never sees it. `speech_gate.apply_default_answer` implements decision 4: a gated file gets `0.02 + 1e-4 × fused score`, so it ranks below every speech file in a deterministic order. Known limit: rhythmic polyphonic music can pass; the preflight and the > 0.8 flag remain the backstop. `speaker_drift` runs ECAPA (`speechbrain/spkrec-ecapa-voxceleb`, Apache-2.0, 89 MB in `weights/`) on 1 s windows at 0.5 s hop and flags min pairwise cosine < 0.05 (score 0.6, else 0.5): 94% of two-speaker splices flagged, 6% of single voices. Finding: fakes are the most self-consistent voices (mean-cosine class AUC 0.73 toward fake), so drift is evidence of editing or of a real speaker and the column must not be fused; routing and evidence only. Docker needs SpeechBrain and those weights.
+
 **Container, ENF, splice (built, rule-based).** Container returns header facts and a constant 0.5 on this test set by design (the container is the label on the training data; every test file carries the same FFmpeg tag). ENF tracks 50/60 Hz hum stability (present in 24 test files; in 36% of LJ clips, so a learned version would learn "hum = real"). Splice flags clicks and DC jumps (58 test files). All three carry evidence and routing facts for the rubric; none moves minDCF.
 
 ## 8. Validation and selection
@@ -273,35 +208,37 @@ flowchart LR
 - **Preflight before every TSV:** silence and a synthetic chord through the scorer; finite, reproducible, and the scores are logged (M1 currently scores both near 1.0, which a non-speech gate must address).
 - **The one labeled readout on the real test set** is NSA's draft review on Saturday afternoon. It settles the score-direction question and compares at most two candidates.
 
-## 9. Fusion and outputs (M4, planned)
+## 9. Fusion and outputs (M4, rule frozen 08:13)
 
 ```mermaid
 flowchart LR
-  E1["m1 or m5 · logit"]
-  E2["handcrafted · logit"]
+  E1["m1b_v3 · logit"]
+  E2["handcrafted_v5 · logit"]
   E3["spectra_aasist · synth_logit"]
-  E4["compression · logit<br/>only if leave-one-out shows a gain"]
-  Z["standardize on inner rows<br/>impute missing with fold-local mean + missing indicator"]
-  E1 --> Z
-  E2 --> Z
-  E3 --> Z
-  E4 --> Z
-  STK["logistic stacker · fit on inner_oof rows, fold-locally<br/>candidates: non-negative weights, shrink toward equal, rank mean<br/>fit on non-LJ real rows (LJ is one speaker on both sides of every fold)"]
-  Z --> STK
-  GATE["default-answer policy<br/>decode failures, non-speech, disagreement → real end of the ranking"]
-  STK --> GATE
-  POST["posterior at π = 0.3 · ranking unchanged"]
-  GATE --> POST
-  TSV["teamName_predictions.tsv"]
-  POST --> TSV
-  RB["container · enf · splice<br/>routing facts + evidence only"]
-  EXP["explanation report per file<br/>top detectors by contribution · evidence sentences · routing log"]
+  E4["m5_xlsr_ft · logit<br/>exported column, re-sweep candidate only"]
+  R1["rank against inner out-of-fold references<br/>from models/fusion_v1/constants.json"]
+  E1 --> R1
+  E2 --> R1
+  BL["base = 0.8 · rank(M1b) + 0.2 · rank(handcrafted)<br/>alpha chosen by the pre-declared sweep"]
+  R1 --> BL
+  SUP["M3 suppression only<br/>if Spectra margin below −3 and base above 0.5, halve base<br/>never promotes; nothing fit on M3"]
+  E3 --> SUP
+  BL --> SUP
+  PL["Platt at the 0.3 prior<br/>p = sigmoid(a · base + b + logit 0.3)"]
+  SUP --> PL
+  GATE["default-answer policy<br/>determinate scores in [0.001, 1]; gated and failed files below 0.001<br/>ordered by weak signal, hash tie-jitter"]
+  PL --> GATE
+  TSV["teamName_predictions.tsv<br/>plus the pre-flipped twin"]
+  GATE --> TSV
+  RB["container · enf · splice · speaker drift · compression<br/>routing facts and evidence only"]
+  EXP["explanation JSON per file<br/>every detector's evidence · fusion inputs · routing log"]
   RB --> EXP
-  STK --> EXP
-  classDef planned fill:#f1f3f4,stroke:#5f6368,color:#111,stroke-dasharray:5
+  GATE --> EXP
+  E4 -.-> R1
   classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
-  class E1,E2,E3,E4,RB,TSV built
-  class Z,STK,GATE,POST,EXP planned
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class E1,E2,E3,R1,BL,SUP,PL,GATE,TSV,RB,EXP built
+  class E4 flight
 ```
 
 ## 10. Open architecture decisions
@@ -312,7 +249,7 @@ flowchart LR
 4. **Default answer for undetermined files.** Decode failures, non-speech (silence, music), detector disagreement: with a false alarm at 9.33× a miss, uncertain files belong at the real end of the ranking, deliberately tie-broken. A voiced-fraction gate is the first candidate (test median voiced fraction 0.8). Depends on the sponsor's scoring direction; the draft review is the tripwire.
 5. **Orchestrator scope.** Routing facts already exist as detector features: container `lossy`/`is_pcm_wav`/`ffmpeg_written`, compression `bw_hz` (69 test files lack the 7.2 kHz wall; a few are telephony-band), ENF presence, splice seams, voiced fraction. v1 is static rules over these plus a per-file routing log in the explanation report. Escalation (run the expensive deep model only where cheap detectors disagree) is possible but unnecessary at 1,671 files; see 6.
 6. **Test-time compute.** The test set is about 95 minutes of audio, so inference cost is not a constraint; validation is. Options ranked by expected value: average M5's five fold models with the full model at test time (free once trained, reduces variance, which is what drives false alarms); average M1 probes on layers 6–8 (embeddings exist; validate on inner folds); a second backbone (WavLM Large weights are downloaded, never run); multi-crop averaging only for the few test clips over 8 s (75% are under 3.8 s). Anything adopted must be validated on inner folds and must keep the test-set share above 0.5 near 30%.
-7. **Docker ownership.** First amd64 image is due Sat 14:00 with the M1 payload; nobody has started. If M5 lands, the image needs its checkpoint from the HF Hub or a GitHub release plus the CPU-parity check; if speaker drift lands, it needs SpeechBrain and the ECAPA weights. One CPU-side saving is available for M1: only layers 1–7 of the backbone are needed to read h7, so the Docker scorer can drop layers 8–24 (about 70% of the transformer compute) with bit-identical output.
+7. **Docker: resolved.** Image built and verified at 07:40 (see section 3). Encoder truncation to layer 8 is on in the runner, bit-identical and pinned by a test. Remaining: the Sunday rebuild after the fusion freeze, and M5's checkpoint if M5 clears its gate.
 
 ## 11. Shortcut ledger
 
@@ -328,4 +265,4 @@ Every train-vs-test difference found so far, and where it is closed. Any new det
 | Mains hum | stable hum in 36% of LJ, 21% of LibriSpeech, <0.5% of nine generators | ENF never learned; low-frequency features checked LJ-vs-LibriSpeech |
 | Crop edges | training crops start mid-word, test clips are whole utterances | no onset/offset features |
 | LJ single speaker | one voice on both sides of every fold | folds group LJ by chapter; stacker to be fit on non-LJ real rows |
-| Non-speech | silence and a chord score ~1.0 with M1 | gate pending (decision 4) |
+| Non-speech | silence and a chord score ~1.0 with M1 | `speech_gate` + `apply_default_answer` (decision 4); 0 of 1,671 test files gated |
