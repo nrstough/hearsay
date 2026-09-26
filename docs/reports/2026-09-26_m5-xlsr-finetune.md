@@ -48,7 +48,20 @@ M1 per-fold OOF recomputed from its saved embeddings (`outputs/m5_runs/m1_v{2,3}
 | 0: grad_tts + unit_speech | 0.524 | 0.528 (EER 20.0%) | 0.515 (EER 21.0%) | **0.520 (EER 17.9%)** |
 | 4: elevenlabs | 0.415 | 0.762 (EER 19.1%) | 0.410 / 0.377 (two seeds; EER 8.8 / 8.2%) | **0.308 (EER 5.9%)** |
 
-All M5 rows: 2,500 steps × 32 crops, augmentation p = 0.65, MLAAD 12% of the spoof side. "Fine-tune" = all 12 kept layers trainable at LR 1e-5 (LLRD 0.85); "frozen" = the same 12-layer XLS-R with only the learned layer-weighted sum, attentive statistics pooling and head trained. Seed-to-seed noise on a fold ≈ ±0.03.
+All M5 rows: 2,500 steps × 32 crops, augmentation p = 0.65, MLAAD 12% of the spoof side. **Final fold models (frozen recipe, 2,500 steps), out-of-fold, vs M1 v3:**
+
+| Fold | held-out generators | M1 v3 | M5 frozen |
+|---|---|---|---|
+| 0 | grad_tts, unit_speech | 0.524 | 0.520 |
+| 1 | diffgan_tts, openvoicev2 | 0.090 | 0.263 |
+| 2 | pro_diff, xtts_v2 | 0.016 | 0.026 |
+| 3 | your_tts | 0.000 | 0.000 |
+| 4 | elevenlabs | 0.415 | 0.308 |
+| **pooled (16,142 rows)** | | **0.257** (EER 6.9%) | **0.302** (EER 11.0%) |
+
+M5 wins the hardest fold (ElevenLabs) and ties three, but loses fold 1 (diffgan_tts + openvoicev2) by 0.17, and the pooled 5-fold OOF, which is one of the three gate clauses, comes out worse than M1 (0.302 vs 0.257). Pooling also penalizes M5 slightly because its five fold models are separately trained heads with their own logit scales, whereas the metric is computed on the concatenation; the per-fold numbers are the fairer comparison.
+
+"Fine-tune" = all 12 kept layers trainable at LR 1e-5 (LLRD 0.85); "frozen" = the same 12-layer XLS-R with only the learned layer-weighted sum, attentive statistics pooling and head trained. Seed-to-seed noise on a fold ≈ ±0.03.
 
 **Decision (06:40): the frozen-backbone recipe for all six final models.** It wins fold 4 by ~0.08 (≈3× the seed noise) over the fine-tune and by 0.11 over M1, ties on fold 0, runs twice as fast (12 min per fold model), and its learned layer weights peak at layers 5–6, consistent with M1's layer-7 optimum. The full fine-tune's failure mode is the classic one: training loss near the label-smoothing floor on the seen generators, poor transfer to the unseen commercial one.
 
