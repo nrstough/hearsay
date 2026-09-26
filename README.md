@@ -63,7 +63,8 @@ All figures are normalized minDCF with `C_FA = 4`, `C_miss = 1`, `π_synth = 0.3
 | Shipped fusion (`A3 w 0.2 + E`: M1b, handcrafted and M5 by rank, Spectra suppression) | 0.135 | 0.0065 | 0.228 | `docs/reports/2026-09-26_fusion-sweep-predeclared.md`, M5 addendum |
 | Previous rule (`E on α 0.2`, no M5), the fallback | 0.140 | 0.014 | 0.260 | same report |
 | M1b alone (the best single detector we trained) | 0.301 | 0.072 | 0.343 | same report |
-| NSA test set (the number that counts) | | | | _pending: the draft review's returned minDCF_ |
+
+**On NSA's test set, the number that counts, the shipped rule scored minDCF 0.0733 (EER 3.53%).** NSA returned it at the draft review (`docs/reports/2026-09-26_sponsor-questions.md`; `submissions/log.csv`, 15:40 row). That is 11× worse than our holdout and 3× better than In-the-Wild ([Validation](#validation) has the full comparison).
 
 The full per-detector and per-rule tables are in [Numbers](#numbers).
 
@@ -155,7 +156,9 @@ The shipped rule is whatever `final` names in `models/fusion_v2/constants.json`;
 
 Nathan first held it (09:25) because the previous rule was the file planned for the draft review. The runner side was built behind a flag (`8316e50`), and at 12:03 he ratified the switch. The submitted file is `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv`, sent as `CrossExam_predictions.tsv`.
 
-**Score direction.** The instructions say 1.0 = synthetic. NSA's scoring code (ASVspoof5's) treats a higher score as bona fide. We follow the instructions and never flip. Every model logs its minDCF under the sponsor's code both ways, and a pre-flipped twin of the draft TSV exists in case NSA's feedback shows they grade inverted.
+_Pending: the 19:30 decision on raising M5's weight to 0.4._ After the draft review, M5 at 0.4 scored In-the-Wild 0.200 / 0.208 (brief / sponsor-code cost) against 0.228 / 0.239, with the holdout unchanged and inner slightly worse. It passes our standing replacement rule but fails the stricter gate adopted after the draft review, and its numbers were seen before it became a candidate (`docs/reports/2026-09-26_post-draft-negatives.md`, item 7; `docs/reports/2026-09-26_post-draft-sweep.md`).
+
+**Score direction.** The instructions say 1.0 = synthetic. NSA's scoring code (ASVspoof5's) treats a higher score as bona fide. We follow the instructions and never flip. Every model logs its minDCF under the sponsor's code both ways, and a pre-flipped twin of the draft TSV exists in case NSA's feedback shows they grade inverted. NSA's returned EER (3.5%) shows they read our direction. The returned pair can't tell us where they put the 4× cost. Under the brief's convention it implies roughly 0–4 false alarms and 18–37 misses; under the sponsor code's, 42–86 false alarms and 0–4 misses. Both fit the pair, which is why every later candidate had to improve under both costs (`docs/reports/2026-09-26_post-draft-negatives.md`, item 5).
 
 ---
 
@@ -175,7 +178,16 @@ Nathan first held it (09:25) because the previous rule was the file planned for 
 | 0.45–0.90 | ambiguous | don't flip; fall back to M1b alone |
 | 0.95–1.00 | NSA's code reads our scores inverted | ship the pre-flipped twin |
 
-**Sent** Saturday 12:30 by Discord DM (team Cross Exam): `CrossExam_predictions.tsv`, a copy of `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv` (sha256 `fb783076…`, `submissions/log.csv` row 12:30:37). _Pending: the returned minDCF and the action taken (`docs/reports/2026-09-26_sponsor-questions.md`)._
+**Sent** Saturday 12:30 by Discord DM (team Cross Exam): `CrossExam_predictions.tsv`, a copy of `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv` (sha256 `fb783076…`, `submissions/log.csv` row 12:30:37). **Returned** about 15:30 (relayed by Nathan): minDCF **0.0733**, EER **3.534%**. NSA gave no false-alarm or miss rates, threshold or cost convention. 0.0733 falls in the 0.00–0.20 band, so the shipped rule stayed unchanged. An EER of 3.5% rather than 96.5% confirms NSA reads 1.0 as synthetic, as the instructions say: no flip, no fallback (`docs/reports/2026-09-26_sponsor-questions.md`). How far each of our proxies was from this number:
+
+| Split | minDCF | EER | Off from the test set by |
+|---|---|---|---|
+| Outer holdout | 0.0065 | 0.21% | 11× optimistic (17× on EER) |
+| Inner out-of-fold | 0.135 | 6.83% | 2× pessimistic |
+| In-the-Wild | 0.228 | 5.80% | 3× pessimistic (1.6× on EER) |
+| **NSA test (returned)** | **0.0733** | **3.53%** | |
+
+On a log scale between the holdout and In-the-Wild, the test set sits at 0.68 for minDCF and 0.85 for EER, further toward the wild end than our λ̂ = 0.51 suggested. On the test set one false alarm is worth about 0.008 under the brief's cost and one miss about 0.002, so any change worth less than about 0.008 is a single-file effect (`docs/reports/2026-09-26_post-draft-negatives.md`, item 6).
 
 ---
 
@@ -230,6 +242,12 @@ Each null result, with its mechanism.
   - Spectra holds at 0.116, but noise pushes it out of its "strongly real" region, so its suppression step never fires and can't help.
   - Found after the rule was frozen and not fixed. The pointer is noise augmentation of the handcrafted training, applied to both classes.
 - **A wild, non-read real-speech corpus for the inner folds was planned and not attempted.** It was the fusion consult's suggested fix for the In-the-Wild gap. We dropped it at 12:16 on Saturday, because a download, extraction and refit would not fit the time box, and the time went to the Spectra probes and the λ estimate. The two candidates we had identified looked unusable anyway: VoxCeleb1's test set needs a request form, and SpoofCeleb's real speech has been speech-enhanced, which its authors warn about (`docs/reports/2026-09-26_channel-robustness.md`, `docs/handoffs/2026-09-26_channel-robustness-handoff.md`).
+- **After the draft review, most remaining ideas measured as dead ends** (`docs/reports/2026-09-26_post-draft-negatives.md`). We asked what could still move 0.0733. Two outside opinions and our own checks answered, and the answers were mostly no. Numbers marked (F) come from the Fable agent's memo alone and were not re-run by our consult chat.
+  - **More heads on the XLS-R backbone.** The shipped rule misses 158 In-the-Wild fakes. M1b alone would catch 1 of them at its own threshold, M5 33 and Spectra 107. So M1b's backbone doesn't see these fakes at any layer. Averaging layers 5–9 improved the holdout (0.052) but worsened In-the-Wild (0.368) and doubled its false alarms (F).
+  - **Re-weighting the same three scores has a ceiling.** Weights chosen on In-the-Wild itself reach only 0.186 there, a 0.04 gain that also costs two holdout false alarms, and no honest rule can beat that (F). Stackers did worse than the rank blend (F). A second, stronger Spectra suppression tier changed nothing on any split, because halving already puts every suppressed file below the rest. Calibration can't move minDCF at all, since minDCF depends only on the order of scores.
+  - **The handcrafted score is the readable column, not an independent vote.** An admissible stacker gives it a coefficient of −0.04 (F). Its rank correlation with M1b falls from 0.79 on the holdout to 0.21 on the test set (F), because on the test set it reads the recording-domain shift more than the class. It keeps its 20% seat for what it explains.
+  - **Letting Spectra promote files would recover 76 of the 158 misses** with no added In-the-Wild false alarms (F), and loosening its suppression threshold improves every proxy (F). We did neither. The evidence is In-the-Wild, a set Spectra's authors evaluated on, and changing a rule set in advance because its alternatives look good afterwards is what the rule exists to prevent.
+  - **Not run tonight:** noise twins for the handcrafted model (the test set shows no additive noise), delta-only features (column pruning failed every time), averaging M5's fold models (it would leak out-of-fold rows, and the checkpoints aren't on disk), and new feature families (each one a research lane).
 - **Our first estimate of how wild the test set is was wrong.** It said λ̂ = 0.947 with a classifier AUC of 0.99, and read "wild" as "codec-processed". One feature did the work: a whole-spectrogram noise-floor percentile that landed in the 7–8 kHz stopband. It was measuring the test files' double low-pass, not the recording channel: one MP3 round-trip moved 91% of our clean clips to "wild". Dropping that feature, under the rule we had already declared for columns above 7 kHz, gave 0.51 (MP3 control 91% → 9%). It is the same kind of shortcut as the 7.2 kHz wall, a band no training clip has, read through a feature that didn't look like a band feature.
 
 ---
