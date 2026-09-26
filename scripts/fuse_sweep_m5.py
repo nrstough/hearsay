@@ -8,7 +8,12 @@ given: then the winner's constants go to models/fusion_v2/constants.json (the ru
 `weights` over the three ranked columns, their inner-OOF rank references, the M3 step, the
 Platt map, `how`, and the M5 checkpoint's hashes so the runner can refuse another checkpoint).
 
-Usage: uv run python scripts/fuse_sweep_m5.py [--write]
+Refit mode (addendum 2, pre-declared 12:50): --refit-m1b NAME [--refit-itw PATH] evaluates exactly
+one candidate, R1 = the shipped A3 w0.2 + E with NAME's column in M1b's seat, against CURRENT (the
+shipped rule on m1b_v3) under the same four conditions, and writes outputs/fusion/sweep_refit_report.json;
+--write is refused in that mode (a refit's constants need the probe identity, built only on ratification).
+
+Usage: uv run python scripts/fuse_sweep_m5.py [--write] [--refit-m1b NAME [--refit-itw PATH]]
 """
 
 from __future__ import annotations
@@ -31,9 +36,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true",
                     help="write models/fusion_v2/constants.json (the runner's file); without it nothing under models/ is written")  # fmt: skip
+    ap.add_argument("--refit-m1b", metavar="NAME", help="addendum 2: evaluate R1 = the shipped rule with this export in M1b's seat")
+    ap.add_argument("--refit-itw", metavar="PATH", help="the refit's In-the-Wild rows if not in its export as split 'stress'")
     args = ap.parse_args()
+    if args.refit_m1b and args.write:
+        ap.error("--write is refused in refit mode: a refit's constants need the probe identity (built on ratification)")
     S = fs.S
     m1 = fs.load("m1b_v3")
+    if args.refit_m1b:
+        return refit_sweep(fs, args, S, m1)
     hc = fs.load("handcrafted_v5", str(S / "_itw_handcrafted_v5.csv"))
     m3 = fs.load("spectra_aasist", str(REPO / "outputs/spectra/itw_stress/scores.csv"))
     m5 = fs.load("m5_xlsr_ft", str(S / "_itw_m5.csv"))
@@ -147,6 +158,83 @@ def main() -> None:
     (REPO / "outputs" / "fusion" / "sweep_m5_report.json").write_text(json.dumps(
         {"t_F": t_f, "t_F_inner_real_coverage": real_cov, "candidates": rep, "qualifying": sorted(ok),
          "winner": winner}, indent=2))
+
+
+def refit_sweep(fs, args, S, m1) -> None:
+    """Addendum 2 (pre-declared 12:50): one candidate, R1 = A3 w0.2 + E with the refit column in
+    M1b's seat, vs CURRENT = the same rule on m1b_v3; identical row sets, identical readouts, the
+    same four conditions as the M5 addendum. With --refit-m1b m1b_v3 every R1 readout must equal
+    CURRENT and the decision must be KEEP (the self-check)."""
+    hc = fs.load("handcrafted_v5", str(S / "_itw_handcrafted_v5.csv"))
+    m3 = fs.load("spectra_aasist", str(REPO / "outputs/spectra/itw_stress/scores.csv"))
+    m5 = fs.load("m5_xlsr_ft", str(S / "_itw_m5.csv"))
+    m1r = fs.load(args.refit_m1b, args.refit_itw)
+    lab = pd.read_csv(REPO / "splits" / "nsa_folds.csv")
+    itwm = pd.read_csv(REPO / "outputs" / "manifests" / "itw_stress.csv")
+    labels = pd.concat([lab[["path", "label", "source"]], itwm[["path", "label", "source"]]])
+    labels["path"] = labels.path.map(fs.norm)
+    labels = labels.set_index("path")
+    idx = {}
+    for s in ("inner_oof", "holdout", "test", "itw"):
+        ix = m1.index[m1.split == s]
+        for d in (hc, m3, m5, m1r):
+            ix = ix.intersection(d.index[d.split == s])
+        idx[s] = ix
+    y = {s: (labels.loc[ix, "label"] == "spoof").to_numpy(int) for s, ix in idx.items() if s != "test"}
+    src = {s: labels.loc[ix, "source"].to_numpy() for s, ix in idx.items() if s != "test"}
+    print({s: len(ix) for s, ix in idx.items()}, f"(refit column {args.refit_m1b!r})")
+
+    def rank(det, s):
+        ref = np.sort(det.loc[idx["inner_oof"], "logit"].to_numpy())
+        return np.searchsorted(ref, det.loc[idx[s], "logit"].to_numpy()) / len(ref)
+
+    def lg(det, s):
+        return det.loc[idx[s], "logit"].to_numpy()
+
+    def e_step(base, s):
+        return np.where((lg(m3, s) < -3) & (base > 0.5), base * 0.5, base)
+
+    def blend(r1):
+        out = {}
+        for s in idx:
+            b = 0.0
+            for w, r in ((0.6, r1[s]), (0.2, rank(hc, s)), (0.2, rank(m5, s))):
+                b = b + w * r  # weights order, as hearsay.pipeline accumulates
+            out[s] = e_step(b, s)
+        return out
+
+    cands = {"CURRENT_A3_w0.2_E": blend({s: rank(m1, s) for s in idx}),
+             f"R1_refit_{args.refit_m1b}": blend({s: rank(m1r, s) for s in idx})}
+
+    def readout(sc):
+        r = {"inner_brief": round(fs.brief(y["inner_oof"], sc["inner_oof"]), 4),
+             "holdout_brief": round(fs.brief(y["holdout"], sc["holdout"]), 4),
+             "holdout_averse": round(fs.averse(y["holdout"], sc["holdout"]), 4)}  # fmt: skip
+        hs = sc["holdout"]
+        t = min(np.unique(hs), key=lambda t_: fs.cost_at(y["holdout"], hs, t_, fs.PI))
+        r["holdout_argmin_FA_miss"] = [int(np.sum(hs[y["holdout"] == 0] >= t)),
+                                       int(np.sum(hs[y["holdout"] == 1] < t))]  # fmt: skip
+        spoof = hs[y["holdout"] == 1]
+        for s_ in ("ljspeech", "librispeech"):
+            b = hs[(y["holdout"] == 0) & (src["holdout"] == s_)]
+            r[f"holdout_{s_}"] = round(fs.brief(np.r_[np.zeros(len(b)), np.ones(len(spoof))], np.r_[b, spoof]), 4)
+        r["itw_brief"] = round(fs.brief(y["itw"], sc["itw"]), 4)
+        r["itw_averse"] = round(fs.averse(y["itw"], sc["itw"]), 4)
+        ti = min(np.unique(sc["inner_oof"]), key=lambda t_: fs.cost_at(y["inner_oof"], sc["inner_oof"], t_, fs.PI))
+        r["itw_pfa_at_inner_thr"] = round(float(np.mean(sc["itw"][y["itw"] == 0] >= ti)), 4)
+        r["itw_pmiss_at_inner_thr"] = round(float(np.mean(sc["itw"][y["itw"] == 1] < ti)), 4)
+        return r
+
+    rep = {k: readout(v) for k, v in cands.items()}
+    cur, r1 = rep["CURRENT_A3_w0.2_E"], rep[f"R1_refit_{args.refit_m1b}"]
+    ok = (r1["itw_brief"] <= cur["itw_brief"] - 0.01 and r1["itw_averse"] <= cur["itw_averse"] + 0.01
+          and r1["holdout_brief"] <= cur["holdout_brief"] + 0.05 and r1["inner_brief"] <= cur["inner_brief"] + 0.03)
+    pd.set_option("display.width", 250)
+    print(pd.DataFrame(rep).T.to_string())
+    print(f"\ndecision (addendum 2): {'R1 QUALIFIES; put to Nathan' if ok else 'KEEP the shipped rule'}")
+    (REPO / "outputs" / "fusion" / "sweep_refit_report.json").write_text(json.dumps(
+        {"refit_column": args.refit_m1b, "rows": {s: len(ix) for s, ix in idx.items()}, "candidates": rep,
+         "qualifies": ok}, indent=2))
 
 
 if __name__ == "__main__":
