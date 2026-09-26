@@ -71,6 +71,27 @@ def sigmoid(z):
     return 1 / (1 + np.exp(-np.asarray(z, dtype=np.float64)))
 
 
+def sponsor_min_dcf(y, s, flip: bool) -> float:
+    """minDCF exactly as the sponsor's shipped code computes it (data/nsa/HackGTMinDCF,
+    ASVspoof5 calculate_metrics.py): Pspoof = 0.5, Cmiss = 1, Cfa = 4, and a HIGHER score is
+    treated as bona fide. flip=False scores our synthetic-high scores as-is (what happens if they
+    run the code unmodified); flip=True scores 1 - s (what happens if they invert first)."""
+    y, s = np.asarray(y), np.asarray(s, dtype=np.float64)
+    s = -s if flip else s
+    bona, spoof = s[y == 0], s[y == 1]
+    scores = np.concatenate([bona, spoof])
+    labels = np.concatenate([np.ones(bona.size), np.zeros(spoof.size)])[
+        np.argsort(scores, kind="mergesort")
+    ]
+    frr = np.concatenate([[0.0], np.cumsum(labels) / bona.size])
+    far = np.concatenate(
+        [[1.0], (spoof.size - (np.arange(1, labels.size + 1) - np.cumsum(labels))) / spoof.size]
+    )
+    p_target = 0.5
+    c_det = 1 * frr * p_target + 4 * far * (1 - p_target)
+    return float(c_det.min() / min(1 * p_target, 4 * (1 - p_target)))
+
+
 def report(y, llr, pi_synth=PI_SYNTH) -> dict:
     """EER + normalized min/actual cost for prior-neutral LLR-like scores."""
     y, llr = np.asarray(y), np.asarray(llr)
@@ -79,4 +100,7 @@ def report(y, llr, pi_synth=PI_SYNTH) -> dict:
         "min_dcf": round(min_cost(y, llr, pi_synth), 4),
         "act_dcf": round(cost_at(y, llr, bayes_llr_threshold(pi_synth), pi_synth), 4),
         "pi_synth": pi_synth,
+        "min_dcf_pi05": round(min_cost(y, llr, 0.5), 4),
+        "sponsor_code_asis": round(sponsor_min_dcf(y, llr, flip=False), 4),
+        "sponsor_code_flipped": round(sponsor_min_dcf(y, llr, flip=True), 4),
     }

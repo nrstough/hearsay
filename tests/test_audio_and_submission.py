@@ -229,3 +229,25 @@ def test_normalize_windows_removes_level_and_offset():
     assert np.allclose(a, b, atol=1e-4)
     assert np.allclose(a.mean(axis=1), 0, atol=1e-5) and np.allclose(a.std(axis=1), 1, atol=1e-3)
     assert np.isfinite(normalize_windows(np.zeros((1, 100)))).all()  # silence stays finite
+
+
+def test_sponsor_min_dcf_matches_shipped_code():
+    import sys
+
+    from hearsay.metrics import sponsor_min_dcf
+
+    pkg = Path(__file__).resolve().parents[1] / "data/nsa/HackGTMinDCF/asvspoof5/evaluation-package"
+    if not pkg.exists():
+        pytest.skip("sponsor evaluation package not present")
+    sys.path.insert(0, str(pkg))
+    from calculate_modules import compute_eer, compute_mindcf
+
+    rng = np.random.default_rng(3)
+    y = np.r_[np.zeros(700, int), np.ones(300, int)]
+    s = np.r_[rng.normal(0.3, 0.15, 700), rng.normal(0.7, 0.15, 300)]
+    for flip in (False, True):
+        t = -s if flip else s
+        _, frr, far, thr, _ = compute_eer(t[y == 0], t[y == 1])
+        ref = compute_mindcf(frr, far, thr, 0.5, 1, 4)[0]
+        assert abs(sponsor_min_dcf(y, s, flip) - ref) < 1e-9
+    assert sponsor_min_dcf(y, s, flip=False) > 0.9 > sponsor_min_dcf(y, s, flip=True)

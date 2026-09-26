@@ -14,7 +14,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedGroupKFold
+from sklearn.model_selection import PredefinedSplit, StratifiedGroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -47,9 +47,19 @@ def make_clf(c: float = 1.0):
     )
 
 
-def oof_scores(X: np.ndarray, y: np.ndarray, groups: np.ndarray, c: float, k: int = 5):
+def oof_scores(
+    X: np.ndarray, y: np.ndarray, groups: np.ndarray, c: float, k: int = 5,
+    folds: np.ndarray | None = None,
+):  # fmt: skip
+    """Out-of-fold decision values. `folds` (predefined fold ids from the fold file) wins
+    over building StratifiedGroupKFold from `groups`."""
     oof = np.zeros(len(y))
-    for tr, te in StratifiedGroupKFold(k, shuffle=True, random_state=0).split(X, y, groups):
+    splits = (
+        PredefinedSplit(folds).split()
+        if folds is not None
+        else StratifiedGroupKFold(k, shuffle=True, random_state=0).split(X, y, groups)
+    )
+    for tr, te in splits:
         oof[te] = make_clf(c).fit(X[tr], y[tr]).decision_function(X[te])
     return oof
 
