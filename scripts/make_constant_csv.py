@@ -16,42 +16,18 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import csv
 import sys
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
-
-from hearsay import SR
-from hearsay.submission import REPO, append_log, score_files, write_submission
-
-AUDIO_EXT = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus", ".aac", ".webm", ".amr", ".mp4"}
-
-
-def list_test_files(test_dir: Path, manifest: Path | None, id_col: str) -> list[tuple[str, Path]]:
-    if manifest:
-        with manifest.open(newline="") as f:
-            ids = [row[id_col] for row in csv.DictReader(f)]
-        return [(i, test_dir / i) for i in ids]
-    files = sorted(p for p in test_dir.rglob("*") if p.suffix.lower() in AUDIO_EXT)
-    return [(str(p.relative_to(test_dir)), p) for p in files]
-
-
-def preflight(score_fn, fallback: float, tmp: Path) -> None:
-    """plan.md: silence + music through the loader before every CSV; finite and reproducible."""
-    import soundfile as sf
-
-    t = np.arange(4 * SR) / SR
-    chord = sum(0.1 * np.sin(2 * np.pi * f * t) for f in (261.6, 329.6, 392.0))
-    sf.write(tmp / "silence.wav", np.zeros(4 * SR, dtype=np.float32), SR)
-    sf.write(tmp / "music.wav", chord.astype(np.float32), SR)
-    paths = [tmp / "silence.wav", tmp / "music.wav"]
-    a = score_files(paths, score_fn, fallback)
-    b = score_files(paths, score_fn, fallback)
-    assert a.scores == b.scores, f"not reproducible: {a.scores} vs {b.scores}"
-    assert all(np.isfinite(a.scores)), a.scores
-    print(f"preflight: silence={a.scores[0]:.4f} music={a.scores[1]:.4f} flags={a.flags}")
+from hearsay.submission import (
+    REPO,
+    append_log,
+    list_test_files,
+    preflight,
+    score_files,
+    write_submission,
+)
 
 
 def main() -> None:

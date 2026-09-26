@@ -173,3 +173,20 @@ def test_windows_cover_clip(n, expect):
     assert w.shape == (expect, 64_000) and w.dtype == np.float32
     if n >= 64_000:
         assert w[0, 0] == 0 and w[-1, -1] == n - 1
+
+
+@pytest.mark.needs_weights
+@pytest.mark.slow
+def test_embed_clip_matches_bulk_extraction_path(tmp_path):
+    """The CSV scorer (embed_clip) and bulk extraction must produce the same features."""
+    from hearsay.embed import REPO, clip_windows, embed_clip, embed_windows, load_backbone
+
+    if not (REPO / "weights" / "wav2vec2-xls-r-300m" / "config.json").exists():
+        pytest.skip("weights not present")
+    p = ffmpeg_sine(tmp_path / "a.wav", sr=SR, ch=1, dur=6.0)
+    x = load_audio(p)
+    model = load_backbone()
+    per_clip = embed_clip(model, x)
+    bulk = embed_windows(model, list(clip_windows(x)), batch=1).mean(axis=0)
+    assert per_clip.shape == (25, 1024)
+    assert np.allclose(per_clip, bulk, atol=1e-3)
