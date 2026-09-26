@@ -77,7 +77,14 @@ Sources: the two bundles' `meta.json` and `eval_itw_stress.json`, and `outputs/c
 
 ## Gate
 
-H_noise (the shipped rule with `handcrafted_v6` in the handcrafted seat) goes to the gate chat's `scripts/fuse_sweep_v3.py` under the manifest's rule (`docs/reports/2026-09-26_post-draft-manifest.md`). The evidence sent was `--hnoise-evidence 0.7716,0.9931`. The noise AUC is below 0.90, so H_noise fails rule 5 regardless of its fused numbers. The fused table and the final verdict are in `docs/reports/2026-09-26_post-draft-sweep.md`.
+H_noise (the shipped rule with `handcrafted_v6` in the handcrafted seat) goes to the gate chat's `scripts/fuse_sweep_v3.py` under the manifest's rule (`docs/reports/2026-09-26_post-draft-manifest.md`). The evidence sent was `--hnoise-evidence 0.7716,0.9931`. The noise AUC is below 0.90, so H_noise fails rule 5 regardless of its fused numbers.
+
+**Result (gate run 2, 19:17): FAIL.** In the fused rule, every cell is slightly worse than the shipped rule. Δ against CURRENT, brief / averse:
+- inner −0.0015 / −0.0061
+- holdout −0.0005 / −0.0016
+- In-the-Wild −0.0003 / −0.0020
+
+It fails rules 2a, 3a, 3b and 5 (both costs and the diagnostic). Its test ranking has Spearman 0.9953 against the shipped file, with one file crossing 0.5. All four post-draft candidates failed, and the shipped file stays final (`docs/reports/2026-09-26_post-draft-sweep.md`, "Run 2").
 
 ## Files
 

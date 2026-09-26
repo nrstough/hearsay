@@ -132,7 +132,9 @@ If it fails any of the three, it becomes a measured negative: post hoc, and it d
 - **Outer holdout:** 0.137 → 0.227, mostly on LibriSpeech real speech (0.155 → 0.298).
 - **In-the-Wild AUC:** 0.768 → 0.722.
 
-**Why.** The handcrafted columns read fine spectral and phase structure in the quiet parts of the signal, and white noise fills exactly those parts. The model does not find a noise-proof version of the cues; it learns to trust them less, and that blurs clean clips too. Noise robustness for this detector would need different features (e.g. voiced-frame-only statistics), not more rows. As H_noise it fails the gate's rule 5 by construction, because its noise AUC is below 0.90 (the fused table is in `docs/reports/2026-09-26_post-draft-sweep.md`). `models/hc_selected` stays on v5b.
+**Why.** The handcrafted columns read fine spectral and phase structure in the quiet parts of the signal, and white noise fills exactly those parts. The model does not find a noise-proof version of the cues; it learns to trust them less, and that blurs clean clips too. Noise robustness for this detector would need different features (e.g. voiced-frame-only statistics), not more rows. In the fused rule (H_noise) every split got slightly worse under both costs (e.g. In-the-Wild −0.0003 / −0.0020), and it failed the gate (`docs/reports/2026-09-26_post-draft-sweep.md`, "Run 2"). `models/hc_selected` stays on v5b.
+
+**Outcome of the evening.** Four candidates were pre-declared and judged by a frozen gate: the second M3 tier, the M5 weight, WavLM as a fourth column and the noise twins. All four failed. The file NSA scored at 0.0733 stays final.
 
 ## Not run tonight, and why
 
