@@ -142,3 +142,20 @@ def test_b8_and_core_abort_smoke_via_script(tmp_path):
     pd.DataFrame(rows, columns=cols).to_csv(man, index=False)
     r = subprocess.run(cmd + ["--out", str(tmp_path / "b2")], capture_output=True, text=True, cwd=REPO, check=False)
     assert r.returncode != 0 and "core row" in r.stderr
+
+
+def test_b7_changed_source_gets_a_new_stamp(tmp_path):
+    """A resumed build reuses a FLAC only if the source's stamp (size:mtime) is unchanged."""
+    import os
+    import time
+
+    from hearsay.m5_bundle import source_stamp
+
+    src = ffmpeg_sine(tmp_path / "a.wav", sr=SR, ch=1, dur=1.0)
+    write_clip(src, tmp_path / "a.flac")
+    stamp1 = source_stamp(src)
+    ffmpeg_sine(src, sr=SR, ch=1, dur=2.0)  # new content at the same path
+    os.utime(src, (time.time() + 5, time.time() + 5))
+    assert source_stamp(src) != stamp1
+    build = (REPO / "scripts" / "m5_build_bundle.py").read_text()
+    assert "stamps.get(dst.stem) == source_stamp(src)" in build  # the reuse gate in the build

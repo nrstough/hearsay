@@ -14,7 +14,7 @@ cd "$REPO"
 import json, sys, time
 from pathlib import Path
 sys.path.insert(0, "scripts")
-from m5_build_bundle import make_code_tgz, _git_sha, xlsr_hf_revision
+from m5_build_bundle import make_code_tgz, _git_sha, xlsr_hf_revision, xlsr_hf_weight_sha256
 from hearsay.m5_bundle import tree_sha
 out = Path(sys.argv[1])
 make_code_tgz(out)
@@ -22,7 +22,8 @@ sha = tree_sha(out)
 (out / "TREE_SHA").write_text(sha)
 meta = json.loads((out / "bundle_meta.json").read_text())
 meta.update(tree_sha=sha, git_sha=_git_sha(), code_rebuilt_at=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            xlsr_hf_revision=meta.get("xlsr_hf_revision") or xlsr_hf_revision())
+            xlsr_hf_revision=meta.get("xlsr_hf_revision") or xlsr_hf_revision(),
+            xlsr_hf_weight_sha256=meta.get("xlsr_hf_weight_sha256") or xlsr_hf_weight_sha256())
 (out / "bundle_meta.json").write_text(json.dumps(meta, indent=2, sort_keys=True))
 print("code.tgz rebuilt; tree", sha[:12], "git", meta["git_sha"][:8])
 PY

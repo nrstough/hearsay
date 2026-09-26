@@ -159,9 +159,10 @@ def rclone_push(src: Path, dst: str) -> None:
     subprocess.run(["rclone", "copy", str(src), dst, "--transfers", "8"], check=False)
 
 
-def rclone_pull(src: str, dst: Path) -> None:
+def rclone_pull(src: str, dst: Path) -> bool:
     assert src.startswith(R2_PREFIX), src
-    subprocess.run(["rclone", "copy", src, str(dst), "--transfers", "8"], check=False)
+    r = subprocess.run(["rclone", "copy", src, str(dst), "--transfers", "8"], check=False)
+    return r.returncode == 0
 
 
 def lr_lambda(step: int, total: int, warmup: float, schedule: str) -> float:
@@ -317,8 +318,13 @@ def main() -> None:
     step = 0
     ck = out / "ckpt" / "last.pt"
     if args.resume:
+        pulled = True
         if args.r2_prefix and not ck.exists():
-            rclone_pull(args.r2_prefix.rstrip("/") + "/ckpt", out / "ckpt")
+            pulled = rclone_pull(args.r2_prefix.rstrip("/") + "/ckpt", out / "ckpt")
+        if not pulled:
+            sys.exit("FATAL: --resume requested but the R2 checkpoint pull failed")
+        if not ck.exists():  # never silently start over when a resume was asked for (Codex 4)
+            sys.exit(f"FATAL: --resume requested but no checkpoint at {ck}")
         if ck.exists():
             state = torch.load(ck, map_location=device, weights_only=False)
             net.load_state_dict(state["model"])

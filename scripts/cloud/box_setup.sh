@@ -37,25 +37,35 @@ assert got == meta['tree_sha'], f"tree sha {got[:12]} != {meta['tree_sha'][:12]}
 print('bundle tree OK', got[:12], meta['n_rows'], 'rows')
 EOF
 
-echo "[setup] XLS-R weights ..."
+echo "[setup] XLS-R weights (pinned Hub revision, sha-checked against bundle_meta.json) ..."
 WANT=$(cat bundle/config_sha.txt)
-if rclone copy "${HEARSAY_R2_PREFIX}weights/wav2vec2-xls-r-300m" weights --transfers 8 2>/dev/null && [ -f weights/model.safetensors ]; then
-  echo "  from R2"
-else
-  python - <<'EOF'
-import json
+python - <<'EOF'
+import hashlib, json
 from huggingface_hub import snapshot_download
-# pinned revision (bundle_meta.json: xlsr_hf_revision), so every box gets the same weights
-rev = json.load(open("/root/m5/bundle/bundle_meta.json")).get("xlsr_hf_revision")
+meta = json.load(open("/root/m5/bundle/bundle_meta.json"))
+rev, want = meta.get("xlsr_hf_revision"), meta.get("xlsr_hf_weight_sha256") or {}
 assert rev, "bundle_meta.json has no xlsr_hf_revision: refuse to pull unpinned weights"
+assert want, "bundle_meta.json has no xlsr_hf_weight_sha256: refuse to pull unverifiable weights"
 p = snapshot_download("facebook/wav2vec2-xls-r-300m", revision=rev, local_dir="/root/m5/weights",
                       allow_patterns=["config.json", "preprocessor_config.json", "*.bin", "*.safetensors"])
-print("  from HF hub at revision", rev, ":", p)
+def sha(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for c in iter(lambda: f.read(1 << 20), b""): h.update(c)
+    return h.hexdigest()
+checked = 0
+for name, expected in want.items():
+    try:
+        got = sha(f"/root/m5/weights/{name}")
+    except FileNotFoundError:
+        continue
+    assert got == expected, f"{name}: sha {got[:12]} != expected {expected[:12]}"
+    checked += 1
+assert checked, "no weight file matched the expected manifest"
+print("  from HF hub at revision", rev, "-", checked, "weight file(s) sha-verified")
 EOF
-fi
 GOT=$(sha256sum weights/config.json | cut -d' ' -f1)
 [ "$GOT" = "$WANT" ] || { echo "FATAL: XLS-R config sha $GOT != bundled $WANT"; exit 1; }
-sha256sum weights/*.safetensors weights/*.bin 2>/dev/null | tee weights/SHA256SUMS  # recorded per box
 python - <<'EOF'
 from transformers import Wav2Vec2Model
 m = Wav2Vec2Model.from_pretrained('/root/m5/weights')

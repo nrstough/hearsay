@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 from hearsay import SR
-from hearsay.m5_bundle import clip_ok, tree_sha, write_clip, write_meta
+from hearsay.m5_bundle import clip_ok, source_stamp, tree_sha, write_clip, write_meta
 from hearsay.m5_data import FOLDS, FOLDS_PLUS, shortcut_aucs
 
 REPO = Path(__file__).resolve().parents[1]
@@ -70,6 +70,16 @@ def xlsr_hf_revision() -> str:
     from huggingface_hub import HfApi
 
     return HfApi().model_info("facebook/wav2vec2-xls-r-300m").sha
+
+
+def xlsr_hf_weight_sha256() -> dict[str, str]:
+    """{filename: sha256} of the Hub's weight files (LFS metadata) so the box can CHECK what it
+    downloaded against an expected manifest (Codex 7)."""
+    from huggingface_hub import HfApi
+
+    info = HfApi().model_info("facebook/wav2vec2-xls-r-300m", files_metadata=True)
+    return {x.rfilename: x.lfs.sha256 for x in info.siblings
+            if x.lfs is not None and x.rfilename.endswith((".safetensors", ".bin"))}
 
 
 def make_code_tgz(out: Path) -> None:
@@ -135,7 +145,14 @@ def main() -> None:
     train_jobs, _ = plan(m, "", lambda r: None)  # placeholder to size
     train_jobs = [(src, out / ("core" if c else "extra") / f"{i}.flac", ms)
                   for (src, _, _), c, i, ms in zip(train_jobs, core_mask, m.id, [min_s(r) for r in m.itertuples()])]  # fmt: skip
-    todo = [j for j in train_jobs if not clip_ok(j[1])]
+    stamps_path = out / "sources.json"  # id -> source stamp of the decoded file (Codex 6)
+    stamps = json.loads(stamps_path.read_text()) if stamps_path.exists() else {}
+
+    def reusable(job):
+        src, dst, _ = job
+        return clip_ok(dst) and stamps.get(dst.stem) == source_stamp(src)
+
+    todo = [j for j in train_jobs if not reusable(j)]
     print(f"training rows: {len(m)} ({len(train_jobs) - len(todo)} reused)")
     res_train = {}
     done = _run(todo, args.workers, "train")
@@ -144,8 +161,13 @@ def main() -> None:
     for j in train_jobs:
         if j[1].name not in res_train:  # reused: recompute stats cheaply from the file
             res_train[j[1].name] = {"file": j[1].name, "reused": True}
+    for j in train_jobs:
+        stamps[j[1].stem] = source_stamp(j[0])
     test_jobs = [(ap_, out / "test" / f"{i}.flac", None) for ap_, i in zip(t.abs_path, t.id)]
-    todo_t = [j for j in test_jobs if not clip_ok(j[1])]
+    todo_t = [j for j in test_jobs if not reusable(j)]
+    for j in test_jobs:
+        stamps[j[1].stem] = source_stamp(j[0])
+    stamps_path.write_text(json.dumps(stamps, sort_keys=True))
     res_test = dict(zip([j[1].name for j in todo_t], _run(todo_t, args.workers, "test")))
     print(f"decode done in {time.time() - t0:.0f}s")
 
@@ -242,6 +264,7 @@ def main() -> None:
 
     make_code_tgz(out)
     hf_rev = xlsr_hf_revision()
+    hf_sha = xlsr_hf_weight_sha256()
     (out / "config_sha.txt").write_text(
         __import__("hashlib").sha256((XLSR / "config.json").read_bytes()).hexdigest())
     sha = tree_sha(out)
@@ -250,7 +273,7 @@ def main() -> None:
                folds_sha256=__import__("hearsay.m5_data", fromlist=["x"]).sha256_file(FOLDS),
                folds_plus_sha256=__import__("hearsay.m5_data", fromlist=["x"]).sha256_file(FOLDS_PLUS),
                git_sha=_git_sha(), xlsr_config_sha=(out / "config_sha.txt").read_text(),
-               xlsr_hf_revision=hf_rev,
+               xlsr_hf_revision=hf_rev, xlsr_hf_weight_sha256=hf_sha,
                built_at=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                size_bytes=int(sum(p.stat().st_size for p in out.rglob("*.flac"))))  # fmt: skip
     print(f"bundle {out}: {len(keep)} training rows, {len(tt)} test rows, tree {sha[:12]}, "

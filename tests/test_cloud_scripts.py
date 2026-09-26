@@ -108,5 +108,7 @@ def test_g6_box_setup_pins_the_hf_revision_and_checks_the_config_sha():
     assert "revision=rev" in t and 'get("xlsr_hf_revision")' in t
     assert 'assert rev, "bundle_meta.json has no xlsr_hf_revision' in t  # refuses unpinned
     b = (REPO / "scripts" / "m5_build_bundle.py").read_text()
-    assert "xlsr_hf_revision=hf_rev" in b  # the key is produced by the bundle build itself
-    assert "FATAL: XLS-R config sha" in t and "SHA256SUMS" in t
+    assert "xlsr_hf_revision=hf_rev" in b and "xlsr_hf_weight_sha256=hf_sha" in b
+    assert "FATAL: XLS-R config sha" in t
+    assert "xlsr_hf_weight_sha256" in t and "sha-verified" in t  # downloaded weights are checked
+    assert "HEARSAY_R2_PREFIX}weights" not in t  # no unverified R2 weights path

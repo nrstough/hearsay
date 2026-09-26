@@ -83,6 +83,13 @@ def clip_ok(path: Path, expected_frames: int | None = None) -> bool:
     return expected_frames is None or info.frames == expected_frames
 
 
+def source_stamp(src: str | Path) -> str:
+    """Identity of a source file for resumable builds: size and mtime (a changed source at the
+    same path must be re-decoded, never reused)."""
+    st = Path(src).stat()
+    return f"{st.st_size}:{int(st.st_mtime)}"
+
+
 def tree_sha(root: str | Path,
              exclude: tuple[str, ...] = ("TREE_SHA", "bundle_meta.json")) -> str:
     """sha256 over sorted (relative path, file sha256) of every file under root, except the

@@ -59,9 +59,15 @@ def test_e1_frozen_and_trainable_sets_with_counterfactual():
             assert not moved, n
     assert any(not torch.equal(before[n], p.detach())
                for n, p in net.named_parameters() if n.startswith("backbone.encoder.layers.2."))
-    # counterfactual: train_top=0 freezes every transformer layer
-    net0 = build_model(M5Config(keep_layers=3, train_top=0), tiny=True)
-    assert not any(n.startswith("backbone.encoder.layers") for n in trainable_names(net0))
+    # counterfactual: train_top=0 freezes EVERY backbone parameter (encoder layer norm and
+    # masked_spec_embed included), and nothing in the backbone moves after a step
+    cfg0 = M5Config(keep_layers=3, train_top=0, spec_augment=False)
+    net0 = build_model(cfg0, tiny=True)
+    assert not any(n.startswith("backbone.") for n in trainable_names(net0))
+    before0 = {n: p.detach().clone() for n, p in net0.backbone.named_parameters()}
+    net0.train()
+    _step(net0, cfg0)
+    assert all(torch.equal(before0[n], p.detach()) for n, p in net0.backbone.named_parameters())
 
 
 @pytest.mark.parametrize("pooling", ["attn_stats", "mean"])

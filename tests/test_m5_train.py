@@ -131,6 +131,11 @@ def test_g4_resume_continues_from_checkpoint(bundle, tmp_path):
     assert json.loads((out / "run_meta.json").read_text())["steps"] == 4
 
 
+def test_g4_resume_without_checkpoint_refuses(bundle, tmp_path):
+    r = _run(bundle, tmp_path / "nores", "--resume", steps=2)
+    assert r.returncode != 0 and "no checkpoint" in (r.stderr + r.stdout)
+
+
 def test_e10_refuses_without_cuda_unless_smoke(bundle, tmp_path):
     import torch
 

@@ -132,6 +132,9 @@ def build_model(cfg: M5Config, weights_dir: str | Path | None = None, tiny: bool
         if bb.encoder.pos_conv_embed is not None:
             for p in bb.encoder.pos_conv_embed.parameters():
                 p.requires_grad_(False)
+    if cfg.train_top == 0:  # the frozen recipe: no backbone parameter moves at all (Codex 3)
+        for p in bb.parameters():
+            p.requires_grad_(False)
     return M5Net(bb, cfg)
 
 
