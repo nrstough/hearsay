@@ -75,7 +75,7 @@ def _wav(path: Path, x: np.ndarray) -> Path:
 class FakeSpectra(torch.nn.Module):
     """Louder input = more spoof (margin negative for quiet clips). Two logits that are not an exact difference of each other
     (so a recomputed synth_logit on resume is detectable). `fail_calls` maps the k-th forward
-    (1-based) to "raise", "nan" or "shape"."""
+    (1-based) to "raise", "nan", "shape", "extra_row" or "missing_row"."""
 
     def __init__(self, gain: float = 1.0, fail_calls: dict | None = None):
         super().__init__()
@@ -95,6 +95,10 @@ class FakeSpectra(torch.nn.Module):
             return torch.stack([m * float("nan"), 0.1 * m], dim=1)
         if self.fail_calls.get(k) == "shape":
             return torch.stack([m, m, m], dim=1)
+        if self.fail_calls.get(k) == "extra_row":
+            return torch.cat([torch.stack([m, 0.1 * m], dim=1)] * 2)  # 2n rows for n windows
+        if self.fail_calls.get(k) == "missing_row":
+            return torch.stack([m, 0.1 * m], dim=1)[:-1]  # one row short, whatever n is
         return torch.stack([self.gain * 10 * (m - 0.15), 0.1 * m], dim=1)
 
 
@@ -358,10 +362,13 @@ def test_b5_default_path_unchanged():
 
 def test_b8_non_finite_or_bad_shape_is_a_failure():
     x = prepare_input(_clip(2.0))
+    for kind in ("nan", "shape", "extra_row"):
+        with pytest.raises(RuntimeError):
+            score_clip(FakeSpectra(fail_calls={1: kind}), x, ("zero",))
+    long = _clip(6.0, seed=11)  # two windows: a single output row must be rejected too
     with pytest.raises(RuntimeError):
-        score_clip(FakeSpectra(fail_calls={1: "nan"}), x, ("zero",))
-    with pytest.raises(RuntimeError):
-        score_clip(FakeSpectra(fail_calls={1: "shape"}), x, ("zero",))
+        score_clip(FakeSpectra(fail_calls={1: "missing_row"}), long, ("zero",))
+    assert score_clip(FakeSpectra(), long, ("zero",))["n_windows"] == 2
 
 
 # --- C: script, export, gates ---------------------------------------------------------------
@@ -515,19 +522,19 @@ def test_c15_no_lightgbm():
 
 def test_b6_b7_row_failures_kept_and_counted(tmp_path):
     mod = _load_script()
-    info = make_repo(tmp_path, inner=(32, 32), hold=(4, 4), n_test=8, bad=(3,))  # 3 of 64 inner = 4.7%
-    fails = {2: "raise", 5: "nan"}  # forward calls 2 and 5 (bad row 3 never reaches the model)
+    info = make_repo(tmp_path, inner=(50, 50), hold=(4, 4), n_test=8, bad=(3,))  # 5 of 100 inner = 5%, at the gate
+    fails = {2: "raise", 5: "nan", 8: "extra_row", 9: "missing_row"}  # bad row 3 never reaches the model
     assert _run(mod, tmp_path, loader=lambda d: FakeSpectra(fail_calls=fails)) == 0
     raw = pd.read_csv(tmp_path / "outputs" / "spectra" / "spectra_aasist_raw.csv")
     raw["flag"] = raw["flag"].fillna("")
     assert len(raw) == info["n_fold"] + info["n_test"]
-    assert raw.flag.value_counts().to_dict() == {"": len(raw) - 3, "decode_error": 1, "model_error": 2}
+    assert raw.flag.value_counts().to_dict() == {"": len(raw) - 5, "decode_error": 1, "model_error": 4}
     assert raw.loc[raw.flag != "", ["synth_logit", "logit"]].isna().all().all()
     pub = pd.read_csv(tmp_path / "outputs" / "detector_scores" / "spectra_aasist.csv")
-    assert pub.logit.isna().sum() == 3 and pub.score.isna().sum() == 3  # C7: rows kept, NaN
+    assert pub.logit.isna().sum() == 5 and pub.score.isna().sum() == 5  # C7: rows kept, NaN
     meta = json.loads(next((tmp_path / "models").glob("m3_spectra_*/meta.json")).read_text())
-    assert meta["failures"]["decode_error"] == 1 and meta["failures"]["model_error"] == 2
-    assert meta["inner"]["n_dropped"] + meta["holdout"]["n_dropped"] + meta["test"]["n"] - meta["test"]["n_used"] == 3
+    assert meta["failures"]["decode_error"] == 1 and meta["failures"]["model_error"] == 4
+    assert meta["inner"]["n_dropped"] + meta["holdout"]["n_dropped"] + meta["test"]["n"] - meta["test"]["n_used"] == 5
 
 
 # --- D: metrics and readouts ----------------------------------------------------------------

@@ -140,14 +140,16 @@ def score_clip(model: torch.nn.Module, x: np.ndarray, pad_modes=("repeat",),
                max_windows: int = 16) -> dict:  # fmt: skip
     """Per-mode logits for one prepared clip: {"n_samples", "n_windows", <mode>: (2,) logits,
     "n_pad_samples_<mode>": int}. Clips >= WIN forward once and every mode gets the same logits.
-    A forward whose output is not (n, 2) or not finite raises RuntimeError (a failed row)."""
+    A forward whose output is not exactly (n_windows, 2) or not finite raises RuntimeError (a
+    failed row: extra or missing rows would otherwise be averaged in silently)."""
     x = np.asarray(x, dtype=np.float32)
     out = {"n_samples": int(x.size)}
 
     def fwd(w: np.ndarray) -> np.ndarray:
         lg = forward_windows(model, w)
-        if lg.ndim != 2 or lg.shape[1] != 2 or not np.all(np.isfinite(lg)):
-            raise RuntimeError(f"model output invalid: shape {lg.shape}, finite {np.isfinite(lg).all()}")
+        if lg.shape != (w.shape[0], 2) or not np.all(np.isfinite(lg)):
+            raise RuntimeError(f"model output invalid: shape {lg.shape} for {w.shape[0]} windows, "
+                               f"finite {bool(np.isfinite(lg).all())}")  # fmt: skip
         lg = lg.mean(axis=0)
         if not np.isfinite(synth_logit(lg)):
             raise RuntimeError("synth_logit not finite")
