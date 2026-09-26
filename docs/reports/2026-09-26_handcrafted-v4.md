@@ -71,6 +71,53 @@ Full run: all six families extracted for the 20,000-clip training sample (`--cro
 
 **Reading.** The handcrafted detector does not transfer to In-the-Wild fakes at its NSA-trained threshold: it calls 97% of them real, and even the best threshold gives minDCF 1.0, no better than "always real" under the 9.33× false-alarm weight. What fails there is the threshold, not the ranking: with AUC 0.76 (v3 0.64; EER 41% → 30%) the In-the-Wild fakes sit just below the inner-fold cut (mean score 0.11 against 0.04 for real), so the logit column still orders them. Fusion refits the scale of that column, so it can use the ordering even though the fixed threshold cannot. What it does not do is false-alarm: 0.65% of the 2,000 real clips cross the threshold, against 1.2–5.7% the main chat reports for the deep detectors. For fusion that is the useful fact: the column is safe on the 4×-cost side in a domain it was never trained for, and it contributes nothing to catching In-the-Wild-style fakes. Its value stays in the NSA domain (holdout 0.17) and on generators like pro_diff. The NSA-holdout-to-ITW gap (0.17 → 1.0) is the same domain-shift headline the main chat found for M1 (0.08–0.15 → 0.37–0.40), larger here because 234 handcrafted numbers are a narrower description than XLS-R's.
 
+## Test-domain shift (found by the first fusion run)
+
+The main chat's fusion run calibrates each column with a Platt map fit on inner OOF logits, shifted to the 0.3 prior, and thresholds at 0.5. Under that map the handcrafted v4 column alone calls **56%** of the NSA test set synthetic (deep detectors: 26–27%; prior 30%). Reproducing the map here gives 56.1% for v4 and **48.8% for v3**, so the inflation predates v4. Inner and holdout numbers show nothing of it: at the same map, 9% of holdout real clips and 99% of holdout fakes score above 0.5.
+
+**Where the shift is** (`outputs/handcrafted/v4_domain_shift.csv`: per column, KS statistic of the 1,671 test files against inner train-real and against inner train-fake, the shift of the test median in train-real SD, and whether the test median lies beyond both classes). Flag = KS > 0.3 against *both* classes with the test median beyond both, i.e. a domain shift rather than a class mix.
+
+| Family | Columns | Flagged | Train-vs-test AUC, family alone |
+|---|---|---|---|
+| v3 (75 original) | 75 | 37 | **0.969** |
+| lfcc | 60 | 14 | 0.954 |
+| cqcc | 72 | 9 | 0.947 |
+| breath | 4 | 4 | 0.837 |
+| phase | 12 | 0 | 0.796 |
+| jitter | 5 | 0 | 0.622 |
+| modulation | 6 | 0 | 0.619 |
+| all 234 | 234 | 64 | 0.991 |
+
+What moves is the **spectral envelope**, not the dynamics: cepstral means (`mfcc4/5/6/10/11/13/14/16_mean`, `cqcc1/2/3_mean`, `lfcc12/13_mean`; 1.4–1.9 SD), and `centroid_mean`, `rolloff85/95_mean`, `zcr_mean` moving *down* (the test set is darker below 7 kHz, the codec-like signature the compression lens already read on 72% of it). **84% of the flagged columns move in the fake direction**, so the shift produces false alarms, the 4×-cost error. The variability columns that carry most of the class signal (stds, delta-stds, flux, contrast, pitch spread) are far less shifted, and the phase, jitter and modulation families are close to domain-neutral.
+
+**Leave-one-family-out** (same calibrated share, computed identically for every export):
+
+| Variant | Inner OOF | LibriSpeech real | pro_diff | elevenlabs | Holdout | Calibrated test share | Raw share > 0.5 |
+|---|---|---|---|---|---|---|---|
+| v3 | 0.614 | 0.77 | 1.00 | 0.80 | 0.254 | 48.8% | 42% |
+| v4a, all | 0.434 | 0.54 | 0.32 | 0.92 | 0.170 | 56.1% | 41% |
+| v4 − lfcc | 0.561 | 0.72 | 0.77 | 0.68 | 0.343 | 56.4% | 51% |
+| v4 − phase | 0.435 | 0.53 | 0.30 | 0.91 | 0.175 | 55.3% | 39% |
+| v4 − cqcc | 0.468 | 0.55 | 0.41 | 0.94 | 0.176 | 53.8% | 34% |
+| v4 − modulation | 0.428 | 0.52 | 0.29 | 0.91 | 0.173 | 57.5% | 41% |
+| v4 − breath | 0.435 | 0.55 | 0.33 | 0.93 | 0.170 | 57.3% | 42% |
+| v4 − jitter | 0.436 | 0.54 | 0.32 | 0.92 | 0.163 | 55.6% | 40% |
+
+No single family is responsible; the shift is spread over every envelope-carrying column, v3's included. Two remedies were tried next, results below: **envelope-blind variants** (drop all cepstral, centroid, roll-off and ZCR means; drop the 64 flagged columns) and **v5, training-side augmentation** (a random subset of training rows re-encoded through MP3/AAC and/or given a random spectral tilt of ±4 dB/kHz plus a 4.5–7 kHz low-pass before feature extraction, test rows untouched), so that envelope means stop being trustworthy class cues and the model leans on dynamics.
+
+**Envelope-blind variants: worse on every count.**
+
+| Variant | Columns | Inner OOF | LibriSpeech real | pro_diff | Holdout | Calibrated test share | Train-vs-test AUC of the kept columns |
+|---|---|---|---|---|---|---|---|
+| v4a, all | 234 | 0.434 | 0.54 | 0.32 | 0.170 | 56.1% | 0.991 |
+| minus all cepstral / centroid / roll-off / ZCR means (78 columns) | 156 | 0.481 | 0.56 | 0.41 | 0.325 | **67.7%** | 0.984 |
+| minus the 64 KS-flagged columns | 170 | 0.480 | 0.56 | 0.29 | 0.257 | 59.5% | 0.982 |
+| minus both | 131 | 0.508 | 0.60 | 0.40 | 0.353 | 60.5% | 0.976 |
+
+Removing the shifted columns does not remove the shift: the remaining columns still separate train from test at AUC 0.98, and the calibrated share goes *up*, so the variability columns are shifted in the fake direction too, just less visibly per column. Column pruning is not the remedy. The domain difference is a property of the whole feature description of the test recordings (darker, codec-processed), not of a few columns.
+
+_(v5 augmentation results: filled in below.)_
+
 ## What worked / what had no effect (v4)
 
 **Worked**
