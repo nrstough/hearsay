@@ -537,7 +537,7 @@ def main():
     try:
         results = run_forensic_pipeline(target_file)
         print(json.dumps(results, cls=NumpyEncoder))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI top level: report any failure as JSON and exit 1
         print(json.dumps({"error": str(e)}), file=sys.stderr)
         sys.exit(1)
 
