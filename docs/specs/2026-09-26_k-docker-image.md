@@ -7,6 +7,17 @@ Status: P1 and P2 frozen (deep mode). Plan: `docs/reports/2026-09-26_k-docker-im
 - **Time box:** plan approved by ~06:50; build and tests until ~09:30; the emulated image build runs in the background. **Hard stop 10:00:** whatever exists then is reported.
 - **Decisions at P1 freeze (Nathan, 06:02):** install Colima (done: Colima 0.x, vz + Rosetta, 6 CPU / 6 GB, VM disk on the external drive; an amd64 `python:3.12-slim-bookworm` container reports `x86_64`); ship the M1b v3 probe `models/m1_wav2vec2-xls-r-300m_L7_20260926-0521`; layer truncation on, gated by an identity test. Delivery to NSA (registry vs tarball) is deferred to the Sunday rebuild.
 
+## Deliverable run line (team name Cross Exam, set Sat Sep 26 ~11:10)
+
+```bash
+docker run --network none \
+  -v <test_dir>:/data:ro -v <out_dir>:/out \
+  -v <path>/HearsayScoreKey4TeamX.tsv:/tmpl/key.tsv:ro -e HEARSAY_TEMPLATE=/tmpl/key.tsv \
+  -e HEARSAY_TEAM=CrossExam hearsay:20260926-0916
+```
+
+It writes `<out_dir>/CrossExam_predictions.tsv` (header `filename<TAB>cm-score`, 1.0 = synthetic, rows in the template's order). The runner's own default team name is `HEARSAY`, which is wrong for the deliverable, so `HEARSAY_TEAM=CrossExam` must always be passed; no rebuild is needed because it is read at run time. The template mount is optional when the key file sits directly under `<test_dir>`; the entrypoint then finds it.
+
 ## Problem
 
 NSA's submission requires a Docker image that "executes inference on the provided test set without major configuration changes". Nothing exists: no `Dockerfile`, no `.dockerignore`, no `docker/`, and no end-to-end runner. Only M1 goes from audio to TSV today (`scripts/make_probe_csv.py`), and it writes into `submissions/` and appends `submissions/log.csv`, which is wrong inside a container. The image must reproduce the logged M1b v3 TSV (`submissions/20260926-0522_M1_m1_wav2vec2-xls-r-300m_L7_20260926-0521.tsv`, holdout minDCF 0.0717, EER 0.014, In-the-Wild minDCF 0.342) on CPU, on amd64, with no network, and be ready to take the fusion rule the main chat freezes at 22:00 without a redesign.
