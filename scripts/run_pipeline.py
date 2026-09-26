@@ -15,16 +15,20 @@ a file that does not decode, still gets a row (the default answer, `undetermined
 before scoring; an empty listing fails with no TSV. Without a template: sorted audio files.
 
 Scoring: --detectors m1b alone means M1 only, P = sigmoid(LLR + logit(0.3)) exactly as
-scripts/make_probe_csv.py; with --fusion <constants.json> (scripts/fuse.py's file) every fused
-detector runs and --rule (zmean default | stack_nonlj) is read from the constants, never refit.
-A rerun with the same --out resumes from results.jsonl; another --rule or --policy re-fuses the
-cached logits without running a model.
+scripts/make_probe_csv.py; otherwise every fused detector runs and --rule is read from the
+constants file, never refit: e_on_a (default; models/fusion_v1/constants.json from
+scripts/fuse_sweep.py: 0.8 rank(M1b) + 0.2 rank(handcrafted), M3 as false-alarm suppression only)
+or zmean | stack_nonlj (models/fusion_v0/constants.json from scripts/fuse.py, via --fusion). A rule
+the file does not define is refused. The policy then maps determinate scores to [0.001, 1] and
+pins gated files below 0.001 (hearsay.detectors.speech_gate.apply_default_answer, applied exactly
+once); --flip emits the pre-flipped variant (1 - p mapped the same way). A rerun with the same
+--out resumes from results.jsonl; another --rule, --policy or --flip re-fuses the cached logits
+without running a model.
 
 Usage:
   uv run python scripts/run_pipeline.py --data data/nsa/HackGTHearsayTesting --out outputs/run1 \
       --template data/nsa/HearsayScoreKey4TeamX.tsv --team HEARSAY --limit 50 \
-      --detectors m1b,spectra,handcrafted --fusion models/fusion_v0/constants.json --rule zmean \
-      [--compare-tsv submissions/<logged>.tsv]
+      [--rule e_on_a] [--flip] [--compare-tsv submissions/<logged>.tsv]
   docker run --network none -v <test_dir>:/data:ro -v <out_dir>:/out hearsay    # entrypoint.sh
 """
 
@@ -46,9 +50,10 @@ import soundfile as sf
 
 from hearsay import SR
 from hearsay.detectors.base import ClipContext
+from hearsay.detectors.speech_gate import BLOCK_TOP
 from hearsay.metrics import PI_SYNTH
 from hearsay.pipeline import (
-    CONSTANTS_PATH,
+    DEFAULT_CONSTANTS_PATH,
     DEFAULT_RULE,
     DETECTOR_ORDER,
     HC_DIR,
@@ -61,9 +66,9 @@ from hearsay.pipeline import (
     FusionConstants,
     Models,
     analyze_clip,
+    final_score,
     fuse_items,
     fusion_block,
-    gated_probability,
     git_sha,
     refuse,
     verdict_for,
@@ -89,9 +94,14 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--detectors", default=os.environ.get("HEARSAY_DETECTORS", ALL_SCORERS),
                     help=f"comma list of {sorted(SCORER_FLAGS)}; m1b alone = M1 only, no fusion ($HEARSAY_DETECTORS)")  # fmt: skip
     ap.add_argument("--fusion", "--constants", dest="fusion", type=Path, default=_env_path("HEARSAY_FUSION"),
-                    help="fusion constants written by scripts/fuse.py ($HEARSAY_FUSION; default "
-                         "<app-root>/models/fusion_v0/constants.json when more than m1b is requested)")  # fmt: skip
-    ap.add_argument("--rule", default=os.environ.get("HEARSAY_RULE", DEFAULT_RULE), choices=RULES)
+                    help="fusion constants file ($HEARSAY_FUSION; default <app-root>/models/fusion_v1/"
+                         "constants.json when more than m1b is requested; models/fusion_v0/constants.json "
+                         "holds zmean and stack_nonlj)")  # fmt: skip
+    ap.add_argument("--rule", default=os.environ.get("HEARSAY_RULE", DEFAULT_RULE), choices=RULES,
+                    help=f"fusion rule; must be one the constants file defines (default {DEFAULT_RULE})")  # fmt: skip
+    ap.add_argument("--flip", action="store_true",
+                    help="emit the pre-flipped variant: 1 - p through the same determinate map, block "
+                         "still at the minimum (only if NSA's scoring turns out inverted)")  # fmt: skip
     ap.add_argument("--policy", default=os.environ.get("HEARSAY_POLICY", "speech_gate"),
                     choices=["speech_gate", "none"],
                     help="none: leave the fused probability ungated (parity against pre-gate TSVs)")  # fmt: skip
@@ -128,7 +138,7 @@ def resolve_scorers(detectors: str, fusion: Path | None, app_root: Path) -> tupl
     if fusion is None and scorers == ("m1b_v3",):
         return scorers, None  # M1 only
     if fusion is None:
-        fusion = app_root / CONSTANTS_PATH.relative_to(REPO)
+        fusion = app_root / DEFAULT_CONSTANTS_PATH.relative_to(REPO)
     if scorers != DETECTOR_ORDER:
         print(f"note: fusion needs every fused detector ({', '.join(DETECTOR_ORDER)}), "
               f"not only --detectors {detectors!r}; running all of them", flush=True)  # fmt: skip
@@ -274,8 +284,8 @@ def preflight_consistent(pa: float, pb: float, abs_tol: float = PREFLIGHT_ABS_TO
 def preflight(models: Models, consts: FusionConstants | None, rule: str, tmp: Path,
               apply_gate: bool = True, **kw) -> dict:  # fmt: skip
     """plan.md: silence and a chord through the whole pipeline, twice; finite and reproducible
-    (within PREFLIGHT_ABS_TOL). Both are non-speech, so with the gate on both must land at the
-    default answer (exact checks)."""
+    (within PREFLIGHT_ABS_TOL). Both are non-speech, so with the gate on both must land in the
+    pinned block below BLOCK_TOP (exact checks)."""
     tmp.mkdir(parents=True, exist_ok=True)
     t = np.arange(4 * SR) / SR
     chord = sum(0.1 * np.sin(2 * np.pi * f * t) for f in (261.6, 329.6, 392.0))
@@ -290,8 +300,8 @@ def preflight(models: Models, consts: FusionConstants | None, rule: str, tmp: Pa
             raise RuntimeError(f"preflight {name}: not finite or not reproducible: {pa} vs {pb}")
         if a["is_speech"]:
             raise RuntimeError(f"preflight {name}: the speech gate let a non-speech clip through")
-        if apply_gate and not pa < 0.05:
-            raise RuntimeError(f"preflight {name}: gated file not at the default answer: {pa}")
+        if apply_gate and not pa < BLOCK_TOP:
+            raise RuntimeError(f"preflight {name}: gated file not in the pinned block below {BLOCK_TOP}: {pa}")
         out[name] = {"p": pa, "p_fused": a["fusion"]["p_fused"], "verdict": a["verdict"],
                      "inputs": a["fusion"]["inputs"]}  # fmt: skip
         (tmp / f"{name}.json").write_text(json.dumps(a))
@@ -319,11 +329,12 @@ def compare_tsv(ids: list[str], scores: list[float], ref: Path) -> dict:
 
 
 def missing_doc(fid: str, consts: FusionConstants | None, rule: str, apply_gate: bool,
-                pi_synth: float, version: dict) -> dict:  # fmt: skip
-    """The row for a template name with no file under --data: no detector ran, the default
-    answer applies (with --policy none, the all-imputed fused probability)."""
+                pi_synth: float, version: dict, flip: bool = False) -> dict:  # fmt: skip
+    """The row for a template name with no file under --data: no detector ran, the file sits
+    below FAILURE_TOP like a decode failure (with --policy none, the all-imputed fused probability
+    through the determinate map)."""
     fo = fuse_items([], consts, rule, pi_synth)
-    p = gated_probability(fo.p, False, apply_gate)
+    p = final_score(fo.p, False, apply_gate, key=fid, order_by=fo.p, failed=True, flip=flip)
     return {"filename": fid, "duration_s": None, "probability_synthetic": p,
             "verdict": verdict_for(p, False, False), "is_speech": False,
             "default_answer_applied": apply_gate, "fusion": fusion_block(fo), "detectors": [],
@@ -387,16 +398,19 @@ def main(argv=None) -> int:
             sys.exit(f"fusion constants {fusion} not found (run scripts/fuse.py, or --detectors m1b)")
         consts = FusionConstants.load(fusion)
         if args.rule not in consts.rules():
-            sys.exit(f"rule {args.rule!r} is not in {fusion} (has {consts.rules()})")
+            sys.exit(f"rule {args.rule!r} is not defined by {fusion} (it has {consts.rules()}); "
+                     f"pass --rule from that list or another --fusion file")  # fmt: skip
     rule = args.rule if consts is not None else "m1b_only"
     apply_gate = args.policy == "speech_gate"
-    kw = {"scorers": scorers, "pi_synth": args.pi_synth}
+    kw = {"scorers": scorers, "pi_synth": args.pi_synth, "flip": args.flip}
     print(f"{len(items)} files ({len(items) - len(todo)} cached in {cache_path}); scorers {', '.join(scorers)}; "
-          f"rule {rule}; policy {args.policy}; order from "
+          f"rule {rule}; policy {args.policy}; polarity {'flipped' if args.flip else 'our_direction'}; order from "
           f"{'template ' + str(args.template) if args.template else 'sorted filenames'}", flush=True)  # fmt: skip
 
     version = {"git_sha": git_sha(), "fusion": fusion.name if fusion else "none", "rule": rule,
-               "policy": args.policy, "scorers": list(scorers), "m1_mode": args.m1_mode}  # fmt: skip
+               "policy": args.policy, "polarity": "flipped" if args.flip else "our_direction",
+               "scorers": list(scorers), "m1_mode": args.m1_mode,
+               "fusion_final": getattr(consts, "final", None)}  # fmt: skip
     build_info = args.app_root / "BUILD_INFO"
     if build_info.exists():
         version["build_info"] = build_info.read_text().strip()
@@ -431,9 +445,11 @@ def main(argv=None) -> int:
             if fid in cache:
                 doc = cache[fid]
                 v = doc.get("version", {})
-                if doc.get("fusion", {}).get("rule") != rule or v.get("policy", "speech_gate") != args.policy:
+                if (doc.get("fusion", {}).get("rule") != rule or v.get("policy", "speech_gate") != args.policy
+                        or v.get("polarity", "our_direction") != version["polarity"]):
                     try:
-                        doc = refuse(doc, consts, rule, apply_gate=apply_gate, pi_synth=args.pi_synth)
+                        doc = refuse(doc, consts, rule, apply_gate=apply_gate, pi_synth=args.pi_synth,
+                                     flip=args.flip)  # fmt: skip
                     except (KeyError, ValueError):
                         doc = None  # the cache lacks a logit this rule needs: rescore below
                     else:  # keep the per-file JSON in step with the TSV being written
@@ -443,7 +459,7 @@ def main(argv=None) -> int:
                     continue
             t0 = time.time()
             if path is None:
-                doc = missing_doc(fid, consts, rule, apply_gate, args.pi_synth, version)
+                doc = missing_doc(fid, consts, rule, apply_gate, args.pi_synth, version, flip=args.flip)
             else:
                 doc = analyze_clip(ClipContext(path), models, consts, rule, version=version,
                                    apply_gate=apply_gate, **kw)  # fmt: skip
@@ -478,7 +494,7 @@ def main(argv=None) -> int:
     meta["share_gt_0.5"] = round(float(np.mean(np.array(scores) > 0.5)), 4)
     meta["version"] = version
 
-    stem = f"{args.team}_predictions"
+    stem = f"{args.team}_predictions" + ("_FLIPPED" if args.flip else "")
     if not args.no_tsv:
         tsv = out / f"{stem}.tsv"
         if tsv.exists():  # a new file per run, never an overwrite

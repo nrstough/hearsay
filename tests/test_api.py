@@ -15,7 +15,7 @@ from hearsay import SR
 from hearsay import api as api_mod
 from hearsay.detectors.speech_gate import BLOCK_TOP
 from hearsay.pipeline import DETECTOR_ORDER, FusionConstants
-from test_pipeline import LOGITS, TOY, FakeModels, fake_dets
+from test_pipeline import LOGITS, LOGITS_V1, TOY, TOY_V1, FakeModels, fake_dets, fake_models_v1
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def test_health_without_loading_models(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok" and body["models_loaded"] is False
-    assert body["rule"] == "zmean" and body["policy"] == "speech_gate"
+    assert body["rule"] == "e_on_a" and body["policy"] == "speech_gate"
     assert body["scorers"] == list(DETECTOR_ORDER) and body["n_results"] == 2
     assert body["version"]["fusion"] == "constants.json"
 
@@ -74,6 +74,7 @@ def test_results_need_the_env(client, monkeypatch):
 
 
 def test_analyze_uses_the_pipeline(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("HEARSAY_RULE", "zmean")  # the toy file is fusion_v0-shaped
     consts = FusionConstants.from_dict(TOY, source="toy")
     fake = FakeModels(dets=fake_dets())
     monkeypatch.setattr(api_mod, "get_models", lambda: (fake, consts))
@@ -102,10 +103,29 @@ def test_analyze_respects_rule_and_policy_env(client, monkeypatch, tmp_path):
     with wav.open("rb") as f:
         doc = client.post("/analyze", files={"file": ("x.wav", f, "audio/wav")}).json()
     assert doc["fusion"]["rule"] == "stack_nonlj" and doc["is_speech"] is False
-    assert doc["default_answer_applied"] is False and doc["probability_synthetic"] == doc["fusion"]["p_fused"]
+    assert doc["default_answer_applied"] is False  # policy off: no block, but the determinate map still applies
+    assert doc["probability_synthetic"] == pytest.approx(BLOCK_TOP + (1 - BLOCK_TOP) * doc["fusion"]["p_fused"])
+
+
+def test_analyze_default_rule_is_e_on_a_mapped_once(client, monkeypatch, tmp_path):
+    consts = FusionConstants.from_dict(TOY_V1, source="toy_v1")
+    monkeypatch.setattr(api_mod, "get_models", lambda: (fake_models_v1(), consts))
+    wav = _wav(tmp_path / "v1.wav")
+    with wav.open("rb") as f:
+        doc = client.post("/analyze", files={"file": ("v1.wav", f, "audio/wav")}).json()
+    fo = consts.fuse(LOGITS_V1, "e_on_a")
+    assert doc["fusion"]["rule"] == "e_on_a" and doc["fusion"]["p_fused"] == fo.p
+    assert doc["probability_synthetic"] == pytest.approx(BLOCK_TOP + (1 - BLOCK_TOP) * fo.p, abs=1e-15)
+    assert doc["fusion"]["detail"]["e_applied"] is True and doc["version"]["polarity"] == "our_direction"
+    assert client.get("/health").json()["rule"] == "e_on_a"
+    monkeypatch.setenv("HEARSAY_RULE", "zmean")  # a rule the file does not define is refused
+    with wav.open("rb") as f:
+        r = client.post("/analyze", files={"file": ("v1.wav", f, "audio/wav")})
+    assert r.status_code == 500 and "not defined" in r.json()["detail"]
 
 
 def test_analyze_undecodable_upload_is_undetermined(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("HEARSAY_RULE", "zmean")
     consts = FusionConstants.from_dict(TOY, source="toy")
     monkeypatch.setattr(api_mod, "get_models", lambda: (FakeModels(), consts))
     r = client.post("/analyze", files={"file": ("junk.wav", b"not audio at all", "audio/wav")})

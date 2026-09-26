@@ -15,12 +15,25 @@ Score paths, kept identical to the exports fusion was fit on (outputs/detector_s
 - spectra_aasist: `hearsay.spectra.prepare_input` -> `score_clip` in zero-pad mode, 16 windows,
   no peak normalization (scripts/score_spectra.py defaults), synth_logit = spoof - bonafide.
 
-Fusion (`FusionConstants`, from models/fusion_v0/constants.json written by scripts/fuse.py):
-z_d = (logit_d - mean_d) / std_d; zmean = mean of z; stack_nonlj = weights . z + intercept;
-p = sigmoid(a * fused + b + prior_shift) with that rule's Platt map. A fused detector that
-errored is imputed at z = 0 (its inner-fold mean) and named in the routing log. Then
-`speech_gate.apply_default_answer`: a file with no speech to judge (or that failed to decode)
-gets the default answer at the real end of the ranking.
+Fusion (`FusionConstants`), from a constants file, never refit:
+- models/fusion_v1/constants.json (scripts/fuse_sweep.py --write; the shipped rule, `e_on_a`,
+  "E on A alpha 0.2"): rank_d = searchsorted(inner_oof_sorted[d], logit_d) / len for m1b_v3
+  and handcrafted_v5; base = (1 - alpha) * rank_m1b + alpha * rank_hc; M3 as false-alarm
+  suppression only: if spectra_aasist logit < -3 and base > 0.5 then base *= 0.5 (M3 never
+  promotes; nothing is fit on M3); p = sigmoid(a * base + b + prior_shift).
+- models/fusion_v0/constants.json (scripts/fuse.py; `zmean`, `stack_nonlj`): z_d = (logit_d -
+  mean_d) / std_d; zmean = mean of z; stack_nonlj = weights . z + intercept; p = sigmoid(a *
+  fused + b + prior_shift) with that rule's Platt map.
+A fused detector that errored is imputed (z = 0 or rank = 0.5, its inner-fold centre; a missing
+M3 means no suppression) and named in the routing log. A rule the file does not define is
+refused.
+
+Policy (`hearsay.detectors.speech_gate.apply_default_answer`, the fusion consult's placement):
+determinate files score BLOCK_TOP + (1 - BLOCK_TOP) * p, i.e. in [0.001, 1]; a file with no
+speech to judge goes to the pinned block [FAILURE_TOP, BLOCK_TOP) ordered by a weak signal plus
+a hash jitter of its filename; a decode failure goes below FAILURE_TOP. `--flip` maps 1 - p the
+same way (the pre-flipped TSV, used only if NSA's scoring turns out inverted); the block stays
+at the minimum.
 """
 
 from __future__ import annotations
@@ -31,7 +44,7 @@ import os
 import subprocess
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -40,19 +53,27 @@ import numpy as np
 from hearsay import SR
 from hearsay.audio import DecodeError
 from hearsay.detectors.base import NEUTRAL_SCORE, ClipContext, DetectorResult, safe_run
-from hearsay.detectors.speech_gate import DEFAULT_ANSWER, apply_default_answer
+from hearsay.detectors.speech_gate import BLOCK_TOP, FAILURE_TOP, apply_default_answer
 from hearsay.metrics import PI_SYNTH, sigmoid
 
 REPO = Path(__file__).resolve().parents[2]
-CONSTANTS_PATH = REPO / "models" / "fusion_v0" / "constants.json"
+# The shipped rule's file is fusion_v1 (DEFAULT_CONSTANTS_PATH); CONSTANTS_PATH keeps naming the
+# fusion_v0 file, which docker/build.sh stages beside it and tests/test_docker_image.py pins.
+CONSTANTS_V0_PATH = REPO / "models" / "fusion_v0" / "constants.json"
+CONSTANTS_V1_PATH = REPO / "models" / "fusion_v1" / "constants.json"
+CONSTANTS_PATH = CONSTANTS_V0_PATH
+DEFAULT_CONSTANTS_PATH = CONSTANTS_V1_PATH
 PROBE_DIR = REPO / "models" / "m1_wav2vec2-xls-r-300m_L7_20260926-0521"
 HC_DIR = REPO / "models" / "hc_selected"
 SPECTRA_ID = "lab260/Spectra-AASIST"
 
-RULES = ("zmean", "stack_nonlj")
-DEFAULT_RULE = "zmean"
+RANK_RULE = "e_on_a"  # the fusion_v1 rule ("E on A alpha 0.2")
+Z_RULES = ("zmean", "stack_nonlj")  # the fusion_v0 rules
+RULES = (RANK_RULE, *Z_RULES)
+DEFAULT_RULE = RANK_RULE
 M1_ONLY = "m1b_only"  # no constants: the probe's own LLR plus the prior shift, as make_probe_csv.py
 DETECTOR_ORDER = ("m1b_v3", "handcrafted_v5", "spectra_aasist")
+RANKED = ("m1b_v3", "handcrafted_v5")  # the two detectors e_on_a ranks; spectra_aasist only suppresses
 SCORER_FLAGS = {"m1b": "m1b_v3", "handcrafted": "handcrafted_v5", "spectra": "spectra_aasist"}
 M1_MODES = ("segment", "windows", "auto")
 DEEP = ("m1b_v3", "spectra_aasist")  # scored by `Models`, not by a registered detector
@@ -78,28 +99,68 @@ CONTRACT_VERSION = "v0"
 class FusionOutput:
     rule: str
     inputs: dict[str, float | None]  # raw logits, None when the detector produced none
-    z: dict[str, float]
+    terms: dict[str, float]  # per-detector z (fusion_v0) or ECDF rank (fusion_v1)
     weights: dict[str, float]
-    fused: float
-    p: float
+    fused: float  # the rule's output before the Platt map (base rank, or the stacked z)
+    p: float  # Platt probability, our direction, before the policy's determinate map
     imputed: tuple[str, ...]
+    detail: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class FusionConstants:
-    """The numbers scripts/fuse.py persisted; loaded once, never refit."""
+    """The numbers scripts/fuse.py or scripts/fuse_sweep.py persisted; loaded once, never refit."""
 
     detectors: tuple[str, ...]
-    mean: dict[str, float]
-    std: dict[str, float]
     platt: dict[str, dict[str, float]]  # rule -> {a, b, prior_shift}
-    stack_weights: dict[str, float] | None
-    stack_intercept: float | None
     pi_synth: float
     source: str = "<dict>"
+    # fusion_v0 (z rules)
+    mean: dict[str, float] = field(default_factory=dict)
+    std: dict[str, float] = field(default_factory=dict)
+    stack_weights: dict[str, float] | None = None
+    stack_intercept: float | None = None
+    # fusion_v1 (rank rule)
+    rank_ref: dict[str, np.ndarray] | None = None
+    alpha: float | None = None
+    e_rule: dict[str, Any] | None = None
+    final: str | None = None
+    how: str | None = None
 
     @classmethod
     def from_dict(cls, c: Mapping[str, Any], source: str = "<dict>") -> FusionConstants:
+        if "rank_ref_inner_oof_sorted" in c:
+            return cls._from_v1(c, source)
+        return cls._from_v0(c, source)
+
+    @classmethod
+    def _from_v1(cls, c: Mapping[str, Any], source: str) -> FusionConstants:
+        refs = c["rank_ref_inner_oof_sorted"]
+        rank_ref = {}
+        for d in RANKED:
+            if d not in refs:
+                raise ValueError(f"constants: no rank reference for {d!r}")
+            ref = np.asarray(refs[d], dtype=np.float64)
+            if ref.size == 0 or not np.all(np.diff(ref) >= 0):
+                raise ValueError(f"constants: rank reference for {d!r} is empty or not sorted")
+            rank_ref[d] = ref
+        alpha = c.get("alpha_handcrafted")
+        if alpha is None or not 0.0 <= float(alpha) <= 1.0:
+            raise ValueError(f"constants: alpha_handcrafted must be in [0, 1], got {alpha!r}")
+        pl = c["platt"]
+        e = dict(c.get("e_rule") or {"applied": False})
+        if e.get("applied"):
+            for k in ("m3_logit_below", "base_rank_above", "multiply_by"):
+                if k not in e:
+                    raise ValueError(f"constants: e_rule.{k} missing")
+        return cls(detectors=DETECTOR_ORDER,
+                   platt={RANK_RULE: {k: float(pl[k]) for k in ("a", "b", "prior_shift")}},
+                   pi_synth=float(c.get("pi_synth", PI_SYNTH)), source=source, rank_ref=rank_ref,
+                   alpha=float(alpha), e_rule=e, final=str(c.get("final", RANK_RULE)),
+                   how=c.get("how"))  # fmt: skip
+
+    @classmethod
+    def _from_v0(cls, c: Mapping[str, Any], source: str) -> FusionConstants:
         dets = tuple(c["detectors"])
         std = c["standardize"]
         for d in dets:
@@ -118,31 +179,44 @@ class FusionConstants:
                 raise ValueError("constants: stack_nonlj weights do not match detectors")
             w = dict(zip(dets, (float(v) for v in st["weights"]), strict=True))
             i = float(st["intercept"])
-        return cls(
-            detectors=dets,
-            mean={d: float(std[d]["mean"]) for d in dets},
-            std={d: float(std[d]["std"]) for d in dets},
-            platt=platt, stack_weights=w, stack_intercept=i,
-            pi_synth=float(c.get("pi_synth", 0.3)), source=source,
-        )  # fmt: skip
+        return cls(detectors=dets, platt=platt, pi_synth=float(c.get("pi_synth", PI_SYNTH)),
+                   source=source, mean={d: float(std[d]["mean"]) for d in dets},
+                   std={d: float(std[d]["std"]) for d in dets}, stack_weights=w, stack_intercept=i,
+                   how=(c.get("how") or {}).get("stack_nonlj"))  # fmt: skip
 
     @classmethod
-    def load(cls, path: str | Path = CONSTANTS_PATH) -> FusionConstants:
+    def load(cls, path: str | Path = DEFAULT_CONSTANTS_PATH) -> FusionConstants:
         path = Path(path)
         return cls.from_dict(json.loads(path.read_text()), source=str(path))
 
     def rules(self) -> tuple[str, ...]:
-        return tuple(r for r in RULES if r in self.platt and (r != "stack_nonlj" or self.stack_weights))
+        """The rules this file defines, in RULES order."""
+        out = []
+        for r in RULES:
+            if r not in self.platt:
+                continue
+            if r == RANK_RULE and self.rank_ref is None:
+                continue
+            if r in Z_RULES and not self.mean:
+                continue
+            if r == "stack_nonlj" and not self.stack_weights:
+                continue
+            out.append(r)
+        return tuple(out)
+
+    def check_rule(self, rule: str) -> None:
+        if rule not in self.rules():
+            raise ValueError(f"rule {rule!r} is not defined by {self.source} (has {self.rules()})")
 
     def weights(self, rule: str) -> dict[str, float]:
-        """Per-detector weight on z: equal for zmean, the stacker's coefficients otherwise."""
+        """Per-detector weight: equal for zmean, the stacker's coefficients for stack_nonlj,
+        (1 - alpha, alpha, 0) for e_on_a (spectra only suppresses; it has no weight)."""
+        self.check_rule(rule)
+        if rule == RANK_RULE:
+            return {"m1b_v3": 1.0 - self.alpha, "handcrafted_v5": self.alpha, "spectra_aasist": 0.0}
         if rule == "zmean":
             return {d: 1.0 / len(self.detectors) for d in self.detectors}
-        if rule == "stack_nonlj":
-            if self.stack_weights is None:
-                raise ValueError("constants have no stack_nonlj weights")
-            return dict(self.stack_weights)
-        raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
+        return dict(self.stack_weights)
 
     def standardize(self, logits: Mapping[str, float | None]) -> tuple[dict[str, float], tuple[str, ...]]:
         z, imputed = {}, []
@@ -154,35 +228,49 @@ class FusionConstants:
                 z[d] = (float(v) - self.mean[d]) / self.std[d]
         return z, tuple(imputed)
 
+    def rank(self, det: str, logit: float) -> float:
+        """ECDF position against the detector's inner-OOF logits (scripts/fuse_sweep.py's rank)."""
+        ref = self.rank_ref[det]
+        return float(np.searchsorted(ref, float(logit)) / len(ref))
+
     def fuse(self, logits: Mapping[str, float | None], rule: str = DEFAULT_RULE) -> FusionOutput:
-        """scripts/fuse.py's arithmetic, read back from the constants: no fitting."""
-        if rule not in self.platt:
-            raise ValueError(f"constants have no Platt map for rule {rule!r}")
-        z, imputed = self.standardize(logits)
-        zs = np.array([z[d] for d in self.detectors], dtype=np.float64)
-        if rule == "zmean":
-            fused = float(np.mean(zs))
-        elif rule == "stack_nonlj":
-            w = np.array([self.weights(rule)[d] for d in self.detectors], dtype=np.float64)
-            fused = float(zs @ w + self.stack_intercept)  # LogisticRegression.decision_function
-        else:
-            raise ValueError(f"rule must be one of {RULES}, got {rule!r}")
-        pl = self.platt[rule]
-        p = float(sigmoid(pl["a"] * fused + pl["b"] + pl["prior_shift"]))
+        """The persisted rule's arithmetic, read back from the constants: no fitting."""
+        self.check_rule(rule)
         inputs = {d: (None if logits.get(d) is None else float(logits[d])) for d in self.detectors}
-        return FusionOutput(rule, inputs, z, self.weights(rule), fused, p, imputed)
-
-
-def truncate_backbone(model, layer: int) -> int:
-    """Drop encoder layers above `layer`. hidden_states[k] is the input to encoder layer k (both
-    Wav2Vec2 encoder variants append it before running the layer), so keeping layers[:layer+1]
-    leaves hidden_states[layer] bit-identical and skips the 24-layer model's remaining work
-    (about two thirds of M1's CPU time at layer 7). Verified on the real backbone
-    (tests/test_pipeline.py::test_truncated_backbone_keeps_layer_7_identical)."""
-    layers = model.encoder.layers
-    keep = min(int(layer) + 1, len(layers))
-    model.encoder.layers = layers[:keep]
-    return keep - 1
+        pl = self.platt[rule]
+        if rule == RANK_RULE:
+            terms, imputed, detail = {}, [], {"final": self.final}
+            for d in RANKED:
+                v = inputs[d]
+                if v is None or not math.isfinite(v):
+                    terms[d], imputed = 0.5, [*imputed, d]  # the inner-fold median
+                else:
+                    terms[d] = self.rank(d, v)
+            a = self.alpha
+            base = (1 - a) * terms["m1b_v3"] + a * terms["handcrafted_v5"]  # fuse_sweep's order of ops
+            detail["base"] = base
+            m3 = inputs["spectra_aasist"]
+            m3_ok = m3 is not None and math.isfinite(m3)
+            if not m3_ok:
+                imputed.append("spectra_aasist")  # no evidence: no suppression
+            e = self.e_rule or {}
+            applied = bool(e.get("applied") and m3_ok and m3 < e["m3_logit_below"]
+                           and base > e["base_rank_above"])  # fmt: skip
+            fused = base * e["multiply_by"] if applied else base
+            detail["e_applied"] = applied
+            detail["e_rule"] = e
+        else:
+            terms, imputed = self.standardize(logits)
+            zs = np.array([terms[d] for d in self.detectors], dtype=np.float64)
+            if rule == "zmean":
+                fused = float(np.mean(zs))
+            else:
+                w = np.array([self.weights(rule)[d] for d in self.detectors], dtype=np.float64)
+                fused = float(zs @ w + self.stack_intercept)  # LogisticRegression.decision_function
+            detail = {}
+            imputed = tuple(imputed)
+        p = float(sigmoid(pl["a"] * fused + pl["b"] + pl["prior_shift"]))
+        return FusionOutput(rule, inputs, terms, self.weights(rule), float(fused), p, tuple(imputed), detail)
 
 
 def m1_only(logit: float | None, pi_synth: float = PI_SYNTH) -> FusionOutput:
@@ -207,6 +295,18 @@ def set_cpu_threads(n: int | None = None) -> int:
     k = max(1, min(int(n) if n else cores, MAX_THREADS))
     torch.set_num_threads(k)
     return k
+
+
+def truncate_backbone(model, layer: int) -> int:
+    """Drop encoder layers above `layer`. hidden_states[k] is the input to encoder layer k (both
+    Wav2Vec2 encoder variants append it before running the layer), so keeping layers[:layer+1]
+    leaves hidden_states[layer] bit-identical and skips the 24-layer model's remaining work
+    (about two thirds of M1's CPU time at layer 7). Verified on the real backbone
+    (tests/test_pipeline.py::test_truncated_backbone_keeps_layer_7_identical)."""
+    layers = model.encoder.layers
+    keep = min(int(layer) + 1, len(layers))
+    model.encoder.layers = layers[:keep]
+    return keep - 1
 
 
 class Models:
@@ -340,7 +440,33 @@ def _feat(items: list[dict], name: str, key: str) -> float | None:
     return None
 
 
-def routing_log(items: list[dict], is_speech: bool, fo: FusionOutput, decoded: bool) -> list[str]:
+def fusion_line(fo: FusionOutput) -> str:
+    """The routing log's fusion entry: what was combined and, for e_on_a, whether M3 suppressed."""
+    if fo.rule == M1_ONLY:
+        line = "fusion: none (m1b_only: the XLS-R probe's LLR plus the 0.3 prior shift)"
+    elif fo.rule == RANK_RULE:
+        w = fo.weights
+        d = fo.detail
+        line = (f"fusion: {fo.rule} ({d.get('final')}): {w['m1b_v3']:.1f} x rank(m1b_v3) + "
+                f"{w['handcrafted_v5']:.1f} x rank(handcrafted_v5) = {d.get('base', fo.fused):.3f}")  # fmt: skip
+        m3 = fo.inputs.get("spectra_aasist")
+        e = d.get("e_rule") or {}
+        if d.get("e_applied"):
+            line += (f"; M3 false-alarm suppression applied (margin {m3:+.2f} < {e['m3_logit_below']:g} and "
+                     f"base > {e['base_rank_above']:g}: x{e['multiply_by']:g} -> {fo.fused:.3f})")  # fmt: skip
+        elif m3 is None:
+            line += "; M3 unavailable, no suppression"
+        else:
+            line += f"; M3 margin {m3:+.2f}, no suppression (M3 never promotes)"
+    else:
+        line = f"fusion: {fo.rule} over {', '.join(fo.inputs)}"
+    if fo.imputed:
+        line += f"; imputed at the inner-fold centre: {', '.join(fo.imputed)}"
+    return line
+
+
+def routing_log(items: list[dict], is_speech: bool, fo: FusionOutput, decoded: bool,
+                apply_gate: bool = True) -> list[str]:  # fmt: skip
     """Plain-English record of what ran and why, from the detector features."""
     log: list[str] = []
     if not decoded:
@@ -378,33 +504,16 @@ def routing_log(items: list[dict], is_speech: bool, fo: FusionOutput, decoded: b
                    f"(min window similarity {cmin:.2f}); evidence only, never fused")  # fmt: skip
     voiced = _feat(items, "speech_gate", "voiced_frac")
     gate_status = next((it["status"] for it in items if it["name"] == "speech_gate"), "missing")
+    gated = apply_gate and not is_speech
+    policy = ("default-answer policy applied (pinned below every scored file)" if gated
+              else "default-answer policy not applied" if apply_gate
+              else "policy off (--policy none)")  # fmt: skip
     if gate_status == "ok":
-        log.append(f"speech_gate: is_speech={str(is_speech).lower()} (voiced {voiced:.0%} of frames); "
-                   f"default-answer policy {'applied' if not is_speech else 'not applied'}")  # fmt: skip
+        log.append(f"speech_gate: is_speech={str(is_speech).lower()} (voiced {voiced:.0%} of frames); {policy}")
     else:
-        log.append(f"speech_gate: {gate_status}; default-answer policy "
-                   f"{'applied' if not is_speech else 'not applied'}")  # fmt: skip
-    if fo.rule == M1_ONLY:
-        fusion = "fusion: none (m1b_only: the XLS-R probe's LLR plus the 0.3 prior shift)"
-    else:
-        fusion = f"fusion: {fo.rule} over {', '.join(fo.inputs)}"
-    if fo.imputed:
-        fusion += f"; imputed at the inner-fold mean: {', '.join(fo.imputed)}"
-    log.append(fusion)
+        log.append(f"speech_gate: {gate_status}; {policy}")
+    log.append(fusion_line(fo))
     return log
-
-
-def gated_probability(p_fused: float, is_speech: bool, apply_gate: bool = True) -> float:
-    """The default-answer policy on one fused probability (array in, array out upstream)."""
-    if not apply_gate:
-        return float(p_fused)
-    return float(apply_default_answer(np.array([p_fused]), np.array([is_speech]))[0])
-
-
-def fusion_block(fo: FusionOutput) -> dict[str, Any]:
-    return {"rule": fo.rule, "inputs": fo.inputs, "weights": fo.weights, "z": fo.z,
-            "fused": fo.fused, "p_fused": fo.p, "imputed": list(fo.imputed),
-            "default_answer": DEFAULT_ANSWER}  # fmt: skip
 
 
 def verdict_for(p: float, is_speech: bool, decoded: bool) -> str:
@@ -413,17 +522,39 @@ def verdict_for(p: float, is_speech: bool, decoded: bool) -> str:
     return "synthetic" if p >= 0.5 else "real"
 
 
+def final_score(p_fused: float, is_speech: bool, apply_gate: bool = True, *, key: str | None = None,
+                order_by: float | None = None, failed: bool = False, flip: bool = False) -> float:  # fmt: skip
+    """The policy on one file (array in, array out upstream): the determinate map
+    BLOCK_TOP + (1 - BLOCK_TOP) * p for speech files, the pinned block for gated ones (ordered by
+    `order_by`, jittered by a hash of `key`), below FAILURE_TOP when `failed`. `flip` maps 1 - p
+    the same way (the pre-flipped TSV); `apply_gate=False` maps every file as determinate."""
+    p = 1.0 - p_fused if flip else p_fused
+    speech = bool(is_speech or not apply_gate)
+    sig = None if order_by is None else np.array([1.0 - order_by if flip else order_by])
+    out = apply_default_answer(np.array([p]), np.array([speech]), order_by=sig,
+                               keys=None if key is None else [key],
+                               failed=np.array([bool(failed) and not speech]))  # fmt: skip
+    return float(out[0])
+
+
+def fusion_block(fo: FusionOutput) -> dict[str, Any]:
+    return {"rule": fo.rule, "inputs": fo.inputs, "weights": fo.weights, "terms": fo.terms,
+            "fused": fo.fused, "p_fused": fo.p, "imputed": list(fo.imputed), "detail": fo.detail,
+            "block_top": BLOCK_TOP, "failure_top": FAILURE_TOP}  # fmt: skip
+
+
 def analyze_clip(ctx: ClipContext, models: Models, consts: FusionConstants | None,
                  rule: str = DEFAULT_RULE, detectors: Sequence | None = None,
                  version: Mapping[str, Any] | None = None, apply_gate: bool = True,
                  scorers: Sequence[str] = DETECTOR_ORDER,
-                 pi_synth: float = PI_SYNTH) -> dict[str, Any]:  # fmt: skip
+                 pi_synth: float = PI_SYNTH, flip: bool = False) -> dict[str, Any]:  # fmt: skip
     """One `AnalyzeResponse` for one clip. Never raises on a bad file: a decode failure gives an
     `undetermined` response with every detector in error and the default answer applied.
-    `apply_gate=False` (the runner's `--policy none`) reports the gate but leaves the fused
-    probability alone, for parity against TSVs that predate the gate. `scorers` names the fused
+    `apply_gate=False` (the runner's `--policy none`) reports the gate but maps every file as
+    determinate, for parity against TSVs that predate the gate. `scorers` names the fused
     columns to compute (the runner's --detectors); `consts=None` means no fusion: the M1 probe's
-    posterior alone (`m1_only`). The evidence detectors always run."""
+    posterior alone (`m1_only`). `flip` emits the pre-flipped score. The evidence detectors
+    always run."""
     t_start = time.time()
     items: list[dict[str, Any]] = []
     scorers = tuple(scorers)
@@ -454,27 +585,30 @@ def analyze_clip(ctx: ClipContext, models: Models, consts: FusionConstants | Non
                 items.append(_error_entry(name, f"{type(e).__name__}: {e}", time.time() - t0))
 
     fo = fuse_items(items, consts, rule, pi_synth)
-
     gate = _feat(items, "speech_gate", "is_speech")
     is_speech = bool(decoded and (gate is None or gate))  # a gate error does not gate
-    p = gated_probability(fo.p, is_speech, apply_gate)
+    m1 = fo.inputs.get("m1b_v3")
+    order_by = float(sigmoid(m1)) if m1 is not None else fo.p  # the block's weak ordering signal
+    p = final_score(fo.p, is_speech, apply_gate, key=ctx.path.name, order_by=order_by,
+                    failed=not decoded, flip=flip)  # fmt: skip
 
     ver = dict(version) if version is not None else {"git_sha": git_sha(), "models": models.version()}
     ver.setdefault("fusion", "none" if consts is None
                    else (Path(consts.source).name if consts.source != "<dict>" else consts.source))  # fmt: skip
     ver.setdefault("contract", CONTRACT_VERSION)
-    ver.setdefault("rule", rule)
+    ver.setdefault("rule", fo.rule)
     ver.setdefault("policy", "speech_gate" if apply_gate else "none")
+    ver.setdefault("polarity", "flipped" if flip else "our_direction")
     return {
         "filename": ctx.path.name,
         "duration_s": round(x.size / SR, 2) if decoded else None,
         "probability_synthetic": p,
-        "verdict": verdict_for(p, is_speech, decoded),
+        "verdict": verdict_for(fo.p, is_speech, decoded),
         "is_speech": is_speech,
         "default_answer_applied": apply_gate and not is_speech,
         "fusion": fusion_block(fo),
         "detectors": items,
-        "routing_log": routing_log(items, is_speech, fo, decoded),
+        "routing_log": routing_log(items, is_speech, fo, decoded, apply_gate),
         "flag": "" if decoded else "decode_error",
         "seconds": round(time.time() - t_start, 3),
         "version": ver,
@@ -503,9 +637,10 @@ def fuse_items(items: list[dict], consts: FusionConstants | None, rule: str,
 
 
 def refuse(doc: Mapping[str, Any], consts: FusionConstants | None, rule: str,
-           apply_gate: bool = True, pi_synth: float = PI_SYNTH) -> dict[str, Any]:  # fmt: skip
-    """Re-fuse a cached response under another rule or gate policy from its stored logits; no
-    model runs. Raises KeyError when the cache lacks a logit the rule needs (rescore instead)."""
+           apply_gate: bool = True, pi_synth: float = PI_SYNTH, flip: bool = False) -> dict[str, Any]:  # fmt: skip
+    """Re-fuse a cached response under another rule, gate policy or polarity from its stored
+    logits; no model runs. Raises KeyError when the cache lacks a logit the rule needs (rescore
+    instead)."""
     inputs = doc["fusion"]["inputs"]
     if consts is None:
         fo = m1_only(inputs["m1b_v3"], pi_synth)
@@ -513,14 +648,18 @@ def refuse(doc: Mapping[str, Any], consts: FusionConstants | None, rule: str,
         fo = consts.fuse({d: inputs[d] for d in consts.detectors}, rule)
     is_speech = bool(doc["is_speech"])
     decoded = doc.get("duration_s") is not None
-    p = gated_probability(fo.p, is_speech, apply_gate)
+    m1 = fo.inputs.get("m1b_v3")
+    order_by = float(sigmoid(m1)) if m1 is not None else fo.p
+    p = final_score(fo.p, is_speech, apply_gate, key=doc["filename"], order_by=order_by,
+                    failed=not decoded, flip=flip)  # fmt: skip
     out = dict(doc)
     out["probability_synthetic"] = p
     out["default_answer_applied"] = apply_gate and not is_speech
-    out["verdict"] = verdict_for(p, is_speech, decoded)
-    out["fusion"] = {**doc["fusion"], **fusion_block(fo)}
-    log = [line for line in doc.get("routing_log", []) if not line.startswith("fusion:")]
-    out["routing_log"] = [*log, routing_log([], is_speech, fo, True)[-1]]
-    out["version"] = {**doc.get("version", {}), "rule": rule,
-                      "policy": "speech_gate" if apply_gate else "none"}  # fmt: skip
+    out["verdict"] = verdict_for(fo.p, is_speech, decoded)
+    out["fusion"] = fusion_block(fo)
+    log = [line for line in doc.get("routing_log", []) if not line.startswith(("fusion:", "speech_gate:"))]
+    out["routing_log"] = [*log, *routing_log(doc.get("detectors", []), is_speech, fo, True, apply_gate)[-2:]]
+    out["version"] = {**doc.get("version", {}), "rule": fo.rule,
+                      "policy": "speech_gate" if apply_gate else "none",
+                      "polarity": "flipped" if flip else "our_direction"}  # fmt: skip
     return out

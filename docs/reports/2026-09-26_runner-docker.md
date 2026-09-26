@@ -1,4 +1,60 @@
-# Runner, API and Docker status (Sat Sep 26, 2026, runner lane; written 07:35)
+# Runner, API and Docker status (Sat Sep 26, 2026, runner lane; written 07:35, v2 at 08:35)
+
+## v2 (08:35): the shipped fusion rule changed to `e_on_a`; parity re-established
+
+The pre-declared sweep (`docs/reports/2026-09-26_fusion-sweep-predeclared.md`, commit 299cab3)
+replaced zmean with **"E on A alpha 0.2"**, persisted in `models/fusion_v1/constants.json` by
+`scripts/fuse_sweep.py --write`. The runner now defaults to it (`--rule e_on_a`, the constants
+file's `final` = `E_on_A_alpha0.2`):
+
+1. `rank_d = searchsorted(inner_oof_sorted[d], logit_d) / len` for m1b_v3 and handcrafted_v5;
+2. `base = 0.8 * rank_m1b + 0.2 * rank_hc`;
+3. M3 as false-alarm suppression only: if the spectra_aasist margin < -3 and base > 0.5, base *= 0.5
+   (M3 never promotes; nothing is fit on M3; a missing M3 means no suppression);
+4. `p = sigmoid(a * base + b + logit(0.3))` with the file's Platt map;
+5. the determinate map `0.001 + 0.999 * p` and the pinned block below 0.001 for gated files are
+   the **policy**, done by `hearsay.detectors.speech_gate.apply_default_answer` (e2d5291) and
+   applied **exactly once**: `FusionConstants.fuse` returns the Platt `p` (`fusion.p_fused`), then
+   `final_score` calls `apply_default_answer(p, is_speech, order_by=sigmoid(m1b LLR), keys=[filename],
+   failed=[decode failure])`. Gated files land in [0.0001, 0.001) ordered by the weak M1b signal
+   with a hash jitter of the filename; decode failures and missing files below 0.0001.
+   `tests/test_pipeline.py::test_analyze_with_the_shipped_rule_applies_the_map_exactly_once` pins
+   the single application; the exact test below would drift by ~1e-3 if it were applied twice.
+
+`--fusion models/fusion_v0/constants.json --rule zmean|stack_nonlj` still selects the 06:02 rules;
+a rule the chosen file does not define is refused before scoring (`rule 'e_on_a' is not defined
+by models/fusion_v0/constants.json (it has ('zmean', 'stack_nonlj'))`). `--flip` emits the
+pre-flipped variant (1 - p through the same map, block still at the minimum) as
+`<team>_predictions_FLIPPED.tsv`. `--policy none` disables the block only; the determinate map is
+step 5 of the rule and always applies, so scores are in [0.001, 1] in every mode. The cache
+identity already covered the constants file's sha, so a `--out` scored under fusion_v0 is moved
+aside and rescored; `--flip`, like `--rule` and `--policy`, re-fuses cached logits in 0.1 s.
+Every pre-existing flag and environment variable is unchanged. The API defaults to `e_on_a`
+(`HEARSAY_RULE`; `HEARSAY_FUSION=models/fusion_v0/constants.json` for the old rules) and answers
+500 with the file's rule list when asked for a rule the file lacks.
+
+**Parity v2** (Mac, CPU, 50 template files, gate on: 0 gated, 0 decode errors; a busier machine
+than at 06:50, 1.7 s/file):
+
+| Comparison | Spearman | max abs diff | mean abs diff |
+|---|---|---|---|
+| exported logits -> fusion_v1 constants -> policy vs `20260926-0813_..._our_direction.tsv` (1,671 rows, test at 1e-6) | | 4.4e-16 | |
+| same, `--flip`, vs `20260926-0813_..._FLIPPED_only_if_NSA_scores_inverted.tsv` | | 4.4e-16 | |
+| live from audio, `e_on_a`, vs the our-direction TSV | 1.000000 | 2.7e-5 | 6.5e-7 |
+| live from audio, `--flip` (re-fused from the cache), vs the FLIPPED TSV | 1.000000 | 2.7e-5 | 6.5e-7 |
+| live from audio, `--fusion fusion_v0 --rule zmean`, vs the 06:02 zmean TSV | 1.000000 | 1.0e-3 | 7.7e-4 |
+
+The zmean row's 1.0e-3 is the determinate map itself (the 06:02 TSVs predate it: p vs
+0.001 + 0.999 p differs by at most 0.001); the underlying Platt p still matches to 2.4e-5 (v1
+section below). The rank rule is far less sensitive to the CPU-vs-MPS logit noise than the z
+rules were: a 5e-4 M1 logit difference moves a rank only when it crosses one of 16,142 reference
+values, hence 2.7e-5 on p (one or two files crossing a step) with a mean of 6.5e-7. Per-detector
+logit parity is unchanged from the 06:50 table (same score paths).
+
+Commits: see the end of this file's commit list (v2 commit noted in the handoff message).
+
+---
+
 
 Owner of this lane: the runner chat. Files: `src/hearsay/pipeline.py`, `scripts/run_pipeline.py`,
 `src/hearsay/api.py`, `tests/test_pipeline.py`, `tests/test_api.py`, this report. The Docker image

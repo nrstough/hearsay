@@ -5,15 +5,17 @@ memory and serves the precomputed responses of a runner --out directory.
 
   uv run uvicorn hearsay.api:app --port 8000
 
-  POST /analyze            multipart `file` (any audio) -> AnalyzeResponse (2-4 s cold-cached CPU)
+  POST /analyze            multipart `file` (any audio) -> AnalyzeResponse (1-2 s on CPU once loaded)
   GET  /results/{filename} the precomputed AnalyzeResponse from $HEARSAY_RESULTS (a runner --out)
   GET  /results            the filenames available there
   GET  /health             status, whether the models are loaded, versions
 
 Environment: HEARSAY_RESULTS (runner --out dir with results/<filename>.json), HEARSAY_RULE
-(zmean | stack_nonlj, default zmean), HEARSAY_POLICY (speech_gate | none), HEARSAY_FUSION
-(constants.json; unset = models/fusion_v0/constants.json), HEARSAY_DETECTORS (m1b for the
-probe-only mode, default m1b,spectra,handcrafted), HEARSAY_PROBE, HEARSAY_HC, OMP_NUM_THREADS.
+(e_on_a default, the shipped rank blend in models/fusion_v1/constants.json; zmean | stack_nonlj
+need HEARSAY_FUSION=models/fusion_v0/constants.json), HEARSAY_POLICY (speech_gate | none),
+HEARSAY_FUSION (a constants file; unset = models/fusion_v1/constants.json), HEARSAY_DETECTORS
+(m1b for the probe-only mode, default m1b,spectra,handcrafted), HEARSAY_PROBE, HEARSAY_HC,
+OMP_NUM_THREADS.
 Models load lazily on the first /analyze (about 5 s) and one clip scores at a time.
 """
 
@@ -33,7 +35,7 @@ from starlette.concurrency import run_in_threadpool
 
 from hearsay.detectors.base import ClipContext
 from hearsay.pipeline import (
-    CONSTANTS_PATH,
+    DEFAULT_CONSTANTS_PATH,
     DEFAULT_RULE,
     DETECTOR_ORDER,
     HC_DIR,
@@ -67,7 +69,7 @@ def settings() -> dict[str, Any]:
     return {
         "rule": rule, "policy": os.environ.get("HEARSAY_POLICY", "speech_gate"),
         "scorers": scorers if m1_only else DETECTOR_ORDER, "m1_only": m1_only,
-        "fusion": None if m1_only else Path(fusion) if fusion else CONSTANTS_PATH,
+        "fusion": None if m1_only else Path(fusion) if fusion else DEFAULT_CONSTANTS_PATH,
         "probe": Path(os.environ.get("HEARSAY_PROBE", PROBE_DIR)),
         "hc": Path(os.environ.get("HEARSAY_HC", HC_DIR)),
         "results": Path(results) if results else None,
@@ -145,6 +147,9 @@ def get_result(filename: str) -> dict[str, Any]:
 def _analyze_path(path: Path) -> dict[str, Any]:
     models, consts = get_models()
     s = settings()
+    if consts is not None and s["rule"] not in consts.rules():
+        raise HTTPException(500, f"HEARSAY_RULE={s['rule']!r} is not defined by {consts.source} "
+                                 f"(it has {consts.rules()})")  # fmt: skip
     with _lock:  # one clip at a time: the models and torch threads are shared
         return analyze_clip(ClipContext(path), models, consts, s["rule"],
                             apply_gate=s["policy"] == "speech_gate", scorers=s["scorers"])  # fmt: skip
