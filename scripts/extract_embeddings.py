@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -55,6 +56,7 @@ def main() -> None:
     ap.add_argument("--crop", choices=["none", "test"], default="none",
                     help="segment mode: random crop to NSA test-duration lengths (training)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--prefetch", type=int, default=4, help="decode threads (segment mode)")
     args = ap.parse_args()
 
     m = pd.read_csv(args.manifest)
@@ -83,15 +85,21 @@ def main() -> None:
                 flag_col[r] = str(f)
             continue
         if args.segment:
-            embs = []
-            for r in rows:
+            def prep(r: int) -> tuple[int, np.ndarray, str]:
                 try:
                     x = prepare_segment(load_audio(m.path.iloc[r]), crop_s[r], args.seed + r)
+                    return r, x, ""
                 except DecodeError:
-                    flag_col[r] = "decode_error"
-                    x = np.zeros(SR, dtype=np.float32)
-                n_win_col[r] = 1
-                embs.append(embed_segment(model, x))
+                    return r, np.zeros(SR, dtype=np.float32), "decode_error"
+
+            embs = []
+            # Decode (ffmpeg subprocess, releases the GIL) in threads while the GPU embeds;
+            # map() keeps row order, so outputs are identical to the serial loop.
+            with ThreadPoolExecutor(args.prefetch) as pool:
+                for r, x, flag in pool.map(prep, rows):
+                    flag_col[r] = flag
+                    n_win_col[r] = 1
+                    embs.append(embed_segment(model, x))
             np.savez(
                 shard_path, emb=np.stack(embs).astype(np.float16), row=np.array(rows),
                 n_windows=n_win_col[rows], flag=np.array([flag_col[r] for r in rows]),
