@@ -68,3 +68,20 @@ def probe_audio(path: str | Path) -> dict:
         "duration_s": float(dur) if dur else None,
         "bit_rate": int(fmt["bit_rate"]) if fmt.get("bit_rate") else None,
     }
+
+
+def windows(x: np.ndarray, win: int, hop: int | None = None) -> np.ndarray:
+    """(n_windows, win) float32 covering the clip, the last window flush with the end.
+
+    Clips shorter than `win` are tiled (repeat-padded) to one window, matching how the SSL
+    anti-spoof checkpoints were trained; empty input becomes one silent window.
+    """
+    hop = hop or win // 2
+    if x.size == 0:
+        x = np.zeros(win, dtype=np.float32)
+    if x.size < win:
+        x = np.tile(x, win // x.size + 1)[:win]
+    starts = list(range(0, x.size - win + 1, hop))
+    if starts[-1] + win < x.size:
+        starts.append(x.size - win)
+    return np.stack([x[s : s + win] for s in starts]).astype(np.float32)

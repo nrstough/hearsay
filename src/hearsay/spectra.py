@@ -19,6 +19,8 @@ import numpy as np
 import torch
 import torchaudio
 
+from hearsay.audio import windows
+
 REPO = Path(__file__).resolve().parents[2]
 WEIGHTS = REPO / "weights" / "Spectra-AASIST"
 WIN = 64_600
@@ -48,23 +50,11 @@ def load_spectra(device: str | None = None) -> torch.nn.Module:
     return model.eval().to(device)
 
 
-def windows(x: np.ndarray) -> np.ndarray:
-    """(n_windows, WIN) float32. Short clips are tiled, as in the model card's pad_random."""
-    if x.size == 0:
-        x = np.zeros(WIN, dtype=np.float32)
-    if x.size < WIN:
-        x = np.tile(x, WIN // x.size + 1)[:WIN]
-    starts = list(range(0, x.size - WIN + 1, HOP))
-    if starts[-1] + WIN < x.size:
-        starts.append(x.size - WIN)
-    return np.stack([x[s : s + WIN] for s in starts]).astype(np.float32)
-
-
 @torch.inference_mode()
 def spectra_logits(model: torch.nn.Module, x: np.ndarray, max_windows: int = 16) -> np.ndarray:
     """Window-averaged (logit_spoof, logit_bonafide) for one 16 kHz mono clip."""
     device = next(model.parameters()).device
-    w = torch.from_numpy(windows(x)[:max_windows])
+    w = torch.from_numpy(windows(x, WIN, HOP)[:max_windows])
     w = torchaudio.functional.preemphasis(w)
     return model(w.to(device)).float().cpu().numpy().mean(axis=0)
 

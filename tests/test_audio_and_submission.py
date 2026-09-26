@@ -162,3 +162,14 @@ def test_append_log(tmp_path):
     rows = list(csv.DictReader(log.open()))
     assert rows[0]["rung"] == "M0"
     assert rows[0]["validation_score_clean_only"] == "0.5"
+
+
+@pytest.mark.parametrize(("n", "expect"), [(0, 1), (100, 1), (64_000, 1), (64_001, 2), (96_000, 2), (160_000, 4)])
+def test_windows_cover_clip(n, expect):
+    from hearsay.audio import windows
+
+    x = np.arange(n, dtype=np.float32)
+    w = windows(x, 64_000)
+    assert w.shape == (expect, 64_000) and w.dtype == np.float32
+    if n >= 64_000:
+        assert w[0, 0] == 0 and w[-1, -1] == n - 1
