@@ -38,7 +38,7 @@ The design:
 | Handcrafted spectral and prosody detector (75 interpretable features) | Done: `hearsay.detectors.handcrafted`. Holdout minDCF 0.25, EER 4.3% (v3: test-length crops + band match, LightGBM). Blind to grad_tts, pro_diff and ElevenLabs. Export `outputs/detector_scores/handcrafted.csv`. |
 | Compression, container, ENF, splice detectors | Done against the contract (`hearsay.detectors.{compression,container,enf,splice}`; `import hearsay.detectors.engineered` registers all five). Container is rule-based (constant on this test set, by design); ENF and splice are mild rule-based scores plus evidence. Exports in `outputs/detector_scores/`. Report: `docs/reports/2026-09-26_cpu-detectors.md`. |
 | Spectra-AASIST (second deep detector), fine-tuning, fusion, orchestrator, Docker | Not started. See the ladder in `docs/plan.md`. |
-| Tests | 152 passing (`uv run pytest -q`), ruff clean. |
+| Tests | 215 passing (`uv run pytest -q`), ruff clean. |
 
 ## Data
 
