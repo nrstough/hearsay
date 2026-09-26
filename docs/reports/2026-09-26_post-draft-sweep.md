@@ -1,6 +1,6 @@
 # Post-draft sweep: the locked table and the packet (Sat Sep 26, 2026, 19:08 EDT)
 
-**Recommendation: KEEP.** None of T2, W4 or P_wl passes its pre-declared test. `submissions/CrossExam_predictions.tsv` (sha256 `fb783076…`, the file NSA scored at minDCF 0.0733) stays final. H_noise is still pending: its export is expected ~20:30 from the CPU chat and will be judged by the same frozen rule in a second run appended below. Both outside opinions put its test-set effect at zero.
+**Recommendation: KEEP.** None of the four candidates (T2, W4, P_wl, H_noise) passes its pre-declared test. `submissions/CrossExam_predictions.tsv` (sha256 `fb783076…`, the file NSA scored at minDCF 0.0733) stays final. H_noise is still pending: its export is expected ~20:30 from the CPU chat and will be judged by the same frozen rule in a second run appended below. Both outside opinions put its test-set effect at zero.
 
 **Provenance:**
 
@@ -23,7 +23,7 @@ Every cell is minDCF (lower is better). "Brief" is the brief's cost, 9.33·P_FA 
 | T2 (second M3 tier) | 0.1351 / 0.2997 | 0.0065 / 0.0087 | 0.2280 / 0.2385 | [0, 13] | 1.3% / 12.2% | 0.9857 | 0 | **FAIL** (gate) |
 | W4 (M5 weight 0.4, post hoc) | 0.1373 / 0.3366 | 0.0065 / 0.0088 | 0.1997 / 0.2075 | [0, 13] | 1.0% / 11.7% | 0.9702 | 4 | **BAKEOFF FAIL** |
 | P_wl (WavLM as a fourth column) | 0.1557 / 0.3330 | 0.0030 / 0.0071 | 0.2047 / 0.2300 | [0, 6] | 1.3% / 10.0% | 0.9667 | 9 | **FAIL** (gate and room) |
-| H_noise (handcrafted v6) | pending | | | | | | | NOT RUN at 19:08; export ~20:30 |
+| H_noise (handcrafted v6) | 0.1366 / 0.3058 | 0.0070 / 0.0103 | 0.2283 / 0.2405 | [0, 14] | 1.25% / 11.9% | 0.9953 | 1 | **FAIL** (gate; run 2, 19:17) |
 
 ## Verdicts
 
@@ -78,3 +78,24 @@ There are no passers, so rule 7 does not arise. The decision is **KEEP**: `submi
 
 - **H_noise:** judged by the frozen gate. Its diagnostic uses the CPU chat's noise-AUC numbers via `--hnoise-evidence`; without them it fails.
 - **Nathan's ruling window:** the packet is ready now. With no passers there is nothing to ratify. His word confirms KEEP, or waits for H_noise.
+
+## Run 2 (19:17): H_noise, and the final report
+
+The CPU chat's v6 export arrived at 19:16, earlier than the expected 20:30. It came with its noise-AUC evidence in `outputs/channel/hc_noise.json` (sha256 `2d4b4455…`; bundle `models/hc_lgbm_20260926-191630`). The run:
+
+`uv run python scripts/fuse_sweep_v3.py --hnoise-evidence 0.7716,0.9931 --hnoise-evidence-source outputs/channel/hc_noise.json`
+
+The **final report** has sha256 `354502ca559118fb3f785ce04986b80a53c3e73453636dbc8b3e7b57c4bbddff`, archived as `sweep_v3_report_20260926-191752.json`. This is the hash `--write` would require. The 19:08 report (`c2b6bc22…`) is kept as `sweep_v3_report_20260926-190836.json`. T2, W4 and P_wl are unchanged cell for cell between the two runs.
+
+**H_noise fails the gate** on 2a, 3a, 3b, 5-brief, 5-averse and 5-diagnostic.
+- **Metrics:** every cell is a little worse than CURRENT.
+  - inner Δ −0.0015 / −0.0061
+  - holdout −0.0005 / −0.0016
+  - ITW −0.0003 / −0.0020
+- **Diagnostic:** it fails. The v6 AUC under 20 dB white noise is **0.7716**, below the 0.90 bar (v5b: 0.6403). Its clean AUC is 0.9931, within 0.005 of 0.998.
+
+The noise twins recover part of the 20 dB lane, but not enough to reach the bar. They also cost the clean holdout: the column alone goes from 0.137 to 0.227, per the CPU chat.
+
+**Decision: KEEP**, with all four candidates judged. `submissions/CrossExam_predictions.tsv` (sha256 `fb783076…`) is final.
+
+After the Codex audit (19:17), the gate code now requires the full five-kind perturbation cohort and all ten bake-off cells. A partial cohort is INVALID. Re-running with that code reproduces `354502ca…` byte for byte.

@@ -75,6 +75,9 @@ ROOM = {"itw_brief_gain": 0.030, "itw_averse_gain": 0.030, "catches": 19}
 PWL_MIN_CATCHES, CORRECTIVE_MIN = 16, 0.5
 HNOISE = {"noise_auc_min": 0.90, "clean_auc_v5": 0.998, "clean_tol": 0.005}  # the CPU chat's pre-declared bar
 BOOT_N, BOOT_SEED, PERTURB_REG, TRIPWIRE = 2000, 0, 0.010, 1e-9
+PERTURB_KINDS = ("none", "mp3", "noise20", "speed", "shift1")  # the channel lane's cohort; all five are required
+PERTURB_PER_CLASS = 250
+PERTURB_CELLS = tuple(f"{k}_{c}" for k in PERTURB_KINDS for c in ("brief", "averse"))
 POPS, COSTS = ("inner", "holdout", "itw"), ("brief", "averse")
 CELLS = [f"{p}_{c}" for p in POPS for c in COSTS]
 EPS = 1e-12  # absorbs float representation in comparisons of 4-decimal values
@@ -263,7 +266,10 @@ def cluster_bootstrap(y, s_cur, s_cand, groups, n=BOOT_N, seed=BOOT_SEED, return
 
 def bakeoff_verdict(standing: dict, perturb_deltas: dict | None, tripwire: float | None, boot: dict | None) -> dict:
     parts = {"1_standing_rule": bool(standing["ok"])}
-    if perturb_deltas is None or tripwire is None or not tripwire <= TRIPWIRE:
+    if perturb_deltas is None or set(perturb_deltas) != set(PERTURB_CELLS):
+        return {"parts": parts, "verdict": "INVALID",
+                "reason": f"perturbation cells must be exactly the 10 of {PERTURB_KINDS} x (brief, averse)"}
+    if tripwire is None or not tripwire <= TRIPWIRE:
         return {"parts": parts, "verdict": "INVALID",
                 "reason": f"perturbation tripwire {tripwire} > {TRIPWIRE} or perturbation cells missing"}
     parts["2_perturbation"] = all(v >= -PERTURB_REG - EPS for v in perturb_deltas.values())
@@ -406,14 +412,24 @@ def rule_eval(ctx: dict, weights: dict, tiers, shipped: pd.Series) -> dict:
     return {"base": base, "sc": sc, "readout": r, "platt": platt, "test": ta}
 
 
+def check_cohort(df: pd.DataFrame) -> None:
+    """The perturbation cohort must hold exactly the five kinds, each with 250 bona fide and 250 spoof rows."""
+    got = df.groupby(["kind", "label"]).size().to_dict()
+    want = {(k, lab): PERTURB_PER_CLASS for k in PERTURB_KINDS for lab in ("bonafide", "spoof")}
+    if got != want:
+        raise ValueError(f"perturbation cohort incomplete or unexpected: {got}")
+
+
 def perturb_eval(df: pd.DataFrame, consts: dict, rules: dict) -> dict:
-    """rules: name -> (weights over the shipped three, tiers). Ranks from the shipped inner-OOF references."""
+    """rules: name -> (weights over the shipped three, tiers). Ranks from the shipped inner-OOF references.
+    The cohort's composition is checked first (check_cohort); a partial cohort raises."""
+    check_cohort(df)
     ref = {k: np.asarray(v) for k, v in consts["rank_ref_inner_oof_sorted"].items()}
     ranks = {k: rank_vs(ref[k], df[k].to_numpy(float)) for k in ref}
     scores = {n: apply_tiers(blend(ranks, w), df["spectra_aasist"].to_numpy(float), t) for n, (w, t) in rules.items()}
     y = (df.label == "spoof").to_numpy(int)
     cells = {n: {f"{k}_{c}": round(f(y[(df.kind == k).to_numpy()], s[(df.kind == k).to_numpy()]), 4)
-                 for k in df.kind.unique() for c, f in (("brief", brief), ("averse", averse))}
+                 for k in PERTURB_KINDS for c, f in (("brief", brief), ("averse", averse))}
              for n, s in scores.items()}  # fmt: skip
     trip = float(np.max(np.abs(scores["CURRENT"] - df["fused"].to_numpy(float)))) if "CURRENT" in scores else None
     return {"cells": cells, "tripwire": trip, "scores": scores, "y": y}
@@ -531,8 +547,9 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
     # mechanism diagnostics
     if name == "T2":
         fires = {s: t2_fires(ctx["y"][s], cand["base"][s], ctx["m3"][s]) for s in ("inner_oof", "holdout", "itw")}
+        check_cohort(perturb)  # a partial cohort makes T2 INVALID, never a vacuous zero-fire pass
         py = (perturb.label == "spoof").to_numpy(int)
-        for k in perturb.kind.unique():
+        for k in PERTURB_KINDS:
             m = (perturb.kind == k).to_numpy()
             fires[f"perturb_{k}"] = t2_fires(py[m], perturb.fused_base.to_numpy(float)[m],
                                              perturb.spectra_aasist.to_numpy(float)[m])  # fmt: skip

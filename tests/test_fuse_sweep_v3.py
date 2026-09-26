@@ -273,6 +273,17 @@ def test_bootstrap_missing_speaker_raises():
         v3.cluster_bootstrap(y, a, b, spk, n=5)
 
 
+def _cohort(rng, cols):
+    """The full perturbation cohort shape: 5 kinds x (250 bona fide + 250 spoof)."""
+    n = len(v3.PERTURB_KINDS) * 2 * v3.PERTURB_PER_CLASS
+    df = pd.DataFrame({"kind": np.repeat(v3.PERTURB_KINDS, 2 * v3.PERTURB_PER_CLASS),
+                       "label": np.tile(["bonafide", "spoof"], n // 2)})  # fmt: skip
+    for k, (lo, hi) in cols.items():
+        df[k] = rng.uniform(lo, hi, n)
+    df["spectra_aasist"] = rng.normal(-3, 2, n)
+    return df
+
+
 def _cells10(v=0.0):
     return {f"{k}_{c}": v for k in ("none", "mp3", "noise20", "speed", "shift1") for c in ("brief", "averse")}
 
@@ -283,9 +294,30 @@ def _cells10(v=0.0):
     (True, {**_cells10(0.0), "mp3_brief": -0.0101}, {"brief_p5": 0.001, "averse_p5": 0.001}, "FAIL"),
     (True, {**_cells10(0.0), "mp3_brief": -0.010}, {"brief_p5": 0.001, "averse_p5": 0.001}, "PASS"),
     (True, _cells10(0.0), {"brief_p5": 0.001, "averse_p5": 0.0}, "FAIL"),
+    (True, _cells10(0.0), {"brief_p5": 0.0, "averse_p5": 0.001}, "FAIL"),
+    (True, _cells10(0.0), {"brief_p5": -0.01, "averse_p5": 0.001}, "FAIL"),
 ])
 def test_bakeoff_parts(standing, pert, boot, verdict):
     assert v3.bakeoff_verdict({"ok": standing}, pert, 0.0, boot)["verdict"] == verdict
+
+
+def test_bakeoff_requires_all_ten_cells():
+    ok_boot = {"brief_p5": 1.0, "averse_p5": 1.0}
+    only_noise = {"noise20_brief": 0.05, "noise20_averse": 0.02}
+    assert v3.bakeoff_verdict({"ok": True}, only_noise, 0.0, ok_boot)["verdict"] == "INVALID"
+    partial = _cells10(0.0)
+    partial.pop("shift1_averse")
+    assert v3.bakeoff_verdict({"ok": True}, partial, 0.0, ok_boot)["verdict"] == "INVALID"
+
+
+def test_check_cohort_rejects_partial():
+    rng = np.random.default_rng(1)
+    full = _cohort(rng, {"m1b_v3": (0, 1)})
+    v3.check_cohort(full)
+    with pytest.raises(ValueError):
+        v3.check_cohort(full[full.kind != "shift1"])
+    with pytest.raises(ValueError):
+        v3.check_cohort(full.iloc[1:])
 
 
 def test_bakeoff_tripwire_invalid():
@@ -297,9 +329,7 @@ def test_bakeoff_tripwire_invalid():
 def test_perturb_eval_tripwire_and_rounding():
     refs = {"m1b_v3": [0.0, 1.0, 2.0, 3.0], "handcrafted_v5": [0.0, 1.0, 2.0, 3.0], "m5_xlsr_ft": [0.0, 1.0, 2.0, 3.0]}
     rng = np.random.default_rng(7)
-    n = 40
-    df = pd.DataFrame({"kind": np.repeat(["none", "mp3"], n // 2), "label": np.tile(["bonafide", "spoof"], n // 2),
-                       **{k: rng.uniform(0, 3, n) for k in refs}, "spectra_aasist": rng.normal(-3, 2, n)})
+    df = _cohort(rng, {k: (0, 3) for k in refs})
     ranks = {k: v3.rank_vs(np.array(refs[k]), df[k].to_numpy()) for k in refs}
     df["fused"] = v3.apply_tiers(v3.blend(ranks, v3.CURRENT_W), df.spectra_aasist.to_numpy(), v3.E_TIERS)
     pe = v3.perturb_eval(df, {"rank_ref_inner_oof_sorted": refs}, {"CURRENT": (v3.CURRENT_W, v3.E_TIERS)})
@@ -472,10 +502,7 @@ def _world(tmp_path, monkeypatch, seed=0):
     base = v3.build(base_cols, m3, labels)
     shipped = pd.Series(rng.uniform(0.01, 1.0, 30), index=[f"HGT{i}.wav" for i in range(30)])
     consts = {"rank_ref_inner_oof_sorted": {k: base["ref"][k].tolist() for k in base_cols}}
-    pk = pd.DataFrame({"kind": np.repeat(["none", "mp3"], 40), "label": np.tile(["bonafide", "spoof"], 40)})
-    for k in base_cols:
-        pk[k] = rng.normal(0, 1.5, len(pk))
-    pk["spectra_aasist"] = rng.normal(-2, 1.5, len(pk))
+    pk = _cohort(rng, {k: (-2, 3) for k in base_cols})
     ranks = {k: v3.rank_vs(base["ref"][k], pk[k].to_numpy()) for k in base_cols}
     pk["fused_base"] = v3.blend(ranks, v3.CURRENT_W)
     pk["fused"] = v3.apply_tiers(pk.fused_base.to_numpy(), pk.spectra_aasist.to_numpy(), v3.E_TIERS)
@@ -594,10 +621,20 @@ def test_world_rule7_common_rows_and_fallback(tmp_path, monkeypatch):
     assert out2["decision"]["pick"] is None and "rule7_error" in out2 and out2["decision"]["line"].startswith("KEEP")
 
 
+def test_world_partial_cohort_invalidates_t2_and_w4(tmp_path, monkeypatch):
+    world, _ = _world(tmp_path, monkeypatch)
+    world["perturb"] = world["perturb"][world["perturb"].kind != "speed"]
+    out = v3.run_candidates(world)
+    assert out["T2"]["status"] == "INVALID" and out["W4"]["status"] == "INVALID"
+    assert "cohort" in out["T2"]["reason"]
+
+
 def test_world_t2_diagnostic_counterfactual(tmp_path, monkeypatch):
     world, _ = _world(tmp_path, monkeypatch)
     pk = world["perturb"].copy()
-    pk.loc[pk.index[1], ["spectra_aasist", "fused_base"]] = [-7.0, 0.8]  # one spoof row in kind 'none'
+    pk.loc[pk.label == "spoof", "spectra_aasist"] = 0.0  # no spoof fires anywhere ...
+    assert v3.run_candidates({**world, "perturb": pk})["T2"]["diagnostic"]["ok"] is True
+    pk.loc[pk.index[1], ["spectra_aasist", "fused_base"]] = [-7.0, 0.8]  # ... then exactly one, in kind 'none'
     world["perturb"] = pk
     t2 = v3.run_candidates(world)["T2"]
     assert t2["diagnostic"]["deeper_tier_fires"]["perturb_none"]["spoof"] == 1

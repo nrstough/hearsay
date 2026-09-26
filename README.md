@@ -411,7 +411,7 @@ We used AI coding assistants heavily, and we say so plainly. The full disclosure
 | XLS-R 300M, `facebook/wav2vec2-xls-r-300m` | Hugging Face (Meta) | Apache-2.0 | Frozen backbone for M1/M1b (layer 7) and M5 (first 12 layers); both are fused |
 | Spectra-AASIST, `lab260/Spectra-AASIST` | Hugging Face | unclear: repo header says Apache-2.0, model card says MIT | M3, scored off the shelf, false-alarm suppression only |
 | ECAPA-TDNN, `speechbrain/spkrec-ecapa-voxceleb` | Hugging Face (SpeechBrain) | Apache-2.0 | Speaker-drift evidence |
-| WavLM Large / Base, `microsoft/wavlm-large`, `microsoft/wavlm-base` | Hugging Face (Microsoft) | no license on the card; released through Microsoft's unilm repo (MIT) | Downloaded as bake-off challengers; never run |
+| WavLM Large / Base, `microsoft/wavlm-large`, `microsoft/wavlm-base` | Hugging Face (Microsoft) | no license on the card; released through Microsoft's unilm repo (MIT) | Large: evaluated as a frozen probe in the post-draft bake-off. It caught 41 of the shipped rule's 122 In-the-Wild misses but worsened inner CV, so it failed the pre-declared gate and is not shipped (`docs/reports/2026-09-26_post-draft-sweep.md`). Base: never run |
 
 ### Datasets
 

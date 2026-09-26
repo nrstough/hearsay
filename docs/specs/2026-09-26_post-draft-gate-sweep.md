@@ -188,3 +188,12 @@ The re-run verdicts are unchanged: T2 FAIL, W4 BAKEOFF FAIL, P_wl and H_noise NO
 - **H.** The 20:30 H_noise run will record its new report sha256 in the sweep doc.
 
 A re-run with the fixed code reproduces the locked report byte for byte (sha256 `c2b6bc22…`). `tests/test_fuse_sweep_v3.py`: 102 passed.
+
+## Codex audit, round 1 (19:17; Overall Fail) and fixes
+
+The audit is `docs/specs/2026-09-26_post-draft-gate-sweep-audit.md`. Scope Excellent; Review compliance, Freeze integrity and Regression Acceptable; Plan adherence, Test coverage and Documentation Fail.
+1. **Perturbation completeness.** `check_cohort` now requires exactly the five kinds × 250 bona fide + 250 spoof rows. It runs in `perturb_eval` and in T2's diagnostic, and a partial cohort makes the candidate INVALID. `bakeoff_verdict` requires exactly the ten cells.
+2. **Missing counterfactual.** A brief-cost bootstrap p5 of ≤ 0 (0 and −0.01) now has its own test. Missing-kind and missing-cell tests were added, and T2 and W4 are tested as INVALID on a partial cohort.
+3. **Documentation.** The CLAUDE.md disclosure and the README asset table now say WavLM Large was evaluated as a probe, failed the pre-declared gate and is not shipped.
+
+The results are unchanged: the re-run reproduces the final report `354502ca…` byte for byte, with KEEP. `tests/test_fuse_sweep_v3.py`: 106 passed, 1 skipped (the NOT RUN data test, skipped because `handcrafted_v6` now exists).
