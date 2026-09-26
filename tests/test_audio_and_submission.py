@@ -217,3 +217,15 @@ def test_min_cost_perfect_and_bayes_threshold():
     assert math.isclose(float(sigmoid(decision_logit(math.log(4), 0.5))), 0.5)
     # above pi_synth = 0.8 the constant decision flips to "synthetic"
     assert sigmoid(decision_logit(0.0, 0.79)) < 0.5 < sigmoid(decision_logit(0.0, 0.81))
+
+
+def test_normalize_windows_removes_level_and_offset():
+    from hearsay.embed import normalize_windows
+
+    rng = np.random.default_rng(0)
+    w = rng.standard_normal((2, 1000)).astype(np.float32)
+    a = normalize_windows(w * 0.54 + 0.1)
+    b = normalize_windows(w * 1.0)
+    assert np.allclose(a, b, atol=1e-4)
+    assert np.allclose(a.mean(axis=1), 0, atol=1e-5) and np.allclose(a.std(axis=1), 1, atol=1e-3)
+    assert np.isfinite(normalize_windows(np.zeros((1, 100)))).all()  # silence stays finite

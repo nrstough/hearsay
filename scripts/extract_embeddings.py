@@ -1,7 +1,8 @@
 """Frozen SSL embeddings for M1 and the bake-off.
 
-For each clip: load_audio -> 4 s windows (50% hop, first --max-windows) -> frozen backbone with
-all hidden states -> mean-pool over time per layer -> average over windows. Stores every layer
+For each clip: load_audio -> 4 s windows (50% hop, first --max-windows) -> hearsay.embed
+(per-window normalization, frozen backbone, all hidden states, time-mean per layer) -> average
+over windows. Same code path as the per-clip scorer (hearsay.embed.embed_clip). Stores every layer
 (fp16) so layer choice is a probe-time decision, not a re-extraction.
 
 Output: outputs/embeddings/<model>/<name>/shard_XXXXX.npz with
@@ -23,20 +24,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from transformers import AutoModel
 
 from hearsay import SR
 from hearsay.audio import DecodeError, load_audio, windows
+from hearsay.embed import embed_windows, load_backbone
 
 REPO = Path(__file__).resolve().parents[1]
-
-
-@torch.inference_mode()
-def embed_batch(model, wins: list[np.ndarray], device: str) -> np.ndarray:
-    """(n_windows, n_layers, dim) float32: per-layer time-mean of each window."""
-    x = torch.from_numpy(np.stack(wins)).to(device)
-    hs = model(x, output_hidden_states=True).hidden_states
-    return torch.stack([h.mean(dim=1) for h in hs], dim=1).float().cpu().numpy()
 
 
 def main() -> None:
@@ -58,7 +51,7 @@ def main() -> None:
     out = REPO / "outputs" / "embeddings" / args.model / args.name
     out.mkdir(parents=True, exist_ok=True)
 
-    model = AutoModel.from_pretrained(REPO / "weights" / args.model).eval().to(args.device)
+    model = load_backbone(args.model, args.device)
     win = int(args.win_s * SR)
     n_win_col, flag_col = np.zeros(len(m), int), [""] * len(m)
     t0, n_done = time.time(), 0
@@ -83,10 +76,7 @@ def main() -> None:
             n_win_col[r] = len(w)
             owners += [r] * len(w)
             wins += list(w)
-        feats = np.concatenate(
-            [embed_batch(model, wins[i : i + args.batch], args.device)
-             for i in range(0, len(wins), args.batch)]
-        )  # fmt: skip
+        feats = embed_windows(model, wins, batch=args.batch)
         owners = np.array(owners)
         emb = np.stack([feats[owners == r].mean(axis=0) for r in rows]).astype(np.float16)
         np.savez(
