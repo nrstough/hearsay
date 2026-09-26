@@ -69,7 +69,7 @@ M5 wins the hardest fold (ElevenLabs) and ties three, but loses fold 1 (diffgan_
 
 - **Pilot** (fold 4, 600 steps, LR decayed to zero): 0.81; throughput ~190 clips/s at 3.4 s crops on an A100 40 GB, 2,500 steps ≈ 16–20 min including evals and checkpoint pushes.
 - **The extra pools are the difference on the unseen commercial generator**: ASV19 bona fide (40 VCTK speakers) + the 2.5k A01–A06 anchor + MLAAD at 12% of the spoof side take fold 4 from 0.76 to 0.41. NSA-only fine-tuning fits the seen generators (training loss near the label-smoothing floor) and does not transfer.
-- Realized augmentation rates per source × label: 0.646–0.655 in every cell (class-blind confirmed).
+- Realized augmentation rates per source × label: 0.646–0.655 in every cell (class-blind confirmed). Trivial-feature AUCs on the realized training stream (1,920 items after sampling, crop, augmentation and band-limit; `outputs/m5_runs/stream_shortcut.json`): pooled duration 0.6881, peak 0.5585, RMS 0.5429, leading silence 0.5083; worst per source 0.7333 (DiffSSD duration: long spoofs are cropped to the batch length while short real clips are used whole, so realized length carries a mild cue; the attention mask exposes it). All under the 0.85 gate.
 - The top-3-layers recipe (LR 5e-6) was cancelled once the frozen result came in; not measured.
 
 ### Full model on the outer holdout (3,858 rows; playht + wavegrad2 + 26 bona fide groups)
@@ -98,7 +98,7 @@ M5 wins the hardest fold (ElevenLabs) and ties three, but loses fold 1 (diffgan_
 - A100 SXM4/PCIe on vast.ai at $0.61–0.81/h, image `pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime`; box setup 8–9 min (apt, pip, 5.3 GB bundle pull at 6 Gbps, XLS-R from the HF Hub, tree-sha check); codec pass 16,015 variants in 273 s on 16 cores.
 - Fine-tune: ~190 clips/s at 3.4 s crops; 2,500 steps ≈ 16–20 min with evals and checkpoint pushes. Frozen recipe: 2,500 steps ≈ 12 min; the full model 3,000 steps ≈ 13 min plus 7 min of holdout/test scoring.
 - 7 rentals (two hosts never booted, two chains failed on my own config-string bugs, see below); **total spend $5.09** (`docs/reports/cloud-expense-ledger.md`).
-- CPU inference (Docker path, `scripts/m5_score.py`): 0.19–0.25 s per clip on the M3 Pro; 1,671 test clips ≈ 6 min. Parity Mac-CPU-on-raw-WAV vs A100-on-bundled-FLAC over 50 test clips: Spearman 0.9999, median |Δlogit| 0.0007, max 0.012 (`outputs/m5_runs/parity_f6.json`). The first parity run showed a 0.28 outlier because the CPU scorer band-limited before trimming (M1's order) while the exports trimmed first; the scorer now uses the exported order (commit after the 07:50 critique).
+- CPU inference (Docker path, `scripts/m5_score.py`): 0.19–0.25 s per clip on the M3 Pro; 1,671 test clips ≈ 6 min. Parity over 50 test clips (`outputs/m5_runs/parity_f6.json`): same input (bundled FLAC), Mac CPU vs A100: max |Δlogit| 0.00445, Spearman 1.0; raw WAV vs bundled FLAC, both on CPU: max 0.01117, median 0.0; combined: max 0.012, Spearman 0.9999. The first parity run showed a 0.28 outlier because the CPU scorer band-limited before trimming (M1's order) while the exports trimmed first; the scorer now uses the exported order (commit after the 07:50 critique).
 - Checkpoint: private HF Hub repo `nrs124554433/hearsay-m5-xlsr` (backbone 657 MB safetensors + head + `hashes.json`), re-downloaded and sha-verified. Provenance: the base weights were fetched from the Hub by the box with the config sha checked but no revision pin (the pin exists for future runs).
 
 ## What worked, what didn't
