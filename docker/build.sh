@@ -1,8 +1,8 @@
 #!/bin/bash
 # Build the linux/amd64 HEARSAY image (run spec D3, D12). Stages the shipped model bundles into
 # docker/build/models/ with symlinks resolved (cp -RL): the probe under its real name (the
-# runner's default PROBE_DIR), models/hc_selected, models/cmp_selected and
-# models/fusion_v0/constants.json. Records BUILD_INFO and the git sha, tags hearsay:<stamp> and
+# runner's default PROBE_DIR), models/hc_selected, models/cmp_selected and every
+# models/fusion_*/constants.json (the runner's default is fusion_v1). Records BUILD_INFO and the git sha, tags hearsay:<stamp> and
 # hearsay:latest. Env: PROBE_DIR, IMAGE (default hearsay). --print-args: resolve only.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
