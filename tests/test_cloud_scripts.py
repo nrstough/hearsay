@@ -153,3 +153,43 @@ exit 1
     assert "PROVISIONED" not in r.stdout
     assert "destroy instance 4242" in log.read_text()
     assert not (home / ".hearsay_vast" / "tjob" / "PROVISIONED").exists()
+
+
+def test_g2_reaper_retries_until_the_instance_is_gone(tmp_path):
+    """Stubbed vastai: the first destroy silently fails (instance still listed), the second
+    works. DESTROYED must appear only after the instance is absent."""
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    state = tmp_path / "state"
+    (state / "job").mkdir(parents=True)
+    (state / "job" / "CID").write_text("77")
+    calls = tmp_path / "calls"
+    (stubs / "uvx").write_text(f"""#!/bin/bash
+echo "$@" >> {calls}
+n=$(grep -c 'destroy instance' {calls} 2>/dev/null || echo 0)
+case "$*" in
+  *'show instances'*) if [ "$n" -ge 2 ]; then echo '[]'; else echo '[{{"id": 77}}]'; fi;;
+  *'destroy instance'*) echo ok;;
+esac
+""")
+    (stubs / "rclone").write_text("#!/bin/bash\necho DONE\n")  # STATUS says DONE
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    home = tmp_path / "home"
+    (home / ".config" / "vastai").mkdir(parents=True)
+    (home / ".config" / "vastai" / "vast_api_key").write_text("stub")
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home),
+           "POLL": "1", "DEADLINE": str(int(__import__("time").time()) + 3600)}
+    # run the reaper's loop body three times by replacing its infinite loop with a bounded one
+    src = (CLOUD / "reaper.sh").read_text().replace('STATE="$HOME/.hearsay_vast"', f'STATE="{state}"')
+    src = src.replace('. "$HERE/r2_guard.sh"', f'. "{CLOUD}/r2_guard.sh"')  # the copy lives in tmp
+    src = src.replace("while :; do", "for _i in 1 2 3; do", 1).replace("sleep 5\n", "sleep 0\n")
+    script = tmp_path / "reaper_bounded.sh"
+    script.write_text(src)
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env,
+                       check=False, timeout=60)
+    assert "not confirmed; retrying" in r.stdout, r.stdout + r.stderr
+    assert (state / "job" / "DESTROYED").exists()
+    assert calls.read_text().count("destroy instance 77") == 2

@@ -51,15 +51,20 @@ def newest_m1_dir(nsa_only: bool = True) -> Path:
 M1_DIR = newest_m1_dir()
 
 
-def find_runs(root: Path, arm: str, train_top: int | None = None) -> dict[str, Path]:
+def find_runs(root: Path, arm: str, train_top: int | None = None,
+              min_steps: int = 2500) -> dict[str, Path]:  # fmt: skip
     """{fold or 'full': run dir} for the newest DONE run per fold of the given arm and recipe
-    (train_top: 0 = frozen backbone, 12 = full fine-tune; None = any)."""
+    (train_top: 0 = frozen backbone, 12 = full fine-tune; None = any) with at least `min_steps`
+    steps, so a later short diagnostic run (a pilot, a resume probe) can never replace a final
+    model (Codex round 4). --pinned lists the six run dirs explicitly and bypasses the search."""
     out: dict[str, Path] = {}
     for rm in sorted(root.rglob("run_meta.json"), key=lambda p: p.stat().st_mtime):
         meta = json.loads(rm.read_text())
         if meta.get("arm") != arm:
             continue
         if train_top is not None and (meta.get("config") or {}).get("train_top") != train_top:
+            continue
+        if int(meta.get("steps") or 0) < min_steps:
             continue
         d = rm.parent
         fold = str(meta["fold"])
@@ -118,6 +123,10 @@ def main() -> None:
     ap.add_argument("--arm", default="nsa_extra")
     ap.add_argument("--train-top", type=int, default=None,
                     help="recipe filter on run_meta config.train_top (0 = frozen backbone)")
+    ap.add_argument("--min-steps", type=int, default=2500,
+                    help="ignore runs with fewer steps (pilots, resume probes)")
+    ap.add_argument("--pinned", type=Path, default=None,
+                    help="JSON {fold: run_dir} naming the six final runs explicitly")
     ap.add_argument("--bundle-manifest", type=Path,
                     default=Path("/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/m5_bundle/v1/manifest.csv"))
     ap.add_argument("--out-name", default="m5_xlsr_ft")
@@ -134,7 +143,16 @@ def main() -> None:
     folds = pd.read_csv(FOLDS)
     folds["fold"] = folds.fold.astype(str)
     test = pd.read_csv(REPO / "outputs/manifests/nsa_test.csv")
-    runs = find_runs(args.runs, args.arm, args.train_top)
+    if args.pinned:
+        runs = {k: Path(v) for k, v in json.loads(args.pinned.read_text()).items()}
+        for k, d in runs.items():
+            meta = json.loads((d / "run_meta.json").read_text())
+            assert str(meta["fold"]) == k and meta["arm"] == args.arm, (k, d)
+            if args.train_top is not None:
+                assert meta["config"].get("train_top") == args.train_top, (k, d)
+            assert int(meta["steps"]) >= args.min_steps, (k, d, meta["steps"])
+    else:
+        runs = find_runs(args.runs, args.arm, args.train_top, args.min_steps)
     print("runs:", {k: str(v) for k, v in runs.items()})
     if "full" not in runs:
         raise SystemExit("no full-model run for this arm")
@@ -232,6 +250,8 @@ def main() -> None:
     out_dir = REPO / "models" / f"{args.out_name}_{stamp}"
     out_dir.mkdir(parents=True, exist_ok=True)
     shutil.copytree(full / "model", out_dir / "model", dirs_exist_ok=True)
+    (out_dir / "final_runs.json").write_text(json.dumps(  # the pin for any re-assembly
+        {k: str(v) for k, v in runs.items()}, indent=2))
     scores_path = REPO / "outputs" / "detector_scores" / f"{args.out_name}.csv"
     scores_path.parent.mkdir(parents=True, exist_ok=True)
     export.to_csv(scores_path, index=False)

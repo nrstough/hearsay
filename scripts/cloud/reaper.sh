@@ -16,6 +16,9 @@ export VAST_API_KEY="${VAST_API_KEY:-$(cat "$HOME/.config/vastai/vast_api_key")}
 VAST="uvx vastai"
 py() { "$REPO/.venv/bin/python" -c "$@"; }
 kill_() { echo y | $VAST destroy instance "$1" >/dev/null 2>&1; }
+gone() { $VAST show instances --raw 2>/dev/null | py "import sys,json
+xs=json.load(sys.stdin) or []
+print('yes' if not any(i['id']==$1 for i in xs) else 'no')" 2>/dev/null; }
 
 # per-job state lives in files (macOS ships bash 3.2: no associative arrays)
 while :; do
@@ -42,8 +45,13 @@ while :; do
     [ -z "$REASON" ] && [ "$ST" = "?" ] && [ "$AGE" -ge $((STALL_MIN * 2)) ] && REASON="no STATUS for ${AGE}m"
     if [ -n "$REASON" ]; then
       echo "$(date '+%H:%M:%S') [$JOB] $REASON -> destroy $CID"
-      kill_ "$CID"; date +%s > "$d/DESTROYED"
-      printf '| %s | vast.ai | %s | %s | destroyed (%s) | | | | \n' "$(date '+%Y-%m-%d %H:%M')" "$CID" "$JOB" "$REASON" >> "$LEDGER"
+      kill_ "$CID"; sleep 5
+      if [ "$(gone "$CID")" = yes ]; then   # only a confirmed absence ends the watch (Codex 4)
+        date +%s > "$d/DESTROYED"
+        printf '| %s | vast.ai | %s | %s | destroyed (%s) | | | | \n' "$(date '+%Y-%m-%d %H:%M')" "$CID" "$JOB" "$REASON" >> "$LEDGER"
+      else
+        echo "$(date '+%H:%M:%S') [$JOB] destroy of $CID not confirmed; retrying next poll"
+      fi
     else
       echo "$(date '+%H:%M:%S') [$JOB] $ST (${AGE}m)"
     fi

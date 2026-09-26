@@ -40,7 +40,7 @@ def _fake_runs(tmp_path: Path, folds: pd.DataFrame, test: pd.DataFrame, arm="nsa
         pd.DataFrame({"path": va.path, "fold": k, "split": "inner_oof", "score": sigmoid(lg),
                       "logit": lg}).to_csv(d / f"scores_{k}.csv", index=False)
         save_m5(net, d / "model")
-        (d / "run_meta.json").write_text(json.dumps({"fold": k, "arm": arm, "steps": 10,
+        (d / "run_meta.json").write_text(json.dumps({"fold": k, "arm": arm, "steps": 2500,
                                                      "config": {}, "config_hash": "x",
                                                      "bundle_tree": "t"}))
     d = runs / f"foldfull_{arm}"
@@ -59,7 +59,7 @@ def _fake_runs(tmp_path: Path, folds: pd.DataFrame, test: pd.DataFrame, arm="nsa
                  ).to_csv(d / "diag_holdout_aug.csv", index=False)
     save_m5(net, d / "model")
     (d / "run_meta.json").write_text(json.dumps({
-        "fold": "full", "arm": arm, "steps": 10, "config": {"keep_layers": 1},
+        "fold": "full", "arm": arm, "steps": 3000, "config": {"keep_layers": 1},
         "config_hash": "x", "bundle_tree": "t", "gpu": "test", "aug_rates": {},
         "shortcut_gate": {}, "hashes": {}}))
     return runs.parent
@@ -157,3 +157,28 @@ def test_f7_long_clip_scored_whole_at_14s_and_capped_at_8s_by_default():
     frames = net.backbone._get_feat_extract_output_lengths(int(m.sum()))
     assert int(frames) == int(net.backbone._get_feat_extract_output_lengths(x14.size))
     assert np.isfinite(score_batch(net, xs, m).numpy()).all()
+
+
+def test_newer_short_run_never_replaces_a_final_model(tmp_path):
+    """A resume probe / pilot written after the finals must not be selected (Codex round 4)."""
+    import importlib.util
+    import time
+
+    spec = importlib.util.spec_from_file_location("m5_assemble", REPO / "scripts" / "m5_assemble.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    root = tmp_path / "runs"
+    for name, steps, age in (("fold4_frozen", 2500, 2), ("resume_probe", 600, 1), ("fold4_ft", 2500, 0)):
+        d = root / name
+        d.mkdir(parents=True)
+        (d / "scores_4.csv").write_text("path,fold,split,score,logit\n")
+        cfg = {"train_top": 12 if name == "fold4_ft" else 0}
+        (d / "run_meta.json").write_text(json.dumps({"fold": "4", "arm": "nsa_extra", "steps": steps, "config": cfg}))
+        t = time.time() - age
+        import os
+
+        os.utime(d / "run_meta.json", (t, t))
+    picked = mod.find_runs(root, "nsa_extra", train_top=0)
+    assert picked["4"].name == "fold4_frozen"  # not the newer 600-step probe
+    assert mod.find_runs(root, "nsa_extra", train_top=0, min_steps=100)["4"].name == "resume_probe"
+    assert mod.find_runs(root, "nsa_extra", train_top=12)["4"].name == "fold4_ft"
