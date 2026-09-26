@@ -156,3 +156,9 @@ Acceptance criteria:
 5. **The final full suite predated the fixes.** It is re-run at the audit-fix commit, recorded below.
 
 Full suite at the audit-fix commit: **572 passed** (`uv run pytest -q`, 199 s). Ruff is clean on this change's files; the 3 findings in `src/hearsay/analyzer.py` belong to another lane (19925a3).
+
+**Codex audit, round 2 (on fb13a29): Overall Fail**, on two completeness gaps. Documentation was now Acceptable, and the saved readouts reproduced exactly.
+1. **The MLAAD readout counted rows without checking scores.** A NaN M3 score or step flag left n = 572. It now uses `complete_rows`: finite values required in every detector, fused score and flag column.
+2. **The perturbation cohort used `notna()`, which accepts ±inf.** It now uses `np.isfinite`.
+
+Both are tested through readout → verdict ("inconclusive") for NaN, +inf and −inf, and for the M3, M1b and step-flag columns. The regenerated outputs are unchanged (500 and 572 clips, verdict "kept"). Full suite at this commit: 581 passed.

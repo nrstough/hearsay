@@ -319,8 +319,8 @@ def perturb_readout(d: pd.DataFrame) -> dict:
     for c in need:
         idx = idx.intersection(piv[c].index)
     paths = [p for p in idx
-             if all(set(PERTURBATIONS) <= set(piv[c].columns) and piv[c].loc[p, list(PERTURBATIONS)].notna().all()
-                    for c in need)]  # fmt: skip
+             if all(set(PERTURBATIONS) <= set(piv[c].columns)
+                    and np.isfinite(piv[c].loc[p, list(PERTURBATIONS)].to_numpy(float)).all() for c in need)]  # fmt: skip
     y = (lab.loc[paths] == "spoof").to_numpy(int)
     res: dict = {"n_paired": len(paths), "n_real": int((y == 0).sum()), "n_spoof": int((y == 1).sum())}
     for c in (*MODELS, "fused_base", "fused"):
@@ -355,8 +355,18 @@ def perturb_readout(d: pd.DataFrame) -> dict:
     return res
 
 
-def mlaad_readout(d: pd.DataFrame, rows: pd.DataFrame) -> dict:
+def complete_rows(d: pd.DataFrame, cols: tuple[str, ...]) -> pd.DataFrame:
+    """Rows with no error and a finite value in every required column (NaN and +-inf dropped),
+    so a missing score shrinks the count instead of being skipped by a mean."""
     d = d[d.error.isna()] if "error" in d else d
+    ok = np.ones(len(d), bool)
+    for c in cols:
+        ok &= np.isfinite(pd.to_numeric(d[c], errors="coerce").to_numpy(float)) if c in d else False
+    return d[ok]
+
+
+def mlaad_readout(d: pd.DataFrame, rows: pd.DataFrame) -> dict:
+    d = complete_rows(d, (*MODELS, "fused_base", "fused", "e_applied"))
     d = d.merge(rows[["path", "model_name"]], on="path", how="left")
     res: dict = {"n": len(d), "n_models": int(d.model_name.nunique())}
     for c in MODELS:

@@ -483,3 +483,32 @@ def test_m3_verdict_rejects_a_boolean_in_every_scalar_input(i):
     vals = [0.001, 0.004, 0.01, 0.0]
     vals[i] = False
     assert m3p.m3_verdict(*vals)[0] == "inconclusive"
+
+
+@pytest.mark.parametrize("bad", [float("inf"), float("-inf"), float("nan")])
+def test_a_non_finite_score_shrinks_the_perturbation_cohort(monkeypatch, bad):
+    monkeypatch.setattr(m3p, "THRESHOLDS_FROM_EXPORTS", False)
+    d = _cohort()
+    d.loc[(d.path == "p6") & (d.kind == "mp3"), "spectra_aasist"] = bad
+    r = m3p.perturb_readout(d)
+    assert r["n_paired"] == 7
+    assert m3p.verdict_from(r, {"e_applied_share": 0.0, "n": 572}, n_perturb=8)["verdict"] == "inconclusive"
+
+
+@pytest.mark.parametrize("col", ["spectra_aasist", "e_applied", "m1b_v3"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_non_finite_mlaad_row_shrinks_n_and_the_verdict_goes_inconclusive(monkeypatch, col, bad):
+    import pandas as pd
+
+    monkeypatch.setattr(m3p, "inner_threshold", lambda c: 0.0)
+    n = 6
+    rows = pd.DataFrame({"path": [f"m{i}" for i in range(n)], "model_name": [f"g{i}" for i in range(n)]})
+    d = pd.DataFrame({"path": rows.path, **{c: [1.0] * n for c in (*m3p.MODELS, "fused_base", "fused")},
+                      "e_applied": [0.0] * n})  # fmt: skip
+    assert m3p.mlaad_readout(d, rows)["n"] == n
+    d.loc[2, col] = bad
+    r = m3p.mlaad_readout(d, rows)
+    assert r["n"] == n - 1
+    good_p = {"mean_abs_d_auc": {"spectra_aasist": 0.001, "m1b_v3": 0.004}, "n_paired": 500,
+              "e_step_effect_min_dcf": dict.fromkeys(m3p.PERTURBATIONS, 0.0)}  # fmt: skip
+    assert m3p.verdict_from(good_p, r, n_mlaad=n)["verdict"] == "inconclusive"
