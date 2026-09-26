@@ -99,3 +99,7 @@ The noise twins recover part of the 20 dB lane, but not enough to reach the bar.
 **Decision: KEEP**, with all four candidates judged. `submissions/CrossExam_predictions.tsv` (sha256 `fb783076…`) is final.
 
 After the Codex audit (19:17), the gate code now requires the full five-kind perturbation cohort and all ten bake-off cells. A partial cohort is INVALID. Re-running with that code reproduces `354502ca…` byte for byte.
+
+## Ruling (Nathan, ~19:35): KEEP
+
+Nathan ratified KEEP. The `submissions/log.csv` row records it, with the final-name copy re-verified at sha256 `fb783076…`. `submissions/CrossExam_predictions.tsv` is the file for NSA. No `models/fusion_v3/` was written, and the lane is closed.
