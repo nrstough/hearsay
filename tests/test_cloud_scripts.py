@@ -112,3 +112,44 @@ def test_g6_box_setup_pins_the_hf_revision_and_checks_the_config_sha():
     assert "FATAL: XLS-R config sha" in t
     assert "xlsr_hf_weight_sha256" in t and "sha-verified" in t  # downloaded weights are checked
     assert "HEARSAY_R2_PREFIX}weights" not in t  # no unverified R2 weights path
+
+
+def test_g2_launcher_destroys_a_box_whose_chain_never_starts(tmp_path):
+    """Run launch.sh against stubbed `uvx vastai` (creates a 'running' box) and a stubbed `ssh`
+    that succeeds for the network check but fails to start the chain: the launcher must exit
+    non-zero, destroy the instance, and never write PROVISIONED."""
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    log = tmp_path / "vast.log"
+    (stubs / "uvx").write_text(f"""#!/bin/bash
+echo "$@" >> {log}
+case "$*" in
+  *'show user'*) echo '{{"credit": 30.0}}';;
+  *'create instance'*) echo '{{"new_contract": 4242}}';;
+  *'show instances'*) echo '[{{"id": 4242, "actual_status": "running", "ssh_host": "h", "ssh_port": "1", "dph_total": 0.6}}]';;
+  *'destroy instance'*) echo destroyed;;
+esac
+""")
+    (stubs / "ssh").write_text(r"""#!/bin/bash
+# the network check passes; rclone setup passes; the chain start never reports CHAIN-UP
+for a in "$@"; do case "$a" in *NET-OK*) echo NET-OK; exit 0;; *RCLONE-OK*) cat >/dev/null; echo RCLONE-OK; exit 0;; *tar\ xzf*) cat >/dev/null; exit 0;; esac; done
+exit 1
+""")
+    (stubs / "rclone").write_text("#!/bin/bash\nexit 0\n")
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    creds = tmp_path / "creds.txt"
+    creds.write_text("account_id=a\naccess_key_id=k\nsecret_access_key=s\n")
+    home = tmp_path / "home"
+    (home / ".config" / "vastai").mkdir(parents=True)
+    (home / ".config" / "vastai" / "vast_api_key").write_text("stub-key")
+    (home / ".config" / "cloudflare-r2-pa-source.txt").write_text(creds.read_text())
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home)}
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "tjob", "fold=0", "0.5", "111"],
+                       capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert "PROVISIONED" not in r.stdout
+    assert "destroy instance 4242" in log.read_text()
+    assert not (home / ".hearsay_vast" / "tjob" / "PROVISIONED").exists()

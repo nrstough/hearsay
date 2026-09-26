@@ -30,4 +30,4 @@ and `scripts/cloud/teardown_check.sh` appends the credit left. Balance: `uvx vas
 | 2026-09-26 08:38 | vast.ai | 52746167 | resume_probe | destroyed (failed: FAIL setup) | | | | 
 | 2026-09-26 08:42 | vast.ai | 52747172 (50894989) | resume_probe | 0.611111111111111 A100 SXM4 | | | est 0.6 h | 
 | 2026-09-26 08:57 | vast.ai | teardown check | | | | | credit left $32.95 | 
-| 2026-09-26 08:57 | vast.ai | M5 resume probes (52746167 failed setup, 52747172 DONE) | G4 evidence | A100 SXM4 $0.61/h | | | ~$0.25 | 
+| 2026-09-26 08:57 | vast.ai | M5 resume probes (52746167 failed setup, 52747172 DONE) | G4 evidence | A100 SXM4 $0.61/h | | | $0.33 (credit $33.28 → $32.95) | 

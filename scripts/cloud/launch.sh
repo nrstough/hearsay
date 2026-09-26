@@ -21,7 +21,7 @@ JOB="${1:?job name}"; JOBS="${2:?jobs}"; EST_HOURS="${3:?est hours}"; shift 3
 IMAGE="${IMAGE:-pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime}"
 DISK_GB="${DISK_GB:-60}"
 DEADLINE="${DEADLINE:-$(date -j -f '%H:%M' '11:45' '+%s' 2>/dev/null || date -d '11:45' '+%s')}"
-STATE="$HOME/.hearsay_vast/$JOB"; mkdir -p "$STATE"
+STATE="$HOME/.hearsay_vast/$JOB"; rm -rf "$STATE"; mkdir -p "$STATE"   # never reuse stale state
 LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"
 CREDS="$HOME/.config/cloudflare-r2-pa-source.txt"
 KEY="${VAST_API_KEY:-$(cat "$HOME/.config/vastai/vast_api_key")}"
@@ -85,10 +85,16 @@ except Exception: print("")')
       mkdir -p /root/.config/rclone; { echo "[r2]"; echo "type = s3"; echo "provider = Cloudflare"; echo "no_check_bucket = true"; cat; } > /root/.config/rclone/rclone.conf; chmod 600 /root/.config/rclone/rclone.conf;
       rclone lsd r2:pa-source/hearsay/ >/dev/null && echo RCLONE-OK' | grep -q RCLONE-OK \
     || { echo "  rclone setup failed -> destroy"; kill_ "$CID"; CID=""; continue; }
-  # ship the box scripts, start the chain detached
-  tar czf - -C "$HERE" box_setup.sh box_chain.sh box_codecs.py r2_guard.sh | $SSH 'mkdir -p /root/m5/cloud && tar xzf - -C /root/m5/cloud'
-  $SSH "setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' bash /root/m5/cloud/box_chain.sh > /root/m5/chain.log 2>&1 < /dev/null &" \
-    && echo PROVISIONED
+  # ship the box scripts and start the chain detached; PROVISIONED is written ONLY after the
+  # chain is confirmed running (a box whose chain never started is destroyed, Codex round 3)
+  if ! tar czf - -C "$HERE" box_setup.sh box_chain.sh box_codecs.py r2_guard.sh 2>/dev/null \
+       | $SSH 'mkdir -p /root/m5/cloud && tar xzf - -C /root/m5/cloud 2>/dev/null'; then
+    echo "  script transfer failed -> destroy"; kill_ "$CID"; CID=""; continue
+  fi
+  if ! $SSH "setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' bash /root/m5/cloud/box_chain.sh > /root/m5/chain.log 2>&1 < /dev/null & sleep 3; pgrep -f 'bash /root/m5/cloud/box_ch[a]in.sh' >/dev/null && echo CHAIN-UP" 2>/dev/null | grep -q CHAIN-UP; then
+    echo "  chain did not start -> destroy"; kill_ "$CID"; CID=""; continue
+  fi
+  echo PROVISIONED
   echo "$CID" > "$STATE/CID"; echo "$HOST $PORT" > "$STATE/SSH"; date +%s > "$STATE/PROVISIONED"
   DPH=$($VAST show instances --raw | py "import sys,json
 for i in json.load(sys.stdin) or []:
