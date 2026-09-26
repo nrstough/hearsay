@@ -84,7 +84,9 @@ def main() -> None:
             miss = idx[s].difference(d.index[d.split == s])
             assert miss.empty, f"{n}: {len(miss)} {s} rows missing"
     has_itw = all((d.split == "itw").any() for d in dets.values())
-    if has_itw:
+    if not has_itw:
+        idx["itw"] = pd.Index([])  # a detector lacks ITW rows: skip the ITW readout
+    else:
         common = set(idx["itw"])
         for d in dets.values():
             common &= set(d.index[d.split == "itw"])
