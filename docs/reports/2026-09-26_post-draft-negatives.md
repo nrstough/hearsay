@@ -14,7 +14,7 @@ NSA returned minDCF 0.0733, EER 3.53% on our draft file. We then asked what coul
 
 **The numbers.** The layer-7 baseline reproduces M1b exactly: inner 0.2649, holdout 0.0717, In-the-Wild 0.342. Averaging layers 5–9 improves the holdout to 0.052. But In-the-Wild gets worse, 0.368, and its false-alarm rate doubles, from 0.8% to 1.55%. Concatenating layers 6–8, layers 5/7/9 and layers 5–9 gives In-the-Wild 0.353, 0.430 and 0.399.
 
-**Why.** The shipped rule misses 158 fakes on In-the-Wild. At its own inner threshold, M1b alone would catch 1 of them and the handcrafted model 2. M5 would catch 33 and Spectra-AASIST 107. So M1b's backbone does not see these fakes at any layer, and a new head on that backbone has the same blind spot. Only a different backbone can see them. That is why the one head experiment we ran tonight is a WavLM Large probe (`docs/reports/2026-09-26_post-draft-heads.md`, pending).
+**Why.** At the threshold that minimizes its In-the-Wild cost, the shipped rule misses 158 fakes there. Each detector alone, at its own inner threshold, would catch these many of them: M1b 1, the handcrafted model 2, M5 33 and Spectra-AASIST 107. At the rule's inner-OOF threshold, the one the gate reads, it misses 122, of which M5 would catch 19 and Spectra-AASIST 79 (correction in `…_RESPONSE.md`, commit 589e9f2). So M1b's backbone does not see these fakes at any layer, and a new head on that backbone has the same blind spot. Only a different backbone can see them. That is why the one head experiment we ran tonight is a WavLM Large probe (`docs/reports/2026-09-26_post-draft-heads.md`, pending).
 
 ## 2. Re-weighting the same three scores has a measured ceiling
 
@@ -39,7 +39,7 @@ NSA returned minDCF 0.0733, EER 3.53% on our draft file. We then asked what coul
 ## 4. The excluded detector could shrink the miss tail, and stays excluded
 
 **The numbers** *(Fable memo, options 3 and 9; not re-run by the consult chat)*.
-- **Promotion.** Raising files with Spectra-AASIST margin above 6.9 and base score below 0.5 recovers 76 of the 158 In-the-Wild misses with no added false alarms (In-the-Wild 0.152 under both costs). On the holdout it promotes two real files, [2 FA, 11 misses] against the shipped [0, 13].
+- **Promotion.** Raising files with Spectra-AASIST margin above 6.9 and base score below 0.5 recovers 76 of the 158 In-the-Wild misses (counted at the In-the-Wild argmin; see item 1) with no added false alarms (In-the-Wild 0.152 under both costs). On the holdout it promotes two real files, [2 FA, 11 misses] against the shipped [0, 13].
 - **Looser suppression.** Moving the suppression threshold from −3 to −1.5 improves every proxy: inner 0.123, holdout 0.003 [0, 6], In-the-Wild 0.188, averse 0.233. The cost is that more MLAAD fakes fall below the threshold: 2.10% against 1.75% at −3.
 
 **Why we skip both.** Spectra-AASIST's authors report results on In-the-Wild and name no training set. The evidence for both changes is In-the-Wild, a set the model's authors may have tuned on. We set the suppression-only rule before any of these numbers existed. Changing it now because the numbers look good is the kind of post hoc choice the rule exists to prevent. So this is the measured ceiling of what the excluded detector could do, not a change.
@@ -81,7 +81,7 @@ On a log scale between the holdout and In-the-Wild, the test sits at 0.68 for mi
 - A "0.0065 → 0.0060" is not evidence.
 - On the brief's cost, one false alarm on the test set is worth about 0.008 and one miss about 0.002. So gains under about 0.008 are single-file effects.
 
-## 7. The M5 weight — *pending the 19:30 decision*
+## 7. A heavier M5 weight did not survive fresh evidence
 
 **What we tried.** The pre-declared M5 sweep stopped at weight 0.2 on the expectation that more M5 would hurt. After the draft review, the Fable agent extended it. The consult chat re-checked the numbers from the exports (Round 2 table):
 
@@ -100,7 +100,19 @@ On a log scale between the holdout and In-the-Wild, the test sits at 0.68 for mi
 
 If it fails any of the three, it becomes a measured negative: post hoc, and it did not survive fresh evidence.
 
-Whether it ships is the gate chat's recommendation and Nathan's decision at 19:30 (`docs/reports/2026-09-26_post-draft-sweep.md`). This section will be updated with the outcome by 21:30 either way.
+**Result: it failed two of the three** (`scripts/fuse_sweep_v3.py`, commit 20a0d04; re-run here with identical output).
+- **Standing rule:** passes.
+- **Perturbation robustness:** fails. Below is the shipped rule's minDCF minus W4's, per kind of change, brief / averse. A negative number means W4 is worse.
+  - no change: −0.012 / 0.000
+  - MP3: −0.004 / −0.004
+  - 20 dB noise: +0.051 / +0.020
+  - speed: −0.004 / −0.012
+  - one-sample shift: −0.016 / −0.004
+
+  Three cells are below the −0.010 bar. W4 helps a lot under noise, where M5 holds up better than M1b, but it costs on the clean, speed and shift cells.
+- **Bootstrap:** fails. Across 54 In-the-Wild speakers and 2,000 replicates, the 5th percentile of W4's gain is +0.0044 under the brief cost but −0.0023 under the averse cost. Its In-the-Wild gain under the sponsor's cost can't be told apart from zero once clips of the same speaker are treated as one unit.
+
+**Why it matters.** A gain of 0.028 on In-the-Wild looked like the one cheap win left. It came from about 54 speakers, and it reversed on clean audio the rule had not been tuned on. Seeing the numbers first and then testing on new evidence is what caught it. W4 is not in the ratifiable set, and the shipped rule stays.
 
 ---
 
