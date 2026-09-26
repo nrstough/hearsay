@@ -26,3 +26,14 @@ tests
 .claude
 .dockerignore
 Dockerfile
+# Frontend tree (teammate, merged 27c1c39): not part of the inference image. Dockerfile copies
+# src/, so the non-Python subtrees under src/ must be excluded here.
+node_modules
+.next
+web
+package.json
+package-lock.json
+src/app
+src/components
+src/context
+src/fonts

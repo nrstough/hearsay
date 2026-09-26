@@ -82,6 +82,14 @@ def test_b4_context_excludes_and_never_copies_private_trees():
     assert sources, "no COPY sources parsed"
 
 
+def test_b4_frontend_tree_stays_out_of_the_image():
+    # the frontend lives beside src/hearsay; COPY src ./src would carry it without these lines
+    for name in ("node_modules", ".next", "web", "package.json", "package-lock.json",
+                 "src/app", "src/components", "src/context", "src/fonts"):
+        assert name in DOCKERIGNORE, name
+    assert "src/hearsay" not in DOCKERIGNORE and "src" not in DOCKERIGNORE
+
+
 def test_b5_context_keeps_what_the_image_copies():
     kept = ("weights/wav2vec2-xls-r-300m", "weights/Spectra-AASIST", "weights/spkrec-ecapa-voxceleb",
             "src", "scripts", "docker", "pyproject.toml", "uv.lock", "README.md")
