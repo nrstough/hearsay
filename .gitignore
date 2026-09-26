@@ -1,0 +1,31 @@
+# Data, weights, and run outputs never go in git
+data/*
+!data/.gitkeep
+weights/*
+!weights/.gitkeep
+models/
+outputs/
+
+# Submissions: keep the log, ignore the CSVs themselves
+submissions/*
+!submissions/.gitkeep
+!submissions/log.csv
+
+# Audio files anywhere
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+
+# Environment and secrets
+.venv/
+.env
+
+# Python / OS noise
+__pycache__/
+*.pyc
+.DS_Store
+
+# Claude Code per-user settings (project .claude/skills and settings.json ARE tracked)
+.claude/settings.local.json

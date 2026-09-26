@@ -1,0 +1,46 @@
+[project]
+name = "hearsay"
+version = "0.0.0"
+description = "Audio deepfake detector: 0-100% likelihood a voice clip is AI-generated (HackGT 13, NSA challenge)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "torch",
+    "torchaudio",
+    "transformers",
+    "huggingface_hub",
+    "librosa",
+    "soundfile",
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "lightgbm",
+    "pandas",
+    "pydub",
+    "ffmpeg-python",
+]
+
+[tool.uv]
+# No application code exists yet (pre-event). Flip to `package = true` and add a
+# [build-system] once src/hearsay/ has an __init__.py.
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "needs_data: requires datasets under data/ (gitignored; not on every laptop)",
+    "needs_weights: requires model weights under weights/ (gitignored)",
+    "slow: takes more than a few seconds",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
