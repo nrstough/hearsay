@@ -183,4 +183,10 @@ cd ~/Projects/hearsay && uv run ruff check .
     - A "planned, not yet downloaded" disclosure stub is added.
   - Kept as is: the external-drive path added to the handoff skill (the team's only archive location).
 - **Logged for the next submission-path change, not fixed here (out of scope):** `list_test_files` reads `--manifest` with a comma `csv.DictReader`, so the TSV template `data/nsa/HearsayScoreKey4TeamX.tsv` would fail. That change also adds the score-direction flip flag.
-- **Codex audit:** _pending._
+- **Codex audit** (`docs/specs/2026-09-25_software-only-rescope-audit.md`), on commit c1567c8: **Acceptable overall.**
+  - Excellent: Plan adherence, Scope discipline, Review compliance.
+  - Acceptable: Test coverage, Regression check, Documentation.
+  - Freeze integrity: not graded (no P1/P2 hashes).
+  - Codex's sandbox couldn't initialize the uv cache, so it ran 109 of the tests directly: lint clean, all passed.
+  - Documentation finding: the recorded test counts predated the final fixes; corrected below.
+- **Final verification** (after c1567c8): `uv run pytest -q` → **147 passed**, of which **59** are in `tests/test_detector_contract.py`; `uv run ruff check .` clean.
