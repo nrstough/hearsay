@@ -105,3 +105,9 @@ If several candidates qualify, the one with the best In-the-Wild brief-cost wins
 - TSVs, both polarities, are logged: `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_*.tsv`.
 - Runner constants: `models/fusion_v2_candidate/constants.json`.
 - Shipping it would require the pipeline and Docker to add the M5 scorer: a 657 MB checkpoint from the HF Hub, about 0.2 s per clip on CPU.
+
+**Nathan's decision (09:25): positive result, not shipped pending draft review.**
+- E on A α 0.2 stays frozen, and it is the file sent for the draft review.
+- A3 w 0.2 + E is revisited only if NSA's draft-review number decodes to our direction and there is time left before 22:00.
+- The candidate artifacts stay where they are. No pipeline changes.
+- Reaction branches are in `docs/reports/2026-09-26_draft-review-branches.md`.
