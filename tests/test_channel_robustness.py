@@ -512,3 +512,18 @@ def test_a_non_finite_mlaad_row_shrinks_n_and_the_verdict_goes_inconclusive(monk
     good_p = {"mean_abs_d_auc": {"spectra_aasist": 0.001, "m1b_v3": 0.004}, "n_paired": 500,
               "e_step_effect_min_dcf": dict.fromkeys(m3p.PERTURBATIONS, 0.0)}  # fmt: skip
     assert m3p.verdict_from(good_p, r, n_mlaad=n)["verdict"] == "inconclusive"
+
+
+@pytest.mark.parametrize("how", ["dropped", "errored"])
+def test_an_entirely_absent_perturbation_gives_an_empty_cohort_and_an_inconclusive_verdict(monkeypatch, how):
+    monkeypatch.setattr(m3p, "THRESHOLDS_FROM_EXPORTS", False)
+    d = _cohort()
+    if how == "dropped":
+        d = d[d.kind != "mp3"]
+    else:  # every mp3 row failed to score: only an error message, no scores
+        d["error"] = None
+        d.loc[d.kind == "mp3", "error"] = "DecodeError('x')"
+        d.loc[d.kind == "mp3", [*m3p.MODELS, "fused_base", "fused", "e_applied"]] = float("nan")
+    r = m3p.perturb_readout(d)
+    assert r["n_paired"] == 0
+    assert m3p.verdict_from(r, {"e_applied_share": 0.0, "n": 572}, n_perturb=8)["verdict"] == "inconclusive"

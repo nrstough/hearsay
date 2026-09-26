@@ -309,7 +309,10 @@ def perturb_readout(d: pd.DataFrame) -> dict:
     from hearsay.metrics import eer, min_cost
 
     d = d[d.get("error", pd.Series(index=d.index, dtype=object)).isna()] if "error" in d else d
-    piv = {c: d.pivot_table(index="path", columns="kind", values=c, aggfunc="first")
+    # Reindexed to every expected perturbation: an absent one becomes all-NaN columns, so the
+    # cohort shrinks (to zero) and the readout stays computable instead of raising KeyError.
+    piv = {c: d.pivot_table(index="path", columns="kind", values=c, aggfunc="first",
+                            dropna=False).reindex(columns=list(PERTURBATIONS))
            for c in (*MODELS, "fused_base", "fused", "e_applied")}  # fmt: skip
     lab = d.groupby("path").label.first()
     # A clip counts only if every detector, both fused scores and the step flag exist under

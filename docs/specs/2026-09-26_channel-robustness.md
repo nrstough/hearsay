@@ -162,3 +162,5 @@ Full suite at the audit-fix commit: **572 passed** (`uv run pytest -q`, 199 s). 
 2. **The perturbation cohort used `notna()`, which accepts ±inf.** It now uses `np.isfinite`.
 
 Both are tested through readout → verdict ("inconclusive") for NaN, +inf and −inf, and for the M3, M1b and step-flag columns. The regenerated outputs are unchanged (500 and 572 clips, verdict "kept"). Full suite at this commit: 581 passed.
+
+**Codex audit, round 3 (on fd779fb): Overall Fail, on one finding.** A perturbation absent from the whole cohort raised `KeyError` instead of giving "inconclusive". The readout's pivots are now reindexed to every expected perturbation, so an absent one gives an empty cohort. That case is tested through readout → verdict, both with the rows dropped and with every row of the perturbation failed. Codex again reproduced the saved readouts exactly (500 and 572 clips, "kept") and the codec table. Full suite at this commit: 583 passed.
