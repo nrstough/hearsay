@@ -21,4 +21,4 @@ Every branch is already a logged TSV in 1,671-row template order, so reacting to
 
 All of these files are archived at `/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/submissions/`.
 
-**Docker / runner:** unchanged. It points at `models/fusion_v1/constants.json` (E on A α 0.2). The flip branches only change the TSV; if NSA confirms inversion, the runner would need its own `--flip` handling.
+**Docker / runner:** unchanged. It points at `models/fusion_v1/constants.json` (E on A α 0.2). It already supports `--flip` (since `9614c18`: `scripts/run_pipeline.py`, `pipeline.py`), which maps 1 − p through the same determinate map and keeps the gate block at the bottom, and the Docker smoke test covers it. So an inversion verdict changes only which TSV is sent.
