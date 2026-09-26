@@ -1,6 +1,6 @@
-# HEARSAY: current state (Sat Sep 26, ~01:15)
+# HEARSAY: current state (Sat Sep 26, ~04:40)
 
-A snapshot for teammates joining now. The plan, with its rules and timeline, is [docs/plan.md](plan.md). The NSA brief is [docs/nsa-challenge.md](nsa-challenge.md). Setup and repo rules are in [CLAUDE.md](../CLAUDE.md).
+A snapshot for teammates joining now. The plan, with its rules and timeline, is [docs/plan.md](plan.md). The architecture, with diagrams, is [docs/architecture.md](architecture.md). The NSA brief is [docs/nsa-challenge.md](nsa-challenge.md). Setup and repo rules are in [CLAUDE.md](../CLAUDE.md).
 
 ## What we're building
 
@@ -34,11 +34,14 @@ The design:
 | Detector contract | Done: `src/hearsay/detectors/base.py`. **Build against this** (see below). |
 | Metric | Done: `hearsay.metrics`, plus an exact re-implementation of NSA's own scoring code (`sponsor_min_dcf`). |
 | Validation split | Done: `splits/nsa_folds.csv`. Whole generators and speakers are held out; the outer holdout is the `playht` and `wavegrad2` generators plus 26 real-speech groups. |
-| Deep detector (XLS-R probe, M1) | **Running now.** Length-matched embeddings, then training. First learned TSV expected tonight. |
-| Handcrafted spectral and prosody detector (75 interpretable features) | Done: `hearsay.detectors.handcrafted`. Holdout minDCF 0.25, EER 4.3% (v3: test-length crops + band match, LightGBM). Blind to grad_tts, pro_diff and ElevenLabs. Export `outputs/detector_scores/handcrafted.csv`. |
+| Deep detector (XLS-R probe, M1) | Done: first learned TSV logged (`submissions/20260926-0308_M1_*.tsv`, holdout minDCF 0.146, EER 2.5%). M1b (+ASVspoof 2019 real speakers, inner folds only) reaches holdout 0.079 but raises In-the-Wild false alarms (report: `docs/reports/2026-09-26_m1b-asv19-bonafide.md`). The deep path is band-matched since commit `133e536`; the v3 re-extraction is running and its numbers replace these. |
+| Handcrafted spectral and prosody detector (75 interpretable features) | Done: `hearsay.detectors.handcrafted`. Holdout minDCF 0.25, EER 4.3% (v3: test-length crops + band match, LightGBM). Blind to grad_tts, pro_diff and ElevenLabs. Export `outputs/detector_scores/handcrafted.csv`. **v4 feature families** (LFCC, phase, CQCC, modulation, breath, jitter/shimmer; all implemented and gated, see `docs/reports/2026-09-26_handcrafted-v4.md`) are opt-in via `--families` in `hearsay.hc_v4`; the teammate brief is `docs/handoffs/2026-09-26_handcrafted-v4-brief.md`. |
 | Compression, container, ENF, splice detectors | Done against the contract (`hearsay.detectors.{compression,container,enf,splice}`; `import hearsay.detectors.engineered` registers all five). Container is rule-based (constant on this test set, by design); ENF and splice are mild rule-based scores plus evidence. Exports in `outputs/detector_scores/`. Report: `docs/reports/2026-09-26_cpu-detectors.md`. |
-| Spectra-AASIST (second deep detector), fine-tuning, fusion, orchestrator, Docker | Not started. See the ladder in `docs/plan.md`. |
-| Tests | 215 passing (`uv run pytest -q`), ruff clean. |
+| Spectra-AASIST (M3, second deep detector) | In flight: plan-reviewed, scoring every fold-file row and the test set through the shared `prepare_segment` crops; In-the-Wild readout before the full export. Handoff: `docs/handoffs/2026-09-26_m3-spectra-aasist-handoff.md`. |
+| Fine-tuned XLS-R (M5) | In flight on rented A100s: 12-layer truncated backbone, attentive pooling, class-blind augmentation; gate is Sat 12:00 (beat M1 on inner folds and holdout, not worse on In-the-Wild false alarms). Spec: `docs/specs/2026-09-26_m5-xlsr-finetune.md`. |
+| Fusion, orchestrator, explanation report (M4) | Planned; starts when detector scores land (Sat 19:00), frozen Sat 22:00. Design and open decisions in `docs/architecture.md`. The fusion consult is drafted and not yet sent: `docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md`. |
+| Docker | Not started and unowned. First amd64 image (M1 payload) is due Sat 14:00. |
+| Tests | 297 passing, 301 collected (`uv run pytest -q`), ruff clean. |
 
 ## Data
 
@@ -64,7 +67,8 @@ Data is gitignored. Put it under `data/` with the same paths as above (`data/nsa
   - **Clip length and tiling.** Training clips are 5–9 s and test clips about 3.4 s. The old 4 s window repeat-padded short test clips, which put a splice seam only in test data. Fixed by embedding each clip at its real length, and training on crops drawn from the test length distribution.
 - **Container format is a trap.** Some training fakes are MP3 or 22 kHz, while every test file is 16 kHz WAV. Any metadata or compression detector must be trained on clips converted to 16 kHz WAV first, or it will learn "MP3 = fake".
 - **The container *is* the label on the training data** (measured): LibriSpeech = FLAC, LJ = 22 kHz WAV, DiffSSD = WAV or MP3, and PlayHT's MP3s carry the same FFmpeg encoder tag (`Lavf58.29.100`) as all 1,671 test files. So the container detector is never learned; it returns routing facts and a constant score here.
-- **The test set is low-passed at about 7.2 kHz** and no training corpus is (not even the sponsor's resampled LJ clips). Everything above 7 kHz was a train-vs-test fingerprint; the handcrafted detector called 90% of the test set synthetic until `hearsay.handcrafted.band_limit` (a 71-tap Kaiser low-pass matching the roll-off) was applied to every clip, train and test. Now 42% of test files score above 0.5. **The deep detector needs the same band match** (one call in `prepare_segment`); details and numbers in `docs/reports/2026-09-26_cpu-detectors.md`.
+- **The test set is low-passed at about 7.2 kHz** and no training corpus is (not even the sponsor's resampled LJ clips). Everything above 7 kHz was a train-vs-test fingerprint; the handcrafted detector called 90% of the test set synthetic until `hearsay.handcrafted.band_limit` (a 71-tap Kaiser low-pass matching the roll-off) was applied to every clip, train and test. Now 42% of test files score above 0.5. The deep path got the same band match on Sat ~04:20 (commit `133e536`: `prepare_segment` calls `band_limit` first), and M1's embeddings are being re-extracted; details and numbers in `docs/reports/2026-09-26_cpu-detectors.md`.
+- **Our holdout is optimistic about real-world audio.** On the eval-only In-the-Wild set, both M1 and M1b score minDCF 0.37–0.40 against 0.08–0.15 on the NSA holdout. Adding 40 VCTK read speakers (M1b) improved every holdout slice but raised In-the-Wild false alarms at the inner threshold from 1.2% to 5.7%. Channel robustness, not more read speech or more spoof data, is the lever; every deep detector now reports In-the-Wild false alarms as a gate.
 - **Leakage check is clean.** No test file is an exact copy of anything in LJ Speech, the NSA LJ subset, or In-the-Wild.
 - **Public-data sanity check** (not an NSA number): frozen XLS-R plus logistic regression gets minDCF 0.023 on ASVspoof 2019's unseen attacks. The same model scored pure silence as 99% synthetic, which is why the silence handling above matters.
 
