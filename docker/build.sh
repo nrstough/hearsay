@@ -21,11 +21,12 @@ resolve() {  # print the real path of $1 (symlinks followed) or fail loudly
 PROBE_REAL="$(resolve "$PROBE_DIR")"
 HC_REAL="$(resolve models/hc_selected)"
 CMP_REAL="$(resolve models/cmp_selected)"
-CONSTANTS="models/fusion_v0/constants.json"
+FUSION_DIRS=()
+for d in models/fusion_*; do [ -f "$d/constants.json" ] && FUSION_DIRS+=("$d"); done
 [ -f "$PROBE_REAL/probe.joblib" ] || { echo "build.sh: $PROBE_REAL has no probe.joblib" >&2; exit 1; }
 [ -f "$HC_REAL/model.joblib" ] || { echo "build.sh: $HC_REAL has no model.joblib" >&2; exit 1; }
 [ -f "$CMP_REAL/model.joblib" ] || { echo "build.sh: $CMP_REAL has no model.joblib" >&2; exit 1; }
-[ -f "$CONSTANTS" ] || { echo "build.sh: $CONSTANTS missing (scripts/fuse.py writes it)" >&2; exit 1; }
+[ "${#FUSION_DIRS[@]}" -ge 1 ] || { echo "build.sh: no models/fusion_*/constants.json (scripts/fuse.py writes them)" >&2; exit 1; }
 
 # Disk guard: the Colima VM disk is a sparse file on whichever drive hosts ~/.colima (a virtual
 # cap does not protect that drive); a from-scratch build transiently adds over 10 GB. Refuse below
@@ -41,18 +42,19 @@ fi
 STAMP="$(date +%Y%m%d-%H%M)"
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DIRTY="$([ -n "$(git status --porcelain 2>/dev/null)" ] && echo dirty || echo clean)"
-BUILD_INFO="sha=$SHA $DIRTY stamp=$STAMP probe=$(basename "$PROBE_REAL") hc=$(basename "$HC_REAL") cmp=$(basename "$CMP_REAL") fusion=fusion_v0"
+FUSION_NAMES="$(printf '%s,' "${FUSION_DIRS[@]##*/}")"; FUSION_NAMES="${FUSION_NAMES%,}"
+BUILD_INFO="sha=$SHA $DIRTY stamp=$STAMP probe=$(basename "$PROBE_REAL") hc=$(basename "$HC_REAL") cmp=$(basename "$CMP_REAL") fusion=$FUSION_NAMES"
 
 if [ "${1:-}" = "--print-args" ]; then
   echo "PROBE_REAL=$PROBE_REAL"; echo "HC_REAL=$HC_REAL"; echo "CMP_REAL=$CMP_REAL"
-  echo "CONSTANTS=$CONSTANTS"; echo "BUILD_INFO=$BUILD_INFO"; exit 0
+  echo "FUSION_DIRS=${FUSION_DIRS[*]}"; echo "BUILD_INFO=$BUILD_INFO"; exit 0
 fi
 
-rm -rf docker/build && mkdir -p docker/build/models/fusion_v0
+rm -rf docker/build && mkdir -p docker/build/models
 cp -RL "$PROBE_REAL" "docker/build/models/$(basename "$PROBE_REAL")"
 cp -RL "$HC_REAL" docker/build/models/hc_selected
 cp -RL "$CMP_REAL" docker/build/models/cmp_selected
-cp "$CONSTANTS" docker/build/models/fusion_v0/constants.json
+for d in "${FUSION_DIRS[@]}"; do mkdir -p "docker/build/models/${d##*/}" && cp "$d/constants.json" "docker/build/models/${d##*/}/constants.json"; done
 echo "build.sh: $BUILD_INFO"
 docker buildx build --platform linux/amd64 --load \
   --build-arg BUILD_INFO="$BUILD_INFO" --build-arg GIT_SHA="$SHA" \

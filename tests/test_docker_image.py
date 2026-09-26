@@ -138,8 +138,9 @@ def _fake_tree(root: Path) -> None:
     (root / "models" / "hc_lgbm_x" / "model.joblib").write_bytes(b"h")
     (root / "models" / "cmp_lgbm_x").mkdir()
     (root / "models" / "cmp_lgbm_x" / "model.joblib").write_bytes(b"c")
-    (root / "models" / "fusion_v0").mkdir()
-    (root / "models" / "fusion_v0" / "constants.json").write_text("{}")
+    for v in ("fusion_v0", "fusion_v1"):
+        (root / "models" / v).mkdir()
+        (root / "models" / v / "constants.json").write_text("{}")
     os.symlink("hc_lgbm_x", root / "models" / "hc_selected")
     os.symlink("cmp_lgbm_x", root / "models" / "cmp_selected")
 
@@ -153,6 +154,7 @@ def test_b7_build_resolves_symlinked_bundles(tmp_path):
     assert f"HC_REAL={tmp_path.resolve() / 'models' / 'hc_lgbm_x'}" in r.stdout, r.stdout
     assert f"CMP_REAL={tmp_path.resolve() / 'models' / 'cmp_lgbm_x'}" in r.stdout
     assert "hc=hc_lgbm_x" in r.stdout and "probe=m1_real" in r.stdout
+    assert "fusion=fusion_v0,fusion_v1" in r.stdout and "FUSION_DIRS=models/fusion_v0 models/fusion_v1" in r.stdout
     # dangling symlink: loud failure, no build
     (tmp_path / "models" / "hc_selected").unlink()
     os.symlink("gone", tmp_path / "models" / "hc_selected")
@@ -281,7 +283,7 @@ def test_p3_smoke_script_runs_offline_and_checks_order():
 def test_p4_build_script_targets_amd64_and_records_provenance():
     assert "--platform linux/amd64" in BUILD and "--load" in BUILD
     assert "--build-arg BUILD_INFO=" in BUILD and "--build-arg GIT_SHA=" in BUILD
-    assert "cp -RL" in BUILD and "fusion_v0/constants.json" in BUILD and "cmp_selected" in BUILD
+    assert "cp -RL" in BUILD and "models/fusion_*" in BUILD and "cmp_selected" in BUILD
     assert "ARG GIT_SHA" in DOCKERFILE and "ENV HEARSAY_GIT_SHA=$GIT_SHA" in DOCKERFILE
     # speaker drift offline (the 06:53 smoke failure): the detector now loads ECAPA from weights/
     # only (commit 1cc4fbe); the image ships the dir untouched and the smoke test proves it runs
