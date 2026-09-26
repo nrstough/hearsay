@@ -7,8 +7,9 @@ Read first: `docs/handoffs/2026-09-26_frontend-contract.md` (the JSON contract, 
 ## Context
 
 - The backend is done. `hearsay.api` (FastAPI, `src/hearsay/api.py`) serves `POST /analyze` (multipart upload → one `AnalyzeResponse`), `GET /results/{filename}` (a precomputed response from a runner output directory), `GET /results` (list) and `GET /health`. It wraps the same `hearsay.pipeline.analyze_clip` the Docker image runs, so what the UI shows is what NSA gets.
-- The shipped fusion rule is `e_on_a`, frozen at 08:13 and read from `models/fusion_v1/constants.json`. The API and the runner default to it since commit `9614c18`.
-- A full dump of all 1,671 test files exists at `outputs/runner/full_20260926/results/<filename>.json`, but it was made at 07:30 with the **rejected** `zmean` rule. Same JSON shape, wrong numbers: fine for layout work, wrong for any demo, screenshot or number that anyone will read. Regenerate it (step 2 below) before showing it to a person.
+- The shipped fusion rule changed at ~12:05 Sat: it is now **A3 w0.2 + E** (`models/fusion_v2/constants.json`: ranks 0.6 M1b v3 + 0.2 handcrafted v5 + 0.2 M5, then the Spectra false-alarm step). `e_on_a` (`fusion_v1`) is the previous rule and fallback. The runner's default is being switched to fusion_v2; until then pass `--fusion models/fusion_v2/constants.json` (the API reads `HEARSAY_FUSION=models/fusion_v2/constants.json`).
+- **Use the dump at `outputs/runner/v2_full/results/<filename>.json`** (all 1,671 files, shipped rule, our direction, 0 rows differing from the submitted TSV). The older `outputs/runner/full_20260926/` dump is the rejected `zmean` rule: layout only, never a demo. Step 2 below is therefore already done unless the rule changes again.
+- **Read `docs/handoffs/2026-09-26_frontend-contract.md`, section "Rewire note", before touching the committed app:** the app at the repo root currently scores with `src/hearsay/analyzer.py`, a toy re-implementation that is not the pipeline, and its copilot answers with canned text. Both must be rewired to the real API or the dump before anyone demos it.
 - No web framework code exists for the UI yet. Nothing under `web/`.
 
 ## Working branch / worktree
