@@ -27,3 +27,31 @@ Written before running:
 2. **Among admissible candidates**, pick the lowest In-the-Wild brief-cost minDCF. Ties within 0.01 go to the smaller α, meaning more M1b.
 3. **Apply E only if** it lowers In-the-Wild brief-cost minDCF by ≥ 0.01 **and** does not raise holdout or inner OOF by more than 0.01.
 4. **No iteration after the results.** If nothing is admissible, ship M1b v3 alone.
+
+## Results (appended after the run, ~08:13; the rule above was not changed)
+
+| Candidate | Inner (brief) | Holdout (brief) | Holdout (averse) | Holdout argmin [#FA, #miss] | ITW brief | ITW averse | ITW P_FA / P_miss at inner threshold |
+|---|---|---|---|---|---|---|---|
+| A α 0.0 (M1b alone) | 0.301 | 0.072 | 0.057 | [8, 63] | 0.343 | 0.296 | 0.8% / 27.8% |
+| A α 0.1 | 0.260 | 0.044 | 0.034 | [5, 37] | 0.319 | 0.285 | 0.65% / 28.6% |
+| **A α 0.2** | 0.236 | 0.030 | 0.029 | [3, 30] | 0.322 | 0.280 | 0.45% / 36.0% |
+| A α 0.3 | 0.230 | 0.021 | 0.023 | [0, 41] | 0.322 | 0.280 | 0.25% / 39.5% |
+| A α 0.4 | 0.232 | 0.015 | 0.020 | [1, 19] | 0.339 | 0.276 | 0.25% / 45.0% |
+| A α 0.5 | 0.241 | 0.016 | 0.019 | [1, 21] | 0.356 | 0.299 | 0.2% / 52.8% |
+| B min | 0.285 | 0.029 | 0.032 | [2, 38] | 0.495 | 0.308 | 0.2% / 76.5% |
+| B max | 0.285 | 0.079 | 0.044 | [4, 118] | 0.459 | 0.498 | 0.3% / 46.9% |
+| C cascade | 0.239 | 0.016 | 0.019 | [1, 21] | 0.355 | 0.296 | 0.2% / 52.6% |
+| D non-neg shrunk | 0.230 | 0.025 | 0.020 | [0, 49] | 0.324 | 0.280 | 0.4% / 36.9% |
+| **E on α 0.2 (FINAL)** | 0.140 | 0.014 | 0.009 | [1, 18] | **0.260** | **0.267** | 1.4% / 14.8% |
+
+**Admissible:** α 0.2–0.5, C and D. The lowest ITW brief-cost score is α 0.2 and α 0.3, tied at 0.322 with D at 0.324 inside the 0.01 band. The tie goes to the smaller α, so the winner is **α 0.2**, inside the consult's predicted 0.2–0.3.
+
+**E (M3 as false-alarm suppression only)** lowers ITW brief from 0.322 to 0.260 and does not raise the holdout or inner scores, so it is applied. **FINAL = E on α 0.2.**
+
+**Caveat.** E's inner, holdout and ITW gains all involve M3, whose training data is undisclosed. E can only move a file toward "real", so if M3 is wrong about a file, the cost is a miss (weight 1), never a false alarm.
+
+**Files:**
+- Primary: `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv`
+- Flipped (use only if NSA's feedback decodes as their code's polarity): `..._FLIPPED_only_if_NSA_scores_inverted.tsv`
+- Constants for the runner: `models/fusion_v1/constants.json`
+- Speech gate: 0 of 1,671 test files gated. Determinate scores sit in [0.001, 1].
