@@ -30,18 +30,12 @@ export VAST_API_KEY="$KEY"
 
 py() { "$REPO/.venv/bin/python" -c "$@"; }
 
-ist() { $VAST show instances --raw 2>/dev/null | py "import sys,json
-for i in json.load(sys.stdin) or []:
-    if i['id']==$1: print(i.get('actual_status') or 'starting')"; }
-issh() { $VAST show instances --raw 2>/dev/null | py "import sys,json
-for i in json.load(sys.stdin) or []:
-    if i['id']==$1: print(i.get('ssh_host'), i.get('ssh_port'))"; }
-gone() {
-  # 'yes' only from a SUCCESSFUL query whose answer is a JSON list without the id; anything
-  # else (command failure, null, {}, garbage) is 'unknown' and never counts as absent
+# instances(): the validated instance list (JSON array) from a SUCCESSFUL query, or exit 1.
+# Every consumer treats a failure as "unknown", never as "no instances" (Codex round 9).
+instances() {
   local raw rc
   raw=$($VAST show instances --raw 2>/dev/null); rc=$?
-  [ "$rc" = 0 ] || { echo unknown; return; }
+  [ "$rc" = 0 ] || return 1
   printf '%s' "$raw" | py "import sys,json
 try:
     xs = json.load(sys.stdin)
@@ -49,6 +43,19 @@ except Exception:
     sys.exit(3)
 if not isinstance(xs, list):
     sys.exit(3)
+print(json.dumps(xs))" 2>/dev/null
+}
+ist() { instances | py "import sys,json
+for i in json.load(sys.stdin) or []:
+    if i['id']==$1: print(i.get('actual_status') or 'starting')"; }
+issh() { instances | py "import sys,json
+for i in json.load(sys.stdin) or []:
+    if i['id']==$1: print(i.get('ssh_host'), i.get('ssh_port'))"; }
+gone() {
+  local xs
+  xs=$(instances) || { echo unknown; return; }
+  printf '%s' "$xs" | py "import sys,json
+xs=json.load(sys.stdin)
 print('yes' if not any(str(i.get('id')) == '$1' for i in xs) else 'no')" 2>/dev/null || echo unknown
 }
 # destroy with confirmation and bounded retries; a box that will not go away is recorded as an
@@ -84,9 +91,10 @@ date +%s > "$STATE/HOLD"
 
 # --- budget guard: credit minus the commitments of boxes already running ---
 CREDIT=$($VAST show user --raw 2>/dev/null | py 'import sys,json; print(json.load(sys.stdin).get("credit", 0))')
-RUNNING=$($VAST show instances --raw 2>/dev/null | py 'import sys,json
-xs=json.load(sys.stdin) or []
-print(sum(float(i.get("dph_total") or 0) for i in xs) if isinstance(xs, list) else 0)')
+RUNNING=$(instances | py 'import sys,json
+xs=json.load(sys.stdin)
+print(sum(float(i.get("dph_total") or 0) for i in xs))' 2>/dev/null) || { echo "REFUSED: cannot read the running instances (commitments unknown)" >&2; exit 3; }
+[ -n "$RUNNING" ] || { echo "REFUSED: cannot read the running instances (commitments unknown)" >&2; exit 3; }
 NEED=$(py "print(round($EST_HOURS * 0.9 + 1.5, 2))")   # est hours at ~\$0.9/h upper bound + margin
 COMMIT=$(py "print(round($RUNNING * 2.0, 2))")          # running boxes: assume 2 h more each
 OK=$(py "print(int($CREDIT - $COMMIT >= $NEED))")

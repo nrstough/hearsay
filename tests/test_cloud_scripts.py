@@ -63,7 +63,8 @@ def test_g3_budget_guard_arithmetic_with_a_stub_vastai(tmp_path):
     """Run only the guard block of launch.sh against a stubbed `uvx vastai`."""
     src = (CLOUD / "launch.sh").read_text()
     start = src.index("# --- budget guard")
-    guard = src[start: src.index('CID=""', start)]
+    helper = src[src.index("# instances():"): src.index("ist() {")]  # the validated query
+    guard = helper + src[start: src.index('CID=""', start)]
     stub = tmp_path / "uvx"
     stub.write_text("#!/bin/bash\ncase \"$*\" in\n  *'show user'*) echo '{\"credit\": 5.0}';;\n"
                     "  *'show instances'*) echo '[{\"id\": 1, \"dph_total\": 0.7}]';;\nesac\n")
@@ -426,6 +427,7 @@ esac
            "DESTROY_TRIES": "1", "BOOT_TRIES": "1", "BOOT_WAIT": "0", "NET_TRIES": "1", "NET_WAIT": "0"}
     r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "rj", "fold=0", "0.5", "1"],
                        capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode != 0  # the stub's network check fails, so no offer works
     lines = log.read_text().splitlines()
     i_del = next(i for i, ln in enumerate(lines) if "deletefile" in ln and "runs/rj/STATUS" in ln)
     i_create = next(i for i, ln in enumerate(lines) if "create instance" in ln)
@@ -433,3 +435,38 @@ esac
     assert "HOLD-PRESENT" in lines  # the reaper was held while the box was provisioning
     assert not (home / ".hearsay_vast" / "rj" / "HOLD").exists()  # released on exit
     assert not (home / ".hearsay_vast" / "rj" / "DESTROYED").exists()  # the old marker is gone
+
+
+@pytest.mark.parametrize("answer, rc", [("null", 0), ("{}", 0), ("[]", 1)])
+def test_g3_every_instance_query_caller_refuses_on_a_bad_answer(tmp_path, answer, rc):
+    """launch.sh's budget guard, teardown_check.sh and the reaper's final check must not read a
+    failed / null / {} answer as 'no instances' (Codex round 9)."""
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    (stubs / "uvx").write_text(f"#!/bin/bash\ncase \"$*\" in *'show instances'*) echo '{answer}'; exit {rc};; *'show user'*) echo '{{\"credit\": 30}}';; *) echo ok;; esac\n")
+    (stubs / "uvx").chmod(0o755)
+    home = _stub_home(tmp_path)
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "DESTROY_WAIT": "0"}
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "nj", "fold=0", "0.5", "1"],
+                       capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode == 3 and "commitments unknown" in r.stderr, r.stderr
+    r = subprocess.run(["bash", str(CLOUD / "teardown_check.sh")], capture_output=True, text=True,
+                       cwd=REPO, env=env, check=False)
+    assert r.returncode == 2 and "cannot read" in r.stderr
+    # the reaper past its deadline must keep watching instead of exiting on an invalid answer
+    import time
+
+    state = tmp_path / "state"
+    state.mkdir()
+    src = (CLOUD / "reaper.sh").read_text().replace('STATE="$HOME/.hearsay_vast"', f'STATE="{state}"')
+    src = src.replace('. "$HERE/r2_guard.sh"', f'. "{CLOUD}/r2_guard.sh"')
+    src = src.replace('REPO="$(cd "$HERE/../.." && pwd)"', f'REPO="{REPO}"')
+    src = src.replace("while :; do", "for _i in 1 2; do", 1)
+    script = tmp_path / "reaper_bounded.sh"
+    script.write_text(src)
+    env2 = {**env, "POLL": "0", "DEADLINE": str(int(time.time()) - 7200)}
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env2,
+                       check=False, timeout=60)
+    assert r.stdout.count("instances on the account: ?") == 2, r.stdout + r.stderr
