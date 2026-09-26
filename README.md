@@ -119,6 +119,8 @@ _Pending: router on vs off, both measured on the holdout and In-the-Wild, with t
 
 ### The fusion rule, frozen at 08:13
 
+The shipped rule is whatever `final` names in `models/fusion_v1/constants.json`; the record of how it was chosen is `docs/reports/2026-09-26_fusion-sweep-predeclared.md`. Today that is `E_on_A_alpha0.2`. If a later pre-declared sweep replaces it, those two paths are what change, and this section follows them.
+
 We wrote the candidates and the selection rule down before running anything (`docs/reports/2026-09-26_fusion-sweep-predeclared.md`), then applied the rule once:
 
 - **Candidates:** a rank blend `(1−α)·rank(M1b) + α·rank(handcrafted)` for α from 0 to 0.5; min and max rules; a cascade; a non-negative stacker shrunk toward equal weights. Then, on top of the winner, Spectra as a false-alarm suppressor.
@@ -221,17 +223,19 @@ Normalized minDCF, `π_synth = 0.3`, `C_FA = 4`, unless marked. **Inner** = pool
 
 ### Fusion rules
 
-| Rule | Inner | Holdout | ITW (brief) | ITW (averse) | ITW FA / miss at inner threshold | Test > 0.5 | Source |
-|---|---|---|---|---|---|---|---|
-| zmean, M1b + handcrafted v4 (05:32) | 0.259 | 0.018 | 0.387 | — | 0.15% / 58.5% | 39.6% | `docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md` |
-| rankmean, same inputs | 0.254 | 0.015 | 0.379 | — | 0.15% / 59.5% | 31.8% | same |
-| zmean incl. Spectra (06:02, logged TSV) | — | 0.000 | 0.116 | — | 0.3% FA | 29.3% | `submissions/log.csv` |
-| stack_nonlj incl. Spectra (06:02, logged TSV) | — | 0.0015 | 0.054 | — | 0.0% FA | 27.5% | `submissions/log.csv` |
-| Sweep A, α = 0 (M1b alone) | 0.301 | 0.072 | 0.343 | 0.296 | 0.8% / 27.8% | — | `docs/reports/2026-09-26_fusion-sweep-predeclared.md` |
-| Sweep A, α = 0.2 | 0.236 | 0.030 | 0.322 | 0.280 | 0.45% / 36.0% | — | same |
-| Sweep A, α = 0.3 | 0.230 | 0.021 | 0.322 | 0.280 | 0.25% / 39.5% | — | same |
-| Sweep D, non-negative stacker | 0.230 | 0.025 | 0.324 | 0.280 | 0.4% / 36.9% | — | same |
-| **Shipped: E on α 0.2** | 0.140 | 0.014 | **0.260** | **0.267** | 1.4% / 14.8% | 27.4% | same; test share from `docs/reports/2026-09-26_sponsor-questions.md` |
+| Rule | Inner | Holdout | ITW (brief) | ITW (averse) | ITW FA / miss at inner threshold | Test > 0.5 | Run (git) | Source |
+|---|---|---|---|---|---|---|---|---|
+| zmean, M1b + handcrafted v4 (05:32) | 0.259 | 0.018 | 0.387 | — | 0.15% / 58.5% | 39.6% | `59951c1` | `docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md` |
+| rankmean, same inputs | 0.254 | 0.015 | 0.379 | — | 0.15% / 59.5% | 31.8% | `59951c1` | same |
+| zmean incl. Spectra (06:02, logged TSV) | — | 0.000 | 0.116 | — | 0.3% FA | 29.3% | `59951c1`‡ | `submissions/log.csv` |
+| stack_nonlj incl. Spectra (06:02, logged TSV) | — | 0.0015 | 0.054 | — | 0.0% FA | 27.5% | `59951c1`‡ | `submissions/log.csv` |
+| Sweep A, α = 0 (M1b alone) | 0.301 | 0.072 | 0.343 | 0.296 | 0.8% / 27.8% | — | `299cab3` | `docs/reports/2026-09-26_fusion-sweep-predeclared.md` |
+| Sweep A, α = 0.2 | 0.236 | 0.030 | 0.322 | 0.280 | 0.45% / 36.0% | — | `299cab3` | same |
+| Sweep A, α = 0.3 | 0.230 | 0.021 | 0.322 | 0.280 | 0.25% / 39.5% | — | `299cab3` | same |
+| Sweep D, non-negative stacker | 0.230 | 0.025 | 0.324 | 0.280 | 0.4% / 36.9% | — | `299cab3` | same |
+| **Shipped: E on α 0.2** | 0.140 | 0.014 | **0.260** | **0.267** | 1.4% / 14.8% | 27.4% | `299cab3` | same; test share from `docs/reports/2026-09-26_sponsor-questions.md` |
+
+**Run (git)** is the commit that holds the code that produced the row: `59951c1` is the first `scripts/fuse.py` (05:32); `299cab3` is `scripts/fuse_sweep.py` committed with its results, run against the selection rule committed beforehand in `bf1dc55`. ‡ The 06:02 TSVs were made with `fuse.py` as of `59951c1`, before `22992c4` (06:25) added the persisted constants.
 
 The two 06:02 rows put Spectra inside an average or a fitted stacker, which is the configuration we later ruled out. Their holdout and In-the-Wild numbers lean on a model whose training data we can't see. The shipped TSV is `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv`.
 
