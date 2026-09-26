@@ -121,6 +121,8 @@ def test_latest_model_dir_picks_the_newest_stamp(tmp_path):
         (tmp_path / name / "model.joblib").write_bytes(b"")
     (tmp_path / "hc_logreg_20260927-0000").mkdir()  # no model.joblib: ignored
     assert latest_model_dir(tmp_path).name == "hc_lgbm_20260926-0300"
+    (tmp_path / "hc_selected").symlink_to(tmp_path / "hc_logreg_20260926-0112")
+    assert latest_model_dir(tmp_path).name == "hc_selected"  # the chosen bundle beats the newest
 
 
 def test_registered_under_its_name():

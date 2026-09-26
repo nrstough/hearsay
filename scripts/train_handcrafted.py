@@ -210,7 +210,7 @@ def main() -> None:
     assert export.path.is_unique, "duplicate paths in the score export"
     assert len(export) == len(d_all) + len(t)
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M")
+    stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")  # seconds: runs a minute apart collided
     out = REPO / "models" / f"{args.model_prefix}_{best}_{stamp}"
     out.mkdir(parents=True, exist_ok=True)
     bundle = {"features": feat_cols, "kind": best, "feature_stats": stats,

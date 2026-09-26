@@ -29,7 +29,13 @@ TOP_K = 3
 
 
 def latest_model_dir(models: Path = MODELS, prefix: str = "hc") -> Path:
-    dirs = sorted((p for p in models.glob(f"{prefix}_*") if (p / "model.joblib").exists()),
+    """`models/<prefix>_selected` (a symlink or directory holding model.joblib) wins when it
+    exists: the chosen bundle, not merely the newest. Otherwise the newest stamp."""
+    selected = models / f"{prefix}_selected"
+    if (selected / "model.joblib").exists():
+        return selected
+    dirs = sorted((p for p in models.glob(f"{prefix}_*") if (p / "model.joblib").exists()
+                   and p.name != selected.name),
                   key=lambda p: (p.name.rsplit("_", 1)[-1], p.name))  # by <stamp>, then name
     if not dirs:
         raise FileNotFoundError(
