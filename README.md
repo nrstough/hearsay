@@ -50,7 +50,7 @@ probability_synthetic = 0.0348  -> real
 
 Spectra-AASIST and M5 both say this voice is fake; the probe and the handcrafted model say real. Under the equal-weight rule we first tried (zmean, 06:02), Spectra's vote carried the file to 0.686, above the midpoint. Under the shipped rule M5's 20% share lifts it from 0.0027 (the previous rule, without M5) to 0.0348, which is still firmly real. Spectra gets no say in that direction: we don't let a pretrained model with undisclosed training data push a file toward "synthetic", because being wrong that way is the expensive error. The drift and compression lines stay in the report as evidence and never touch the score.
 
-Seven more real test files, each with its full routing log, every detector's evidence sentence, the shipped and the rejected equal-weight probability, and a paragraph on why the system said what it said, are in `docs/reports/2026-09-26_worked-examples.md`: a confident real, a confident fake, the file where Spectra's suppression fired, a fake with a stable mains hum, a real file with editing seams, a 21%-voiced file near the gate, and a genuinely uncertain file scored 0.471. Those examples were written and reproduced live on the previous rule, `e_on_a`, to four decimals of its TSV; the rule switch at 12:20 moves 3 of the 1,671 test files across 0.5. The router-on vs router-off measurement is under [Orchestration](#orchestration-what-routing-changes).
+Seven more real test files, each with its full routing log, every detector's evidence sentence, the shipped and the rejected equal-weight probability, and a paragraph on why the system said what it said, are in `docs/reports/2026-09-26_worked-examples.md`: a confident real, a confident fake, the file where Spectra's suppression fired, a fake with a stable mains hum, a real file with editing seams, a 21%-voiced file near the gate, and a genuinely uncertain file scored 0.471. They were written on the previous rule, `e_on_a`. The report's addendum re-runs all eight live under the shipped rule, and the results agree with the submitted TSV to 5.4e-5. No example changes side of 0.5: the largest moves are the uncertain file (0.471 → 0.466) and `HGT1046947` above (0.0027 → 0.0348). The router-on vs router-off measurement is under [Orchestration](#orchestration-what-routing-changes).
 
 ---
 
@@ -119,16 +119,21 @@ Orchestration here is a set of fixed rules over measured file properties, not a 
 
 **The abstention path.** Undecidable files (non-speech, decode failures) get scores in [0, 0.001). Every scored file gets a score in [0.001, 1], so the block sits strictly below all of them. Inside the block, files are ordered by the weak M1b signal plus a hash of the filename, so no two share a value; decode failures go to the very bottom. Placing the block at the bottom is the right call under *both* possible readings of the sponsor's scorer. It is optimal under the brief's cost when the block's fake rate is below 80%, and under the scoring code's inverted cost when it is above 9.7%. Undecidable files should sit near the 30% base rate, which leaves roughly a 3× margin on each side (`docs/consults/2026-09-26_fusion-strategy_RESPONSE.md`, item 5). No test file is gated today, so this costs nothing on the current ranking. It only protects against a silent or musical file being scored as synthetic, which our deep models do: the first probe scored pure silence at 0.99.
 
-**Router on vs off, measured** (on the previous rule, `e_on_a`: M1b and handcrafted only, no M5). `scripts/orchestration_ablation.py` re-fuses the exported detector scores with each rule switched on and off and reports minDCF for both cost weightings plus the number of files each rule touched (`outputs/fusion/orchestration_ablation.md`). "Router off" is the plain rank blend: no Spectra suppression, no gate, no pinned block. "Fuse everything equally" is an equal-weight z-mean of M1b, the handcrafted model and Spectra.
+**Router on vs off, measured.** `scripts/orchestration_ablation.py` re-fuses the exported detector scores with each rule switched on and off. It reports minDCF under both cost weightings and the number of files each rule touched (`outputs/fusion/orchestration_ablation_v2.md`, shipped rule; the same table for the previous rule is in `outputs/fusion/orchestration_ablation.md`). The three configurations:
+- **Router off** is the plain `0.6 / 0.2 / 0.2` rank blend, with no Spectra suppression, no gate and no pinned block.
+- **Fuse everything equally** is a four-way equal rank mean of M1b, the handcrafted model, M5 and Spectra.
 
-| Split | Router on (`e_on_a`) | No Spectra suppression | Router off | Fuse everything equally | Files Spectra suppression touched | Files the gate touched |
+| Split | Router on (shipped) | No Spectra suppression | Router off | Fuse everything equally | Files Spectra suppression touched | Files the gate touched |
 |---|---|---|---|---|---|---|
-| Holdout, 3,858 rows | 0.014 | 0.030 | 0.030 | 0.0085 | 123 (all real) | 31 |
-| In-the-Wild, brief cost | 0.258 | 0.323 | 0.322 | 0.276 | 34 (all real) | 9 |
-| In-the-Wild, sponsor-code cost | 0.270 | 0.283 | 0.280 | 0.255 | | |
-| NSA test, share above 0.5 | 27.6% | 30.3% | 30.3% | 29.1% | 45 | 0 |
+| Holdout, 3,858 rows | 0.0065 | 0.0200 | 0.0200 | 0.0045 | 83 (all real) | 31 |
+| In-the-Wild, brief cost | 0.229 | 0.274 | 0.274 | 0.214 | 24 (all real) | 9 |
+| In-the-Wild, sponsor-code cost | 0.2415 | 0.2535 | 0.2505 | 0.1955 | | |
+| NSA test, share above 0.5 | 27.5% | 30.3% | 30.3% | 28.8% | 47 | 0 |
 
-Spectra suppression is the rule that changes decisions: it halves the holdout cost and takes 0.06 off In-the-Wild under the brief's cost, and every file it touched where a label exists was real. Fusing everything equally looks better on the holdout and under the sponsor-code weighting but worse under the brief's cost on In-the-Wild, the cost we are graded on in the domain we are least sure of. The gate touched 31 holdout rows (no change in cost), 9 In-the-Wild rows (7 real, 2 fake; 0.260 → 0.258) and 0 test files: a measured null on the test set, reported as one. The evidence-only detectors flagged 591, 504 and 180 holdout rows (hum, seams, drift) without moving a score, by design.
+- **Spectra suppression is the rule that changes decisions.** It cuts the holdout cost to a third (0.020 → 0.0065) and takes 0.045 off In-the-Wild under the brief's cost, and every file it touched where a label exists was real. It held under the previous rule too (0.030 → 0.014, 0.322 → 0.258).
+- **The gate is a measured null on the test set.** It touched 31 holdout rows (no change in cost), 9 In-the-Wild rows, and 0 test files. On In-the-Wild it cost 0.001 under the brief's cost and 0.003 under the sponsor code's (0.228 without it, the sweep's number). Under the previous rule it gained 0.003 under the brief's cost.
+- **The evidence-only detectors never move a score, by design.** They flagged 591, 504 and 180 holdout rows (hum, seams, drift) and 24, 58 and 269 test files.
+- **Our rule does not win every readout.** With M5 in the blend, fusing everything equally beats the shipped rule on every labeled readout (holdout 0.0045, In-the-Wild 0.214 and 0.196). It does so by giving Spectra-AASIST a full vote. We ruled that out before seeing these numbers, because Spectra's training data is undisclosed and our validation rows may be in its training set. So the choice rests on that argument, not on these readouts, and we report them as measured.
 
 ### The fusion rule
 
