@@ -142,7 +142,8 @@ def main() -> None:
     families = [str(n) for n in side_meta.get("families", [])]
     families = [fam for fam in families
                 if any(c.startswith(FAMILY_PREFIXES.get(fam, (fam,))) for c in feat_cols)]  # fmt: skip
-    n_laundered = int((d_all.get("cmp_launder", pd.Series(dtype=str)).fillna("") != "").sum())
+    aug_all = next((c for c in d_all.columns if c.endswith(("_launder", "_augment"))), None)
+    n_laundered = int((d_all[aug_all].fillna("") != "").sum()) if aug_all else 0
     print(f"{args.train}: {len(d)} rows ({(d_all[flag_col] != '').sum()} feature failures "
           f"dropped), {len(feat_cols)} features, crop_mode={crop_mode}, band_match={band_match}, "
           f"families={families}, dropped={n_dropped} columns, laundered={n_laundered}, "
@@ -177,9 +178,10 @@ def main() -> None:
     val["val_auc"] = round(float(roc_auc_score(yv, s)), 4)
     per_gen, per_src = by_group(dv, yv, s, args.pi_synth)
     extra = {}
-    if "cmp_launder" in dv:
-        for name, m in (("clean", dv.cmp_launder.fillna("") == ""),
-                        ("laundered", dv.cmp_launder.fillna("") != "")):  # fmt: skip
+    aug_col = next((c for c in dv.columns if c.endswith(("_launder", "_augment"))), None)
+    if aug_col is not None:  # clean-only validation beside the augmented one (CLAUDE.md rule)
+        for name, m in (("clean", dv[aug_col].fillna("") == ""),
+                        ("augmented", dv[aug_col].fillna("") != "")):  # fmt: skip
             m = m.to_numpy()
             if m.sum() and 0 < yv[m].sum() < m.sum():
                 extra[f"val_{name}"] = {"n": int(m.sum()),
