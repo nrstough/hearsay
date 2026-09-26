@@ -55,3 +55,27 @@ Written before running:
 - Flipped (use only if NSA's feedback decodes as their code's polarity): `..._FLIPPED_only_if_NSA_scores_inverted.tsv`
 - Constants for the runner: `models/fusion_v1/constants.json`
 - Speech gate: 0 of 1,671 test files gated. Determinate scores sit in [0.001, 1].
+
+## Addendum: M5 candidates, pre-declared before any run (Sat ~08:35, requested by Nathan via the oversight chat)
+
+M5 = `outputs/detector_scores/m5_xlsr_ft.csv`. It is the frozen-backbone, head-only arm; its inner rows are out-of-fold. Its In-the-Wild scores are the 2,000 real clips already scored plus the 1,000 spoof clips scored now with `scripts/m5_score.py`, using the same seed-200 crops.
+
+**F: M5 as a second false-alarm suppressor, on top of the shipped E-on-A-α0.2 rule.**
+- Order: after the M3 step. If `m5_logit < t_F` and `base > 0.5`, then `base *= 0.5`. M5 never promotes a file toward synthetic.
+- Threshold: `t_F` is fixed from inner OOF only, before the holdout or In-the-Wild is looked at. It is the M5 logit value below which **1% of inner spoof rows** fall, so the suppression can fire wrongly on at most ~1% of known fakes.
+- Why that reading: the request said "~1% inner-real coverage", which is ambiguous. A threshold that fires on only 1% of *real* rows would almost never act, so this is the conservative interpretation that keeps the step meaningful. The fraction of inner real rows it covers is reported alongside.
+
+**A3: three-way rank blend** with weights (0.8 − w, 0.2, w) for (M1b, handcrafted, M5).
+- w ∈ {0.1, 0.2}, each run **without** and **with** the M3 suppression step (same E rule as before), so four variants.
+
+**Readouts:** identical to the 08:13 sweep.
+
+**Decision rule (fixed now).** The current rule (E on A α 0.2) is replaced by a candidate only if **all** of these hold:
+1. In-the-Wild brief-cost minDCF improves by ≥ 0.01.
+2. In-the-Wild miss-averse minDCF gets worse by no more than 0.01.
+3. Holdout brief-cost gets worse by no more than 0.05 (inside the holdout's noise band).
+4. Inner OOF gets worse by no more than 0.03.
+
+If several candidates qualify, the one with the best In-the-Wild brief-cost wins. If none qualifies, the rule stays frozen and the negative result is recorded here. Any change needs Nathan's ratification before it ships.
+
+**Expectation, stated in advance:** F may buy a little on In-the-Wild false alarms. A3 will probably lose on the holdout's short clips and LibriSpeech real.
