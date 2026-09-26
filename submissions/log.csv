@@ -1,2 +1,3 @@
 timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes
 2026-09-26T00:36:28-04:00,M0,1.0,1.0,submissions/20260926-0036_M0_constant.tsv,"minDCF=1.0 EER=0.5; constant always real (pi_synth=0.3); 1671 rows; 0 decode flags. M0 rollback; all real (4:1 FA cost, pi=0.3)"
+2026-09-26T03:08:58-04:00,M1,0.1458,0.1458,submissions/20260926-0308_M1_m1_wav2vec2-xls-r-300m_L7_20260926-0302.tsv,"minDCF=0.1458 EER=0.0254; probe m1_wav2vec2-xls-r-300m_L7_20260926-0302; pi_synth=0.3 cost_shift=False; 1671 rows; 0 flagged. M1 v2 segment mode (trim, no tiling, test-length crops), layer 7; outer holdout playht+wavegrad2+26 bona groups; sponsor-code asis 1.0 / flipped 0.0897"
