@@ -79,6 +79,10 @@ RAW_COLS = ["logit_spoof", "logit_bonafide", "synth_logit", "n_windows", "n_samp
             "n_pad_samples", "crop_s", "peak", "flag", "seconds"]  # fmt: skip
 FAIL_RATE = 0.05
 CAVEATS = {
+    "in_the_wild_possibly_optimistic": True,
+    "reason_in_the_wild": "the model card lists In-the-Wild only as an evaluation set (authors' EER 1.46%) "
+                          "and does not disclose the training data, so the stress readout cannot be shown "
+                          "to be uncontaminated.",
     "inner_rows_possibly_in_sample": True,
     "reason": "Spectra-AASIST's training data is undisclosed; LJ Speech, LibriSpeech and DiffSSD are "
               "public and plausible training corpora, and the inner rows score AUC 1.0. Treat the "
@@ -115,6 +119,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                     help="inner=<scores.csv> stress=<name>=<scores.csv>; no inference")  # fmt: skip
     ap.add_argument("--out", type=Path, help="--readout output json")
     ap.add_argument("--merge-into", type=Path, help="--readout: also write the readout into this meta.json")
+    ap.add_argument("--final", action="store_true",
+                    help="--readout: the inner scores are the full run's (not a pilot); unsets provisional")  # fmt: skip
     ap.add_argument("--out-name", default="spectra_aasist")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--max-chunks", type=int, help="stop after N chunks, keep the partial (exit 5)")
@@ -170,7 +176,7 @@ def build_rows(args, root: Path) -> tuple[pd.DataFrame, str]:
                 m[c] = np.where(m.label == "spoof", "spoof", "bonafide") if c == "generator" else "stress"
         plan = crop_plan(_under(root, args.manifest), args.stress_seed)
         rows = m[["path", "label", "generator", "source"]].assign(fold="stress", split="stress")
-        if args.limit:
+        if args.limit is not None:
             rows = rows.iloc[: args.limit]
         mode = "manifest"
     else:
@@ -182,10 +188,10 @@ def build_rows(args, root: Path) -> tuple[pd.DataFrame, str]:
             _die(f"{len(missing)} fold-file paths are not in {args.train_manifest} "
                      f"(first: {missing[0]})")  # fmt: skip
         f = f.assign(split=np.where(f.fold == "holdout", "holdout", "inner_oof"))
-        if args.limit:
+        if args.limit is not None:
             f = f.iloc[: args.limit]
             f = f[f.split != "holdout"]  # the holdout is read once, after the full run
-            t = t.iloc[: (args.test_limit or args.limit)]
+            t = t.iloc[: (args.limit if args.test_limit is None else args.test_limit)]
             mode = "pilot"
         else:
             mode = "full"
@@ -409,7 +415,11 @@ def do_readout(args, root: Path) -> int:
         name, path = v.split("=", 1)
         st = pd.read_csv(_under(root, Path(path)))
         out["stress"][name] = stress_readout(_y(inner), inner.synth_logit, _y(st), st.synth_logit,
-                                             st[["generator", "source"]], provisional=True)  # fmt: skip
+                                             st[["generator", "source"]],
+                                             provisional=not args.final)  # fmt: skip
+    if "pilot" in kv:  # the pad-mode pilot's table and selection, carried into the full run's meta
+        pm = json.loads(_under(root, Path(kv["pilot"])).read_text())
+        out["pilot"] = {"run": kv["pilot"], "table": pm.get("pilot"), "selection": pm.get("selection")}
     if "m1_tsv" in kv and "test" in kv:
         out["m1_disagreement"] = m1_disagreement(_under(root, Path(kv["test"])), _under(root, Path(kv["m1_tsv"])))
     out["caveats"] = CAVEATS
@@ -532,7 +542,7 @@ def run(argv=None, loader=load_spectra) -> int:
             "sec_per_clip": round(seconds / max(1, len(rows) - len(done)), 4)}  # fmt: skip
     over = {s: v for s, v in fails["by_split"].items() if v["rate"] > FAIL_RATE}
     if over:
-        raw.to_csv(run_dir / "raw.csv", index=False)
+        (raw if len(pad_modes) > 1 else mode_frame(raw, pad_modes[0])).to_csv(run_dir / "raw.csv", index=False)
         meta["gate"] = {"failure_rate": "failed", "splits_over_5pct": over}
         _atomic_write_text(run_dir / "meta.json", json.dumps(meta, indent=2))
         print(f"FAILURE GATE: splits over {FAIL_RATE:.0%} not-ok: {over}; nothing published", flush=True)

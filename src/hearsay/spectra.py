@@ -237,7 +237,8 @@ def masked_report(y, s, frame: pd.DataFrame | None = None, pi: float = PI_SYNTH)
 def sweep_thresholds(y, s, pi: float = PI_SYNTH) -> dict:
     """Thresholds from a labeled (inner) set: the minDCF-optimal one and the EER one, on the
     synth_logit scale, sklearn's ">= threshold is synthetic" convention. None plus a flag when
-    the sweep never beats the constant decision or the argmin sits at roc_curve's +inf entry."""
+    the sweep never beats the constant decision (that covers roc_curve's +inf entry, whose cost
+    is exactly the constant decision)."""
     m, info = finite_rows(y, s)
     if info["status"] != "ok":
         return {**info, "thr_dcf": None, "thr_eer": None}
@@ -247,10 +248,8 @@ def sweep_thresholds(y, s, pi: float = PI_SYNTH) -> dict:
     const = min(C_FA * (1 - pi), C_MISS * pi)
     i = int(np.argmin(c))
     out = {**info, "thr_dcf": None, "thr_dcf_flag": "", "thr_eer": None, "thr_eer_flag": ""}
-    if c[i] >= const:
+    if c[i] >= const:  # includes roc_curve's +inf entry at index 0, whose cost is the constant decision
         out["thr_dcf_flag"] = "no_threshold_beats_constant_decision"
-    elif not np.isfinite(thr[i]):
-        out["thr_dcf_flag"] = "argmin_at_inf_entry"
     else:
         out["thr_dcf"] = round(float(thr[i]), 4)
     j = int(np.nanargmin(np.abs((1 - tpr) - fpr)))

@@ -2,7 +2,7 @@
 
 Hermetic: a fake torch module stands in for Spectra, tiny WAVs are written with soundfile and
 decoded through the real loader, and every script run points --repo-root at a temp directory
-(run spec docs/specs/2026-09-26_m3-spectra-aasist.md, test IDs A1-A13, B1-B8, C1-C16, D1-D11, W1).
+(run spec docs/specs/2026-09-26_m3-spectra-aasist.md, test IDs A1-A14, B1-B8, C1-C16, D1-D11, W1).
 """
 
 from __future__ import annotations
@@ -192,7 +192,9 @@ def test_a2_band_match_counterfactual_and_fir_warm():
     y = prepare_input(x)
     drop_db = 20 * np.log10(np.sqrt(np.mean(y**2)) / np.sqrt(np.mean(x**2)))
     assert drop_db < -40, drop_db
-    assert np.array_equal(prepare_input(x, band_match=False), prepare_segment(x, band_match=False))
+    y_off = prepare_input(x, band_match=False)
+    off_db = 20 * np.log10(np.sqrt(np.mean(y_off**2)) / np.sqrt(np.mean(x**2)))
+    assert abs(off_db) < 0.5, off_db  # the tone is untouched without the band match
     assert hc._FIR is not None and hc._FIR.dtype == np.float32
 
 
@@ -219,11 +221,11 @@ def test_a4_crop_plan_reproduces_shared_recipe(repo):
         crop_plan(dup, 0)
 
 
-def test_a4_real_seed0_draws_pinned():
+def test_a4_real_seed0_draws_pinned(monkeypatch):
     real = REPO / "splits" / "nsa_test_durations.csv"
     if not real.exists():
         pytest.skip("test durations not present")
-    embed_mod.TEST_DURATIONS = real  # the fixture is not used here; restore is implicit per test
+    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", real)
     draw = duration_sampler(0)
     got = [round(draw(), 6) for _ in range(5)]
     assert got == [3.552688, 3.25075, 3.041875, 3.1115, 3.3205], got
@@ -442,6 +444,9 @@ def test_c10_pilot_writes_only_under_pilot_dir(repo):
     sc = pd.read_csv(pdir / "scores_zero.csv").set_index("path")
     assert np.allclose(sc.crop_s, raw.loc[sc.index, "crop_s"], equal_nan=True)  # A4: --limit changes no crop
     assert sc.crop_s.notna().sum() == 4  # the inner rows were cropped, the test rows were not
+    assert _run(_load_script(), root, "--limit", "4", "--test-limit", "0", "--name", "q") == 0
+    qdir = max((root / "outputs" / "spectra" / "pilot").iterdir())
+    assert set(pd.read_csv(qdir / "scores_zero.csv").split) == {"inner_oof"}  # --test-limit 0 means none
 
 
 def test_c11_manifest_mode(repo):
@@ -594,7 +599,55 @@ def test_d9_readout_mode_and_threshold_sweep(repo):
     assert stress_readout([0, 1, 0, 1], [0.9, 0.1, 0.8, 0.2], y, s)["at_inner_thresholds"]["thr_dcf"] is None
 
 
-def test_d10_d11_level_measurement_and_finite_mask(repo):
+def test_d11_failures_in_every_split_keep_every_readout(tmp_path, monkeypatch):
+    mod = _load_script()
+    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", tmp_path / "splits" / "nsa_test_durations.csv")
+    # 64 inner (rows 0-63), 20 holdout (64-83), 20 test (84-103); one bad file in each split (<= 5%)
+    info = make_repo(tmp_path, inner=(32, 32), hold=(10, 10), n_test=20, bad=(5, 70, 90))
+    assert _run(mod, tmp_path, "--pad-mode", "zero") == 0
+    meta = json.loads(next((tmp_path / "models").glob("m3_spectra_*/meta.json")).read_text())
+    assert meta["failures"]["by_split"] == {
+        "inner_oof": {"n": 64, "not_ok": 1, "rate": round(1 / 64, 4)},
+        "holdout": {"n": 20, "not_ok": 1, "rate": 0.05},
+        "test": {"n": 20, "not_ok": 1, "rate": 0.05}}
+    assert meta["inner"]["n_dropped"] == 1 and meta["inner"]["n_used"] == 63 and meta["inner"]["status"] == "ok"
+    assert meta["holdout"]["n_dropped"] == 1 and meta["holdout"]["n_used"] == 19 and "min_dcf" in meta["holdout"]
+    assert meta["test"]["n"] == 20 and meta["test"]["n_used"] == 19
+    for k in ("direction", "thresholds", "platt_diagnostic"):
+        assert meta[k]["n_dropped"] == 1, k
+    assert meta["failures"]["fold_rows_not_ok_by_generator"]  # per-generator coverage recorded
+    # stress set with two bad files out of 40 (5%): manifest mode and the readout both keep going
+    st = info["folds"][["path", "label", "generator", "source"]].iloc[10:50].copy()  # no bad row inside
+    for j in (7, 8):
+        Path(st.path.iloc[j]).write_bytes(b"garbage")
+    st.to_csv(tmp_path / "stress.csv", index=False)
+    assert _run(mod, tmp_path, "--manifest", "stress.csv", "--name", "st", "--pad-mode", "zero") == 0
+    sm = json.loads((tmp_path / "outputs" / "spectra" / "st" / "meta.json").read_text())
+    assert sm["stress"]["n_dropped"] == 2 and sm["stress"]["status"] == "ok"
+    raw = tmp_path / "outputs" / "spectra" / "spectra_aasist_raw.csv"
+    assert _run(mod, tmp_path, "--readout", f"inner={raw}",
+                f"stress=itw={tmp_path / 'outputs' / 'spectra' / 'st' / 'scores.csv'}", "--final") == 0  # fmt: skip
+
+
+def test_c14b_failure_late_in_the_run_publishes_nothing(repo):
+    """Publication is the last step: a run that trips the gate on its final chunk leaves the run
+    directory (raw + gate meta) and no fusion file, no sidecar, no raw companion."""
+    root, info = repo
+    mod = _load_script()
+    n = info["n_fold"] + info["n_test"]  # 14 rows, chunk 2: the last chunk is the last two test rows
+    fails = {n - 1: "raise", n: "raise"}
+    assert _run(mod, root, "--pad-mode", "zero", loader=lambda d: FakeSpectra(fail_calls=fails)) == 3
+    assert not (root / "outputs" / "detector_scores").exists()
+    assert not (root / "outputs" / "spectra" / "spectra_aasist_raw.csv").exists()
+    run_dir = next((root / "models").glob("m3_spectra_*"))
+    assert (run_dir / "raw.csv").exists() and (run_dir / "meta.json").exists()
+    assert not (run_dir / "fusion.csv").exists()
+    meta = json.loads((run_dir / "meta.json").read_text())
+    assert meta["gate"]["failure_rate"] == "failed" and "test" in meta["gate"]["splits_over_5pct"]
+    assert list(pd.read_csv(run_dir / "raw.csv").columns[:5]) == BASE_HEADER.split(",")  # mode frame, not wide
+
+
+def test_d10_level_measurement_recorded(repo):
     root, _ = repo
     mod = _load_script()
     assert _run(mod, root, "--pad-mode", "zero") == 0
