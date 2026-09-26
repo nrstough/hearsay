@@ -50,7 +50,7 @@ Written before running:
 
 **Caveat.** E's inner, holdout and ITW gains all involve M3, whose training data is undisclosed. E can only move a file toward "real", so if M3 is wrong about a file, the cost is a miss (weight 1), never a false alarm.
 
-**Caveats added 13:10 (channel-robustness lane, relayed by the oversight chat).** (1) The M3 leakage probes returned KEEP for the suppression step: M3 was the most stable detector under perturbation, fires only on real clips, and had the lowest MLAAD miss rate. (2) **The rule is not noise-robust:** 20 dB additive white noise collapses handcrafted v5 (AUC 0.998 → 0.64) and takes the shipped rule's holdout from 0.012 to 0.269 while M3 holds; the test set shows no additive noise, no rule change was proposed, and symmetric noise augmentation is future work.
+**Caveats added 13:10 (channel-robustness lane, relayed by the oversight chat).** (1) The M3 leakage probes returned KEEP for the suppression step: M3's margins are the most stable under perturbation (mean |ΔAUC| 0.0008), though its rank order is the least stable of the three deep models (clean-vs-perturbed Spearman under noise: M3 0.875, M1b 0.913, M5 0.939); it fires only on real clips and had the lowest MLAAD miss rate, and the suppression step itself is safe. (2) **The rule is not noise-robust:** 20 dB additive white noise collapses handcrafted v5 (AUC 0.998 → 0.64) and takes the shipped rule's holdout from 0.012 to 0.269 while M3 holds; the test set shows no additive noise, no rule change was proposed, and symmetric noise augmentation is future work.
 
 **Files:**
 - Primary: `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv`
