@@ -78,7 +78,12 @@ def main() -> None:
     platt = LogisticRegression(class_weight="balanced").fit(oof[:, None], ytr)
     clf = make_clf(args.c).fit(Xtr[:, best], ytr)
     probe = Probe(args.model, best, clf, float(platt.coef_[0, 0]), float(platt.intercept_[0]))
-    meta_path = REPO / "outputs" / "embeddings" / args.model / args.train / "extract_meta.json"
+    # First training set decides the mode; all sets must share it (checked below).
+    metas = [REPO / "outputs" / "embeddings" / args.model / n / "extract_meta.json"
+             for n in args.train.split(",")]  # fmt: skip
+    modes = {json.loads(p.read_text()).get("mode") for p in metas if p.exists()}
+    assert len(modes) <= 1, f"training sets mix embedding modes: {modes}"
+    meta_path = metas[0]
     if meta_path.exists():
         em = json.loads(meta_path.read_text())
         probe.segment = em.get("mode") == "segment"
