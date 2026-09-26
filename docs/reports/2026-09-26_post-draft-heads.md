@@ -15,7 +15,7 @@ The pre-declared entry failed both the pre-declared gate and the room. Details: 
 | | Blend (brief / averse) | Shipped rule | Direction |
 |---|---|---|---|
 | Inner | 0.1557 / 0.3330 | 0.1351 / 0.2997 | worse |
-| Holdout | 0.0030 / 0.0071 | | better |
+| Holdout | 0.0030 / 0.0071 | 0.0065 / 0.0087 | better |
 | In-the-Wild | 0.2047 / 0.2300 | 0.228 / 0.2385 | better, but short of the room's 0.03 under each cost |
 
 **The gate's diagnostic** counts, at the inner-OOF threshold, the shipped rule's 122 In-the-Wild misses: WavLM catches 41 of them. Its corrective share is 0.80 on In-the-Wild but 0.31 on inner OOF, which fails the diagnostic. This report's 57 of 158 is the same kind of count against the misses at the In-the-Wild argmin.
@@ -103,9 +103,11 @@ The four reference counts reproduce the Fable consult's numbers exactly (`docs/c
 ## Reading
 
 - **A different backbone does see different fakes.** WavLM flags 57 of the misses, 57 times M1b's count and more than M5, while agreeing with M1b's ranking at only 0.79 on the test set. This is the new information the consult said only a new representation could bring.
-- **On the NSA domain it is a peer, not an upgrade.** Holdout minDCF ties M1b (0.0717). The generator profile flips: WavLM is better on wavegrad2 and worse on playht. Real LibriSpeech and LJ are slightly better. Inner CV is worse by 0.03.
+- **On the NSA domain it ties M1b on the holdout and loses on inner OOF.** Holdout minDCF ties M1b (0.0717). The generator profile flips: WavLM is better on wavegrad2 and worse on playht. Real LibriSpeech and LJ are slightly better. Inner CV is worse by 0.03, and the inner-OOF averse cost nearly doubles (0.624 vs 0.331): at the averse operating point it misses far more of the inner generators than M1b does.
 - **On wild real speech it false-alarms.** P_FA at the inner threshold is 7.05% against M1b's 0.8%, and the brief-cost minDCF doubles. Under C_FA = 4 that is the costly direction. M1b's own In-the-Wild weakness is misses; WavLM's is false alarms. Complementary errors are what a rank blend can exploit, but WavLM's false alarms sit where the blend's threshold operates.
-- **Expected effect.** The consult's prior was near zero, and nothing here moves it much in either direction. The gate's four conditions settle it: In-the-Wild ≥ 0.020 better under the brief's cost, ≤ 0.002 worse under the sponsor's, inner ≥ 0.010 better, holdout ≤ 0.010 worse. The large In-the-Wild false-alarm rate makes the sponsor-averse condition the one to watch.
+- **Against the gate.** Before the verdict this report named the sponsor-averse In-the-Wild condition as the one to watch because of the false-alarm rate. That was the wrong one.
+  - In the blend, In-the-Wild improved under both costs (+0.023 brief, +0.009 averse). It fell short of the room's 0.03 but was not worse.
+  - The candidate failed on inner (worse by 0.021 brief and 0.033 averse; the column-alone inner-OOF averse gap above predicted this), on the gate's corrective-share diagnostic, and on thresholds doubled by the 0.967 test-set Spearman of the blend with the shipped rule.
 
 ## Incident: transient decode failures under parallel extraction (fixed; D2)
 
@@ -113,7 +115,7 @@ The four reference counts reproduce the Fable consult's numbers exactly (`docs/c
 - WavLM extraction at one clip per forward pass ran 0.17–0.25 s/clip. Serial, it would have finished near 19:15.
 - At ~17:40 the serial chain was cut. The four sets then ran in three concurrent processes, and the training sample resumed from its five completed shards.
 - Each process grew to ~5.5 GB (the MPS allocator caches buffers for variable-length inputs). The 18 GB Mac swapped (~16 GB of swap in use), throughput fell to 0.4–0.5 s/clip, and FFmpeg failed transiently on files that decode fine on retry.
-- The extractor replaces an undecodable clip with 1 s of zeros and records `decode_error` in the shard, so nothing was silent. But such a row would have entered training and scoring as a silent clip.
+- The extractor replaces an undecodable clip with 1 s of zeros and records `decode_error` in the shard and in `manifest.csv`, so the failure is recorded. But `hearsay.probe.load_embeddings` does not read the flag, so such a row would have entered training and scoring as a silent clip without warning.
 
 **Counts.**
 - 99 rows in total: 74 train sample, 10 ASV19, 4 test, 11 In-the-Wild.
@@ -124,8 +126,18 @@ The four reference counts reproduce the Fable consult's numbers exactly (`docs/c
 **Fix.**
 - The process count dropped to two at ~18:15, and the training-sample process was restarted clean at 18:34. Resumes are bit-identical: crop lengths and per-row seeds are regenerated deterministically.
 - New `scripts/repair_decode_errors.py` re-embeds only flagged rows through the extractor's own segment path (the stored crop length, seed = meta seed + row).
-- It first re-embeds 5 unflagged rows of the same set and refuses to write unless they reproduce. The relative error was **0.0** on every set.
-- It ran on each set after that set's extraction had finished. The finish chain ran it again on the train sample and the add-on before training: 0 still failing, and 0 decode errors in all four sets (check A3).
+- It first re-embeds unflagged rows of the same set (`--verify`, 5 in every run here) and refuses to write unless they reproduce.
+- It ran on the test set, In-the-Wild and ASV19 once each after their extraction finished. The fixed row IDs are listed below.
+- The train sample's 74 rows were repaired by the finish chain (`outputs/logs/wavlm_finish_chain.log`), which also re-ran ASV19 (a no-op) before training.
+- **Tightened after the pre-audit critique.**
+  - The first version's identity bar was a whole-matrix max relative error, lax at WavLM's value range; it is now element-wise, |diff| ≤ 5e-3 + 5e-3·|stored|.
+  - The tool now refuses an empty verify pool, a mismatched manifest and an unfinished set, and writes shards atomically.
+- **Persisted evidence for A1–A5.** The tool's new `--verify-only` mode was run on all four sets after training. It changes nothing. It compared each set with its v3 twin (meta, paths, stored crop lengths), counted decode errors, checked finiteness, and re-embedded 10 random rows per shard plus every repaired row: 426 rows in all, every one matching exactly (max abs diff 0.0). Logs: `outputs/logs/wavlm_verify_{nsa_train_sample_wl, asv19_addon_wl, nsa_test_wl, itw_stress_wl}.json`.
+- **Repaired rows.**
+  - Test: 1141, 1143, 1164, 1233.
+  - In-the-Wild: 1057, 1090, 1390, 2049, 2050, 2051, 2118, 2215, 2224, 2368, 2719.
+  - ASV19: 1279, 1303, 1350, 1365, 1377, 2912, 2913, 3369, 3370, 3371.
+  - Train sample: the 74 listed in the chain log.
 - `tests/test_repair_decode_errors.py` covers it (6 hermetic tests, including a counterfactual: an identity mismatch writes nothing).
 
 **Latent hazard for other lanes.** `extract_embeddings.py` falls back to zeros on a decode failure and only flags the row. Any future extraction under memory pressure should check `manifest.csv`'s `flag` column before training, or run the repair tool.
@@ -138,19 +150,19 @@ The four reference counts reproduce the Fable consult's numbers exactly (`docs/c
 | A2 | Rows 20,000 / 7,648 / 1,671 / 3,000, paths in v3 order | pass |
 | A3 | 0 decode errors after repair | pass (99 repaired, 0 still failing) |
 | A4 | Shape (N, 25, 1024), finite | pass |
-| A5 | Repair identity check < 2e-3 | pass (0.0 on every set) |
+| A5 | Re-embedding reproduces stored rows | pass: 426 rows re-embedded across all four sets (10 per shard plus all 99 repaired rows), max abs diff 0.0 (`outputs/logs/wavlm_verify_*.json`) |
 | A6 | Layer by inner-CV argmin, table recorded | pass (layer 9) |
 | A7 | Holdout AUC > 0.5 | pass (0.9991) |
 | A8 | Export splits 16,142 / 3,858 / 1,671 / 3,000, path sets equal to `m1b_v3.csv`, no NaN or duplicates | pass |
 | A9 | Shipped rule reproduces 15 FA / 158 miss | pass |
-| A10 | `pytest -q` all pass; `ruff check .` clean | pytest 745 passed. Ruff is clean on this lane's files. The repo-wide run fails on 3 findings in `src/hearsay/analyzer.py` from commit 19925a3 (another lane), reported to the oversight chat and not touched here |
+| A10 | `pytest -q` all pass; `ruff check .` clean | pass; see the run spec's Results for the counts at each commit |
 
 ## Timing
 
 | Stage | When (Sat Sep 26) |
 |---|---|
-| Extraction | 17:22–19:05, including the parallel detour; a clean serial run would take ~1 h 55 min at 0.215 s/clip |
-| Final solo train-sample shards | 0.15–0.17 s/clip |
+| Extraction | 17:19–19:05, including the parallel detour; a clean serial run would take ~1 h 55 min at 0.215 s/clip |
+| Train-sample shards after the 18:34 restart | 0.10–0.41 s/clip per shard, 0.23 cumulative |
 | Repair, validation, training, export | 19:05–19:07 (training 59 s) |
 
 ## Artifacts (gitignored; not archived)
