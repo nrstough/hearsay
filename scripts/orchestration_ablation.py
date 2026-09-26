@@ -2,7 +2,7 @@
 eval-only In-the-Wild set, plus the unlabeled test set's share above 0.5.
 
 No model runs. It re-fuses the exported logits (outputs/detector_scores/, the In-the-Wild
-companions) exactly as models/fusion_v1/constants.json prescribes, then switches each routing
+companions) exactly as the fusion constants file prescribes (fusion_v1: alpha over M1b + handcrafted; fusion_v2: weights over M1b + handcrafted + M5), then switches each routing
 rule off in turn. Two rules can change a file's score; every other detector only routes or
 explains:
 
@@ -23,7 +23,7 @@ Readouts per split: normalized minDCF under the brief's cost (9.33 P_FA + P_miss
 prior) and under the sponsor code's cost weighting, the number of files each rule touched, and
 how many files the evidence-only detectors flagged without changing any score.
 
-Usage: uv run python scripts/orchestration_ablation.py [--constants models/fusion_v1/constants.json]
+Usage: uv run python scripts/orchestration_ablation.py [--constants models/fusion_v2/constants.json --out outputs/fusion/orchestration_ablation_v2]
 Writes outputs/fusion/orchestration_ablation.{json,md}.
 """
 
@@ -83,11 +83,19 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=REPO / "outputs" / "fusion" / "orchestration_ablation")
     args = ap.parse_args()
     c = json.loads(args.constants.read_text())
-    alpha, e = float(c["alpha_handcrafted"]), c["e_rule"]
+    e = c["e_rule"]
+    # fusion_v1 stores one alpha (M1b + handcrafted); fusion_v2 stores a weights dict (+ M5).
+    if "weights" in c:
+        weights = {d: float(w) for d, w in c["weights"].items()}
+    else:
+        alpha = float(c["alpha_handcrafted"])
+        weights = {"m1b_v3": 1 - alpha, "handcrafted_v5": alpha}
     refs = {d: np.asarray(v, dtype=float) for d, v in c["rank_ref_inner_oof_sorted"].items()}
 
-    m1 = load("m1b_v3")
-    hc = load("handcrafted_v5", str(S / "_itw_handcrafted_v5.csv"))
+    itw_companion = {"handcrafted_v5": str(S / "_itw_handcrafted_v5.csv"),
+                     "m5_xlsr_ft": str(S / "_itw_m5.csv")}  # crop-fair M5 In-the-Wild, as in the v2 sweep
+    cols = {d: load(d, itw_companion.get(d)) for d in weights}
+    m1 = cols["m1b_v3"]
     m3 = load("spectra_aasist", str(REPO / "outputs" / "spectra" / "itw_stress" / "scores.csv"))
     lab = pd.read_csv(REPO / "splits" / "nsa_folds.csv")[["path", "label"]]
     itwm = pd.read_csv(REPO / "outputs" / "manifests" / "itw_stress.csv")[["path", "label"]]
@@ -95,18 +103,20 @@ def main() -> None:
     labels = labels.drop_duplicates("path").set_index("path").label
     gate = gate_flags()
 
-    report: dict[str, dict] = {"constants": str(args.constants.relative_to(REPO)), "alpha": alpha,
-                               "e_rule": e, "splits": {}}  # fmt: skip
+    report: dict[str, dict] = {"constants": str(args.constants.resolve().relative_to(REPO)), "rule": c.get("final"),
+                               "weights": weights, "e_rule": e, "splits": {}}  # fmt: skip
     lines = ["| Split | Configuration | minDCF (brief cost) | minDCF (sponsor-code cost) | Files E touched | Files G touched |",
              "|---|---|---|---|---|---|"]
     for split in SPLITS:
-        idx = m1[m1.split == split].index
-        idx = idx.intersection(hc.index).intersection(m3.index)
-        l1, lh, l3 = (m1.loc[idx, "logit"].to_numpy(), hc.loc[idx, "logit"].to_numpy(),
-                      m3.loc[idx, "logit"].to_numpy())  # fmt: skip
-        r1, rh = rank_of(l1, refs["m1b_v3"]), rank_of(lh, refs["handcrafted_v5"])
+        idx = m1[m1.split == split].index.intersection(m3.index)
+        for s in cols.values():
+            idx = idx.intersection(s.index)
+        ranks = {d: rank_of(cols[d].loc[idx, "logit"].to_numpy(), refs[d]) for d in weights}
+        l3 = m3.loc[idx, "logit"].to_numpy()
         r3 = rank_of(l3, np.sort(m3[m3.split == "inner_oof"].logit.to_numpy()))
-        base = (1 - alpha) * r1 + alpha * rh
+        base = np.zeros(len(idx))
+        for d, w in weights.items():  # accumulated in the constants' order, as the runner does
+            base = base + w * ranks[d]
         e_fires = (l3 < e["m3_logit_below"]) & (base > e["base_rank_above"])
         with_e = np.where(e_fires, base * e["multiply_by"], base)
         is_speech = gate.reindex(idx).fillna(1.0).to_numpy()
@@ -116,7 +126,8 @@ def main() -> None:
             "no_gate": with_e,
             "no_suppression": apply_default_answer(base, is_speech, keys=list(idx)),
             "router_off": base,
-            "fuse_everything": (r1 + rh + r3) / 3.0,
+            # equal-weight rank mean over every weighted column plus M3 as a full voter
+            "fuse_everything": (sum(ranks.values()) + r3) / (len(ranks) + 1),
         }
         y = None
         if split != "test":

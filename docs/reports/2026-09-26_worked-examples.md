@@ -2,6 +2,8 @@
 
 Sat Sep 26, 2026, README chat. Brief: `docs/handoffs/2026-09-26_readme-orchestration-handoff.md`. Purpose: show that per-file routing and explanation are real, on real NSA test files, with the exact records the runner writes.
 
+_Update, Sat ~12:30: the shipped fusion rule moved at ~12:05 from `E_on_A_alpha0.2` (fusion_v1) to `A3_w0.2_E` (fusion_v2: 0.6 M1b v3 + 0.2 handcrafted v5 + 0.2 M5 in rank space, same M3 suppression; the default switch is pending Nathan's word). The eight records below were produced under fusion_v1 and are kept as written. The addendum at the end re-runs the same eight files under fusion_v2; no file changes side of 0.5._
+
 **Where the records come from.** The eight files were chosen from `outputs/inventory/test_worked_candidates.csv` (a join of the shipped TSV, the 06:02 z-mean TSV and the runner's per-file features over all 1,671 test files) to cover the situations the brief asks for: a confident real, a confident fake, a file where M3 suppressed a false alarm, a file with a hum and one with a seam flagged as evidence, a low-voiced-fraction file near the gate, and two disagreement cases. The records below were produced by running the shipped pipeline on these eight files with the frozen rule:
 
 ```bash
@@ -229,3 +231,39 @@ Why. The probe is slightly on the real side (LLR −1.0, rank 0.45), the handcra
 - Six detectors contributed evidence without touching the score, and the log says so each time ("evidence only, never fused"): hum on file 5, seams on files 6 and 8, drift on file 4, codec traces on all eight.
 - The rejected equal-weight rule would have moved four of the eight files across 0.5 (files 3, 4, 6 in one direction of risk, file 8 in the other), all by letting a detector with undisclosed training data vote in full.
 - Disagreements are shown, not hidden: files 4 and 8 carry a deep-detector split in their records, with the fused probability reflecting the rule, not a tie-break.
+
+---
+
+## Addendum (Sat ~12:30): the same eight files under fusion_v2 (`A3_w0.2_E`)
+
+Re-run with the same command plus `--fusion models/fusion_v2/constants.json`, which adds the M5 head (`models/m5_xlsr_ft_20260926-0741`) as a third weighted scorer: base = 0.6 · rank(M1b v3) + 0.2 · rank(handcrafted v5) + 0.2 · rank(M5), then the same M3 suppression and the same Platt and determinate maps. Live probabilities agree with the logged candidate TSV (`submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv`) to 5.4e-5 or better on all eight files. Every detector sentence above is unchanged; the new lines per file are M5's evidence and the fusion line.
+
+| File | p under fusion_v1 | p under fusion_v2 | M5 logit (P) | Base under v2 | M3 suppression | M5's evidence sentence |
+|---|---|---|---|---|---|---|
+| HGT1013455.wav | 0.0024 | 0.0028 | −5.26 (0.01) | 0.151 | no | XLS-R fine-tuned head (M5, 12 layers, attentive pooling): logit −5.26 (real-like, P=0.01) |
+| HGT1310023.wav | 0.9995 | 0.9994 | +5.73 (1.00) | 0.931 | no | logit +5.73 (synthetic-like, P=1.00) |
+| HGT3739624.wav | 0.0312 | 0.0305 | −0.78 (0.31) | 0.622 → 0.311 | **yes** | logit −0.78 (real-like, P=0.31) |
+| HGT1046947.wav | 0.0027 | 0.0348 | +5.64 (1.00) | 0.319 | no (M3 never promotes) | logit +5.64 (synthetic-like, P=1.00) |
+| HGT3237868.wav | 0.9347 | 0.8973 | +0.14 (0.54) | 0.631 | no | logit +0.14 (synthetic-like, P=0.54) |
+| HGT1794158.wav | 0.0049 | 0.0097 | −3.59 (0.03) | 0.241 | no | logit −3.59 (real-like, P=0.03) |
+| HGT2080120.wav | 0.9640 | 0.9384 | −0.13 (0.47) | 0.663 | no | logit −0.13 (real-like, P=0.47) |
+| HGT2305393.wav | 0.4714 | 0.4656 | −2.23 (0.10) | 0.501 | no (M3 never promotes) | logit −2.23 (real-like, P=0.10) |
+
+The fusion line under v2 reads, for example (file 3): `fusion: e_on_a (A3_w0.2_E): 0.6 x rank(m1b_v3) + 0.2 x rank(handcrafted_v5) + 0.2 x rank(m5_xlsr_ft) = 0.622; M3 false-alarm suppression applied (margin -6.63 < -3 and base > 0.5: x0.5 -> 0.311)`.
+
+What changes and what does not:
+- No file crosses 0.5, consistent with the sweep's count of 3 crossings over the whole test set. M3 suppression still fires on file 3 and only there.
+- The largest move is file 4 (0.003 → 0.035): M5 sides with Spectra (fake, +5.64) against the probe (real, −5.78). With 20% of the weight it lifts the base from 0.157 to 0.319, still well inside the real range; the rule's asymmetry (Spectra cannot promote) is unchanged, and this file now records a two-against-one disagreement among the deep detectors rather than one-against-one.
+- Files 5 and 7 lose a little confidence (0.935 → 0.897, 0.964 → 0.938) because M5 is near its boundary on both (+0.14, −0.13), while the probe and Spectra stay far into the synthetic range.
+- File 8 stays the coin flip it was (0.471 → 0.466); M5 leans real (−2.23), Spectra leans fake, the probe is near the boundary.
+
+**Router on vs off under fusion_v2** (`scripts/orchestration_ablation.py --constants models/fusion_v2/constants.json`, output `outputs/fusion/orchestration_ablation_v2.md`; "fuse everything equally" is now the four-way equal rank mean of M1b, handcrafted, M5 and Spectra):
+
+| Split | Router on | No M3 suppression | Router off | Fuse everything equally | Files M3 suppression touched | Files the gate touched |
+|---|---|---|---|---|---|---|
+| Holdout, 3,858 rows | 0.0065 | 0.0200 | 0.0200 | 0.0045 | 83 (all real) | 31 |
+| In-the-Wild, brief cost | 0.2290 | 0.2737 | 0.2737 | 0.2137 | 24 (all real) | 9 |
+| In-the-Wild, sponsor-code cost | 0.2415 | 0.2535 | 0.2505 | 0.1955 | | |
+| NSA test, share above 0.5 | 27.5% | 30.3% | 30.3% | 28.8% | 47 | 0 |
+
+Under fusion_v2 the router-on holdout and In-the-Wild numbers reproduce the sweep's readout for `A3 w 0.2 + E` (0.0065 and 0.228 before the gate; the gate's 9 In-the-Wild rows cost 0.001 under the brief's cost and 0.003 under the sponsor code's cost here, where under fusion_v1 they gained 0.003). M3 suppression still touches only real files and is still the rule that changes decisions (0.020 → 0.0065 on the holdout, 0.274 → 0.229 on In-the-Wild). One reading differs from fusion_v1: with M5 in the blend, the four-way equal-weight rank mean beats the shipped rule on every labeled readout (holdout 0.0045, In-the-Wild 0.214 brief and 0.196 sponsor-code). That rule gives Spectra a full vote, which the fusion consult ruled out because its training data is undisclosed and its inner rows may be in-sample; the numbers are recorded here as measured, and the decision rests on that argument, not on these readouts.
