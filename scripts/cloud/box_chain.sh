@@ -38,8 +38,10 @@ run_jobs() {
         STEPS=$(echo "$spec" | tr ':' '\n' | sed -n 's/^steps=//p'); STEPS=${STEPS:-3000}
         ARM=$(echo "$spec" | tr ':' '\n' | sed -n 's/^arm=//p'); ARM=${ARM:-nsa_extra}
         CFG=$(echo "$spec" | tr ':' '\n' | sed -n 's/^cfg=//p'); CFG=${CFG:-{\}}
+        CFG64=$(echo "$spec" | tr ':' '\n' | sed -n 's/^cfg64=//p')   # base64 JSON (colons!)
+        [ -n "$CFG64" ] && CFG=$(echo "$CFG64" | base64 -d)
         EXTRA=$(echo "$spec" | tr ':' '\n' | sed -n 's/^extra=//p')
-        NAME="fold${FOLD}_${ARM}"
+        NAME=$(echo "$spec" | tr ':' '\n' | sed -n 's/^name=//p'); NAME=${NAME:-fold${FOLD}_${ARM}}
         status "RUNNING $NAME"
         [ -f /root/m5/bundle/codecs/codec_manifest.csv ] || rclone copy "${HEARSAY_R2_PREFIX}bundle/v1/codecs" /root/m5/bundle/codecs --transfers 16 2>/dev/null || true
         # shellcheck disable=SC2086
