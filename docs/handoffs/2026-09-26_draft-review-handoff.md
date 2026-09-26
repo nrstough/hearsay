@@ -10,7 +10,7 @@ Read first: `docs/reports/2026-09-26_draft-review-branches.md` (the decoding tab
 - **What we know about our error:** holdout 0.014 (two unseen generators + 26 unseen real speakers), In-the-Wild 0.260 (3,000 real-world clips, never trained on), inner 0.140. The test number is unknown; NSA provided no labels. The draft review is the only labeled measurement we will ever get on the test set: one file, one time, one number back.
 - **The draft is the shipped rule, not an experiment.** `e_on_a`, frozen by Nathan at 09:25: rank blend 0.8·M1b v3 + 0.2·handcrafted v5, Spectra-AASIST used only to suppress false alarms, Platt at the 0.3 prior into [0.001, 1], non-speech and decode failures pinned below 0.001. The runner reproduces it to 4e-16, the Docker image `hearsay:20260926-0916` to 2e-4 (Spearman 1.0 on 50 files).
 - **Score direction:** we submit 1.0 = synthetic, as the brief says. NSA's scoring code is ASVspoof5 code that treats a higher score as bona fide. The draft's returned number tells us which one they actually use; the decoding table below turns that number into an action. The pinned block stays at the bottom in both polarities, by design (consult item 5): that is where the 4× error is avoided under either reading.
-- **The M5 candidate (A3 w0.2 + E)** beat the frozen rule on every readout but is shelved until the draft number is back; artifacts under `submissions/20260926-0914_*CANDIDATE*`, `outputs/fusion/fusion_v2_candidate/` and the runner's `models/fusion_v2/constants.json`. The runner can already execute it (8316e50, opt-in via `--fusion`; default and the draft file unchanged, reproduced to 1.1e-16), so reopening it is Nathan's call and needs only the Docker lane (~1 h) plus a 22-minute Mac run.
+- **The M5 candidate (A3 w0.2 + E)** beat the frozen rule on every readout but is shelved until the draft number is back; artifacts under `submissions/20260926-0914_*CANDIDATE*`, `outputs/fusion/fusion_v2_candidate/` and the runner's `models/fusion_v2/constants.json`. The runner can already execute it (8316e50, opt-in via `--fusion`; default and the draft file unchanged, reproduced to 1.1e-16), so reopening it is Nathan's call and, now that the Docker image is not required (NSA, Sat ~12:00), costs nothing but a file copy and a README line. Nathan is deciding at ~12:15 whether the draft itself goes out as A3.
 
 ## The file to send
 
@@ -42,7 +42,7 @@ Copy the file for the band, rename it to `<TeamName>_predictions.tsv`, run the c
 |---|---|---|---|
 | **0.00–0.20** | our direction; test behaves like our holdout | the 08:13 file, unchanged | remaining hours to README and diversity; A3 may be revisited if it is before ~14:00 and Nathan wants it |
 | **0.20–0.45** | our direction; test is wild-like | the 08:13 file, unchanged (it already has the best In-the-Wild brief-cost score of the ratified rules) | the channel-robustness report (16:00) becomes the lever; A3 worth a second look |
-| **0.45–0.90** | ambiguous; do not flip | `submissions/20260926-0928_BRANCH_C_M1b_alone_our_direction.tsv` (sha `4ae685ff9824543d1`) | tell the Docker chat: the image would need `--rule m1_only`-equivalent output or ship as is with the TSV disclosed |
+| **0.45–0.90** | ambiguous; do not flip | `submissions/20260926-0928_BRANCH_C_M1b_alone_our_direction.tsv` (sha `4ae685ff9824543d1`) | no image work (Docker not required); note the rule in the README |
 | **0.95–1.00** | NSA's code reads our scores inverted | `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_FLIPPED_only_if_NSA_scores_inverted.tsv` (sha `84468a0925fa8d8ad`) | raise it with NSA at the booth or on Discord (the brief says 1.0 = synthetic); the runner's `--flip` already produces this file, so the image needs no change |
 
 If only EER comes back: 2–5% → first row; 95–98% → last row. If a number lands on a boundary or NSA sends something else (a rank, a plot, "looks fine"), do not guess: post it to Nathan and the M4 lane verbatim and ask NSA for minDCF and EER.
@@ -67,7 +67,7 @@ If only EER comes back: 2–5% → first row; 95–98% → last row. If a number
    EOF
    ```
 3. Direction check: the file's share ≥ 0.5 should be near 0.27 in our direction and near 0.73 flipped. If that does not match the branch you chose, stop.
-4. Rename the copy to `<TeamName>_predictions.tsv`; `cmp` it against the logged file; Nathan DMs it with the Docker image reference and the repo link.
+4. Rename the copy to `CrossExam_predictions.tsv`; `cmp` it against the logged file; Nathan DMs it with the repo link (the Docker image is optional evidence, not a deliverable).
 5. Append a log row (`submissions/log.csv`: `timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes`) saying "FINAL, sent HH:MM, sha …, branch …".
 
 ## Working branch / worktree
@@ -89,7 +89,7 @@ Nothing else is needed for this lane. Regenerating any TSV from audio is the M4 
 - Check: the pandas snippet above on whichever file is about to leave the machine; expected `OK … min 0.0012 max 0.9997 share>=0.5 0.274` for the draft.
 - At-risk: `submissions/*.tsv` (gitignored). Archived to `/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/submissions/` (13 files at 09:55). The external drive is at 100%; TSVs are 57 KB each, so the archive is safe, but check `df -h` before writing anything larger there. `~/Downloads/HEARSAY_predictions.tsv` is a convenience copy, not the record.
 - At-risk: `submissions/log.csv` is tracked; every send gets a row, and the row is the source of truth on numbers when docs disagree.
-- In flight: the M4 lane (branches done; idle until the number), Docker (image verified, idle), channel robustness (report 16:00; a symmetric refit would change the exports and the M4 lane would re-run both sweeps, producing new logged TSVs that this table would then need to point at), README (20:00).
+- In flight: the M4 lane (branches done; idle until the number), Docker (image verified; not required, lane stood down), channel robustness (report 16:00; a symmetric refit would change the exports and the M4 lane would re-run both sweeps, producing new logged TSVs that this table would then need to point at), README (20:00).
 
 ## Analytical notes
 

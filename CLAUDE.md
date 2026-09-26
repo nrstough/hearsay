@@ -5,7 +5,7 @@
 HEARSAY is a software-only audio authentication system, built at HackGT 13 (Sep 25–27, 2026) for the NSA HEARSAY challenge.
 - **Input and output.** Any audio file in; out comes a probability that the voice is synthetic (0.0 real, 1.0 synthetic), plus a plain-English explanation of why.
 - **How it decides.** A rule-based orchestrator picks forensic detectors per file, and a logistic stacker fuses their scores.
-- **Deliverables.** `teamName_predictions.tsv` on NSA's 1,671-file test set, a Docker image that runs inference offline, and a README.
+- **Deliverables.** `CrossExam_predictions.tsv` (team Cross Exam) on NSA's 1,671-file test set and a README. A Docker image that runs inference offline was listed in the brief but is not required (NSA, Sat Sep 26 ~12:00); ours is built and kept as reproducibility evidence.
 - **Validation.** Every rung is measured on a generator- and speaker-held-out split, and there is always a valid TSV on hand.
 
 The earlier device-and-demo design is dropped (cut); see `docs/plan.md`.
