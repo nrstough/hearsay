@@ -1,65 +1,360 @@
 # HEARSAY
 
-Audio authentication for the NSA HEARSAY challenge at HackGT 13. Give it any audio file and it returns the probability that the voice is synthetic (0.0 real, 1.0 synthetic), along with the forensic evidence behind that call.
+HEARSAY is our entry to the NSA HEARSAY challenge at HackGT 13 (Sep 25–27, 2026). You give it an audio file in any format. It returns the probability that the voice is synthetic (0.0 real, 1.0 synthetic) and a per-file report that says which detectors ran, what each one found, and how the final number was put together.
 
-A rule-based orchestrator chooses which detectors to run on each file. The detectors cover:
-- container and metadata
-- spectral
-- prosody
-- compression
-- speaker-embedding drift
-- splice
-- ENF
-- deep SSL anti-spoofing
+It is a software pipeline and nothing else: one decode path, nine forensic detectors behind one contract, a fixed fusion rule chosen before we looked at its results, and an offline Docker image that writes the submission TSV.
 
-A logistic stacker fuses their scores into the final probability.
+**Where to look next:** [docs/STATUS.md](docs/STATUS.md) for the live state, [docs/architecture.md](docs/architecture.md) for diagrams of every component, [docs/code-map.md](docs/code-map.md) for where the code lives, and [docs/reports/](docs/reports/) for the experiment write-ups every number below comes from.
 
-_The team will rewrite this README in our own words before submission: approach, architecture, what worked and what didn't._
+---
 
-**Joining now? Start with [docs/STATUS.md](docs/STATUS.md)** (current state, data, how to help).
+## How it decides
 
-Project context, the detector contract, the model ladder, and working rules are in [CLAUDE.md](CLAUDE.md). The plan is in [docs/plan.md](docs/plan.md) and the NSA brief is in [docs/nsa-challenge.md](docs/nsa-challenge.md).
+![System flow: ingest, orchestrator, deep and engineered detectors, fusion, outputs](docs/img/architecture-flow.svg)
 
-## Setup
+_Source: [docs/img/architecture-flow.mmd](docs/img/architecture-flow.mmd)._
 
-Requires [uv](https://docs.astral.sh/uv/) and ffmpeg (`brew install uv ffmpeg`).
+1. **Decode once.** Every file goes through one FFmpeg path to 16 kHz mono float32, and the header facts are read before decoding. Nothing downstream ever sees the original container, sample rate or filename.
+2. **Run every detector.** Each detector gets the same read-only clip and returns a `DetectorResult`: a score in [0, 1] (higher = more synthetic), a one-sentence reason, named features and a status. A detector that crashes becomes `status="error"` at 0.5 and is treated as missing. It is never treated as evidence and never costs us a row.
+3. **Route by role.** Detectors don't all do the same job. Three are **fused**: the XLS-R probe (M1b), Spectra-AASIST (M3) and the handcrafted spectral/prosody model. The speech gate is a **gate**. Container facts are for **routing**. Compression, ENF, splice and speaker drift are **evidence**: they are printed in the report and never added to the score. Every file's routing log records these decisions in plain English.
+4. **Fuse by rank, and let Spectra only pull scores down.** The shipped rule is `0.8 × rank(M1b) + 0.2 × rank(handcrafted)`, with each rank taken against that detector's own out-of-fold training scores. Spectra-AASIST can only halve a high score, when it is confident the voice is real. It can never raise one.
+5. **Abstain at the bottom.** A file with no speech to judge, or one that fails to decode, is pinned below every scored file. With a false alarm costing 9.33 misses, "we don't know" belongs at the real end of the ranking.
+6. **Write the TSV and one JSON per file.** The TSV has header `filename<TAB>cm-score`, rows in the template's order, and scores in [0.001, 1] for every file we could judge.
+
+**One file, end to end.** Test file `HGT1046947.wav` is one where the two deep detectors disagree. This is the shipped pipeline's own output (`scripts/run_pipeline.py`, rule `e_on_a`); its score matches the logged draft TSV `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv` to 1e-16:
+
+```text
+fused   m1b_v3          XLS-R layer-7 probe: calibrated log-likelihood ratio -5.78 (real-like, P=0.00)
+fused   spectra_aasist  spoof-minus-bonafide margin +9.50 (synthetic-like, P=1.00)
+fused   handcrafted     real-like (P=0.16): LFCC 16 frame-to-frame change 3.0 SD below real speech (toward synthetic); ...
+evidence speaker_drift  voice drifts across the clip: minimum window-to-window speaker similarity -0.10 over 14 windows
+evidence compression    compression-trace features synthetic-like (P=0.91): ...
+routing container       wav/pcm_s16le 16000 Hz mono, [encoder=Lavf58.29.100]: no class evidence in the container
+gate    speech_gate     speech present: voiced 28% of frames, pitch spread 0.34, loudness std 18.5 dB
+
+routing_log:
+  container: PCM WAV, not lossy, FFmpeg-written; compression forensics run for evidence, not score
+  compression: effective bandwidth 7500 Hz, above the 7.25 kHz band match
+  enf: no mains hum; no environment evidence either way
+  splice: no editing seams
+  speaker_drift: voice drifts (min window similarity -0.10); evidence only, never fused
+  speech_gate: is_speech=true (voiced 28% of frames); default-answer policy not applied
+  fusion: e_on_a (E_on_A_alpha0.2): 0.8 x rank(m1b_v3) + 0.2 x rank(handcrafted_v5) = 0.157;
+          M3 margin +9.50, no suppression (M3 never promotes)
+
+probability_synthetic = 0.0027  -> real
+```
+
+Spectra-AASIST is sure this voice is fake. The probe and the handcrafted model both say real. Under the equal-weight rule we first tried (zmean, 06:02) Spectra's vote carried the file to 0.686, above the midpoint. Under the shipped rule it stays at 0.0027: we don't let a pretrained model with undisclosed training data push a file toward "synthetic", because being wrong in that direction is the expensive error. The drift and compression lines stay in the report as evidence and never touch the score.
+
+_Pending (CPU-detectors lane): 5–10 worked examples in `docs/reports/2026-09-26_worked-examples.md` and the router-on vs router-off ablation (`scripts/orchestration_ablation.py`). Their results go in [Orchestration](#orchestration-what-routing-changes)._
+
+---
+
+## Results at a glance
+
+All figures are normalized minDCF with `C_FA = 4`, `C_miss = 1`, `π_synth = 0.3` (9.33·P_FA + P_miss; lower is better). "Holdout" is our outer holdout of two unseen generators plus 26 unseen real-speech groups. "In-the-Wild" is a public set of web-sourced real and fake speech that we never trained on.
+
+| | Inner OOF | Holdout | In-the-Wild | Source |
+|---|---|---|---|---|
+| Shipped fusion (`E on α 0.2`) | 0.140 | 0.014 | 0.260 | `docs/reports/2026-09-26_fusion-sweep-predeclared.md` |
+| M1b alone (the best single detector we trained) | 0.301 | 0.072 | 0.343 | same report |
+| NSA test set (the number that counts) | | | | _pending: the draft review's returned score_ |
+
+The full per-detector and per-rule tables are in [Numbers](#numbers).
+
+---
+
+## Approach and architecture
+
+### What shaped the design
+
+- **The metric punishes false alarms.** Calling a real file synthetic costs four times a miss, and about 70% of the test files are real. So the real-speech side of every model got the most scrutiny, and every rule was chosen on minDCF, with EER only reported. minDCF depends only on ranking, which is why our fusion works in ranks.
+- **The rubric rewards distinct techniques and choosing them per file.** So each technique is its own detector behind one contract, and each file gets a routing log.
+- **The training data and the test data were made differently.** We found five ways they differ, all of which a model can exploit as shortcuts (see [What did not work](#what-did-not-work)). Most of our engineering went into closing them.
+- **Everything runs offline on CPU.** No hosted API and no LLM on the scoring path. LightGBM is never imported at inference: it and PyTorch each ship their own OpenMP runtime and crash together on macOS, so the trained trees are dumped and evaluated in numpy (`hearsay.trees`).
+
+### The detector contract
+
+`src/hearsay/detectors/base.py`. A detector takes a `ClipContext` (path, decoded audio, probe metadata, a per-clip cache) and returns a `DetectorResult(name, score, evidence, features, status, error)`. The contract rejects a score outside [0, 1], a non-finite feature or empty evidence with a `ValueError`; nothing is silently clipped. Detectors never read filenames or file timestamps, because git, zip and Docker rewrite them. `safe_run` wraps every call so one bad file can't cost a TSV row.
+
+Every learned detector exports one file, `outputs/detector_scores/<name>.csv`, with columns `path, fold, split, score, logit` over the same 21,671 rows (20,000 training clips and the 1,671 test files). Fusion reads only these exports, so every detector can be swapped or ablated without touching the others.
+
+### Deep detectors
+
+| | What it is | Role | Why |
+|---|---|---|---|
+| **M1 / M1b** | Frozen XLS-R 300M; layer-7 hidden state averaged over time, then a class-balanced logistic regression and a Platt map. M1b adds 40 VCTK real speakers from ASVspoof 2019 and a 2.5k spoof anchor to the training folds only. | Primary fused score (80% of the rank blend) | Layer 7 won inner cross-validation (0.257; layers 6 and 8 close; layers 20+ at 0.40–0.43, `models/m1_…_0518/meta.json`). Mid-depth SSL layers carry the acoustic detail that separates vocoders; the top layers are tuned for phonetic content. |
+| **M3, Spectra-AASIST** | `lab260/Spectra-AASIST` run off the shelf with no training, through the same band-matched input path and crops. Short clips are zero-padded to one 4.04 s window. | False-alarm suppressor only | It is the strongest detector on every set we hold, but its training data is undisclosed, so none of our validation rows can be shown to be out-of-sample for it. It is allowed to lower a score and never to raise one. |
+| **M5, trained head on XLS-R** | 12 kept XLS-R layers, learned layer weights, attentive statistics pooling, linear head; trained on rented A100s with class-blind augmentation (noise, telephony band-limits, reverb, codecs, RawBoost). | Not shipped; exported as a column | It did not clear its gate (holdout 0.363 vs M1's 0.159). Details under [What did not work](#what-did-not-work). |
+
+### The eight forensic techniques
+
+| Rubric technique | Detector | How it's used | What it measures |
+|---|---|---|---|
+| Metadata / container | `container` | routing | Header facts (codec, rate, bit depth, encoder tag). Rule-based on purpose: on our data the container *is* the label (below). |
+| Spectral | `handcrafted` | fused (20%) | 234 features: spectral contrast, flatness, flux, roll-off, MFCC, LFCC and CQCC statistics, group-delay and phase-coherence cues; LightGBM. |
+| Prosody | `handcrafted` | fused | YIN pitch spread and slope, jitter/shimmer, loudness modulation, pauses, breath frames. Pitch variability is the one prosody cue that carried signal. |
+| Compression | `compression` | evidence | 19 codec-trace features in 3–7 kHz (spectral holes, floor depth, effective bandwidth), trained with both classes laundered through MP3/AAC. |
+| ENF | `enf` | evidence | Tracks 50/60 Hz mains hum and its stability on 2 s windows. |
+| Speaker-embedding consistency | `speaker_drift` | evidence | ECAPA-TDNN embeddings on 1 s windows; flags a voice that changes within the clip. |
+| Deep anti-spoofing | M1b, M3 (M5 as a column) | fused | Above. |
+| Splice | `splice` | evidence | Sample-level clicks and DC-offset jumps between 100 ms windows. |
+
+Plus the **speech gate** (`speech_gate`), which decides whether a file contains speech at all from five cues: not silent, at least 5% voiced, pitch moving, loudness moving, not spectrally flat. We set each threshold beyond the extreme value in the full test set, so it gates 0 of 1,671 test files and only catches silence, tones, static and noise.
+
+### Orchestration: what routing changes
+
+Orchestration here is a set of fixed rules over measured file properties, not a learned router. Every detector runs on every file: the whole test set is about 95 minutes of audio, so compute was never the constraint. What the rules decide is what each result is *allowed to do* to the score. The per-file routing log records each decision.
+
+- **Container → compression.** The container detector reads the header first, and its facts set how compression forensics is reported. A lossy header gets "compression forensics apply"; a PCM file written by FFmpeg (every test file) gets "run for evidence, not score". Either way compression describes the file's pipeline, not the voice, and never enters the score.
+- **Bandwidth.** Compression reports each file's effective bandwidth against our 7.25 kHz band match. That flags the few test files that don't share the test set's 7.2 kHz low-pass (981 read 7,250 Hz, 670 read 7,500 Hz, 12 read full band and 8 sit at 5–7 kHz, `docs/reports/2026-09-26_cpu-detectors.md`).
+- **Speech gate → abstention.** A file that fails the gate skips fusion and goes into the pinned block (below).
+- **Spectra → suppression only.** If Spectra's margin is below −3 (strongly real) and the fused rank is above 0.5, the rank is halved. If Spectra is missing, nothing is suppressed.
+- **Imputation.** If a fused detector errors on a file, its column is imputed at its training mean, and the log names it.
+
+**The abstention path.** Undecidable files (non-speech, decode failures) get scores in [0, 0.001). Every scored file gets a score in [0.001, 1], so the block sits strictly below all of them. Inside the block, files are ordered by the weak M1b signal plus a hash of the filename, so no two share a value; decode failures go to the very bottom. Placing the block at the bottom is the right call under *both* possible readings of the sponsor's scorer. It is optimal under the brief's cost when the block's fake rate is below 80%, and under the scoring code's inverted cost when it is above 9.7%. Undecidable files should sit near the 30% base rate, which leaves roughly a 3× margin on each side (`docs/consults/2026-09-26_fusion-strategy_RESPONSE.md`, item 5). No test file is gated today, so this costs nothing on the current ranking. It only protects against a silent or musical file being scored as synthetic, which our deep models do: the first probe scored pure silence at 0.99.
+
+_Pending: router on vs off, both measured on the holdout and In-the-Wild, with the number of files each rule touched (`scripts/orchestration_ablation.py`, CPU-detectors lane). A null delta will be reported as a null delta._
+
+### The fusion rule, frozen at 08:13
+
+We wrote the candidates and the selection rule down before running anything (`docs/reports/2026-09-26_fusion-sweep-predeclared.md`), then applied the rule once:
+
+- **Candidates:** a rank blend `(1−α)·rank(M1b) + α·rank(handcrafted)` for α from 0 to 0.5; min and max rules; a cascade; a non-negative stacker shrunk toward equal weights. Then, on top of the winner, Spectra as a false-alarm suppressor.
+- **Rule:** keep candidates within 0.03 of the best inner out-of-fold score whose In-the-Wild minDCF under the sponsor code's cost is ≤ 0.45. Among those, take the best In-the-Wild minDCF under the brief's cost, with ties going to more M1b. Add Spectra suppression only if it helps In-the-Wild by ≥ 0.01 without hurting inner or holdout by more than 0.01. No iteration afterward.
+- **Result:** α = 0.2 (tied with 0.3; the tie went to more M1b). Adding Spectra suppression moved In-the-Wild from 0.322 to 0.260 and hurt nothing, so it was applied. Final: inner 0.140, holdout 0.014, In-the-Wild 0.260 (0.267 under the sponsor code's cost).
+
+**Why not equal weights.** Our first fusion (05:32) averaged the two detectors equally, as `zmean` (mean of standardized logits) and `rankmean` (mean of ranks). On the holdout it looked like the best thing we had: 0.018 and 0.015, against 0.072 for M1b alone. On In-the-Wild it doubled the misses, from 28% for M1b alone to 58–60%, and pushed the share of test files called synthetic up to 32–40% (`docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md`). The holdout gain (about 0.05) was below the holdout's resolution floor. The In-the-Wild loss was large and consistent. The handcrafted column is excellent on generators it has seen and blind to the web-sourced fakes (97% missed on its own), so giving it half the vote traded real-world detection for a holdout number. We dropped equal weights and let the sweep choose α.
+
+_Pending: a second pre-declared sweep (added 08:35, same report) tests M5 as a second false-alarm suppressor (F) and as a third rank-blend input (A3). It replaces the rule above only if it clears all four fixed conditions, and any change needs Nathan's sign-off. Result and decision go here._
+
+**Score direction.** The instructions say 1.0 = synthetic. NSA's scoring code (ASVspoof5's) treats a higher score as bona fide. We follow the instructions and never flip. Every model logs its minDCF under the sponsor's code both ways, and a pre-flipped twin of the draft TSV exists in case NSA's feedback shows they grade inverted.
+
+---
+
+## Validation
+
+- **Folds by generator and speaker, never by clip.** `splits/nsa_folds.csv` (20,000 rows: 10 DiffSSD generators, LJ Speech, LibriSpeech). Fakes are grouped by generator; real speech by speaker (LJ, a single speaker, by chapter). Five inner folds each hold out whole generators: grad_tts + unit_speech, diffgan_tts + openvoicev2, pro_diff + xtts_v2, your_tts, ElevenLabs. Every learned piece of a detector, scalers and Platt maps included, is fit fold-locally, and selection uses only inner out-of-fold scores.
+- **One outer holdout, read once per model.** PlayHT and WaveGrad2 plus 26 real-speech groups (3,858 rows). Nothing was ever trained, tuned or selected on it. Extra training data (ASVspoof 2019 real speakers, MLAAD, the rest of DiffSSD) enters inner folds only, so holdout numbers stay comparable across every model.
+- **The holdout has a resolution floor.** With two held-out generators its noise is about ±0.07–0.10, so we treat any gap under 0.15 as noise. It can tell a good detector from a bad one, not a good fusion rule from a slightly better one.
+- **In-the-Wild is the stress test.** 3,000 clips (2,000 real from 54 speakers, 1,000 fake), evaluation only, never trained on. For each model we report minDCF and the false-alarm rate at the threshold chosen on inner folds. From the fusion sweep on we report it under both cost weightings: the brief's, and the sponsor code's, where the 4× lands on a missed fake.
+- **The test set as a smoke alarm.** We track the share of test files scored above 0.5 against the ~30% the brief states. It flagged the band mismatch (below). It is never a selection signal: any monotone rescaling changes it without changing minDCF.
+- **The draft review.** NSA scores one early submission for us. We are sending the exact artifact we plan to ship and have decided in advance what each returned number means:
+
+| Returned minDCF | What it means | What we do |
+|---|---|---|
+| 0.00–0.20 | our direction; the test set behaves like our holdout | ship unchanged |
+| 0.20–0.45 | our direction; the test set is more like In-the-Wild | switch to the most false-alarm-robust candidate |
+| 0.45–0.90 | ambiguous | don't flip; fall back to M1b alone |
+| 0.95–1.00 | NSA's code reads our scores inverted | ship the pre-flipped twin |
+
+_Pending: the returned number and the action taken (`docs/reports/2026-09-26_sponsor-questions.md`)._
+
+---
+
+## What worked
+
+Each line names what we did, what it did, and why.
+
+- **Band-matching the training audio to the test set.** The test set is low-passed at about 7.2 kHz and no training corpus is. A 71-tap Kaiser low-pass at 7.25 kHz on every clip, train and test, took the handcrafted detector from calling 90% of test files synthetic to 42%. Without it, everything above 7 kHz was a train-vs-test fingerprint (`docs/reports/2026-09-26_cpu-detectors.md`).
+- **Real-speaker diversity, once band-matched.** Adding 40 VCTK speakers (M1b) improved the holdout from 0.159 to 0.072 and In-the-Wild from 0.380 to 0.342. Before band matching, the same addition made In-the-Wild *worse* (0.374 → 0.405): the wall was hiding the gain (`submissions/log.csv`, `docs/reports/2026-09-26_m1b-asv19-bonafide.md`).
+- **Length parity.** Test clips are about 3.4 s and training clips 5–9 s. Embedding each clip at its own length and training on crops drawn from the test-length distribution removed a repeat-padding seam that only test clips had; it was worth 0.05 on its own for the handcrafted detector (0.709 → 0.661).
+- **Gradient-boosted trees over logistic regression** for the handcrafted features: holdout 0.374 vs 0.661 on the same features. The trees transfer to unseen generators and the linear model does not (`docs/reports/2026-09-26_cpu-detectors.md`).
+- **New feature families that see new generators.** CQCC frame-to-frame change and LFCC upper-coefficient variability made pro_diff visible (1.00 → 0.32 out of fold) and cut inner minDCF from 0.614 to 0.434 (`docs/reports/2026-09-26_handcrafted-v4.md`).
+- **Augmented twins for the handcrafted model.** Codec round-trips and random spectral tilt, added as fit-only extra rows, cut holdout-real false alarms from 9.1% to 6.3% and In-the-Wild false alarms from 0.65% to 0.40%, and improved the holdout (0.170 → 0.137). The price was inner minDCF (0.418 → 0.469) and pro_diff (0.30 → 0.63). With a false alarm worth 9.33 misses, we took the trade (v5b).
+- **Treating the container as routing, not evidence.** We measured it before using it and found it was the label (see [What did not work](#what-did-not-work)), so the detector never learns from it.
+- **Laundering both classes for compression forensics.** Re-encoding a random half of *both* classes through MP3/AAC meant the detector could not learn "MP3 = ElevenLabs/PlayHT". It then detects codec history well (AUC 0.90–0.94).
+- **A pre-declared fusion sweep.** Writing the candidates and the selection rule down first stopped us from shipping the equal-weight rule our holdout liked best.
+- **Spectra-AASIST as a one-way vote.** As a false-alarm suppressor it moved In-the-Wild from 0.322 to 0.260 at no cost elsewhere. Used that way, if it is wrong about a file the cost is a miss (weight 1), never a false alarm.
+- **The phase cues as evidence.** Peak phase-vs-magnitude coherence separates grad_tts from real speech (AUC 0.80), is corpus-neutral, and names a vocoder property a person can check.
+
+## What did not work
+
+Each null result, with its mechanism.
+
+- **Five shortcuts in the data, all found and closed.**
+  - **Level:** test clips peak near full scale and training real speech near 0.5; peak alone predicted the label (AUC 0.66). Closed by normalizing each input.
+  - **Leading silence:** LibriSpeech starts with about 0.37 s of silence, test clips 0.06 s. Closed by trimming both.
+  - **Tiling:** repeat-padding short test clips put a seam only in test data. Closed by length parity.
+  - **Container:** every test file is 16 kHz PCM WAV with the same FFmpeg tag. Closed by one decode path.
+  - **The 7.2 kHz wall:** closed by band matching.
+- **The container is the label.** LibriSpeech is FLAC, LJ is 22 kHz WAV, and DiffSSD's ElevenLabs and PlayHT are MP3. PlayHT's MP3s carry the exact encoder tag (`Lavf58.29.100`) that all 1,671 test files carry. A learned metadata model would score perfectly on our holdout (PlayHT) for the wrong reason, then call the whole test set PlayHT. The container detector returns a constant 0.5 on this test set by design.
+- **Compression forensics sees the pipeline, not the class.** With codec history equalized, class holdout minDCF is 0.90 (`models/cmp_selected/meta.json`), and it calls 81% of the test set synthetic, because the test set reads as laundered throughout (mean P(laundered) 0.62). It stays as evidence.
+- **ENF can't be validated here.** Stable mains hum is in 36% of LJ Speech clips (a home studio) and 21% of LibriSpeech, and in almost no generated audio, so a learned version would learn "hum = LJ = real". Only 24 test files carry hum. Rule-based and mild on purpose; evidence only.
+- **Splice finds vocoder artifacts, not edits.** On training data the seams are single-sample clicks in 27% of WaveGrad2 and DC jumps in 9–13% of several generators *and* 9% of LibriSpeech. The sponsor said no test clip is partially synthetic. It flags 58 test files; evidence only.
+- **Speaker drift points the wrong way.** Fakes are the *most* self-consistent voices: mean window-to-window similarity separates them toward fake at AUC 0.73. A cloned voice doesn't vary from second to second the way a person does. Drift flags 16% of test files, mostly the hard real recordings. Fused, it would push those toward synthetic, so it is evidence only (`docs/reports/2026-09-26_gate-and-drift.md`).
+- **Fine-tuning XLS-R lost to a frozen probe.** Fine-tuning all 12 kept layers fit the seen generators (training loss at the label-smoothing floor) and transferred worse to the unseen commercial one: 0.38–0.41 on the ElevenLabs fold vs 0.31 with the backbone frozen. The frozen-backbone head then lost to the plain M1 probe on the holdout (0.363 vs 0.159), on WaveGrad2, on LibriSpeech real speech and on clips under 4 s (0.60). It won only on In-the-Wild false alarms (0.45% vs 0.7%). Seven A100 rentals, $5.09 in total (`docs/reports/2026-09-26_m5-xlsr-finetune.md`).
+- **Pruning corpus-cue columns hurt every time.** 83 handcrafted columns separate LJ from LibriSpeech more than they separate real from fake. Dropping them made every readout worse, including LibriSpeech false alarms (0.54 → 0.59–0.61); stripping v3's own cue columns took it from 0.614 to 0.848. The check told us which per-source numbers to read, not which columns to delete.
+- **The handcrafted detector's test-domain offset.** Even band-matched, the test recordings have a darker, codec-like spectral envelope. The 234 columns tell train from test at AUC 0.99, and 84% of the shifted columns move toward "fake". Pruning the shifted columns made it worse (the rest still separate at 0.98); augmentation removed only part of it. This is part of why it gets 20% of the vote, not half.
+- **grad_tts is invisible to the handcrafted model under our validation.** Its phase cue is shown by no other generator, so when grad_tts is the held-out one, nothing teaches the cue: 1.00 in every variant. That is an honest limit of holding out by generator.
+- **Prosody beyond pitch.** Pause fraction and count, voiced fraction, loudness dynamics and zero-crossing rate all sat within 0.05 of chance.
+- **Equal-weight fusion.** Best on the holdout, twice the In-the-Wild misses (above).
+- **Our holdout overstates real-world skill.** Every XLS-R probe we trained sits at 0.34–0.41 on In-the-Wild against 0.07–0.16 on the holdout, and the handcrafted model gets 1.00 there. Channel robustness, not more read speech or more fake data, is the gap we did not close.
+- **A pretrained model we can't audit.** Spectra-AASIST separates our inner rows perfectly (AUC 1.000) and its card reports In-the-Wild results. LJ Speech, LibriSpeech and DiffSSD are all public and plausible training data for it, so its inner, holdout and In-the-Wild numbers may all be in-sample. Only the draft review is fully independent. That is why it is only allowed to lower scores.
+- **Peak-normalizing Spectra's input** (a fix for its within-fake level correlation) cost 0.033 on real speech and did not remove the correlation, so the level was a proxy, not the cue. Rejected.
+
+---
+
+## Numbers
+
+Normalized minDCF, `π_synth = 0.3`, `C_FA = 4`, unless marked. **Inner** = pooled out-of-fold over the 16,142 inner rows. **ITW** = In-the-Wild (3,000 clips, never trained on); "averse" is the sponsor code's cost (the 4× on a missed fake). **ITW FA** = In-the-Wild real-speech false-alarm rate at the model's own inner-fold threshold. **Test > 0.5** = share of the 1,671 test files above 0.5 (brief: ~30% synthetic); a sanity check, not a score. Every cell comes from the file in its row's last column; "—" means that file does not report it.
+
+### Detectors
+
+| Detector | Inner | Holdout | Holdout EER | ITW | ITW FA | Test > 0.5 | Source |
+|---|---|---|---|---|---|---|---|
+| M0 constant "always real" | — | 1.000 | 50% | — | — | 0% | `submissions/log.csv` |
+| M1 v2 (XLS-R L7 probe, before band match) | 0.250 | 0.146 | 2.5% | 0.374 | 1.2% | 39.6% | `models/m1_…_0302/meta.json`, `submissions/log.csv`; ITW from `docs/reports/2026-09-26_m1b-asv19-bonafide.md`; test share from `docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md` |
+| M1 v3 (band-matched) | 0.257 | 0.159 | 2.9% | 0.380 | 0.7% | 28.9% | `models/m1_…_0518/meta.json`, `submissions/log.csv` |
+| **M1b v3** (+40 VCTK speakers) | 0.301* | 0.072 | 1.4% | 0.342 (averse 0.296) | 0.8% | 26.8% | `models/m1_…_0521/meta.json`, `submissions/log.csv`; *inner and averse from the fusion sweep report |
+| **M3 Spectra-AASIST** (off the shelf) | 0.0045† | 0.012 | 0.16% | 0.065† | 0.0% | 29.3% | `models/m3_spectra_20260926-0522/meta.json` |
+| M5 frozen-backbone head (not shipped) | 0.302 | 0.363 | 6.0% | — | 0.45% | 25.8% | `models/m5_xlsr_ft_20260926-0741/meta.json` |
+| Handcrafted v3 (75 features) | 0.614 | 0.254 | 4.3% | 1.00 | 0.55% | 42% | `docs/reports/2026-09-26_cpu-detectors.md`, `…_handcrafted-v4.md` |
+| Handcrafted v4a (234 features) | 0.434 | 0.170 | 3.6% | 1.00 | 0.65% | 41% | `docs/reports/2026-09-26_handcrafted-v4.md` |
+| **Handcrafted v5b** (v4a + augmented twins) | 0.469 | 0.137 | 3.1% | — | 0.40% | 45.1% | `models/hc_selected/meta.json`; ITW FA from `docs/reports/2026-09-26_handcrafted-v4.md` |
+| Compression forensics | 0.931 | 0.900 | 20.1% | — | — | 80.7% | `models/cmp_selected/meta.json` |
+| Container, ENF, splice (rule-based) | 1.0 | 1.0 | — | — | — | — | `docs/reports/2026-09-26_cpu-detectors.md` |
+
+\* M1b's own meta file reports 0.265 because its folds include the ASVspoof rows; 0.301 is on the NSA inner rows only, comparable with the fusion rows below.
+† Possibly in-sample: Spectra-AASIST's training data is undisclosed.
+
+### Fusion rules
+
+| Rule | Inner | Holdout | ITW (brief) | ITW (averse) | ITW FA / miss at inner threshold | Test > 0.5 | Source |
+|---|---|---|---|---|---|---|---|
+| zmean, M1b + handcrafted v4 (05:32) | 0.259 | 0.018 | 0.387 | — | 0.15% / 58.5% | 39.6% | `docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md` |
+| rankmean, same inputs | 0.254 | 0.015 | 0.379 | — | 0.15% / 59.5% | 31.8% | same |
+| zmean incl. Spectra (06:02, logged TSV) | — | 0.000 | 0.116 | — | 0.3% FA | 29.3% | `submissions/log.csv` |
+| stack_nonlj incl. Spectra (06:02, logged TSV) | — | 0.0015 | 0.054 | — | 0.0% FA | 27.5% | `submissions/log.csv` |
+| Sweep A, α = 0 (M1b alone) | 0.301 | 0.072 | 0.343 | 0.296 | 0.8% / 27.8% | — | `docs/reports/2026-09-26_fusion-sweep-predeclared.md` |
+| Sweep A, α = 0.2 | 0.236 | 0.030 | 0.322 | 0.280 | 0.45% / 36.0% | — | same |
+| Sweep A, α = 0.3 | 0.230 | 0.021 | 0.322 | 0.280 | 0.25% / 39.5% | — | same |
+| Sweep D, non-negative stacker | 0.230 | 0.025 | 0.324 | 0.280 | 0.4% / 36.9% | — | same |
+| **Shipped: E on α 0.2** | 0.140 | 0.014 | **0.260** | **0.267** | 1.4% / 14.8% | 27.4% | same; test share from `docs/reports/2026-09-26_sponsor-questions.md` |
+
+The two 06:02 rows put Spectra inside an average or a fitted stacker, which is the configuration we later ruled out. Their holdout and In-the-Wild numbers lean on a model whose training data we can't see. The shipped TSV is `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv`.
+
+---
+
+## Reproduce it
+
+### Setup
+
+Requires [uv](https://docs.astral.sh/uv/) and FFmpeg (`brew install uv ffmpeg`).
 
 ```bash
-uv sync                  # creates .venv (Python 3.12) with all dependencies
-cp .env.example .env     # fill in any secrets locally; never commit .env
-uv run pytest            # tests
-uv run ruff check .      # lint
+uv sync
 ```
-
-Datasets go in `data/`, model weights in `weights/`, and submission TSVs in `submissions/`. All of these are gitignored except `submissions/log.csv`.
-
-## Docker
-
-The image runs the whole pipeline offline on CPU (linux/amd64): every engineered detector, the XLS-R probe and Spectra-AASIST, the persisted fusion rule, the non-speech gate, and the TSV writer. Nothing is downloaded at run time; all weights are baked in.
 
 ```bash
-bash docker/build.sh                      # builds hearsay:<stamp> and hearsay:latest for linux/amd64
-docker run --network none \
-  -v <test_dir>:/data:ro -v <out_dir>:/out \
-  -e HEARSAY_TEAM=<teamName> hearsay
+cp .env.example .env
 ```
 
-Outputs under `<out_dir>`: `<teamName>_predictions.tsv` (header `filename<TAB>cm-score`, probability that the file is synthetic, 1.0 = synthetic), one JSON per file under `results/` with every detector's score, evidence and the routing log, a resumable `results.jsonl` (rerun the same command to continue after a crash), `timings.csv` and `run_meta.json`. A run never overwrites an earlier TSV.
+```bash
+uv run pytest -q
+```
 
-Row order comes from NSA's template when one is available: mount it and set `HEARSAY_TEMPLATE=/tmpl/key.tsv` (`-v <key.tsv>:/tmpl/key.tsv:ro`), or drop the `.tsv` beside the audio and the entrypoint finds it. Without a template the rows are the sorted filenames. Other settings: `HEARSAY_RULE` (`zmean`, the default, or `stack_nonlj`), `OMP_NUM_THREADS` (default: the smaller of the container's CPU quota and six; torch is capped at six by the runner as well). Extra arguments go to `scripts/run_pipeline.py`, for example `--limit 50 --compare-tsv /ref/logged.tsv` for a parity check.
+```bash
+uv run ruff check .
+```
 
-Speed: about 4 s per file inside the image on an Apple Silicon Mac through Rosetta (the whole test set in about two hours); the same runner natively on the Mac's CPU takes about 0.8 s per file (the main chat's measurement, reproduced in the run spec), and a native amd64 box should land in between. All models stay loaded; resident memory during a full run is about 3.3 GiB (`docker stats`).
+Data, weights, model directories and submission TSVs are gitignored; only `submissions/log.csv` is tracked. Expected layout: the NSA test set at `data/nsa/HackGTHearsayTesting/`, the template at `data/nsa/HearsayScoreKey4TeamX.tsv`, pretrained weights under `weights/`, trained bundles under `models/` (the probe `m1_wav2vec2-xls-r-300m_L7_20260926-0521`, `hc_selected`, `fusion_v1/constants.json`). [docs/STATUS.md](docs/STATUS.md) lists every dataset and where it comes from.
 
-Checks: `bash docker/smoke.sh` runs three files (WAV, MP3, FLAC) with a reversed template through the image with `--network none` and asserts the row order, that repeat runs agree within 1e-6 (they were byte-identical on the recorded build) and the in-image self-checks; `docker/parity.py pcm-hash` compares decoded audio between the Mac and the image; `uv run pytest -q tests/test_docker_image.py` checks the build files without Docker. Building needs Docker with buildx (Colima with Rosetta works on Apple Silicon: `colima start --vm-type vz --vz-rosetta`). Design and results: `docs/specs/2026-09-26_k-docker-image.md`.
+### Score a directory on the Mac
 
-## Layout
+```bash
+uv run python scripts/run_pipeline.py --in data/nsa/HackGTHearsayTesting --out outputs/runner/final --template data/nsa/HearsayScoreKey4TeamX.tsv --team <teamName>
+```
+
+The runner uses the shipped rule (`e_on_a` from `models/fusion_v1/constants.json`) by default. It writes `<teamName>_predictions.tsv`, one explanation JSON per file under `results/`, a resumable `results.jsonl`, `timings.csv` and `run_meta.json`. Rerun the same command to resume after a crash. `--flip` also writes the pre-flipped twin. `--rule`, `--policy` and `--flip` re-fuse the cached logits in about 0.1 s without reloading a model. Speed: 0.78 s per file with 4 threads (1,671 files in 22 minutes, `docs/reports/2026-09-26_runner-docker.md`).
+
+**Parity** (`docs/reports/2026-09-26_runner-docker.md`):
+
+| Check | Result |
+|---|---|
+| Exported logits → `fusion_v1` constants → policy, vs the logged 08:13 TSV, all 1,671 rows | max abs diff 4.4e-16 |
+| Same, `--flip`, vs the logged flipped TSV | max abs diff 4.4e-16 |
+| Live from audio, 50 template files, vs the logged 08:13 TSV | Spearman 1.000000, max 2.7e-5, mean 6.5e-7 |
+| Handcrafted logit, live vs export | max 4.4e-16 (numpy trees, identical) |
+| M1b logit, live CPU vs the MPS-extracted export | max 5.5e-4 |
+| Spectra-AASIST logit, live CPU vs MPS export | max 1.1e-4 |
+
+### Score a directory in Docker (offline, CPU, linux/amd64)
+
+```bash
+bash docker/build.sh
+```
+
+```bash
+docker run --network none -v <test_dir>:/data:ro -v <out_dir>:/out -e HEARSAY_TEAM=<teamName> hearsay
+```
+
+The image contains every detector, the M1b probe, Spectra-AASIST, the ECAPA speaker model, the handcrafted bundle and the fusion constants, with a sha manifest of the shipped files checked at start. It refuses to start unless it is offline, and nothing is downloaded at run time. Row order comes from NSA's template: mount it and set `HEARSAY_TEMPLATE=/tmpl/key.tsv` (`-v <key.tsv>:/tmpl/key.tsv:ro`), or put the `.tsv` beside the audio. Without a template, rows are the sorted filenames. Extra arguments pass through to the runner, e.g. `--limit 50 --compare-tsv /ref/logged.tsv` for a parity check. Outputs are the same as the Mac runner's, and a run never overwrites an earlier TSV.
+
+Checks: `bash docker/smoke.sh` (WAV, MP3 and FLAC with a reversed template under `--network none`; row order, repeat runs within 1e-6, in-image self-checks, and a negative check that an online container is refused); `docker/parity.py pcm-hash` (decoded audio, Mac vs image); `uv run pytest -q tests/test_docker_image.py` (build files, no Docker needed). On Apple Silicon, Colima with Rosetta builds it (`colima start --vm-type vz --vz-rosetta`).
+
+Recorded on build `hearsay:20260926-0753` (`docs/specs/2026-09-26_k-docker-image.md`): 50 test files inside the image vs the logged 06:02 zmean TSV, Spearman 1.0, max abs diff 1.43e-4; decoded audio byte-identical to the Mac on 50/50 files; about 4 s per file under Rosetta emulation and 3.3 GiB resident. _Pending: the rebuild on the shipped rule `e_on_a` and its parity against the 08:13 TSV._
+
+### Where each artifact lives
+
+| Artifact | Path |
+|---|---|
+| Experiment log (every TSV with its holdout score) | `submissions/log.csv` |
+| Shipped fusion constants | `models/fusion_v1/constants.json` (written by `scripts/fuse_sweep.py --write`) |
+| Per-detector score exports | `outputs/detector_scores/<name>.csv` (gitignored; regenerable, commands in each report) |
+| Model bundles and their readouts | `models/<rung>_<stamp>/meta.json` (gitignored) |
+| Fold file | `splits/nsa_folds.csv` (+ `nsa_folds_plus_asv19.csv` for M1b) |
+| Experiment write-ups | `docs/reports/` |
+| Outside reviews we asked for, and their answers | `docs/consults/` |
+| Run specs and audits | `docs/specs/` |
+
+---
+
+## Repository layout
 
 ```
-src/hearsay/            application code (detectors/ holds the detector contract)
-tests/                  pytest suite
-scripts/                one-off and ops scripts
-docs/                   plan.md, nsa-challenge.md, specs/, reports/, handoffs/, consults/
-submissions/            log.csv (tracked) + submission TSVs (ignored)
+src/hearsay/            application code; detectors/ holds the contract and every detector
+tests/                  pytest suite (hermetic; data- and weight-dependent tests are marked)
+scripts/                extraction, training, fusion, runner, cloud and ops scripts
+docker/                 build, entrypoint, smoke, parity and asset-manifest scripts
+docs/                   plan, architecture, code map, reports/, specs/, consults/, handoffs/
+submissions/            log.csv (tracked) and submission TSVs (ignored)
 data/ weights/ models/  local only
-.claude/                Claude Code skills and Codex review scripts (shared with the team)
+.claude/                Claude Code skills and review scripts shared by the team
 ```
+
+---
+
+## AI use and credits
+
+We used AI coding assistants heavily, and we say so plainly. The full disclosure, including which components each tool touched and what we built versus what the AI wrote, is kept current in [CLAUDE.md, "AI use disclosure"](CLAUDE.md#ai-use-disclosure). In short:
+
+- **Claude Code (Anthropic)** wrote most of the code and documents under our direction, in parallel sessions per rung: loader, metrics, fold file, M1 probe, the engineered detectors, M3 scoring, the M5 cloud pipeline, fusion sweep, runner, API, Docker image, and these docs. We chose the approach, set the gates and selection rules, reviewed results and made every ship decision.
+- **OpenAI Codex (Codex CLI)** reviewed plans and audited finished rungs through our `/plan-review` workflow.
+- **Outside consults.** Two strategy questions, one on M5's extra data and one on fusion, went to an outside multi-model review (VeriLM; the fusion memo was answered by Claude and Gemini with a synthesis). The prompts and answers are saved in `docs/consults/`, and we record which advice we adopted and which we ignored.
+- **No AI on the scoring path.** No LLM or hosted API runs at inference; the Docker image runs with networking off.
+
+### Pretrained models
+
+| Model | Source | License | How we used it |
+|---|---|---|---|
+| XLS-R 300M, `facebook/wav2vec2-xls-r-300m` | Hugging Face (Meta) | Apache-2.0 | Frozen backbone for M1/M1b (layer 7) and M5 |
+| Spectra-AASIST, `lab260/Spectra-AASIST` | Hugging Face | unclear: repo header says Apache-2.0, model card says MIT | M3, scored off the shelf, false-alarm suppression only |
+| ECAPA-TDNN, `speechbrain/spkrec-ecapa-voxceleb` | Hugging Face (SpeechBrain) | Apache-2.0 | Speaker-drift evidence |
+| WavLM Large / Base, `microsoft/wavlm-large`, `microsoft/wavlm-base` | Hugging Face (Microsoft) | no license on the card; released through Microsoft's unilm repo (MIT) | Downloaded as bake-off challengers; never run |
+
+### Datasets
+
+| Dataset | Source | License | How we used it |
+|---|---|---|---|
+| NSA HEARSAY data: test set, resampled LJ subset, DiffSSD, ASVspoof5 scoring code | NSA, provided during the event | event terms | Test set; training sample and fold file; metric reference |
+| LJ Speech 1.1 | keithito.com | public domain | Real speech (one speaker); training |
+| LibriSpeech dev-clean / test-clean | openslr.org/12 | CC BY 4.0 | Real speech (multi-speaker); training |
+| ASVspoof 2019 LA | University of Edinburgh DataShare | ODC Attribution | Public shakedown of M1; 40 VCTK real speakers and an A01–A06 anchor as training-only rows for M1b and M5 |
+| In-the-Wild (Müller et al. 2022), `mueller91/In-The-Wild` | Hugging Face | CC-BY-SA-4.0 on Hugging Face; Apache-2.0 on deepfake-total.com | Stress test only; never trained on |
+| MLAAD, `mueller91/MLAAD` | Hugging Face (gated) | non-commercial notice | 6,180 fake clips from 143 TTS models, training-only for M5 |
+
+### Frameworks and tools
+
+PyTorch and torchaudio (BSD), Hugging Face transformers and huggingface_hub (Apache-2.0), SpeechBrain (Apache-2.0), librosa (ISC), soundfile (BSD-3-Clause), NumPy, SciPy, scikit-learn and pandas (BSD-3-Clause), LightGBM (MIT, training only), pydub (MIT), ffmpeg-python (Apache-2.0), FFmpeg (LGPL/GPL), FastAPI (MIT) and uvicorn (BSD-3-Clause) for the local API, pytest and ruff for tests and lint, uv for environments, Docker with Colima for the image, vast.ai A100s and Cloudflare R2 for the M5 runs.
