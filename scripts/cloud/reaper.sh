@@ -54,6 +54,12 @@ while :; do
     fi
     ACTIVE=$((ACTIVE + 1))
     ST=$(rclone cat "${HEARSAY_R2_PREFIX}runs/$JOB/STATUS" 2>/dev/null || echo "?")
+    # a STATUS carries the generation that wrote it ("<gen> <status>"); one from another
+    # generation (a previous instance under the same job name) counts as no status at all
+    if [ -f "$d/GEN" ]; then
+      WANT=$(cat "$d/GEN"); GOT_GEN=${ST%% *}
+      if [ "$GOT_GEN" = "$WANT" ]; then ST=${ST#* }; else ST="?"; fi
+    fi
     LAST=$(cat "$d/LAST" 2>/dev/null || echo "")
     if [ "$LAST" != "$ST" ]; then echo "$ST" > "$d/LAST"; echo "$NOW" > "$d/SEEN"; fi
     SEEN=$(cat "$d/SEEN" 2>/dev/null || echo "$NOW")

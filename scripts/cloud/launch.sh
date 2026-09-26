@@ -86,7 +86,10 @@ fi
 rm -f "$STATE"/CID "$STATE"/SSH "$STATE"/PROVISIONED "$STATE"/ORPHAN "$STATE"/DESTROYED "$STATE"/HOLD "$STATE"/LAST "$STATE"/SEEN
 # a previous generation's STATUS in R2 must not be applied to the new instance: retire it, and
 # hold the reaper until the chain is up (the hold is released on every exit path; Codex round 8)
-rclone deletefile "$(r2_path "${HEARSAY_R2_PREFIX}runs/$JOB/STATUS")" 2>/dev/null || true
+rclone deletefile "$(r2_path "${HEARSAY_R2_PREFIX}runs/$JOB/STATUS")" 2>/dev/null || true  # best effort only
+# the real isolation: every launch is a new GENERATION; the box prefixes each STATUS it publishes
+# with it and the reaper ignores any STATUS from another generation (Codex round 10)
+GEN="$(date +%s)-$$"; echo "$GEN" > "$STATE/GEN"
 date +%s > "$STATE/HOLD"
 
 # --- budget guard: credit minus the commitments of boxes already running ---
@@ -118,6 +121,7 @@ try: print(json.load(sys.stdin).get("new_contract","") or "")
 except Exception: print("")')
   [ -n "$CID" ] || { echo "  create failed"; CID=""; continue; }
   echo "$CID" > "$STATE/CID"   # persisted the moment it exists, before anything can fail
+  printf '| %s | vast.ai | %s (%s) | %s | created | | | gen %s | \n' "$(date '+%Y-%m-%d %H:%M')" "$CID" "$OFFER" "$JOB" "$GEN" >> "$LEDGER"  # every rental gets a row
   echo "  CID=$CID waiting for running..."; ST=""
   for _ in $(seq 1 "${BOOT_TRIES:-40}"); do ST=$(ist "$CID"); [ "$ST" = running ] && break; sleep "${BOOT_WAIT:-15}"; done
   [ "$ST" = running ] || { echo "  stuck ($ST) -> destroy"; kill_ "$CID" && CID="" || exit 1; continue; }
@@ -145,7 +149,7 @@ except Exception: print("")')
        | $SSH 'mkdir -p /root/m5/cloud && tar xzf - -C /root/m5/cloud 2>/dev/null'; then
     echo "  script transfer failed -> destroy"; kill_ "$CID" && CID="" || exit 1; continue
   fi
-  if ! $SSH "setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' bash /root/m5/cloud/box_chain.sh > /root/m5/chain.log 2>&1 < /dev/null & sleep 3; pgrep -f 'bash /root/m5/cloud/box_ch[a]in.sh' >/dev/null && echo CHAIN-UP" 2>/dev/null | grep -q CHAIN-UP; then
+  if ! $SSH "setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' GEN='$GEN' bash /root/m5/cloud/box_chain.sh > /root/m5/chain.log 2>&1 < /dev/null & sleep 3; pgrep -f 'bash /root/m5/cloud/box_ch[a]in.sh' >/dev/null && echo CHAIN-UP" 2>/dev/null | grep -q CHAIN-UP; then
     echo "  chain did not start -> destroy"; kill_ "$CID" && CID="" || exit 1; continue
   fi
   echo PROVISIONED

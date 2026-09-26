@@ -385,11 +385,18 @@ def test_g2_absence_helpers_never_trust_a_bad_answer(tmp_path, answer, rc):
     env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}"}
     for script in ("launch.sh", "reaper.sh"):
         src = (CLOUD / script).read_text()
+        helper = src[src.index("# instances():"): src.index("\n}\n", src.index("instances() {")) + 3]
         body = src[src.index("gone() {"): src.index("\n}\n", src.index("gone() {")) + 3]
         probe = (f'REPO="{REPO}"; VAST="uvx vastai"; py() {{ "$REPO/.venv/bin/python" -c "$@"; }}\n'
-                 + body + '\ngone 7')
+                 + helper + body + '\ngone 7')
         r = subprocess.run(["bash", "-c", probe], capture_output=True, text=True, env=env, check=False)
         assert r.stdout.strip() == "unknown", (script, answer, rc, r.stdout, r.stderr)
+        # positive cases: a valid list answers 'no' (present) / 'yes' (absent)
+        for listing, want in ('[{"id": 7}]', "no"), ("[]", "yes"), ('[{"id": 8}]', "yes"):
+            (stubs / "uvx").write_text(f"#!/bin/bash\ncase \"$*\" in *'show instances'*) echo '{listing}';; esac\n")
+            r = subprocess.run(["bash", "-c", probe], capture_output=True, text=True, env=env, check=False)
+            assert r.stdout.strip() == want, (script, listing, r.stdout, r.stderr)
+        (stubs / "uvx").write_text(f"#!/bin/bash\ncase \"$*\" in *'show instances'*) echo '{answer}'; exit {rc};; *'show user'*) echo '{{\"credit\": 30}}';; esac\n")
     home = _stub_home(tmp_path)
     (home / ".hearsay_vast" / "j").mkdir(parents=True)
     (home / ".hearsay_vast" / "j" / "CID").write_text("7")
@@ -470,3 +477,81 @@ def test_g3_every_instance_query_caller_refuses_on_a_bad_answer(tmp_path, answer
     r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env2,
                        check=False, timeout=60)
     assert r.stdout.count("instances on the account: ?") == 2, r.stdout + r.stderr
+
+
+def _bounded_reaper(tmp_path, state, iterations=2):
+    src = (CLOUD / "reaper.sh").read_text().replace('STATE="$HOME/.hearsay_vast"', f'STATE="{state}"')
+    src = src.replace('. "$HERE/r2_guard.sh"', f'. "{CLOUD}/r2_guard.sh"')
+    src = src.replace('REPO="$(cd "$HERE/../.." && pwd)"', f'REPO="{REPO}"')
+    src = src.replace('LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"', f'LEDGER="{tmp_path}/ledger.md"')
+    src = src.replace("while :; do", f"for _i in $(seq 1 {iterations}); do", 1).replace("sleep 5\n", "sleep 0\n")
+    script = tmp_path / "reaper_bounded.sh"
+    script.write_text(src)
+    return script
+
+
+def test_g2_reaper_ignores_a_status_from_another_generation(tmp_path):
+    """The reaper acts on a DONE/FAIL only if it carries the job's current generation id; a
+    previous instance's status under the same job name is 'no status' (Codex round 10)."""
+    import time
+
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    calls = tmp_path / "calls"
+    (stubs / "uvx").write_text(f"#!/bin/bash\necho \"$@\" >> {calls}\ncase \"$*\" in *'show instances'*) if grep -q 'destroy' {calls}; then echo '[]'; else echo '[{{\"id\": 71}}]'; fi;; *) echo ok;; esac\n")
+    status = tmp_path / "status.txt"
+    (stubs / "rclone").write_text(f"#!/bin/bash\ncat {status}\n")
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    state = tmp_path / "state"
+    (state / "g").mkdir(parents=True)
+    (state / "g" / "CID").write_text("71")
+    (state / "g" / "GEN").write_text("gen-new")
+    home = _stub_home(tmp_path)
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "POLL": "0",
+           "DEADLINE": str(int(time.time()) + 3600), "STALL_MIN": "999"}
+    script = _bounded_reaper(tmp_path, state)
+    status.write_text("gen-old DONE\n")  # the previous instance's final status
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env, check=False, timeout=60)
+    assert "destroy" not in (calls.read_text() if calls.exists() else ""), r.stdout
+    assert not (state / "g" / "DESTROYED").exists()
+    status.write_text("gen-new DONE\n")  # this generation finished
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env, check=False, timeout=60)
+    assert "destroy instance 71" in calls.read_text(), r.stdout + r.stderr
+    assert (state / "g" / "DESTROYED").exists()
+
+
+def test_g2_launcher_writes_a_generation_and_a_ledger_row_per_created_instance(tmp_path):
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    log = tmp_path / "combined.log"
+    (stubs / "uvx").write_text(f"""#!/bin/bash
+echo "vast $@" >> {log}
+case "$*" in
+  *'show user'*) echo '{{"credit": 30.0}}';;
+  *'show instances'*) if grep -q 'destroy' {log}; then echo '[]'; else echo '[{{"id": 6161, "actual_status": "running", "ssh_host": "h", "ssh_port": "1", "dph_total": 0.6}}]'; fi;;
+  *'create instance'*) echo '{{"new_contract": 6161}}';;
+  *) echo ok;;
+esac
+""")
+    (stubs / "rclone").write_text("#!/bin/bash\nexit 0\n")
+    (stubs / "ssh").write_text(f"#!/bin/bash\necho \"ssh $@\" >> {log}\nexit 1\n")  # network check fails
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    home = _stub_home(tmp_path)
+    ledger = tmp_path / "ledger.md"
+    src = (CLOUD / "launch.sh").read_text().replace('LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"', f'LEDGER="{ledger}"')
+    src = src.replace('HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"', f'HERE="{CLOUD}"')
+    script = tmp_path / "launch_t.sh"
+    script.write_text(src)
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "DESTROY_WAIT": "0",
+           "BOOT_WAIT": "0", "NET_TRIES": "1", "NET_WAIT": "0"}
+    r = subprocess.run(["bash", str(script), "gj", "fold=0", "0.5", "1"], capture_output=True, text=True,
+                       cwd=REPO, env=env, check=False)
+    assert r.returncode != 0
+    gen = (home / ".hearsay_vast" / "gj" / "GEN").read_text().strip()
+    assert gen and "6161" in ledger.read_text() and f"gen {gen}" in ledger.read_text()

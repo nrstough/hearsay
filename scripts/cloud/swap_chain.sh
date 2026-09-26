@@ -18,5 +18,5 @@ trap 'rm -f "$STATE/HOLD"' EXIT   # released on every exit path, including an ss
 tar czf - -C "$HERE" box_setup.sh box_chain.sh box_codecs.py r2_guard.sh 2>/dev/null \
   | ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p "$PORT" "root@$HOST" 'mkdir -p /root/m5/cloud && tar xzf - -C /root/m5/cloud 2>/dev/null'
 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p "$PORT" "root@$HOST" 'pkill -f "[c]loud/box_chain" || true; pkill -f "[m]5_train" || true; sleep 1; echo "[swap] old chain stopped"'
-ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p "$PORT" "root@$HOST" "rm -f /root/m5/code.tgz; echo SWAPPING > /tmp/STATUS; rclone copyto /tmp/STATUS r2:pa-source/hearsay/runs/$JOB/STATUS 2>/dev/null; setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' bash /root/m5/cloud/box_chain.sh >> /root/m5/chain.log 2>&1 < /dev/null & sleep 4; echo \"[swap] new chain: \$(cat /tmp/STATUS)\""
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p "$PORT" "root@$HOST" "rm -f /root/m5/code.tgz; echo SWAPPING > /tmp/STATUS; rclone copyto /tmp/STATUS r2:pa-source/hearsay/runs/$JOB/STATUS 2>/dev/null; setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' GEN='$(cat "$STATE/GEN" 2>/dev/null || echo 0)' bash /root/m5/cloud/box_chain.sh >> /root/m5/chain.log 2>&1 < /dev/null & sleep 4; echo \"[swap] new chain: \$(cat /tmp/STATUS)\""
 rm -f "$STATE/HOLD"

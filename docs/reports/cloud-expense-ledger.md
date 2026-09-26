@@ -24,10 +24,20 @@ and `scripts/cloud/teardown_check.sh` appends the credit left. Balance: `uvx vas
 | 2026-09-26 06:55 | vast.ai | 52725429 | abl_extra | destroyed (failed: FAIL full_frozen) | | | | 
 | 2026-09-26 07:34 | vast.ai | 52718897 | pilot (pilot #2, ablation NSA-only, replicate, frozen folds 1-2, full model) | destroyed by teardown_check after DONE | | | | 
 | 2026-09-26 07:34 | vast.ai | teardown check | | | | | credit left $33.28 | 
-| 2026-09-26 07:35 | vast.ai | M5 total (7 rentals: 2 stalled at boot, pilot x2, ablation x2, conservative x1) | all runs | A100 SXM4/PCIe $0.61–0.81/h | included | included | **$5.09** (credit $38.37 → $33.28) | 
+| 2026-09-26 07:35 | vast.ai | M5 total through the finals (10 instances: 6 never booted, pilot x2, ablation x2, conservative x1) | all runs | A100 SXM4/PCIe $0.61–0.81/h | included | included | **$5.09** (credit $38.37 → $33.28) | 
 | 2026-09-26 08:33 | vast.ai | 52718897 | pilot | destroyed (stalled 60m at 'WAITING 0') | | | | 
 | 2026-09-26 08:34 | vast.ai | 52746167 (50894989) | resume_probe | 0.611111111111111 A100 SXM4 | | | est 0.6 h | 
 | 2026-09-26 08:38 | vast.ai | 52746167 | resume_probe | destroyed (failed: FAIL setup) | | | | 
 | 2026-09-26 08:42 | vast.ai | 52747172 (50894989) | resume_probe | 0.611111111111111 A100 SXM4 | | | est 0.6 h | 
 | 2026-09-26 08:57 | vast.ai | teardown check | | | | | credit left $32.95 | 
+| 2026-09-26 05:13 | vast.ai | 52722912 (41367916) | abl_extra attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
+| 2026-09-26 05:30 | vast.ai | 52724147 | abl_extra attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
+| 2026-09-26 05:40 | vast.ai | 52724249 | abl_cons attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
+| 2026-09-26 05:45 | vast.ai | 52725556 (51341862) | abl_cons attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
 | 2026-09-26 08:57 | vast.ai | M5 resume probes (52746167 failed setup, 52747172 DONE) | G4 evidence | A100 SXM4 $0.61/h | | | $0.33 (credit $33.28 → $32.95) | 
+| 2026-09-26 10:32 | vast.ai | 4242 (111) | tjob | created | | | gen 1790433157-79665 | 
+| 2026-09-26 10:33 | vast.ai | 4343 (222) | tjob2 | created | | | gen 1790433208-80085 | 
+| 2026-09-26 10:33 | vast.ai | 5151 (1) | rj | created | | | gen 1790433222-81070 | 
+| 2026-09-26 10:34 | vast.ai | 4242 (111) | tjob | created | | | gen 1790433274-82264 | 
+| 2026-09-26 10:35 | vast.ai | 4343 (222) | tjob2 | created | | | gen 1790433326-82732 | 
+| 2026-09-26 10:35 | vast.ai | 5151 (1) | rj | created | | | gen 1790433341-83456 | 

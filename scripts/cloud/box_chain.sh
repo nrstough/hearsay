@@ -9,7 +9,8 @@ cd /root/m5
 RUNS="${HEARSAY_R2_PREFIX}runs/${JOB}"
 LOGDIR=/root/m5/runs; mkdir -p "$LOGDIR"
 
-status() { echo "$1" > /tmp/STATUS; echo "$(date -u '+%FT%TZ') $1" >> /tmp/STATUS.log
+GEN="${GEN:-0}"   # the launcher's generation id; the reaper only acts on a STATUS of its own generation
+status() { echo "$GEN $1" > /tmp/STATUS; echo "$(date -u '+%FT%TZ') $GEN $1" >> /tmp/STATUS.log
            rclone copyto /tmp/STATUS "$RUNS/STATUS" 2>/dev/null; rclone copyto /tmp/STATUS.log "$RUNS/STATUS.log" 2>/dev/null; }
 push_logs() { rclone copy /root/m5/chain.log "$RUNS/" 2>/dev/null; rclone copy "$LOGDIR" "$RUNS/" --exclude 'ckpt/**' 2>/dev/null; }
 fail() { status "FAIL $1"; push_logs; exit 1; }
