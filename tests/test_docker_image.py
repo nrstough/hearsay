@@ -109,8 +109,8 @@ def test_b6_copy_destinations_match_the_loaders():
     assert "COPY docker/build/models ./models" in DOCKERFILE
     assert learned.MODELS.name == "models" and pipeline.HC_DIR.parts[-2:] == ("models", "hc_selected")
     assert pipeline.PROBE_DIR.parent.name == "models"
-    assert pipeline.DEFAULT_CONSTANTS_PATH.parts[-3:] == ("models", "fusion_v1", "constants.json"), \
-        "the shipped rule's file (e_on_a) is staged by build.sh with every models/fusion_*/"
+    assert pipeline.DEFAULT_CONSTANTS_PATH.parts[-3:] == ("models", "fusion_v2", "constants.json"), \
+        "the shipped rule's file (A3_w0.2_E since Sat 12:35) is staged by build.sh with every models/fusion_*/"
     assert pipeline.CONSTANTS_PATH.parts[-3:] == ("models", "fusion_v0", "constants.json")
     # weights before code: a code edit must not re-copy the weight layers
     assert DOCKERFILE.index("COPY weights/wav2vec2-xls-r-300m") < DOCKERFILE.index("COPY src ./src")

@@ -792,9 +792,11 @@ def test_analyze_v2_response_shape(consts_v2):
     json.dumps(doc)
 
 
-def test_default_constants_path_is_still_v1():
-    assert DEFAULT_CONSTANTS_PATH.parts[-3:] == ("models", "fusion_v1", "constants.json")
-    assert CONSTANTS_V2_PATH.parts[-3:] == ("models", "fusion_v2", "constants.json")
+def test_default_constants_path_is_v2_since_the_switch():
+    """Sat 12:35 (Nathan: GO A3, "switch"): the default is the shipped rule's file; v1 stays a loadable fallback."""
+    assert DEFAULT_CONSTANTS_PATH.parts[-3:] == ("models", "fusion_v2", "constants.json")
+    assert DEFAULT_CONSTANTS_PATH == CONSTANTS_V2_PATH
+    assert CONSTANTS_V1.parts[-3:] == ("models", "fusion_v1", "constants.json")
 
 
 def test_m5_failure_on_one_clip_is_imputed_not_fatal(consts_v2):
@@ -982,7 +984,7 @@ def test_runner_resolve_scorers(tmp_path):
     rp = _runner()
     assert rp.resolve_scorers("m1b", None, tmp_path) == (("m1b_v3",), None)
     sc, fu = rp.resolve_scorers("m1b,spectra,handcrafted", None, tmp_path)
-    assert sc == tuple(DETECTOR_ORDER) and fu == tmp_path / "models" / "fusion_v1" / "constants.json"
+    assert sc == tuple(DETECTOR_ORDER) and fu == tmp_path / "models" / "fusion_v2" / "constants.json"
     sc, fu = rp.resolve_scorers("m1b", tmp_path / "c.json", tmp_path)
     assert sc == tuple(DETECTOR_ORDER) and fu == tmp_path / "c.json"  # a bundle needs every column
     with pytest.raises(ValueError):

@@ -14,14 +14,14 @@ Score paths, kept identical to the exports fusion was fit on (outputs/detector_s
   `hc_logit` feature is the export's logit (logit of the clipped P(synthetic)).
 - spectra_aasist: `hearsay.spectra.prepare_input` -> `score_clip` in zero-pad mode, 16 windows,
   no peak normalization (scripts/score_spectra.py defaults), synth_logit = spoof - bonafide.
-- m5_xlsr_ft (only when the constants file weights it, i.e. fusion_v2): `hearsay.m5_data.deploy_transform`
+- m5_xlsr_ft (only when the constants file weights it, i.e. fusion_v2, the default since Sat 12:35): `hearsay.m5_data.deploy_transform`
   (trim_silence -> band-limit -> cap 8 s -> normalize, the order the export used) -> `collate`
   (normalizes again, as the export did) -> `hearsay.m5_model.score_batch`, scripts/m5_score.py's
   sequence on one clip; fp32, batch 1, no layer truncation (the checkpoint is saved at 12 layers).
 
 Fusion (`FusionConstants`), from a constants file, never refit:
-- models/fusion_v1/constants.json (scripts/fuse_sweep.py --write; the shipped rule, `e_on_a`,
-  "E on A alpha 0.2"): rank_d = searchsorted(inner_oof_sorted[d], logit_d) / len for m1b_v3
+- models/fusion_v1/constants.json (scripts/fuse_sweep.py --write; the 08:13 rule, `e_on_a`,
+  "E on A alpha 0.2", shipped until Sat 12:35, now the fallback): rank_d = searchsorted(inner_oof_sorted[d], logit_d) / len for m1b_v3
   and handcrafted_v5; base = (1 - alpha) * rank_m1b + alpha * rank_hc; M3 as false-alarm
   suppression only: if spectra_aasist logit < -3 and base > 0.5 then base *= 0.5 (M3 never
   promotes; nothing is fit on M3); p = sigmoid(a * base + b + prior_shift).
@@ -30,7 +30,8 @@ Fusion (`FusionConstants`), from a constants file, never refit:
   (m1b_v3 0.6, handcrafted_v5 0.2, m5_xlsr_ft 0.2) of weight * rank, accumulated in that order,
   then the same M3 step and Platt map. A v1 file is the same rule with weights (1 - alpha, alpha).
   The file also records the M5 checkpoint's hashes; `check_m5_identity` refuses another one.
-  DEFAULT_CONSTANTS_PATH is still fusion_v1: fusion_v2 runs only when passed explicitly.
+  DEFAULT_CONSTANTS_PATH is fusion_v2 since Sat 12:35 (the shipped rule, A3_w0.2_E); fusion_v1 (the
+  08:13 rule) stays loadable with --fusion models/fusion_v1/constants.json as the documented fallback.
 - models/fusion_v0/constants.json (scripts/fuse.py; `zmean`, `stack_nonlj`): z_d = (logit_d -
   mean_d) / std_d; zmean = mean of z; stack_nonlj = weights . z + intercept; p = sigmoid(a *
   fused + b + prior_shift) with that rule's Platt map.
@@ -73,7 +74,7 @@ CONSTANTS_V0_PATH = REPO / "models" / "fusion_v0" / "constants.json"
 CONSTANTS_V1_PATH = REPO / "models" / "fusion_v1" / "constants.json"
 CONSTANTS_V2_PATH = REPO / "models" / "fusion_v2" / "constants.json"  # scripts/fuse_sweep_m5.py --write (A3_w0.2_E)
 CONSTANTS_PATH = CONSTANTS_V0_PATH
-DEFAULT_CONSTANTS_PATH = CONSTANTS_V1_PATH
+DEFAULT_CONSTANTS_PATH = CONSTANTS_V2_PATH  # switched Sat 12:35 (Nathan: GO A3, "switch"); fusion_v1 stays loadable via --fusion
 PROBE_DIR = REPO / "models" / "m1_wav2vec2-xls-r-300m_L7_20260926-0521"
 HC_DIR = REPO / "models" / "hc_selected"
 # The M5 checkpoint whose exported column (outputs/detector_scores/m5_xlsr_ft.csv, byte-identical to this

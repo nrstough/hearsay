@@ -28,9 +28,15 @@ changing what ships:
   written. `version.fusion` records `fusion_v1/constants.json` (the bare file name was the same for
   both layouts); the cache identity gains the M5 head-sha prefix; `timings.csv` has one column per deep
   scorer and moves an older layout aside on resume.
-- **Unchanged:** `DEFAULT_CONSTANTS_PATH` = `models/fusion_v1/constants.json`; the 08:13 draft-review
-  payload; the Docker image (nothing to stage until the switch; a rebuild on this commit would list
-  `fusion_v2` in BUILD_INFO and the file would be inert without the checkpoint).
+- **Switched at 12:35 (Nathan: GO A3, "switch"):** `DEFAULT_CONSTANTS_PATH` = `models/fusion_v2/constants.json`, so
+  `scripts/run_pipeline.py --team CrossExam` reproduces the submitted file with no flags; `fusion_v1` (the
+  08:13 rule) stays loadable via `--fusion` as the fallback. The Docker image is not a graded deliverable
+  (NSA, ~12:00) and stays on `e_on_a` as reproducibility evidence; no rebuild.
+- Seam worth knowing: a rerun that re-fuses under another polarity (`--flip`) rewrites the per-file JSONs
+  under `results/` and `run_meta.json` in place; a later rerun whose polarity already matches the cache
+  does not rewrite them. After the flip pass on `outputs/runner/v2_full`, the our-direction JSONs were
+  regenerated from `results.jsonl` (12:30) so that directory matches the submitted TSV again; write the
+  flipped pass to its own `--out` next time.
 
 | Comparison (v3) | Spearman | max abs diff | mean abs diff | notes |
 |---|---|---|---|---|

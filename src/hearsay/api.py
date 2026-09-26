@@ -11,10 +11,10 @@ memory and serves the precomputed responses of a runner --out directory.
   GET  /health             status, whether the models are loaded, versions
 
 Environment: HEARSAY_RESULTS (runner --out dir with results/<filename>.json), HEARSAY_RULE
-(e_on_a default, the shipped rank blend in models/fusion_v1/constants.json; zmean | stack_nonlj
+(e_on_a default, the shipped rank blend in models/fusion_v2/constants.json since Sat 12:35; zmean | stack_nonlj
 need HEARSAY_FUSION=models/fusion_v0/constants.json), HEARSAY_POLICY (speech_gate | none),
-HEARSAY_FUSION (a constants file; unset = models/fusion_v1/constants.json; models/fusion_v2/
-constants.json adds M5 as a weighted scorer), HEARSAY_DETECTORS (m1b for the probe-only mode,
+HEARSAY_FUSION (a constants file; unset = models/fusion_v2/constants.json, the shipped rule with M5;
+models/fusion_v1/constants.json is the 08:13 rule without M5, the fallback), HEARSAY_DETECTORS (m1b for the probe-only mode,
 default m1b,spectra,handcrafted; otherwise the fused columns are the constants file's own),
 HEARSAY_PROBE, HEARSAY_HC, HEARSAY_M5 (the M5 checkpoint dir, loaded only under a file that
 weights it), OMP_NUM_THREADS.

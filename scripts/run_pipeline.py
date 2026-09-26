@@ -16,11 +16,12 @@ before scoring; an empty listing fails with no TSV. Without a template: sorted a
 
 Scoring: --detectors m1b alone means M1 only, P = sigmoid(LLR + logit(0.3)) exactly as
 scripts/make_probe_csv.py; otherwise the fused detectors the constants file names run and --rule
-is read from that file, never refit: e_on_a (default; models/fusion_v1/constants.json from
-scripts/fuse_sweep.py: 0.8 rank(M1b) + 0.2 rank(handcrafted), M3 as false-alarm suppression only;
-or, via --fusion models/fusion_v2/constants.json from scripts/fuse_sweep_m5.py, the same rule
-with weights 0.6 M1b / 0.2 handcrafted / 0.2 M5, which also loads the M5 checkpoint from --m5 and
-refuses one whose hashes the file did not record) or zmean | stack_nonlj
+is read from that file, never refit: e_on_a (default since Sat 12:35: models/fusion_v2/constants.json
+from scripts/fuse_sweep_m5.py --write, the shipped rule A3_w0.2_E: weights 0.6 rank(M1b) +
+0.2 rank(handcrafted) + 0.2 rank(M5), M3 as false-alarm suppression only; it loads the M5
+checkpoint from --m5 and refuses one whose hashes the file did not record. The 08:13 rule,
+models/fusion_v1/constants.json from scripts/fuse_sweep.py, 0.8 / 0.2 without M5, stays loadable
+via --fusion as the documented fallback) or zmean | stack_nonlj
 (models/fusion_v0/constants.json from scripts/fuse.py, via --fusion). A rule the file does not
 define is refused. A fused scorer that fails on a clip is imputed at its inner-fold centre and
 counted; the run exits 4 (after writing the TSV) when a weighted scorer failed on any file of a
@@ -105,9 +106,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--detectors", default=os.environ.get("HEARSAY_DETECTORS", ALL_SCORERS),
                     help=f"comma list of {sorted(SCORER_FLAGS)}; m1b alone = M1 only, no fusion ($HEARSAY_DETECTORS)")  # fmt: skip
     ap.add_argument("--fusion", "--constants", dest="fusion", type=Path, default=_env_path("HEARSAY_FUSION"),
-                    help="fusion constants file ($HEARSAY_FUSION; default <app-root>/models/fusion_v1/"
-                         "constants.json when more than m1b is requested; models/fusion_v2/constants.json adds "
-                         "M5 as a weighted scorer; models/fusion_v0/constants.json "
+                    help="fusion constants file ($HEARSAY_FUSION; default <app-root>/models/fusion_v2/"
+                         "constants.json when more than m1b is requested: the shipped rule with M5; "
+                         "models/fusion_v1/constants.json is the 08:13 rule without M5 (fallback); models/fusion_v0/constants.json "
                          "holds zmean and stack_nonlj)")  # fmt: skip
     ap.add_argument("--rule", default=os.environ.get("HEARSAY_RULE", DEFAULT_RULE), choices=RULES,
                     help=f"fusion rule; must be one the constants file defines (default {DEFAULT_RULE})")  # fmt: skip

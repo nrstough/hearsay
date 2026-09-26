@@ -66,11 +66,11 @@ def test_health_without_loading_models(client):
     body = r.json()
     assert body["status"] == "ok" and body["models_loaded"] is False
     assert body["rule"] == "e_on_a" and body["policy"] == "speech_gate" and body["n_results"] == 2
-    if DEFAULT_CONSTANTS_PATH.exists():  # the real (gitignored) v1 file names three columns
-        assert body["scorers"] == list(V1_DETECTORS) and body["scorers_from"] == "constants"
+    if DEFAULT_CONSTANTS_PATH.exists():  # the real (gitignored) v2 file names all four columns
+        assert body["scorers"] == list(DETECTOR_ORDER) and body["scorers_from"] == "constants"
     else:
         assert body["scorers"] == list(DETECTOR_ORDER) and body["scorers_from"] == "env (fusion file missing)"
-    assert body["version"]["fusion"] == "fusion_v1/constants.json"
+    assert body["version"]["fusion"] == "fusion_v2/constants.json"
 
 
 def test_health_reports_m1_only_mode(client, monkeypatch):
