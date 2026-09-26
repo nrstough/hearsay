@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Response: M5 extra-data mix and fine-tune recipe · HEARSAY</title>
+<meta name="description" content="Rendered from docs/consults/2026-09-26_m5-extra-data-finetune_RESPONSE.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/consults/2026-09-26_m5-extra-data-finetune_RESPONSE.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#round-1-clarifying-questions-0240-edt">Round 1: clarifying questions (~02:40 EDT)</a></li><li><a href="#round-1-the-answer-in-brief">Round 1: the answer, in brief</a></li><li><a href="#synthesis-what-we-act-on">Synthesis: what we act on</a></li><li><a href="#follow-ups">Follow-ups</a></li></ul></details>
+<h1 id="response-m5-extra-data-mix-and-fine-tune-recipe">Response: M5 extra-data mix and fine-tune recipe</h1>
+<p>Prompt: <code>2026-09-26_m5-extra-data-finetune_CONSULTATION.md</code>. Target: a frontier-LLM panel (VeriLM memo synthesizing two experts, "Claude" and "Gemini"). Verbatim answer: <code>2026-09-26_m5-extra-data-finetune_RESPONSE_verbatim.md</code> (765 lines, received ~03:20 EDT).</p>
+<h2 id="round-1-clarifying-questions-0240-edt">Round 1: clarifying questions (~02:40 EDT)</h2>
+<p>The source first asked five clarifying questions. Our answers, from measured facts:</p>
+<ul>
+<li><strong>Ablation budget:</strong> ~6 GPU-hours total; 6 final models fixed; ~2 h of ablation across all four questions; rank by EV, give the top 2–3.</li>
+<li><strong>M1 bar:</strong> known in time (it is: holdout minDCF 0.1458). M5 replaces M1 only if it beats it; its scores feed the stacker either way.</li>
+<li><strong>Ratios:</strong> first guesses, open to revision.</li>
+<li><strong>M-AILABS bona fide:</strong> off the table (both hosts unreachable at 02:36 EDT).</li>
+<li><strong>Diagnostics:</strong> the handcrafted-feature + LightGBM tooling is available on the Mac's CPU; frozen XLS-R embeddings only on the rented box.</li>
+</ul>
+<h2 id="round-1-the-answer-in-brief">Round 1: the answer, in brief</h2>
+<p><strong>Verdict:</strong> "Over-engineered on data, proportionate on recipe, and under-invested in the quantity the metric actually measures." Both experts derived the same cost weight (normalized DCF = P_miss + 9.33·P_FA; at the 70/30 split, one false alarm costs four misses) and inverted our plan: <strong>real-side diversity beats spoof volume.</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Question</th><th>Recommendation</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>MLAAD (spoof only)</strong></td><td>Split: Gemini drops it; Claude keeps it <strong>gated</strong> at ~28% of the spoof side, ≤ 120 clips per model, behind a CPU corpus probe with an explicit drop rule. The memo sides with the gated position: MLAAD clips are vocoder output and carry a resample/rolloff cue and an audiobook register, not a microphone chain; LibriSpeech (LibriVox, labelled bona fide in the same batches) contradicts the register cue; band-limit augmentation attacks the rolloff cue. Probe A: LightGBM on handcrafted features, MLAAD spoof vs DiffSSD spoof (label held constant), on augmented copies; project the real pools onto that axis. AUC &gt; 0.95 with LibriSpeech landing on the MLAAD side → fall back to ~12%; &lt; 0.85 → no exploitable fingerprint. Probe C: score both arms on <strong>In-the-Wild bona fide only</strong> (read-out is allowed; training is not) at the inner-fold threshold; drop MLAAD if ΔP_FA &gt; +1 point.</td></tr>
+<tr><td><strong>ASVspoof 2019</strong></td><td><strong>All ~5.1k bona fide: the highest-EV item in the plan</strong> (a third real recording chain pushes the model toward chain-invariant bona fide; the trade-off risk is a miss, cost 1). Correction: train+dev is ~40 VCTK speakers, not ~100. <strong>Spoof: 45k is wrong; ~2.5k stratified across A01–A06 as a channel anchor</strong> (so VCTK isn't real-only); zero is defensible.</td></tr>
+<tr><td><strong>Mixing</strong></td><td>Label-balanced 50/50. Real side 25/35/40 LJ / LibriSpeech / ASV19 (LJ capped below its data share: one speaker). Spoof side 62/28/10 DiffSSD / MLAAD / ASV19. <strong>Kill the +50k DiffSSD spoof</strong> (no new generators on a generator-grouped validation); cap DiffSSD at ~2k per inner generator. Pool ≈ 48k at 49% real vs our add-everything 145k at 16% real. <strong>No curriculum, no taper</strong>, constant mix. Sampling ratios instead of loss weights; a bona fide class weight of ~2.0 is a "maybe".</td></tr>
+<tr><td><strong>Recipe</strong></td><td>Truncate to <strong>L = 12</strong> and fully fine-tune the retained layers (CNN frozen); fallback L = 14–16 if learned layer weights concentrate at the top. <strong>Learned softmax-weighted layer sum</strong> + <strong>attentive statistics pooling</strong> (mean + std, 128-d bottleneck). Head LR 5e-4 (no weight decay); backbone 1e-5 at the top layer with layer-wise decay γ = 0.85, weight decay 0.01 (not biases/LayerNorm); 8% warmup then cosine; bf16; grad clip 1.0. ≤ 4 epochs, validate every half epoch, <strong>select on minDCF at π = 0.3, never on loss or EER.</strong> Augmentation p = 0.65 with the existing codec/noise/band-limit/RIR set, band-limit upweighted, plus only RawBoost's convolutive (linear + nonlinear) algorithm at p = 0.25. <strong>Identical augmentation distribution across classes and pools; log realized rates per source × class.</strong> BCE with label smoothing 0.05. <strong>No OC-softmax</strong> (a narrow bona fide class makes it manufacture weight-4 errors), no AASIST.</td></tr>
+<tr><td><strong>Unnamed failure modes</strong></td><td>(1) <strong>Score–duration coupling</strong> under a single global threshold: check Spearman(score, log duration) on out-of-fold bona fide; correct with a linear trend fit on OOF bona fide if needed. (2) Augmentation–label leakage (the highest-probability silent bug). (3) <strong>Stacker miscalibration from LJ's single speaker</strong>: LJ's OOF bona fide scores are optimistic; fit the stacker on LibriSpeech/VCTK OOF bona fide or treat LJ as weakly grouped. (4) Trim-boundary and crest-factor signatures: jitter the trim threshold (30–40 dB) and retain 0–200 ms at random.</td></tr>
+<tr><td><strong>The gate itself</strong></td><td>On a holdout with 2 generators and 26 bona fide groups, σ(minDCF) ≈ 0.07–0.10 (97% from the P_FA term). <strong>A holdout gap under ~0.15 is not evidence.</strong> Decide on 5-fold OOF minDCF and the holdout together; if they disagree by &lt; 0.15, keep M1 primary and route M5 through the stacker.</td></tr>
+<tr><td><strong>Cuts</strong></td><td>+50k DiffSSD spoof; ASV19 spoof 45k → ~2.5k; curriculum/taper; OC-softmax; AASIST; non-convolutive RawBoost. Reallocate to the MLAAD probe, one mix A/B, and the CPU audits. "Run few arms, pre-declare the criterion, and stop."</td></tr>
+</tbody>
+</table></div>
+<h2 id="synthesis-what-we-act-on">Synthesis: what we act on</h2>
+<p><strong>Adopt (config or small code):</strong></p>
+<ol>
+<li>Extra DiffSSD spoof capped so each inner generator has ~2k total (1k sample + 1k extra), not 4k.</li>
+<li>All extra NSA bona fide kept (LJ + LibriSpeech, minus holdout groups).</li>
+<li>ASV19: all bona fide; spoof 2.5k stratified across A01–A06 (then the ≥ 2.0 s cut and duration matching from the plan, applied to both classes).</li>
+<li>MLAAD: 28% of the spoof side, ≤ 120 clips per model; <strong>Probe A</strong> runs on the Mac's CPU before the finals (handcrafted features already exist for the pipeline); Probe C runs on In-the-Wild bona fide at assembly. Drop rule as stated.</li>
+<li>Batch mix: real 25/35/40, spoof 62/28/10, constant.</li>
+<li>Model: L = 12 (fallback 16), all retained layers trainable, learned layer-weighted sum, attentive statistics pooling (mean + std), BCE + label smoothing 0.05, head 5e-4 / backbone 1e-5 with LLRD 0.85, weight decay 0.01, 8% warmup + cosine, bf16, clip 1.0.</li>
+<li>Augmentation p = 0.65; add convolutive RawBoost at p = 0.25; add trim-threshold jitter (30–40 dB) and 0–200 ms retained edges as a training-only op; log realized augmentation rates per source × class.</li>
+<li>Readouts: Spearman(score, log duration) on OOF bona fide; pooled 5-fold OOF minDCF next to the holdout; gate stated as "both".</li>
+</ol>
+<p><strong>Keep from the reviewed plan despite the memo:</strong></p>
+<ul>
+<li>Selection stays wall-clock-fixed for the fold models (the memo's "select on minDCF every half epoch" would select on single-generator folds 3 and 4; Codex/critique flagged that). The pilot and ablation curves are reported.</li>
+<li>Codec ops stay precomputed for a seeded 30% subset of <strong>all</strong> training clips regardless of class (that satisfies the symmetric-augmentation rule; test D6 measures it).</li>
+<li>"Random peak normalization before ZMUV" is a no-op after ZMUV (pure gain); our gain + hard-clip op covers the crest-factor axis instead.</li>
+<li>Frozen-backbone control arm: not run; M1 v2 already is that control (holdout 0.1458 with OOF scores).</li>
+</ul>
+<p><strong>Pass to the main chat:</strong> the stacker caveat about LJ's single-speaker OOF bias, and the "holdout gap under 0.15 is noise; decide on OOF + holdout" rule for the M5-vs-M1 decision.</p>
+<h2 id="follow-ups">Follow-ups</h2>
+<p>None planned; the ablation (NSA-only vs the recommended mix) is the empirical check.</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/consults/2026-09-26_m5-extra-data-finetune_RESPONSE.md</code> <span class="hash">17539052ec6c</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

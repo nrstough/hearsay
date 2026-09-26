@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Systems and subsystems · HEARSAY</title>
+<meta name="description" content="One page per system and subsystem, all with the same shape: what it is in plain words, what goes in and comes out, where it lives, every parameter with the line">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>Systems and subsystems</h1>
+<p class="lead">One page per system and subsystem, all with the same shape: what it is in plain words, what goes in and comes out, where it lives, every parameter with the line that sets it, status, numbers, known limits, the tests that pin it, and sources.</p>
+
+<h2 id="ingest">Ingest</h2>
+<ul class="doc-list">
+<li><a href="audio-loader.html">Audio loader and probe</a><span class="lead-short"> One decode path for every file: FFmpeg turns any container or codec into 16 kHz mono float32, once, and the header is read separately. Nothing downstream ever sees the original format.</span></li>
+<li><a href="detector-contract.html">Detector contract and safe runner</a><span class="lead-short"> Every detector takes the same read-only clip and returns the same kind of result: a score that rises with synthetic likelihood, one sentence of evidence, named features and a status. A wrapper guarantees that a crashing detector becomes a neutral, flagged result and never costs a file its row.</span></li>
+<li><a href="segment-preparation.html">Segment preparation and band match</a><span class="lead-short"> Training and test audio must look the same to a detector, or the detector learns the difference instead of the voice. This stage low-passes every clip at the test set's roll-off, trims silence, crops training rows to test-like lengths, caps the length and normalizes the level.</span></li>
+</ul>
+<h2 id="orchestration">Orchestration</h2>
+<ul class="doc-list">
+<li><a href="runner-routing.html">The runner and its routing rules</a><span class="lead-short"> One script takes a directory of audio and produces the TSV, one explanation JSON per file, timings and a resumable cache. Inside it, a short list of fixed rules over measured facts decides what each detector's result may do. That list is the orchestrator.</span></li>
+<li><a href="explanation-json.html">The routing log and explanation JSON</a><span class="lead-short"> For every file the runner writes one JSON record: every detector's score, status, sentence and features, the fusion inputs and arithmetic, the routing log, and the version of everything that produced it. It is the explainability deliverable and the frontend's data.</span></li>
+<li><a href="local-api.html">The local API</a><span class="lead-short"> A thin FastAPI wrapper around the pipeline for the demo frontend: upload a file, get the same explanation record the runner writes. It is not on the scoring path.</span></li>
+<li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a><span class="lead-short"> Five cheap cues decide whether a file contains speech to judge. A file that fails skips fusion and is placed in a block strictly below every judged file, at the real end of the ranking, where an uncertain file belongs under the sponsor's cost.</span></li>
+</ul>
+<h2 id="deep-detectors">Deep detectors</h2>
+<ul class="doc-list">
+<li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a><span class="lead-short"> A frozen self-supervised speech model, one of its middle layers averaged over time, and a small logistic classifier on top. It is the primary detector, with the largest weight in the fusion, and the one every other rung was measured against.</span></li>
+<li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a><span class="lead-short"> An off-the-shelf anti-spoofing model run with no training through the same input path as everything else. The strongest detector on every set we hold, and the one we trust least, because its training data is undisclosed. It may only lower a score.</span></li>
+<li><a href="m5-head.html">The M5 head on XLS-R</a><span class="lead-short"> A trained head on the first twelve layers of XLS-R: learned layer weights, attentive statistics pooling and a linear output, trained on rented A100s with heavy class-blind augmentation. It failed its gate as a replacement for the probe and ships as a fifth of the fusion vote, because it errs on different files.</span></li>
+</ul>
+<h2 id="engineered-detectors">Engineered detectors</h2>
+<ul class="doc-list">
+<li><a href="handcrafted.html">Handcrafted spectral and prosody features</a><span class="lead-short"> Two hundred and thirty-four engineered features of the spectrum and the prosody of a clip, fed to gradient-boosted trees that are evaluated in plain numpy at inference. Interpretable by construction: every sentence it writes names the three features that moved it and by how many standard deviations from real speech.</span></li>
+<li><a href="compression.html">Compression forensics</a><span class="lead-short"> Nineteen features that read the traces a lossy codec leaves in the upper band, trained with both classes laundered so the model cannot learn that MP3 means a particular generator. It detects codec history well and the class barely, so it is evidence and routing, never score.</span></li>
+<li><a href="container.html">Container and metadata</a><span class="lead-short"> Reads the header facts of a file (format, codec, rate, bit depth, tags) and applies a few rules. On this test set it returns a constant score by design, because on our training data the container is the label; its facts route the compression detector instead.</span></li>
+<li><a href="enf.html">ENF: mains hum</a><span class="lead-short"> Tracks the 50 or 60 Hz hum a mains-powered recording chain leaves behind, and whether it is stable across the clip. Rule-based and mild on purpose: on our training data hum means a home studio, which means one real corpus, so a learned version would learn the corpus.</span></li>
+<li><a href="splice.html">Splice and discontinuity detection</a><span class="lead-short"> Looks for the seams an edit leaves: a single-sample click, or a jump in the DC offset between short windows. On this data it finds vocoder artifacts more often than edits, and the sponsor said no test clip is partially synthetic, so it is evidence.</span></li>
+<li><a href="speaker-drift.html">Speaker drift</a><span class="lead-short"> Speaker embeddings on one-second windows, compared pairwise, to ask whether the voice stays the same within a clip. It works as a detector of edits and second voices, and it points the wrong way as a detector of fakes: cloned voices are the most self-consistent voices in the data.</span></li>
+</ul>
+<h2 id="fusion">Fusion</h2>
+<ul class="doc-list">
+<li><a href="fusion-rule.html">The fusion rule</a><span class="lead-short"> Three detectors are turned into ranks against their own training distributions, blended with fixed weights, checked once by Spectra-AASIST, which may only halve a high rank, and mapped through a Platt map into a probability. Everything it needs is in one constants file that the runner never refits.</span></li>
+<li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a><span class="lead-short"> Two scripts that chose the fusion rule under rules written before they ran, and one that measures what the router changes by switching each rule off. Together they are the record of how the shipped rule was picked and what it buys.</span></li>
+</ul>
+<h2 id="outputs">Outputs</h2>
+<ul class="doc-list">
+<li><a href="submission-writer.html">The submission writer and the experiment log</a><span class="lead-short"> One function writes the TSV and refuses anything that would make it invalid: a wrong header, a duplicate file, a non-finite or out-of-range score, or an existing path. Every TSV gets a row in a tracked log with its validation score. A submitted file is never overwritten.</span></li>
+<li><a href="metrics.html">The metric module</a><span class="lead-short"> The normalized detection cost used for every selection and every reported number, plus an exact re-implementation of the sponsor's shipped scoring code, so each result can be read both ways.</span></li>
+</ul>
+<h2 id="validation">Validation</h2>
+<ul class="doc-list">
+<li><a href="folds.html">The fold file</a><span class="lead-short"> One tracked CSV assigns every training clip to an inner fold or the outer holdout, grouping fakes by generator and real speech by speaker, so that no model is ever tested on a voice or a synthesis system it trained on.</span></li>
+<li><a href="stress-sets.html">The stress sets</a><span class="lead-short"> Two public sets that nothing was selected on: In-the-Wild, web-sourced real and fake speech that no model ever trained on, for false alarms on unfamiliar voices; and MLAAD, synthetic speech from many generators, as training-only data for M5 and a miss-rate readout for the others.</span></li>
+<li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a><span class="lead-short"> Before any model trained, scripts measured how the training and test data differ in ways that have nothing to do with the voice. Every difference found is a shortcut a model would learn instead of the task, and each one is closed somewhere in the pipeline. The ledger is the list.</span></li>
+<li><a href="channel-robustness.html">The channel-robustness probes</a><span class="lead-short"> Three diagnostic scripts run on Saturday afternoon: how wild is the test set, is the <span class="num" data-src="README.md#what-worked">7.2 kHz</span><a class="src" href="../library/readme.html#what-worked" title="Source: README.md, section what-worked"><span class="sr">source: README.md, section what-worked</span></a> wall a codec, and is the off-the-shelf Spectra model memorising. Diagnostic only: no TSV, no rule change.</span></li>
+</ul>
+<h2 id="delivery">Delivery</h2>
+<ul class="doc-list">
+<li><a href="docker-image.html">The Docker image</a><span class="lead-short"> An offline, CPU-only image whose entrypoint is the runner, with every model and weight inside, a hash manifest checked at start, and a refusal to run if the network is on. Not a graded deliverable since Saturday noon; kept as evidence that the pipeline runs from a clean build.</span></li>
+<li><a href="frontend-contract.html">The frontend contract</a><span class="lead-short"> The demo frontend is a separate application built by another team member. What it may rely on is written down as a contract over the explanation record, so the UI and the pipeline can move independently. This page documents the contract; the frontend itself is outside this site.</span></li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Generated from none. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

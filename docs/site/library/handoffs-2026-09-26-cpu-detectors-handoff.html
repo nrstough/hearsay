@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: CPU detector track (Sat Sep 26, 2026, ~01:10) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_cpu-detectors-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_cpu-detectors-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important-tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT: tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-cpu-detector-track-sat-sep-26-2026-0110">Handoff: CPU detector track (Sat Sep 26, 2026, ~01:10)</h1>
+<p><strong>Purpose of this chat:</strong> run HEARSAY's <strong>CPU-only</strong> detector work in parallel with the main chat, which owns the GPU, M1 and TSVs. Deliver interpretable engineered detectors (handcrafted spectral + prosody first, then metadata/container, compression, splice, ENF). Each one needs out-of-fold and holdout scores on the shared fold file and a scored test set, in a fixed format that the main chat's fusion (M4) can consume. Record what worked and what didn't. <strong>Never use the GPU (MPS).</strong></p>
+<h2 id="context">Context</h2>
+<p>HEARSAY is the HackGT 13 NSA HEARSAY entry, rescoped to <strong>software only</strong> (commit <code>a523112</code>; audited Acceptable by Claude and Codex).</p>
+<p><strong>Scoring</strong></p>
+<ul>
+<li>60% MinDCF. False alarms (real called synthetic) cost 4×, and about 70% of test files are real.</li>
+<li><code>hearsay.metrics</code>: <code>C_FA = 4</code>, <code>π_synth = 0.3</code>, i.e. normalized minDCF = 9.33·P_FA + P_miss. Only ranking matters.</li>
+<li>20% forensic diversity: "points for each distinct technique your system actually leverages". This track is where most of those points come from.</li>
+<li>20% docs, including "what worked / what had no effect".</li>
+</ul>
+<p><strong>Output format.</strong> 1.0 = synthetic. Never flip (decided by Nathan; see <code>docs/plan.md</code>, "Score direction").</p>
+<p><strong>Data</strong></p>
+<ul>
+<li><strong>Test set:</strong> <code>data/nsa/HackGTHearsayTesting/</code>, 1,671 WAVs, all PCM16 16 kHz mono, 3.0–13.6 s (median 3.4 s), peaks near 1.0, almost no leading silence.</li>
+<li><strong>Training:</strong>
+<ul>
+<li>DiffSSD synthetic, 70k clips from 10 generators, 22 kHz WAV plus MP3 for ElevenLabs and PlayHT. Symlink <code>data/nsa/DiffSSD</code> points to the external drive.</li>
+<li>LJ Speech real, 13,100 clips (<code>data/ljspeech</code>).</li>
+<li>LibriSpeech dev+test real, 5,323 clips (<code>data/librispeech</code>).</li>
+<li>Both symlinks point to <code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/</code>, and <strong>the drive must be mounted</strong>.</li>
+</ul></li>
+<li><strong>Training sample:</strong> <code>outputs/manifests/nsa_train_sample.csv</code>, 20,000 rows. That's 1,000 per generator, plus 6,000 LJ and 4,000 LibriSpeech.</li>
+<li><strong>Fold file:</strong> <code>splits/nsa_folds.csv</code>.
+<ul>
+<li>Groups: spoof by generator; bona fide by speaker, or by chapter for LJ.</li>
+<li><strong>Outer holdout</strong> = generators <code>playht</code> and <code>wavegrad2</code>, plus 26 bona fide groups. Inner folds are <code>0</code>–<code>4</code>.</li>
+</ul></li>
+<li><strong>Detector contract:</strong> <code>src/hearsay/detectors/base.py</code>.
+<ul>
+<li>Returns <code>DetectorResult(name, score∈[0,1] increasing with synthetic, evidence, features, status)</code>.</li>
+<li><code>safe_run</code> never loses a row.</li>
+<li>Fusion uses <code>logit(clip(score, 1e-4, 1−1e-4))</code> when <code>status == "ok"</code>.</li>
+</ul></li>
+</ul>
+<p><strong>Shortcut findings.</strong> These come from <code>outputs/inventory/nsa_train_vs_test_shortcuts.csv</code>.</p>
+<ul>
+<li>Peak level alone separates the classes (AUC 0.66), and LibriSpeech has 0.37 s of leading silence against 0.06 s in the test set.</li>
+<li>Durations differ too: training 5–9 s, test about 3.4 s.</li>
+<li><code>hearsay.handcrafted</code> already trims silence, RMS-normalizes, and excludes duration, peak and absolute level.</li>
+<li><strong>Container format is a trap.</strong> Training fakes include MP3s and 22 kHz WAVs, but every test file is 16 kHz PCM WAV. Any metadata or compression feature that sees the original container will learn "mp3/22 kHz = fake" and fall apart on the test set. Measure that before trusting it.</li>
+</ul>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>main</code> in <code>~/Projects/hearsay</code>, clean at <code>f394717</code> when this was written. <strong>The main chat commits to the same worktree at the same time</strong>, so:</p>
+<ul>
+<li>Stage only your own files: <code>git add &lt;paths&gt;</code>. <strong>Never <code>git add -A</code>.</strong></li>
+<li>Don't push without asking Nathan.</li>
+</ul>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay
+uv sync
+ls data/nsa/DiffSSD data/ljspeech data/librispeech   # external drive must be mounted
+uv run pytest -q                                       # expect 152 passed</code></pre>
+<p>Run everything with <code>uv run …</code> from the repo root. Use at most about 6 CPU workers: the main chat's GPU extraction also needs CPU for decoding.</p>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li><strong>Handcrafted features for the training sample</strong> (in flight from the previous chat).
+<ul>
+<li>Check that <code>outputs/handcrafted/nsa_train_sample.csv</code> exists with 20,000 rows. <code>outputs/handcrafted/nsa_test.csv</code> is already done: 1,671 rows, 75 features, 0 failures.</li>
+<li>If it's missing (the job died with the old chat), re-run:
+<code>uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_train_sample.csv --name nsa_train_sample --workers 6</code>
+It takes about 0.63 s per clip, about 35 min with 6 workers.</li>
+</ul></li>
+<li><strong>Train and read out the handcrafted detector.</strong>
+<ul>
+<li>Run <code>uv run python scripts/train_handcrafted.py --train nsa_train_sample --folds splits/nsa_folds.csv</code>.</li>
+<li>Record CV minDCF (logreg vs LightGBM), and holdout minDCF, EER and AUC under every reading (including <code>sponsor_code_asis</code> and <code>sponsor_code_flipped</code>).</li>
+<li>Record per-generator and per-bona-fide-source results, and the top-15 feature AUCs.</li>
+<li>Write a short report in <code>docs/reports/</code> covering what separated the classes and what didn't.</li>
+</ul></li>
+<li><strong>Export scores for fusion.</strong> This is the format the main chat's M4 expects; add it to <code>scripts/train_handcrafted.py</code>.
+<ul>
+<li>Write <code>outputs/detector_scores/handcrafted.csv</code> with columns <code>path, fold, split, score, logit</code>:
+<ul>
+<li><code>split</code> is <code>inner_oof</code> for inner rows (OOF predictions from the predefined folds), <code>holdout</code> for outer-holdout rows (model fit on all inner rows), and <code>test</code> for the 1,671 test files (keyed by path; the manifest is <code>outputs/manifests/nsa_test.csv</code>).</li>
+<li><code>score</code> is P(synthetic), and <code>logit</code> is the decision value.</li>
+</ul></li>
+<li>Every learned piece is fit fold-locally, including the scaler.</li>
+</ul></li>
+<li><strong>Length parity with the deep detector (v2).</strong> The main chat's embeddings now use <code>hearsay.embed.prepare_segment</code>: trim, then a test-duration random crop with <code>seed + row</code> for training, no tiling, 8 s cap. <code>hearsay.handcrafted._crop</code> still takes the first 4 s after the trim. For a fair fusion:
+<ul>
+<li>Switch <code>_crop</code> to <code>prepare_segment(x, crop_s, seed)</code>, with crop lengths drawn exactly as <code>scripts/extract_embeddings.py --segment --crop test --seed 0</code> draws them (<code>test_duration_sampler(0)</code>, one draw per manifest row, in order). Test-time uses <code>prepare_segment(x)</code> with no crop.</li>
+<li>Re-extract and compare holdout minDCF against the first version, and log both.</li>
+</ul></li>
+<li><strong>Wrap as a contract detector.</strong> Add <code>src/hearsay/detectors/handcrafted.py</code>, a <code>Detector</code> that loads the saved model and returns a <code>DetectorResult</code>. Its evidence names the top contributing features, e.g. "high-band energy ratio 3.1 SD above real speech". Add tests under <code>tests/</code>, following <code>tests/test_detector_contract.py</code>.</li>
+<li><strong>Next CPU detectors</strong>, time-boxed per <code>docs/plan.md</code> "Forensic techniques". The same score export applies to each.
+<ul>
+<li><strong>Container/metadata</strong>, 1.5 h. Use ffprobe/ExifTool embedded fields only, never file dates or filenames. First check that the test set is uniform (all PCM16 16 kHz), then report honestly that the container carries almost no signal on it. It still counts as a technique if used, so gate it via the orchestrator.</li>
+<li><strong>Compression forensics</strong>, 1.5 h. Look for MP3-origin traces that survive transcoding to WAV (spectral holes, a ~16 kHz lowpass at 44.1 kHz origin). Because training fakes include raw MP3s, <strong>transcode every training clip to 16 kHz PCM WAV first</strong>, so train matches test.</li>
+<li><strong>Splice</strong> (1 h) and <strong>ENF</strong> (1 h) come last. They are the first to be cut if time runs short.</li>
+</ul></li>
+</ol>
+<p><strong>Do not touch</strong> (the main chat owns them):</p>
+<ul>
+<li><code>src/hearsay/embed.py</code>, <code>src/hearsay/probe.py</code>, <code>src/hearsay/submission.py</code></li>
+<li><code>scripts/extract_embeddings.py</code>, <code>scripts/train_probe.py</code>, <code>scripts/make_probe_csv.py</code></li>
+<li><code>submissions/</code> (the TSVs and <code>log.csv</code>)</li>
+<li><code>splits/nsa_folds.csv</code>: never regenerate it; everyone shares it.</li>
+</ul>
+<h2 id="important-tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT: tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test: <code>uv run pytest -q</code> → <strong>152 passed</strong> at <code>f394717</code>. <code>uv run ruff check .</code> → clean.</li>
+<li>Test: <code>uv run pytest -q tests/test_docs_consistency.py</code> → must stay green. It pins the metric constants and the no-hardware/no-CSV wording in living docs, and checks the plan's technique list.</li>
+<li><strong>In flight:</strong> handcrafted extraction for the training sample, started by the previous chat. Check with <code>ls -la outputs/handcrafted/</code> and <code>pgrep -fl extract_handcrafted</code>. If the old chat was closed, the job may have died; re-run step 1.</li>
+<li><strong>In flight, main chat's job, don't interfere:</strong> GPU v2 embeddings <code>nsa_test_v2</code> and <code>nsa_train_sample_v2</code>, then M1 training. Check with <code>pgrep -fl extract_embeddings</code>.</li>
+<li><strong>At risk:</strong>
+<ul>
+<li><code>outputs/</code> (handcrafted CSVs, manifests, inventory) and <code>models/</code>: gitignored and <strong>NOT archived</strong>. They can be regenerated from the scripts, but slowly.</li>
+<li><code>data/nsa/</code> (test set, LJ subset, template, scoring code) is archived at <code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/nsa/</code>.</li>
+<li>DiffSSD, LJ Speech and LibriSpeech <strong>exist only on the external drive</strong>; the originals were downloaded to <code>~/Downloads/DiffSSD.tar</code> (21.5 GB), keithito.com and openslr.org.</li>
+</ul></li>
+<li><strong>Tracked:</strong> <code>submissions/log.csv</code>. It holds the M0 row. The M0 constant TSV (<code>submissions/20260926-0036_M0_constant.tsv</code>, all 0.0) is archived to the external drive's <code>hearsay/submissions/</code>.</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li><strong>Sponsor scoring code:</strong> <code>data/nsa/HackGTMinDCF/asvspoof5/evaluation-package</code>. It's ASVspoof5 with <code>Pspoof = 0.5, Cmiss = 1, Cfa = 4</code>, and it treats a <strong>higher score as bona fide</strong>. <code>hearsay.metrics.sponsor_min_dcf(y, s, flip)</code> reproduces it exactly (a test pins that). Report both <code>flip=False</code> and <code>flip=True</code>, and select on our π = 0.3 minDCF.</li>
+<li><strong>Public-data M1 baseline, not an NSA number:</strong> frozen XLS-R layer 7 plus logistic regression gets minDCF 0.023 on ASVspoof19 A07–A19. It scores pure silence as 0.99 synthetic. That's a shortcut warning, not an NSA number.</li>
+<li><strong>Handcrafted cost:</strong> about 0.63 s per clip, dominated by YIN pitch tracking. The first call pays a roughly 30 s numba JIT warm-up.</li>
+<li><strong>Multiprocessing on macOS:</strong> scripts must be files with an <code>if __name__ == "__main__":</code> guard. Inline <code>python - &lt;&lt;EOF</code> with a <code>ProcessPoolExecutor</code> fails.</li>
+<li><strong>LJ is single-speaker,</strong> and 4 of the 10 DiffSSD generators speak in LJ's voice. That's good: those pairs isolate synthesis artifacts from speaker identity. The multi-speaker generators share 10 cloned target voices across folds, a stated limit in <code>scripts/make_folds.py</code>.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<p>Read in this order:</p>
+<ol>
+<li><code>CLAUDE.md</code></li>
+<li><code>docs/plan.md</code>: "Forensic techniques", "Architecture", "Data", "Timeline" hard cutoffs. <strong>Teammate detector out-of-fold scores are due Sat 19:00; fusion freezes Sat 22:00.</strong></li>
+<li><code>docs/nsa-challenge.md</code>: the brief's rubric list.</li>
+<li><code>src/hearsay/detectors/base.py</code></li>
+<li><code>src/hearsay/handcrafted.py</code>, <code>scripts/extract_handcrafted.py</code>, <code>scripts/train_handcrafted.py</code></li>
+<li><code>scripts/make_folds.py</code></li>
+<li><code>docs/reports/2026-09-25_sponsor-questions.md</code>: the rules, including Nathan's notes from the talk.</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-26_cpu-detectors-handoff.md</code> <span class="hash">3303681d407b</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

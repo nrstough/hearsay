@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brief: handcrafted v4, feature discovery for the three blind generators (Sat Sep 26, 2026, ~03:40) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_handcrafted-v4-brief.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_handcrafted-v4-brief.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#1-what-exists-and-the-bar-youre-extending">1. What exists, and the bar you're extending</a></li><li><a href="#2-the-preprocessing-you-inherit-and-must-not-bypass">2. The preprocessing you inherit (and must not bypass)</a></li><li><a href="#3-where-to-plug-in">3. Where to plug in</a></li><li><a href="#4-the-metric-exactly">4. The metric, exactly</a></li><li><a href="#5-folds-exactly">5. Folds, exactly</a></li><li><a href="#6-shortcuts-specific-to-this-data">6. Shortcuts specific to this data</a></li><li><a href="#7-the-30-minute-gate-concretely">7. The 30-minute gate, concretely</a></li><li><a href="#8-the-families-grounded">8. The families, grounded</a></li><li><a href="#9-writing-it-down-graded">9. Writing it down (graded)</a></li><li><a href="#10-reading-order">10. Reading order</a></li></ul></details>
+<h1 id="brief-handcrafted-v4-feature-discovery-for-the-three-blind-generators-sat-sep-26-2026-0340">Brief: handcrafted v4, feature discovery for the three blind generators (Sat Sep 26, 2026, ~03:40)</h1>
+<p>For the teammate taking the spectral/prosody lane. This replaces the generic explainer with the project's actual numbers, code paths and rules. Read <a href="status.html">STATUS.md</a>, the <a href="reports-2026-09-26-cpu-detectors.html">CPU detector report</a> and <a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/handcrafted.py" title="on GitHub"><code>src/hearsay/handcrafted.py</code></a> first; this brief tells you what in them matters for your job.</p>
+<p><strong>The job in one sentence.</strong> Add cheap acoustic statistics to <code>hearsay.handcrafted.features</code> that separate <code>grad_tts</code>, <code>pro_diff</code> and <code>elevenlabs</code> from real speech, without raising false alarms on LibriSpeech real speech, measured on the shared folds with the shared preprocessing, and exported through the existing trainer.</p>
+<p><strong>Deadlines.</strong> Detector scores due <strong>Sat 19:00</strong>. Fusion freezes <strong>Sat 22:00</strong>. After that, nothing new gets in.</p>
+<h2 id="1-what-exists-and-the-bar-youre-extending">1. What exists, and the bar you're extending</h2>
+<p>The pipeline is already <code>audio → features() → LightGBM → P(synthetic)</code>, fold-validated, exported for fusion, wrapped as a contract detector with plain-English evidence. You are adding columns to <code>features()</code>. Everything downstream is built.</p>
+<p><strong>Current detector (v3, <code>models/hc_lgbm_20260926-0232</code>)</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Readout</th><th>Value</th>
+</tr></thead>
+<tbody>
+<tr><td>Inner-fold OOF minDCF (LightGBM / logistic)</td><td>0.614 / 0.640</td></tr>
+<tr><td>Outer-holdout minDCF, EER, AUC</td><td>0.254, 4.3%, 0.993</td></tr>
+<tr><td>Test set: share of files scored &gt; 0.5</td><td>42% (NSA says ~30% are synthetic)</td></tr>
+<tr><td>Features, cost</td><td>75, about 0.63 s per clip (YIN pitch dominates)</td></tr>
+</tbody>
+</table></div>
+<p><strong>Per generator, inner out-of-fold, v3.</strong> This is your target table. Lower is better; 1.0 means "no better than always saying real".</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Generator</th><th>Voice</th><th>minDCF</th><th>Verdict</th>
+</tr></thead>
+<tbody>
+<tr><td>unit_speech</td><td>multi-speaker</td><td>0.25</td><td>visible</td></tr>
+<tr><td>diffgan_tts</td><td>LJ</td><td>0.27</td><td>visible</td></tr>
+<tr><td>your_tts</td><td>multi-speaker</td><td>0.32</td><td>visible</td></tr>
+<tr><td>xtts_v2</td><td>multi-speaker</td><td>0.47</td><td>partly</td></tr>
+<tr><td>openvoicev2</td><td>multi-speaker</td><td>0.53</td><td>partly</td></tr>
+<tr><td><strong>elevenlabs</strong></td><td>commercial, MP3 source</td><td><strong>0.80</strong></td><td><strong>blind</strong></td></tr>
+<tr><td><strong>pro_diff</strong></td><td>LJ, diffusion</td><td><strong>1.00</strong></td><td><strong>blind</strong></td></tr>
+<tr><td><strong>grad_tts</strong></td><td>LJ, diffusion</td><td><strong>1.00</strong></td><td><strong>blind</strong></td></tr>
+<tr><td>playht (holdout)</td><td>commercial, MP3 source</td><td>0.25</td><td>visible</td></tr>
+<tr><td>wavegrad2 (holdout)</td><td>LJ, diffusion vocoder</td><td>0.26</td><td>visible</td></tr>
+</tbody>
+</table></div>
+<p><strong>Per real source</strong> (real clips of that source vs all synthetic): inner OOF LJ 0.43, <strong>LibriSpeech 0.77</strong>; holdout LJ 0.10, LibriSpeech 0.32. Unfamiliar real voices draw the false alarms. That is the side that costs 4×.</p>
+<p><strong>What already separates the classes</strong> (single-feature AUC on inner rows; &lt; 0.5 means lower on synthetic): spectral contrast bands 4 and 0 (0.26, 0.30), frame-to-frame variability of upper MFCCs <code>mfcc16–19_std</code> (0.28–0.35), pitch variability <code>f0_iqr_log</code> and <code>f0_std_log</code> (0.29, 0.35), spectral flux (0.32), spectral flatness (0.64–0.67). Reading: synthetic speech here has flatter pitch, steadier spectra frame to frame, and is noisier between harmonics. <strong>Do not re-measure these.</strong> Note what carried signal: the <em>variability over time</em> of spectral shape, more than its mean. Build your new families with that in mind.</p>
+<p><strong>What sits at chance and should not be re-attempted as-is:</strong> pause fraction and count, voiced fraction, loudness dynamics, zero-crossing rate, and every feature above 7 kHz.</p>
+<p><strong>Why grad_tts and pro_diff are the cleanest target you'll ever get.</strong> Four DiffSSD generators (grad_tts, diffgan_tts, pro_diff, wavegrad2) speak in LJ Speech's voice, and LJ Speech real is in every training fold. So "grad_tts vs LJ real" is the same voice, same text style, same nominal recording, different origin. A feature that separates that pair is measuring synthesis, not speaker or corpus. Both are diffusion TTS front ends with a GAN-type neural vocoder behind them. Vocoder phase incoherence is the documented weakness of that class, which is why phase and group delay are first on the list.</p>
+<h2 id="2-the-preprocessing-you-inherit-and-must-not-bypass">2. The preprocessing you inherit (and must not bypass)</h2>
+<p><code>hearsay.handcrafted._crop</code> runs before any feature, in this order:</p>
+<ol>
+<li><code>band_limit(x)</code>: a 71-tap Kaiser low-pass, cutoff 7,250 Hz, 600 Hz transition, 45 dB, applied zero-delay (<code>fftconvolve</code>, <code>mode="same"</code>). <strong>Linear phase, so it does not distort phase or group delay below 7 kHz.</strong></li>
+<li><code>hearsay.embed.prepare_segment(x, crop_s, seed)</code>: silence trim (35 dB below the loudest 20 ms frame), then for training rows a random crop to a length drawn from the NSA test-duration distribution (median 3.4 s), then an 8 s cap. Test clips are used whole, no crop.</li>
+<li>RMS-normalize to 0.1.</li>
+</ol>
+<p>So inside <code>features()</code> you receive <code>x</code>: float32, 16 kHz mono, band-limited to ~7.2 kHz, trimmed, about 3–8 s, at a fixed RMS. Consequences:</p>
+<ul>
+<li><strong>Nothing above 7 kHz is signal.</strong> The test set is low-passed there (1,602 of 1,671 files fall 44 dB between 6.5 and 7.5 kHz) and the filter now does the same to training audio. Any filterbank, CQT or band feature you add must stop at 7,000 Hz. Bins above it are filter shape, identical for both classes, and just add noise columns.</li>
+<li><strong>Absolute level is gone.</strong> Do not add level features; add ratios and shapes only.</li>
+<li><strong>Duration is not a feature.</strong> Training crops and test clips share a length distribution by construction; do not add anything that scales with clip length (use means, stds, percentiles and rates per second, never counts).</li>
+<li><strong>Crop edges are arbitrary.</strong> Training clips are cut mid-word at a random offset; test clips are whole utterances with natural onsets and offsets. Any feature that looks at how a clip begins or ends will separate train from test, not real from fake. Onset/offset shape, first-syllable energy, edge silence: don't.</li>
+</ul>
+<p>The correction to the explainer: the 7 kHz wall is on <strong>every</strong> test file, real and fake alike, and on <strong>no</strong> training file of either class. It never showed up in fold validation (train and validation were both full-band). It showed up as the v2 detector calling 90% of the test set synthetic. Your fold numbers cannot catch this class of shortcut; only the test-set score distribution can (section 7).</p>
+<p><strong>Cost budget.</strong> Extraction of the 75 v3 features is 0.14 worker-seconds per clip; 20,000 clips take about 8 minutes on 6 workers. All six v4 families together add about 0.06 s per clip. Keep any new family under about 0.05 s per clip. Use at most <strong>6 workers</strong>; the main chat's GPU job needs the other cores for decoding.</p>
+<h2 id="3-where-to-plug-in">3. Where to plug in</h2>
+<p>Minimal-change path, all within the CPU lane:</p>
+<ol>
+<li>New module <code>src/hearsay/hc_v4.py</code>. One function per family, each taking what it needs and returning a flat <code>dict[str, float]</code>:
+<pre><code class="language-python">def lfcc(x: np.ndarray, S: np.ndarray) -&gt; dict[str, float]: ...      # S = power STFT, 512/160
+def phase(x: np.ndarray, Z: np.ndarray) -&gt; dict[str, float]: ...     # Z = complex STFT, 512/160
+def modulation(rms_db: np.ndarray) -&gt; dict[str, float]: ...
+FAMILIES = {"lfcc": ..., "phase": ..., "cqcc": ..., "modulation": ..., "jitter": ..., "breath": ...}</code></pre></li>
+<li>In <code>handcrafted.features</code>, add a keyword <code>families: tuple[str, ...] = ()</code>. Keep the complex STFT (<code>Z = librosa.stft(...)</code>, then <code>s = np.abs(Z) ** 2</code>, which is what the code already computes) so phase families reuse it, and at the end <code>for name in families: f.update(FAMILIES[name](...))</code>. The existing final line already maps non-finite values to 0.0.</li>
+<li><code>scripts/extract_handcrafted.py</code>: add <code>--families lfcc,phase</code> and pass it through <code>features_for_path</code> (it is a positional <code>ex.map</code>; add one more list). Record <code>families</code> in the <code>.meta.json</code> sidecar.</li>
+<li><code>scripts/train_handcrafted.py</code>: copy <code>families</code> from the sidecar into the saved bundle, next to <code>crop_mode</code> and <code>band_match</code>.</li>
+<li><code>src/hearsay/detectors/_learned.py</code>, in <code>run()</code>: pass <code>families=b.get("families", ())</code> to the feature function so test-time audio gets the same features. <code>src/hearsay/detectors/handcrafted.py</code>: add a <code>LABELS</code> entry per new feature (plain English; it becomes the evidence sentence judges read).</li>
+<li>Tests under <code>tests/</code>: one hermetic test per family (a tone and a noise clip, as <code>tests/test_handcrafted_detector.py</code> does), asserting finite values, expected key names, and that a shifted copy of the same clip gives the same values within tolerance (offset invariance; see section 2).</li>
+</ol>
+<p><strong>Naming rules.</strong> Column names must be unique, must not be in the trainer's metadata set (<code>path, label, generator, speaker, utt, source, filename, group, fold</code>) and must not end in <code>_flag</code>, <code>_launder</code> or <code>_crop_s</code>, which the trainer treats as metadata and drops. Prefix by family: <code>lfcc3_std</code>, <code>gd_std_mean</code>, <code>mod_2_4_ratio</code>.</p>
+<p><strong>Files you must not touch</strong> (other lanes): <code>src/hearsay/embed.py</code>, <code>probe.py</code>, <code>submission.py</code>; <code>scripts/extract_embeddings.py</code>, <code>train_probe.py</code>, <code>make_probe_csv.py</code>; <code>submissions/</code>; <code>splits/nsa_folds.csv</code>; <code>outputs/detector_scores/handcrafted.csv</code> (fusion consumes it; you write <code>handcrafted_v4.csv</code>). Never <code>import lightgbm</code> anywhere but <code>scripts/train_handcrafted.py</code> (it crashes next to torch on this Mac; <code>hearsay.trees</code> runs the trees in numpy). <code>git add</code> only your own paths, never <code>-A</code>; don't push.</p>
+<h2 id="4-the-metric-exactly">4. The metric, exactly</h2>
+<p>Not <code>4·FPR + FNR</code>. The project's number is the normalized detection cost at π_synth = 0.3, C_FA = 4, C_miss = 1:</p>
+<pre><code>normalized minDCF = 9.33 · P_FA + P_miss,   minimized over the threshold</code></pre>
+<p><code>hearsay.metrics.min_cost(y, s)</code> computes it (y: 1 = synthetic; higher s = more synthetic). <code>hearsay.metrics.report(y, s)</code> adds EER, the π = 0.5 reading and both sponsor-code directions. Only the ranking matters; the threshold is swept.</p>
+<p>The explainer's example, redone at the real weights: detector A with P_FA 2%, P_miss 20% scores 0.39; detector B with P_FA 10%, P_miss 5% scores 0.98, barely better than a constant answer. One false alarm costs as much as 9.3 misses. Judge every feature by whether it moves the <strong>real</strong> side.</p>
+<h2 id="5-folds-exactly">5. Folds, exactly</h2>
+<p><code>splits/nsa_folds.csv</code>: columns <code>path, label, generator, speaker, source, group, fold</code>; <code>fold</code> ∈ {0, 1, 2, 3, 4, holdout}. Spoof is grouped by generator, real by speaker (LibriSpeech, 80 speakers) or by chapter (LJ, one speaker). 20,000 rows: 16,142 inner, 3,858 holdout.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fold</th><th>Synthetic generators held out in that fold</th><th>Real clips</th>
+</tr></thead>
+<tbody>
+<tr><td>0</td><td>grad_tts, unit_speech</td><td>~1,635</td></tr>
+<tr><td>1</td><td>diffgan_tts, openvoicev2</td><td>~1,634</td></tr>
+<tr><td>2</td><td>pro_diff, xtts_v2</td><td>~1,632</td></tr>
+<tr><td>3</td><td>your_tts</td><td>~1,609</td></tr>
+<tr><td>4</td><td>elevenlabs</td><td>~1,632</td></tr>
+<tr><td>holdout</td><td>playht, wavegrad2 (+ 26 real groups)</td><td>1,858</td></tr>
+</tbody>
+</table></div>
+<p>So the out-of-fold score for grad_tts comes from a model that never saw grad_tts (trained on folds 1–4). The trainer does this for you with <code>PredefinedSplit</code> and picks logistic vs LightGBM by inner OOF minDCF. It reads the holdout <strong>once</strong> per run.</p>
+<p><strong>Rules.</strong> Select on inner OOF only. Read the holdout as a sanity check, not a target; its noise is about ±0.07–0.10 (two generators), so a holdout gap under 0.15 is not evidence. Never look at the holdout while choosing features. Never touch In-the-Wild; the main chat uses it as an eval-only stress set.</p>
+<p>"Real multi-speaker audio" in the earlier message means <strong>LibriSpeech</strong>, 80 different readers, one per clip. It does not mean several people in one clip; no clip here has that. The check is: per-source minDCF for LibriSpeech real must not get worse. The trainer prints it (<code>cv_by_bonafide_source</code>, <code>val_by_bonafide_source</code>).</p>
+<h2 id="6-shortcuts-specific-to-this-data">6. Shortcuts specific to this data</h2>
+<p>These are measured, not hypothetical. Each is a way a new feature can look great and be wrong.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Cue</th><th>Fact</th><th>What it does to a naive feature</th>
+</tr></thead>
+<tbody>
+<tr><td>Codec</td><td>Only <code>elevenlabs</code> (MP3 128 kbps, 44.1 kHz) and <code>playht</code> (MP3 ~160 kbps, 24 kHz) are lossy; every real clip and the other 8 generators are lossless.</td><td>A phase or fine-structure feature that "detects ElevenLabs" may be detecting MP3. Test: <code>hearsay.compression.launder</code> round-trips a clip through MP3/AAC; if the feature moves on laundered <strong>real</strong> clips, it is a codec cue.</td></tr>
+<tr><td>Mains hum</td><td>Stable 50/60 Hz hum in 36% of LJ clips and 21% of LibriSpeech, in under 0.5% of nine generators; 24 of 1,671 test files have any hum.</td><td>Any low-frequency feature (CQCC with a low <code>fmin</code>, sub-100 Hz bands) learns "hum = real", which fires on 1% of the test set. Keep <code>fmin</code> ≥ 65 Hz and run the LJ-vs-LibriSpeech check below.</td></tr>
+<tr><td>Corpus identity</td><td>LJ is one speaker in one home studio. LibriSpeech is audiobooks. Four generators clone LJ's voice.</td><td>A feature with AUC far from 0.5 on <strong>LJ real vs LibriSpeech real</strong> is a corpus cue, whatever it does to the classes.</td></tr>
+<tr><td>Crop edges</td><td>Training crops start mid-word; test clips are whole utterances.</td><td>Any onset/offset-sensitive feature separates train from test.</td></tr>
+<tr><td>Already closed</td><td>Peak level (AUC 0.66 alone), leading silence (LibriSpeech 0.37 s vs test 0.06 s), duration, container format, the 7 kHz wall.</td><td>Closed by RMS normalization, trim, test-length crops, <code>load_audio</code>, <code>band_limit</code>. Do not re-open any of them with a level, silence, length or bandwidth feature.</td></tr>
+</tbody>
+</table></div>
+<h2 id="7-the-30-minute-gate-concretely">7. The 30-minute gate, concretely</h2>
+<p>Per family: hypothesis → implement → extract on a small stratified sample → per-generator AUC table → keep or kill. Do not run the full 20,000-clip extraction per idea.</p>
+<p><strong>Sample manifest</strong> (about 2,400 clips, ~4 minutes at 0.63 s/clip on 6 workers; less if you compute only the new family):</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python - &lt;&lt;'EOF'
+import pandas as pd
+m = pd.read_csv("outputs/manifests/nsa_train_sample.csv")
+f = pd.read_csv("splits/nsa_folds.csv")[["path", "fold"]]
+m = m.merge(f, on="path")
+m = m[m.fold != "holdout"]                     # inner rows only; the holdout is never used for gating
+s = pd.concat([g.sample(min(len(g), 200), random_state=0) for _, g in m.groupby(["source", "generator"])])
+s.drop(columns="fold").to_csv("outputs/manifests/hc_gate_sample.csv", index=False)
+print(s.groupby(["source", "generator"]).size())
+EOF
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/hc_gate_sample.csv \
+    --name hc_gate_&lt;family&gt; --crop test --seed 0 --workers 6 --families &lt;family&gt;</code></pre>
+<p><strong>Gate table</strong>: per new column, AUC of each blind generator against all real, AUC of each real source against all synthetic, and the corpus check.</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python - &lt;&lt;'EOF'
+import pandas as pd, numpy as np
+from sklearn.metrics import roc_auc_score as auc
+d = pd.read_csv("outputs/handcrafted/hc_gate_&lt;family&gt;.csv")
+d = d[d.hc_flag.fillna("") == ""]
+new = [c for c in d.columns if c.startswith("&lt;prefix&gt;")]       # e.g. "lfcc", "gd_", "mod_"
+real, spoof = d[d.label == "bonafide"], d[d.label == "spoof"]
+rows = []
+for c in new:
+    r = {"feature": c, "all": auc(d.label == "spoof", d[c])}
+    for g in ["grad_tts", "pro_diff", "elevenlabs", "openvoicev2", "xtts_v2"]:
+        sub = pd.concat([real, spoof[spoof.generator == g]])
+        r[g] = auc(sub.label == "spoof", sub[c])
+    for src in ["ljspeech", "librispeech"]:
+        sub = pd.concat([real[real.source == src], spoof])
+        r[f"real_{src}"] = auc(sub.label == "spoof", sub[c])
+    r["LJ_vs_Libri_real"] = auc(real.source == "ljspeech", real[c])   # corpus check: want ~0.5
+    rows.append(r)
+t = pd.DataFrame(rows).set_index("feature")
+t["sep_blind"] = (t[["grad_tts", "pro_diff", "elevenlabs"]] - 0.5).abs().max(axis=1)
+print(t.sort_values("sep_blind", ascending=False).round(3).to_string())
+EOF</code></pre>
+<p><strong>Proposed keep/kill rule</strong> (numbers are a starting point; tighten if many pass):</p>
+<ul>
+<li><strong>Keep</strong> a family if at least one feature has |AUC − 0.5| ≥ 0.15 on grad_tts, pro_diff or elevenlabs, <strong>and</strong> its <code>LJ_vs_Libri_real</code> AUC is within 0.5 ± 0.15, <strong>and</strong> its <code>real_librispeech</code> AUC is no worse than the same feature's <code>real_ljspeech</code> by more than 0.1.</li>
+<li><strong>Kill</strong> a family if its best blind-generator separation is under 0.10, or if it separates LJ from LibriSpeech real more strongly than it separates real from fake.</li>
+<li>Codec check for anything that passes on elevenlabs: launder 100 real clips through MP3 128 kbps at 44.1 kHz (<code>hearsay.compression.launder</code>), recompute the feature, compare distributions to the unlaundered clips. If it moves by more than half a standard deviation, it is a codec cue; drop or note it.</li>
+</ul>
+<p><strong>Then the real run</strong> for the families that survive. Use the <strong>full</strong> manifest and <code>--seed 0</code>, so crop lengths match the deep detector row for row (that parity is what lets fusion compare the two on the same audio):</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_test.csv \
+    --name nsa_test_v4 --workers 6 --families lfcc,phase
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_train_sample.csv \
+    --name nsa_train_sample_v4 --crop test --seed 0 --workers 6 --families lfcc,phase
+uv run python scripts/train_handcrafted.py --train nsa_train_sample_v4 --folds splits/nsa_folds.csv \
+    --test nsa_test_v4 --out-name handcrafted_v4</code></pre>
+<p>The trainer prints the top single-feature AUCs, the inner CV for both models, the holdout once, per generator, per real source, and the test-set share above 0.5. <strong>Success looks like:</strong> inner CV minDCF below 0.614; grad_tts / pro_diff / elevenlabs OOF minDCF visibly below 1.00 / 1.00 / 0.80; LibriSpeech per-source minDCF not above 0.77; test share above 0.5 not moving away from 30%. It writes <code>outputs/detector_scores/handcrafted_v4.csv</code> in the fusion format (<code>path, fold, split, score, logit</code>; 21,671 rows; <code>score</code> = P(synthetic)) and a bundle under <code>models/hc_&lt;kind&gt;_&lt;stamp&gt;/</code>. You never write the export by hand, so the score direction cannot be inverted by accident.</p>
+<p>Tell the main chat when <code>handcrafted_v4.csv</code> exists and what the per-generator table says. It decides whether fusion switches from v3 to v4.</p>
+<h2 id="8-the-families-grounded">8. The families, grounded</h2>
+<p>Order by expected value per half hour. Each says what to compute on the <code>x</code>, <code>Z</code>, <code>S</code> and <code>rms_db</code> you already have inside <code>features()</code>.</p>
+<p><strong>8.1 LFCC (first; easiest; named in the plan and never built).</strong> 40 triangular filters linearly spaced 0–7,000 Hz over the 257-bin power spectrum <code>S</code> (n_fft 512, hop 160), log, DCT-II (ortho), keep 20 coefficients. Summarize over frames: mean, std, and <strong>std of the first difference</strong> (the v3 signal was in upper-MFCC frame-to-frame variability, so include the deltas). 60 features. Cost is negligible. Expect modest gains on the visible generators and a chance on ElevenLabs; probably nothing on the diffusion pair.</p>
+<p><strong>8.2 Phase and group delay (the main bet for grad_tts and pro_diff).</strong> Use the complex STFT <code>Z</code> (same 512/160 frame). Two unwrap-free quantities, both restricted to voiced frames (the existing <code>voiced</code> mask) and to bins between 300 and 7,000 Hz:</p>
+<ul>
+<li><em>Group delay without unwrapping.</em> With <code>Y = stft(n · x[n])</code> using the same window, <code>τ_g(k, t) = Re(Y / Z) = (Z_r·Y_r + Z_i·Y_i) / |Z|²</code>, in samples. Clip to ±256. Per frame take the std and the interquartile range across bins; summarize over frames as mean, std, 10th/90th percentiles. Natural speech has structured group delay near harmonics; GAN vocoders produce phase that is locally inconsistent, so the spread differs.</li>
+<li><em>Instantaneous-frequency deviation.</em> <code>Δφ(k, t) = angle(Z(k, t+1) · conj(Z(k, t))) − 2π·k·160/512</code>, wrapped to [−π, π]. For a steady harmonic the deviation is nearly constant over time; incoherent phase makes it jump. Features: per-bin temporal std of Δφ, then mean and median across bins; and the fraction of bins with std above 0.5 rad.</li>
+</ul>
+<p>Two cautions. (1) The random crop offset changes every raw phase value but not these derived quantities; test that with a shifted copy. (2) ElevenLabs is MP3-decoded; MP3 mangles phase in a codec-specific way. Run the laundering check before believing any ElevenLabs result from this family.</p>
+<p><strong>8.3 CQCC.</strong> <code>librosa.cqt(x, sr=16000, fmin=65, n_bins=162, bins_per_octave=24, hop_length=256)</code> reaches about 6,994 Hz, safely under the wall. Log power, DCT across the 162 bins, keep 24 coefficients, then mean, std and delta-std over frames (72 features). fmin 65 Hz keeps the 50/60 Hz fundamentals out, but the 100–180 Hz hum harmonics are in band, so run the LJ-vs-LibriSpeech check. Cost about 0.05–0.1 s per clip.</p>
+<p><strong>8.4 Rhythm / modulation spectrum.</strong> Envelope is the existing <code>rms_db</code> at 100 frames per second (frame 400, hop 160). Mean-subtract, Hann, rfft. Features: energy in 1–2, 2–4, 4–8 and 8–16 Hz as fractions of the 1–16 Hz total; peak modulation frequency; spectral entropy of 1–16 Hz. Expectations are <strong>low</strong>: a 3.4 s clip gives 0.3 Hz resolution and 10–15 syllables, and every pause/energy statistic v3 tried sits at chance. Keep it to one gate cycle.</p>
+<p><strong>8.5 Jitter and shimmer.</strong> The 10 ms YIN track already yields <code>f0_slope_std</code>, which is a frame-level jitter proxy and is <em>not</em> among the top cues, so frame-level variants are unlikely to add much. The version worth 30–60 minutes is cycle-level: band-pass <code>x</code> to 0.7–1.4× the clip's median F0, take positive-going zero crossings as cycle marks inside voiced runs of at least five cycles, periods <code>T_i</code> from consecutive marks. Jitter (local) = mean |T_i − T_{i+1}| / mean T; RAP with a 3-point average; shimmer from the peak |x| within each cycle on the unfiltered signal. Reject runs where any |Δ log F0| &gt; log 1.5 (octave errors). Median-filter the YIN track (5 frames) before using it to define voiced runs. This is the riskiest cheap family; if the marks are unstable after 30 minutes, kill it.</p>
+<p><strong>8.6 Breath.</strong> Frames with −35 dB &lt; <code>rms_db</code> &lt; −20 dB are the between-speech material (below −35 is what <code>pause_frac</code> already counts). Features: their fraction, and the mean spectral centroid and flatness of those frames relative to the voiced frames' values. A breath is broadband and noisy; digital or room silence is not. One gate cycle; expectations low, given that pause statistics carry nothing here.</p>
+<p><strong>8.7 Speaker-embedding drift (only if the above are done; rubric technique 6, never started).</strong> ECAPA weights are <strong>not</strong> downloaded and SpeechBrain is not a dependency; budget <code>uv add speechbrain</code> plus the <code>speechbrain/spkrec-ecapa-voxceleb</code> download, and tell whoever owns Docker that the image needs both. Windows of 1.0 s at 0.5 s hop give 5–6 embeddings on a 3.4 s clip; features: minimum and mean pairwise cosine, std of cosines. Build it as a contract detector (<code>src/hearsay/detectors/speaker_drift.py</code>, see <code>enf.py</code> for a rule-based example) with a mild score like ENF's, export with <code>scripts/score_detector.py --detector speaker_drift</code>, and expect near-constant scores on 3 s clips. It is for the 20% technique-diversity rubric with per-file evidence, not for minDCF.</p>
+<h2 id="9-writing-it-down-graded">9. Writing it down (graded)</h2>
+<p>Add to <code>docs/reports/2026-09-26_cpu-detectors.md</code> or a new <code>docs/reports/2026-09-26_handcrafted-v4.md</code>: the gate table for every family tried, kept <strong>and killed</strong>, with the per-generator and per-real-source numbers, and one sentence on why each was kept or dropped. "What had no effect" is scored. Add one disclosure line under "AI use disclosure" in <code>CLAUDE.md</code> if you used an assistant.</p>
+<h2 id="10-reading-order">10. Reading order</h2>
+<ol>
+<li><code>docs/STATUS.md</code></li>
+<li><code>docs/reports/2026-09-26_cpu-detectors.md</code>: the "Handcrafted spectral + prosody detector" section and "Trap 2".</li>
+<li><code>src/hearsay/handcrafted.py</code>, <code>scripts/extract_handcrafted.py</code>, <code>scripts/train_handcrafted.py</code>.</li>
+<li><code>src/hearsay/detectors/_learned.py</code> and <code>detectors/handcrafted.py</code> (where the evidence sentence comes from).</li>
+<li><code>src/hearsay/metrics.py</code>.</li>
+<li><code>tests/test_handcrafted_detector.py</code> for the hermetic test pattern.</li>
+</ol>
+<p>Setup: <code>cd ~/Projects/hearsay &amp;&amp; uv sync</code>, external drive mounted (<code>ls data/nsa/DiffSSD data/ljspeech data/librispeech</code>), <code>uv run pytest -q</code> → 215 passed, <code>uv run ruff check .</code> clean. Keep both green.</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-26_handcrafted-v4-brief.md</code> <span class="hash">745c6484f63b</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

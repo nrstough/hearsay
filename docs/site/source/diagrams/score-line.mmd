@@ -1,0 +1,14 @@
+%% The score line, synthetic at the top, with the pinned block at the bottom.
+%% cites: README.md#orchestration-what-routing-changes, README.md#how-it-decides
+flowchart TB
+  T["1.0 · synthetic"]
+  T --> D["every file we could judge<br/>scores in [0.001, 1]<br/>ranked by the fused probability"]
+  D --> E["0.001 · the floor of every judged file"]
+  E --> B["the pinned block · [0, 0.001)<br/>no speech to judge, or the decode failed<br/>ordered by the weak M1b signal + a filename hash"]
+  B --> Z["0.0 · real · decode failures at the very bottom"]
+  classDef top fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef mid fill:#e9eff6,stroke:#005493,color:#101a2b
+  classDef block fill:#fff3d1,stroke:#c37530,color:#101a2b
+  class T top
+  class D,E mid
+  class B,Z block

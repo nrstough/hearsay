@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The fold file · HEARSAY</title>
+<meta name="description" content="One tracked CSV assigns every training clip to an inner fold or the outer holdout, grouping fakes by generator and real speech by speaker, so that no model is e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html" aria-current="page">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>The fold file</h1>
+<p class="lead">One tracked CSV assigns every training clip to an inner fold or the outer holdout, grouping fakes by generator and real speech by speaker, so that no model is ever tested on a voice or a synthesis system it trained on.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Parameters and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>Splitting clips at random would let a model see every generator and every speaker in training and then be "tested" on more of the same. The fold file prevents that by moving whole groups. Two generators and about a fifth of the real-speech groups form a holdout that nothing is ever fitted or selected on and each model reads once; the rest forms five inner folds that each hold out whole generators. Extra training corpora are added to the inner folds only, so holdout numbers stay comparable across every model.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: the training manifest (path, label, generator, speaker, source). Out: <code>splits/nsa_folds.csv</code> with a <code>group</code> and a <code>fold</code> per row (0–4 or <code>holdout</code>); <code>splits/nsa_folds_plus_asv19.csv</code> with the ASVspoof 2019 rows added to the inner folds.</p>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/make_folds.py" title="scripts/make_folds.py (GitHub; assumes main is public)">scripts/make_folds.py</a> builds the base file; <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/extend_folds.py" title="scripts/extend_folds.py (GitHub; assumes main is public)">scripts/extend_folds.py</a> adds extra rows; the M5 data module pins both files' hashes.</p>
+<h2 id="params">Parameters and where each is set</h2>
+<ul>
+<li>Grouping: fakes by generator; LJ Speech by chapter (it is one speaker); other real speech by speaker (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/make_folds.py#L28" title="scripts/make_folds.py line 28 (GitHub; assumes main is public)">make_folds.py, lines 28–33</a>).</li>
+<li>Holdout generators <code>wavegrad2</code> and <code>playht</code>; a <span class="num" data-src="scripts/make_folds.py#L41">0.2</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/scripts/make_folds.py#L41" title="Source: scripts/make_folds.py line 41 (GitHub; assumes main is public)"><span class="sr">source: scripts/make_folds.py line 41 (GitHub; assumes main is public)</span></a> share of real-speech groups; five inner folds by stratified group k-fold; at least 30 clips per class in every fold; seed 0 (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/make_folds.py#L39" title="scripts/make_folds.py line 39 (GitHub; assumes main is public)">make_folds.py, lines 39–44</a>). Two assertions: every fold has both classes, and no group straddles folds.</li>
+<li>Extra rows (M1b, M5) go to the inner folds only by the same grouped split, never to the holdout; path overlap with the base file is refused; the base file is never modified (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/extend_folds.py#L28" title="scripts/extend_folds.py line 28 (GitHub; assumes main is public)">extend_folds.py, lines 28–48</a>).</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built and frozen on Friday night; hash-pinned by the M5 tests since Saturday.</p>
+<h2 id="numbers">Numbers</h2>
+<ul>
+<li><span class="num" data-src="README.md#validation">20,000</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> rows: 10 <span class="term" tabindex="0" data-term="DiffSSD" aria-describedby="tip-1">DiffSSD<span class="tip-body" role="tooltip" id="tip-1">The sponsor's synthetic training corpus: clips from ten text-to-speech generators, including commercial ones.</span></span> generators, <span class="term" tabindex="0" data-term="LJ Speech" aria-describedby="tip-2">LJ Speech<span class="tip-body" role="tooltip" id="tip-2">A public read-speech corpus of a single speaker. Part of the real side of the training data; being one voice, it is a shortcut risk of its own.</span></span>, <span class="term" tabindex="0" data-term="LibriSpeech" aria-describedby="tip-3">LibriSpeech<span class="tip-body" role="tooltip" id="tip-3">A public multi-speaker read-speech corpus. The multi-speaker real side of the training data.</span></span>. Inner folds <span class="num" data-src="README.md#numbers">16,142</span><a class="src" href="../library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> rows; the holdout <span class="num" data-src="README.md#validation">3,858</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> rows (PlayHT, WaveGrad2 and 26 real-speech groups).</li>
+<li>Inner folds hold out, in turn: grad_tts + unit_speech; diffgan_tts + openvoicev2; pro_diff + xtts_v2; your_tts; ElevenLabs (<a class="srclink" href="../library/readme.html#validation" title="README.md, section validation">README</a>).</li>
+<li>M1b's extension adds <span class="num" data-src="docs/architecture.md#62-xls-r-backbone-with-the-m1-probe-and-the-m5-head">5,128</span><a class="src" href="../library/architecture.html#62-xls-r-backbone-with-the-m1-probe-and-the-m5-head" title="Source: docs/architecture.md, section 62-xls-r-backbone-with-the-m1-probe-and-the-m5-head"><span class="sr">source: docs/architecture.md, section 62-xls-r-backbone-with-the-m1-probe-and-the-m5-head</span></a> ASVspoof 2019 real clips (40 speakers) and <span class="num" data-src="docs/architecture.md#62-xls-r-backbone-with-the-m1-probe-and-the-m5-head">2,520</span><a class="src" href="../library/architecture.html#62-xls-r-backbone-with-the-m1-probe-and-the-m5-head" title="Source: docs/architecture.md, section 62-xls-r-backbone-with-the-m1-probe-and-the-m5-head"><span class="sr">source: docs/architecture.md, section 62-xls-r-backbone-with-the-m1-probe-and-the-m5-head</span></a> spoof anchors to the inner folds.</li>
+<li>The holdout's resolution floor is about ±<span class="num" data-src="README.md#validation">0.07–0.10</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a>; a gap under <span class="num" data-src="README.md#validation">0.15</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> is treated as noise.</li>
+</ul>
+<h2 id="limits">Known limits</h2>
+<p>Known leakage that grouping cannot fix is printed, not hidden: several DiffSSD generators clone the same voices, and LJ is one voice on both sides of every fold. grad_tts is invisible to the handcrafted features under this scheme because no other generator shows its phase cue.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_m5_manifest.py</code>: the fold files' hashes, the extended file agrees with the shared one on all <span class="num" data-src="README.md#validation">20,000</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> core rows and never puts an extra row in the holdout, no holdout row in any training set. <code>tests/test_cloud_scripts.py</code>: the M5 code never writes the fold files.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/architecture.html#8-validation-and-selection" title="docs/architecture.md, section 8-validation-and-selection">Architecture §8</a>; <a class="srclink" href="../library/readme.html#validation" title="README.md, section validation">README, "Validation"</a>; <a class="srclink" href="../library/reports-2026-09-26-m1b-asv19-bonafide.html" title="docs/reports/2026-09-26_m1b-asv19-bonafide.md">the M1b report</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="metrics.html">← The metric module</a><a class="next" rel="next" href="stress-sets.html">The stress sets →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/specs/folds.frag</code> <span class="hash">fa972ee10cd6</span>, <code>scripts/make_folds.py</code> <span class="hash">c279dc454f83</span>, <code>scripts/extend_folds.py</code> <span class="hash">ec9479e998ef</span>, <code>docs/architecture.md</code> <span class="hash">c69e77a1900c</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

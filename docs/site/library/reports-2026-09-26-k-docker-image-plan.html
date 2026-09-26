@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: K, the offline CPU Docker image and scripts/runpipeline.py (Sat Sep 26, 2026) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_k-docker-image-plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_k-docker-image-plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#execution-note-0635-the-runner-moved-to-the-main-chat">Execution note (06:35): the runner moved to the main chat</a></li><li><a href="#anchors-current-code-verified-0620">Anchors (current code, verified 06:20)</a></li><li><a href="#step-0-pre-flight-5-min">Step 0: pre-flight (5 min)</a></li><li><a href="#step-1-dockerassetspy-10-min">Step 1: docker/assets.py (10 min)</a></li><li><a href="#step-2-scriptsrun_pipelinepy-60-min">Step 2: scripts/runpipeline.py (60 min)</a></li><li><a href="#step-3-teststest_docker_runnerpy-45-min-written-alongside-step-2">Step 3: tests/testdockerrunner.py (45 min, written alongside step 2)</a></li><li><a href="#step-4-dockerfile-dockerignore-dockerentrypointsh-dockerbuildsh-25-min">Step 4: Dockerfile, .dockerignore, docker/entrypoint.sh, docker/build.sh (25 min)</a></li><li><a href="#step-5-teststest_docker_imagepy-25-min">Step 5: tests/testdockerimage.py (25 min)</a></li><li><a href="#step-6-dockerparitypy-dockersmokesh-and-p1p4-25-min">Step 6: docker/parity.py, docker/smoke.sh and P1–P4 (25 min)</a></li><li><a href="#step-7-hermetic-gates-t1t3-10-min">Step 7: hermetic gates T1–T3 (10 min)</a></li><li><a href="#step-8-build-in-the-background-mac-parity-in-the-foreground-t4-t5">Step 8: build in the background, Mac parity in the foreground (T4, T5)</a></li><li><a href="#step-9-image-checks-t6-t7-t8">Step 9: image checks (T6, T7, T8)</a></li><li><a href="#step-10-docs-run-spec-results-commit-audits-30-min">Step 10: docs, run spec results, commit, audits (30 min)</a></li><li><a href="#risks-and-mitigations-risk-agent-0640-all-verified-unless-marked">Risks and mitigations (risk agent, 06:40; all VERIFIED unless marked)</a></li><li><a href="#toolchain-probe-result-0630-amd64-container-under-rosetta-6-vcpu">Toolchain probe result (06:30, amd64 container under Rosetta, 6 vCPU)</a></li></ul></details>
+<h1 id="plan-k-the-offline-cpu-docker-image-and-scriptsrun_pipelinepy-sat-sep-26-2026">Plan: K, the offline CPU Docker image and <code>scripts/run_pipeline.py</code> (Sat Sep 26, 2026)</h1>
+<p>Run spec: <code>docs/specs/2026-09-26_k-docker-image.md</code> (decisions D1–D14, tests B/R/L/D/M/F/G/C/O/P, acceptance T1–T9). Branch <code>main</code>, worktree <code>~/Projects/hearsay</code>, shared with five chats: stage only the files listed in "Files" by path. Time box: build from approval (~06:50) to 09:30, hard stop 10:00, gate 14:00. The emulated amd64 build runs in the background from step 8 onward.</p>
+<p>Preconditions verified at 06:10: Colima running (vz, Rosetta, 6 CPU, 6 GB, VM disk on the external drive with 30 GB free), <code>docker buildx</code> v0.37.1, an amd64 <code>python:3.12-slim-bookworm</code> container reports <code>x86_64</code>; <code>codex</code> CLI 0.154.0; 301 tests passing; ffmpeg 7.1.1 on the Mac.</p>
+<h2 id="execution-note-0635-the-runner-moved-to-the-main-chat">Execution note (06:35): the runner moved to the main chat</h2>
+<p>Steps 2 and 3 below (the runner and its tests) were superseded before execution: the main chat shipped <code>scripts/run_pipeline.py</code> + <code>src/hearsay/pipeline.py</code>, so the image wraps their runner (run spec, "Scope change at 06:35"). Steps 1, 4, 5 (image tests only), 6 (<code>pcm-hash</code> only; score parity is their <code>--compare-tsv</code>), 7, 8, 9 and 10 were executed as written with these adjustments: the Dockerfile copies weights before code (the critique's finding 2); every <code>-v</code> source is absolute and under <code>$HOME</code>; in-image checks use <code>--entrypoint python</code>; the build started at 06:37 with the weights layers cached for later rebuilds. The Codex review's findings and how each was handled are in the run spec. Intermediate stops: 08:00 commit and Claude critique, 09:00 Codex audit, 09:30 T8 addendum, 10:00 hard stop and report.</p>
+<h2 id="anchors-current-code-verified-0620">Anchors (current code, verified 06:20)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Symbol</th><th>Where</th><th>Note</th>
+</tr></thead>
+<tbody>
+<tr><td><code>score_files(paths, score_fn, fallback) -&gt; ScoredFiles</code></td><td><code>src/hearsay/submission.py:44</code></td><td>flags <code>decode_error</code>, <code>score_error:&lt;Exc&gt;</code>, <code>nonfinite_score</code>; one row per input</td></tr>
+<tr><td><code>write_submission(ids, scores, out_path, *, id_col, score_col, score_max, sep)</code></td><td><code>submission.py:73</code></td><td><code>FileExistsError</code> at :85, validates, reads back at :105–109</td></tr>
+<tr><td><code>list_test_files(test_dir, manifest, id_col)</code></td><td><code>submission.py:139</code></td><td>comma reader at :142 (unusable for the tab template); no-manifest branch at :144 is the sorted rglob</td></tr>
+<tr><td><code>preflight(score_fn, fallback, tmp)</code></td><td><code>submission.py:148</code></td><td>silence + chord, scored twice, asserts equal and finite</td></tr>
+<tr><td><code>AUDIO_EXT</code></td><td><code>submission.py:136</code></td><td></td></tr>
+<tr><td><code>load_backbone(name, device)</code></td><td><code>src/hearsay/embed.py:30</code></td><td><code>AutoModel.from_pretrained(REPO/"weights"/name).eval().to(device)</code></td></tr>
+<tr><td><code>prepare_segment(x, crop_s, seed, max_s, band_match)</code></td><td><code>embed.py:80</code></td><td>band → trim → crop → cap</td></tr>
+<tr><td><code>embed_segment(model, x)</code></td><td><code>embed.py:105</code></td><td><code>model(t, output_hidden_states=True).hidden_states</code>, time-mean per layer</td></tr>
+<tr><td><code>Probe</code> (<code>backbone, layer, clf, platt_a, platt_b, win_s, max_windows, segment</code>) / <code>llr</code> / <code>load</code></td><td><code>src/hearsay/probe.py:67, 78, 98</code></td><td><code>segment</code> is wrong for 0521 (spec)</td></tr>
+<tr><td><code>load_spectra(device)</code>, <code>prepare_input</code>, <code>score_clip(model, x, pad_modes, max_windows)</code>, <code>synth_logit</code></td><td><code>src/hearsay/spectra.py:47, 73, 139, 135</code></td><td><code>score_clip</code> returns <code>{n_samples, n_windows, &lt;mode&gt;: (2,), n_pad_samples_&lt;mode&gt;}</code></td></tr>
+<tr><td><code>score_spectra.run(argv, loader=load_spectra)</code></td><td><code>scripts/score_spectra.py:458</code></td><td>the injectable-loader pattern the runner copies; test rows: crop None, pad zero, no peak-norm, 16 windows (:100–105, :198, :260–264, :293)</td></tr>
+<tr><td><code>ClipContext</code>, <code>safe_run</code>, <code>DetectorResult</code></td><td><code>src/hearsay/detectors/base.py:43, 163, 109</code></td><td></td></tr>
+<tr><td><code>FeatureModelDetector(model_dir)</code>, <code>.run</code> clip 1e-6 and <code>hc_logit</code></td><td><code>src/hearsay/detectors/_learned.py:77, 102, 105</code></td><td></td></tr>
+<tr><td><code>HandcraftedDetector</code>, <code>NAME="handcrafted"</code></td><td><code>src/hearsay/detectors/handcrafted.py:101, 18</code></td><td><code>latest_model_dir</code> prefers <code>models/hc_selected/model.joblib</code> (<code>_learned.py:34</code>)</td></tr>
+<tr><td><code>speech_gate.DETECTOR</code>, <code>analyze</code>, <code>apply_default_answer(fused, is_speech, default)</code>, <code>DEFAULT_ANSWER=0.02</code>, <code>TIE_BREAK=1e-4</code></td><td><code>src/hearsay/detectors/speech_gate.py:126, 53, 115, 48, 49</code></td><td><code>features["is_speech"]</code> is 1.0/0.0</td></tr>
+<tr><td>fusion arithmetic</td><td><code>scripts/fuse.py:93–100</code> (mu, sd = inner_oof mean, std+1e-9), <code>:110</code> zmean, <code>:112–116</code> stack (<code>decision_function</code> on Z), <code>:137–138</code> Platt + prior shift</td><td>the D8 bundle freezes these numbers</td></tr>
+<tr><td>M1 export logit = <code>probe.llr</code></td><td><code>scripts/export_probe_scores.py:58, 65</code></td><td></td></tr>
+<tr><td>hc export logit clip 1e-6</td><td><code>scripts/train_handcrafted.py:77–80</code></td><td></td></tr>
+<tr><td><code>hash_one(p) -&gt; (p, file_sha, pcm_sha, n)</code></td><td><code>scripts/hash_audio.py:31</code></td><td>for <code>parity.py pcm-hash</code></td></tr>
+<tr><td><code>sigmoid</code>, <code>PI_SYNTH</code></td><td><code>src/hearsay/metrics.py:74, 31</code></td><td></td></tr>
+<tr><td><code>FakeSpectra</code>, <code>_wav</code>, <code>_clip</code>, <code>_tone</code>, <code>_load_script</code></td><td><code>tests/test_spectra.py:75, 69, 59, 64, 105</code></td><td>reuse by import</td></tr>
+<tr><td><code>_make_bundle(out, kind)</code></td><td><code>tests/test_handcrafted_detector.py:55</code></td><td>toy lgbm bundle from <code>tests/fixtures/lgbm_toy.json</code></td></tr>
+<tr><td><code>ffmpeg_sine(out, *, sr, ch, dur, args)</code></td><td><code>tests/test_audio_and_submission.py:18</code></td><td></td></tr>
+<tr><td><code>bash -n</code> pattern</td><td><code>tests/test_cloud_scripts.py:21–26</code></td><td></td></tr>
+<tr><td>no-lightgbm pattern</td><td><code>tests/test_spectra.py:486</code></td><td></td></tr>
+<tr><td>Spectra <code>model.py</code> imports</td><td><code>weights/Spectra-AASIST/model.py:1–5</code></td><td>torch, transformers, huggingface_hub only; hub id at :755 patched by <code>spectra.py:56–65</code></td></tr>
+<tr><td>lock: torch CUDA markers</td><td><code>uv.lock:2086–2103</code></td><td><code>cuda-toolkit</code>, <code>nvidia-*</code>, <code>triton</code> under <code>sys_platform == 'linux'</code></td></tr>
+<tr><td>transformers hidden-state capture</td><td><code>transformers/models/wav2vec2/modeling_wav2vec2.py:907, 1265</code></td><td><code>_can_record_outputs</code> records each encoder layer's output; <code>tie_last_hidden_states=False</code>, so <code>hidden_states[L]</code> is the raw output of layer L−1 and keeping <code>L+1</code> modules preserves it (verified on a tiny stable-LN model: keep 3 and keep 4 both identical for L=3)</td></tr>
+</tbody>
+</table></div>
+<h2 id="step-0-pre-flight-5-min">Step 0: pre-flight (5 min)</h2>
+<ol>
+<li><code>git branch --show-current</code> → <code>main</code>; <code>pwd</code> → <code>~/Projects/hearsay</code>; <code>git status --short</code> (other chats' edits stay untouched).</li>
+<li><code>df -h "/Volumes/Crucial P3 NVME Gen 3 2TB" /</code> → at least 15 GB free on the VM drive, else stop and report.</li>
+<li><code>docker context show</code> → <code>colima</code>; <code>docker run --rm --platform linux/amd64 python:3.12-slim-bookworm python -c "import platform; print(platform.machine())"</code> → <code>x86_64</code>.</li>
+<li>Read the toolchain probe result (below) once, and paste the exact RUN block into the Dockerfile in step 5.</li>
+</ol>
+<h2 id="step-1-dockerassetspy-10-min">Step 1: <code>docker/assets.py</code> (10 min)</h2>
+<p>Standalone module, no hearsay imports (it runs inside the build before the venv exists).</p>
+<ul>
+<li><code>freeze(root: Path, dirs: list[str], out: Path)</code>: for each relative dir, every regular file, sorted: <code>{"path": rel, "sha256": ..., "size": ...}</code>; writes JSON <code>{"created": iso, "files": [...]}</code>. Backbone files (<code>pytorch_model.bin</code>, <code>model.safetensors</code>) are included; hashing 2.5 GB takes about 10 s in the build.</li>
+<li><code>verify(root: Path, manifest: Path, *, hash_over_mb: float | None = 100) -&gt; list[str]</code>: returns a list of problems (missing, size mismatch, sha mismatch, extra file in a model dir); files larger than <code>hash_over_mb</code> are checked by size only at run time unless <code>--full</code> (so startup stays under a second); an empty list means OK.</li>
+<li>CLI: <code>python docker/assets.py freeze --root /app --dirs models/m1_shipped models/hc_selected weights/wav2vec2-xls-r-300m weights/Spectra-AASIST weights/spkrec-ecapa-voxceleb --out /app/models/assets.json</code> and <code>verify --root /app --manifest /app/models/assets.json [--full]</code>; non-zero exit and one line per problem.
+Tests (step 6, <code>test_docker_image.py</code> B10): tmp tree with small files; freeze → verify OK; tamper a byte, delete a file, add a file → each reported by name.</li>
+</ul>
+<h2 id="step-2-scriptsrun_pipelinepy-60-min">Step 2: <code>scripts/run_pipeline.py</code> (60 min)</h2>
+<p>Module layout, top to bottom:</p>
+<ol>
+<li>Docstring: purpose, CLI, env vars, outputs, the never-flip rule.</li>
+<li>Imports: stdlib; <code>numpy</code>; <code>hearsay.SR</code>; <code>hearsay.audio.DecodeError, load_audio</code>; <code>hearsay.metrics.PI_SYNTH, sigmoid</code>; <code>hearsay.submission.AUDIO_EXT, list_test_files, preflight, score_files, write_submission</code>. <strong>No torch import at module top</strong>: torch is imported inside the loaders so listing, cache and fusion tests run without it and <code>--help</code> is instant. No <code>lightgbm</code> anywhere (B9).</li>
+<li>Constants: <code>APP = Path(__file__).resolve().parents[1]</code>; <code>DEFAULT_PROBE = "models/m1_shipped"</code>; <code>DEFAULT_HC = "models/hc_selected"</code>; <code>DETECTOR_ORDER = ("m1b", "spectra", "handcrafted")</code>; <code>SPECTRA_CFG = {"pad_mode": "zero", "peak_norm": False, "band_match": True, "max_windows": 16}</code>; <code>FALLBACK_LOGIT = float("nan")</code>; <code>PLACEHOLDER_TEAM = "teamName"</code>.</li>
+<li><code>truncate_backbone(model, layer: int)</code>: <code>n = len(model.encoder.layers)</code>; <code>layer &gt; n</code> → <code>ValueError</code>; <code>keep = min(layer + 1, n)</code>; <code>model.encoder.layers = model.encoder.layers[:keep]</code>; <code>model.config.num_hidden_layers = keep</code>; return <code>keep</code>. (B11, B12, M6.)</li>
+<li>Listing: <code>@dataclass Item(id: str, path: Path | None, sha256: str | None)</code>.
+<ul>
+<li><code>read_template(path) -&gt; list[str]</code>: <code>csv.DictReader(f, delimiter="\t")</code>; header must contain <code>filename</code> (else <code>SystemExit</code> naming the header); duplicates → <code>SystemExit</code> (L2, L7).</li>
+<li><code>index_audio(data_dir) -&gt; dict[str, list[Path]]</code>: basename → paths, from <code>sorted(p for p in data_dir.rglob("*") if p.suffix.lower() in AUDIO_EXT)</code> (the same filter as <code>list_test_files</code>).</li>
+<li><code>list_items(data_dir, template, limit) -&gt; list[Item]</code>: with a template, each id resolves via the index (0 hits → <code>path=None</code>, flag later <code>missing_file</code>; 2+ hits → <code>SystemExit</code> ambiguous); without, <code>list_test_files(data_dir, None, "filename")</code> ids (relative paths); <code>limit</code> slices; empty → <code>SystemExit</code> (L1–L9). <code>sha256</code> of each existing file computed here (C5).</li>
+<li><code>manifest_sha(items)</code>: sha256 over <code>"\t".join((id, sha or "missing"))</code> lines in order.</li>
+</ul></li>
+<li>Cache: <code>class Cache</code> with <code>path</code>, <code>header: dict</code>; <code>open()</code> reads the header line, discards the file if <code>manifest_sha</code>/<code>config_sha</code> differ (prints a notice), parses the rest with a <code>try/except json.JSONDecodeError</code> that drops only a corrupt final line (C4); <code>rows: dict[tuple[str, str], dict]</code> keyed by <code>(id, sha256)</code>; <code>append(row)</code> writes one JSON line and flushes (C1–C5).</li>
+<li>Scorers (each a small class with <code>name</code>, <code>config() -&gt; dict</code>, <code>load()</code>, <code>unload()</code>, <code>logit(x: np.ndarray) -&gt; float</code>):
+<ul>
+<li><code>M1Scorer(app_root, probe_dir, mode, truncate, device, loaders)</code>: <code>load()</code> → <code>Probe.load(probe_dir)</code> (M4 checks: dir exists, backbone dir exists under <code>app_root/weights</code>, <code>0 &lt;= layer &lt;= 24</code>), <code>load_backbone(probe.backbone, device)</code> via the injectable <code>loaders["backbone"]</code>, <code>truncate_backbone</code> when <code>truncate</code> (records <code>kept_layers</code>), <code>torch.manual_seed(0)</code>; mode resolution: <code>segment</code> default, <code>windows</code>, or <code>auto</code> = the probe flag; if the flag disagrees with the resolved mode, print <code>WARNING: probe.segment=&lt;flag&gt; disagrees with --m1-mode &lt;mode&gt;; using &lt;mode&gt;</code> (M3). <code>logit(x)</code>: segment → <code>embed_segment(model, prepare_segment(x))</code>; windows → <code>embed_clip(model, x, probe.win_s, probe.max_windows)</code>; return <code>float(probe.llr(e)[0])</code> (M2, M5). <code>config()</code> → <code>{probe_sha, layer, kept_layers, mode, backbone}</code>. <code>unload()</code> → drop references, <code>gc.collect()</code>.</li>
+<li><code>SpectraScorer(app_root, device, loaders)</code>: <code>load()</code> → <code>loaders["spectra"](device)</code> (default <code>hearsay.spectra.load_spectra</code>); <code>logit(x)</code> → <code>x = prepare_input(x)</code> (band match on, no crop); <code>out = score_clip(model, x, (SPECTRA_CFG["pad_mode"],), SPECTRA_CFG["max_windows"])</code>; return <code>synth_logit(out[pad_mode])</code> (F5). <code>config()</code> → <code>SPECTRA_CFG | {"weights_sha": sha of model.safetensors from assets.json if present}</code>.</li>
+<li><code>HandcraftedScorer(app_root, model_dir, loaders)</code>: <code>load()</code> → <code>HandcraftedDetector(model_dir=model_dir)</code> (F6); <code>logit(x)</code> → <code>res = safe_run(det, ClipContext.from_array(x))</code>; status not <code>ok</code> → raise <code>RuntimeError(res.error)</code> (so <code>score_files</code> flags it <code>score_error:RuntimeError</code>); return <code>res.features["hc_logit"]</code>. Note: <code>ClipContext.from_array</code> skips a second decode; the array is the one <code>score_files</code> already decoded.</li>
+<li><code>SpeechGate</code>: not a scorer; <code>gate(x) -&gt; (is_speech: bool, reasons: dict)</code> via <code>safe_run(speech_gate.DETECTOR, ClipContext.from_array(x))</code>; error → gated, reason <code>gate_error</code>.</li>
+</ul></li>
+<li>Scoring loop <code>score_detector(scorer, items, cache, fallback_logit) -&gt; dict[id, row]</code>: <code>preflight(scorer.logit, float("nan"), tmpdir)</code> first (D2; the runner records the two printed values by calling <code>score_files</code> on the same two files once more and storing them in <code>run_info["preflight"][scorer.name]</code>; the preflight itself already asserts reproducibility). Then for each item not in the cache: <code>path is None</code> → row <code>{logit: nan, flag: "missing_file"}</code>; else <code>res = score_files([path], scorer.logit, fallback=float("nan"))</code> → <code>logit = res.scores[0]</code>, <code>flag = res.flags[0]</code>; <code>row = {id, sha256, logit, score: sigmoid(logit) if flag == "" else nan, flag, seconds}</code>; <code>cache.append(row)</code>. Per-detector wall time recorded.</li>
+<li>Gate pass <code>gate_items(items) -&gt; dict[id, (is_speech, reasons)]</code>: decode once per file (<code>load_audio</code>), <code>DecodeError</code> → gated with reason <code>decode_error</code> (G3). Cached like a detector (<code>cache/speech_gate.jsonl</code>).</li>
+<li>Fusion <code>load_bundle(path) -&gt; dict</code> (validates keys, detectors ⊆ producible set else <code>SystemExit</code>, F4) and <code>fuse_row(bundle | None, logits: dict[str, float], shift) -&gt; tuple[float, str]</code>:
+<ul>
+<li>no bundle: <code>llr = logits["m1b"]</code>; NaN → <code>(sigmoid(shift), "fusion_missing:m1b")</code> (the detector's own flag is kept beside it); else <code>(sigmoid(llr + shift), "")</code> (F2, D5).</li>
+<li>bundle: <code>z[d] = (logits[d] - mu[d]) / sd[d]</code>; any NaN → fallback + <code>fusion_missing:&lt;d&gt;</code> (F3); rule <code>zmean</code> → <code>mean(z)</code>, <code>{"type": "linear"}</code> → <code>Σ w[d]·z[d] + intercept</code>, <code>identity</code> → the single detector's logit; <code>p = sigmoid(a·fused + b + shift)</code> with <code>platt = [a, b]</code> (F1).</li>
+</ul></li>
+<li>Policy: <code>apply_default_answer(p, is_speech)</code> from <code>hearsay.detectors.speech_gate</code> when <code>--policy speech_gate</code> (G1–G4).</li>
+<li>Output <code>write_outputs(out_dir, team, ids, scores, rows, run_info, limit)</code>: name <code>f"{team}_predictions{'-limit'+str(limit) if limit else ''}.tsv"</code>; if it exists, insert <code>-&lt;YYYYmmdd-HHMMSS&gt;</code> before <code>.tsv</code> (O2); scores outside [0, 1] are replaced by the fallback with flag <code>out_of_range</code> before <code>write_submission</code> (O6); <code>write_submission(ids, scores, path)</code>; sidecar CSV (<code>id, score, flag, is_speech, gate_reasons, &lt;det&gt;_logit...</code>) and <code>&lt;stem&gt;.run.json</code> (D10 fields, R4). Print the summary: file written, rows, flags by kind, share above 0.5, preflight values, wall time. Return 0.</li>
+<li><code>parse_args(argv)</code> and <code>run(argv=None, *, loaders=None) -&gt; int</code> (the same shape as <code>score_spectra.run</code>): environment checks first (<code>--require-offline</code> → both env vars must be <code>"1"</code>, R1; <code>shutil.which("ffmpeg")</code>, R2; threads: <code>OMP_NUM_THREADS</code> if set, else <code>len(os.sched_getaffinity(0))</code> when available, else <code>os.cpu_count()</code>; <code>torch.set_num_threads</code> right after the torch import inside the loaders, R3), then listing, <code>assets.verify</code> when <code>&lt;app&gt;/models/assets.json</code> exists (R5), then the detector passes in <code>DETECTOR_ORDER</code> restricted to <code>--detectors</code>, the gate pass, fusion, policy, output. <code>main()</code> → <code>sys.exit(run())</code>.</li>
+<li>Exit codes: <code>SystemExit(2)</code> for usage/environment/listing failures before any TSV; <code>0</code> after a TSV (O5).</li>
+</ol>
+<h2 id="step-3-teststest_docker_runnerpy-45-min-written-alongside-step-2">Step 3: <code>tests/test_docker_runner.py</code> (45 min, written alongside step 2)</h2>
+<p>Load the runner with the <code>_load_script</code> pattern (<code>tests/test_spectra.py:105</code>). Fixtures:</p>
+<ul>
+<li><code>fake_backbone()</code>: <code>torch.nn.Module</code> with <code>encoder = types.SimpleNamespace(layers=nn.ModuleList([nn.Identity() for _ in range(24)]))</code>, a dummy <code>Parameter</code>, and <code>forward(x, output_hidden_states=True)</code> returning an object whose <code>.hidden_states</code> is a tuple of <code>len(layers)+1</code> tensors <code>(1, T, 4)</code> computed deterministically from <code>x</code> (mean, std, min, max broadcast), so <code>embed_segment</code> and <code>truncate_backbone</code> run for real.</li>
+<li><code>fake_probe(layer=7)</code>: a real <code>Probe</code> with <code>clf</code> = an object whose <code>decision_function(X)</code> returns <code>X[:, 0] * 3.0</code> and <code>platt_a=1.0, platt_b=0.0</code>, saved with <code>joblib</code> into <code>tmp/models/m1_shipped/probe.joblib</code> (+ <code>meta.json</code>).</li>
+<li><code>fake_spectra</code>: <code>FakeSpectra</code> from <code>tests/test_spectra.py</code>.</li>
+<li><code>hc_bundle</code>: <code>_make_bundle(tmp, "lgbm")</code> renamed to <code>models/hc_selected</code>.</li>
+<li><code>data_dir(n)</code>: WAVs via <code>_wav</code> (noise and tone clips at 16 kHz), plus one MP3 via <code>ffmpeg_sine</code>, a README.txt, and an empty <code>broken.wav</code>.</li>
+<li><code>template(ids, order)</code>: writes a tab-separated file.</li>
+<li><code>run(args, loaders)</code>: calls <code>mod.run([...], loaders={"backbone": ..., "spectra": ..., "hc_dir": ...})</code> with <code>--app-root tmp --device cpu --policy none</code> unless a test says otherwise; captures stdout.</li>
+</ul>
+<p>Tests, by ID (one function each unless parametrized): L1 (shuffled template order), L2 (tab parse; missing header fails), L3 (no template → sorted relative ids), L4 (nested dir; ambiguous basename fails), L5 (<code>missing_file</code> row, exit 0, warning), L6 (empty → exit 2, no TSV), L7 (duplicate template ids fail before any scorer call: the fake loader records calls), L8 (<code>--limit 2</code> name and order), L9 (README.txt ignored; template naming it → <code>decode_error</code>); D1 (broken.wav → <code>decode_error</code>; fake scorer raising on the 2nd call → <code>score_error:RuntimeError</code>; NaN → <code>nonfinite_score</code>), D2 (preflight precedes real files; a fake whose 2nd preflight call differs → no TSV), D3 (preflight values in run.json; WARNING when &gt; 0.8 via a fake that scores silence high), D4 (<code>/out</code> contents), D5 (fallback equals 0.3); M1 (exact posterior values and monotonicity), M2 (spies on <code>hearsay.embed.prepare_segment</code>/<code>embed_segment</code>/<code>embed_clip</code>), M3 (probe flag False + default → WARNING and segment path; <code>--m1-mode auto</code> → windows path), M4 (missing probe dir; layer 99), M5 (cache logit == fake llr), M6 (kept layers 8 by default; 24 with <code>--no-truncate</code>), M7 (loader called with <code>cpu</code>), M8 (two runs, identical TSVs); F1 (<code>fuse_row</code> unit tests for zmean and linear against hand-computed numbers, including the Platt and prior shift), F2 (no bundle equals the M1 formula), F3 (<code>fusion_missing:spectra</code> on a failed file), F4 (bundle naming <code>m5</code> fails before scoring), F5 (spectra logit equals <code>synth_logit(score_clip(...)["zero"])</code> computed directly with the same fake), F6 (hc logit equals <code>log(p/(1−p))</code> from the detector's own result), F7 (loader/unloader order and at most one live model); G1 (silence file gated → <code>0.02 + 1e-4·fused</code>), G2 (a speech-like clip passes <code>analyze</code> and keeps its score), G3 (broken.wav gated), G4 (<code>--policy none</code> leaves fused scores); C1 (cache files and header), C2 (pre-seeded partial cache → only the rest scored; byte-identical TSV), C3 (manifest or config change discards the cache; same values reuse it), C4 (corrupt trailing line skipped), C5 (changed bytes → rescored); O1 (name and format), O2 (second run gets a stamped name; first byte-identical), O3 (order read back), O4 (sidecar columns and run.json keys), O5 (exit codes), O6 (a fake returning 1.5 → <code>out_of_range</code> row, TSV still written), O7 (<code>partial: true</code>), O8 (timings present); R1 (<code>--require-offline</code> without env fails; with env proceeds), R2 (no ffmpeg on PATH fails first), R3 (thread env), R4 (run.json fields), R5 (tampered probe refused, intact accepted).</p>
+<h2 id="step-4-dockerfile-dockerignore-dockerentrypointsh-dockerbuildsh-25-min">Step 4: <code>Dockerfile</code>, <code>.dockerignore</code>, <code>docker/entrypoint.sh</code>, <code>docker/build.sh</code> (25 min)</h2>
+<p><code>.dockerignore</code> (no wholesale <code>weights</code> exclusion: a <code>!</code> re-include under an excluded parent is not something to bet a 14:00 gate on; the wavlm dirs are excluded by name and <code>models/</code> is excluded entirely because the shipped bundles are copied from the staging dir):</p>
+<pre><code>.git
+.venv
+.cache
+.pytest_cache
+.ruff_cache
+**/__pycache__
+data
+outputs
+submissions
+models
+weights/wavlm-*
+weights/*/.cache
+docs
+tests
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+.env
+.env.example
+.claude</code></pre>
+<p>The hc bundle and the probe are copied from a staging directory <code>docker/build/</code> that <code>build.sh</code> populates (<code>cp -RL &lt;resolved hc&gt; docker/build/hc_selected</code>, <code>cp -RL &lt;probe dir&gt; docker/build/m1_shipped</code>), so <code>.dockerignore</code> re-includes only fixed paths and <code>docker/build/</code> (gitignored via <code>docker/.gitignore</code>). This keeps the Dockerfile free of stamps.</p>
+<p><code>Dockerfile</code> (single stage; verified sequence from the toolchain probe, 06:30):</p>
+<pre><code>FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    UV_PYTHON_DOWNLOADS=never PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
+    PATH=/opt/venv/bin:$PATH PYTHONPATH=/app/src
+RUN apt-get update &amp;&amp; apt-get install -y --no-install-recommends ffmpeg &amp;&amp; rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.11.21 /uv /usr/local/bin/uv
+WORKDIR /app
+COPY pyproject.toml uv.lock README.md ./
+RUN uv export --frozen --no-dev --no-hashes --no-emit-project \
+      --no-emit-package torch --no-emit-package torchaudio --no-emit-package lightgbm \
+    | grep -vE '^(nvidia-|cuda-|triton)' &gt; /app/requirements-cpu.txt \
+ &amp;&amp; uv venv /opt/venv --python 3.12 \
+ &amp;&amp; uv pip install --python /opt/venv/bin/python --no-deps -r /app/requirements-cpu.txt \
+ &amp;&amp; uv pip install --python /opt/venv/bin/python --index-url https://download.pytorch.org/whl/cpu torch==2.14.0 torchaudio==2.11.0 \
+ &amp;&amp; uv pip check --python /opt/venv/bin/python \
+ &amp;&amp; rm -rf /root/.cache/uv
+COPY src ./src
+COPY scripts ./scripts
+COPY docker ./docker
+RUN uv pip install --python /opt/venv/bin/python --no-deps -e /app &amp;&amp; rm -rf /root/.cache/uv
+COPY weights/wav2vec2-xls-r-300m ./weights/wav2vec2-xls-r-300m
+COPY weights/Spectra-AASIST ./weights/Spectra-AASIST
+COPY weights/spkrec-ecapa-voxceleb ./weights/spkrec-ecapa-voxceleb
+COPY docker/build/m1_shipped ./models/m1_shipped
+COPY docker/build/hc_selected ./models/hc_selected
+ARG BUILD_INFO=""
+RUN printf '%s\n' "$BUILD_INFO" &gt; /app/BUILD_INFO \
+ &amp;&amp; python docker/assets.py freeze --root /app --dirs models/m1_shipped models/hc_selected weights/wav2vec2-xls-r-300m weights/Spectra-AASIST weights/spkrec-ecapa-voxceleb --out /app/models/assets.json
+VOLUME ["/data", "/out"]
+ENTRYPOINT ["bash", "/app/docker/entrypoint.sh"]</code></pre>
+<p>Why each non-obvious line: <code>--no-deps</code> on the requirements install is load-bearing (without it <code>speechbrain</code> resolves <code>torch</code> from PyPI as <code>2.14.0+cu130</code> with the whole CUDA tree, 5.8 GB, and the later CPU step becomes a no-op because <code>==2.14.0</code> is already satisfied); the export's <code>--no-emit-package torch</code> drops only the torch line, so the <code>grep</code> removes its 19 CUDA-only lines while keeping torch's pinned pure-Python deps (jinja2, sympy, networkx, setuptools, mpmath, markupsafe), which <code>--prune</code> would have unpinned; <code>README.md</code> is required by the editable install (<code>readme = "README.md"</code> in pyproject); <code>uv pip check</code> proves the closure is consistent; <code>rm -rf /root/.cache/uv</code> in the same layer saves 1.4 GB; the base is pinned by digest. Measured on this Mac: apt 56 s, requirements 9 s, torch 13 s (187 MB wheel), editable 1 s, venv 1.4 GB, ffmpeg 5.1.9 with mp3/flac/aac/opus/vorbis/pcm decoders, <code>torch.backends.cpu.get_cpu_capability()</code> = AVX2 under Rosetta. The <code>NNPACK ... Unsupported hardware</code> warning under Rosetta is harmless.</p>
+<p>The weight COPYs come last so code changes do not invalidate the 2.5 GB layers. The torch versions are written literally in the Dockerfile and test B3 parses <code>uv.lock</code> to assert they match.</p>
+<p><code>docker/entrypoint.sh</code>: <code>set -euo pipefail</code>; if <code>OMP_NUM_THREADS</code> is unset, derive it: <code>n=$(nproc)</code>; read <code>/sys/fs/cgroup/cpu.max</code> and, when its first field is not <code>max</code>, <code>n=min(n, ceil(quota/period))</code>; <code>export OMP_NUM_THREADS=$n MKL_NUM_THREADS=$n</code>; print <code>threads=$n</code>. Then <code>exec python /app/scripts/run_pipeline.py --data /data --out /out --require-offline --app-root /app ${HEARSAY_TEMPLATE:+--template "$HEARSAY_TEMPLATE"} --team "${HEARSAY_TEAM:-teamName}" --detectors "${HEARSAY_DETECTORS:-m1b}" --policy "${HEARSAY_POLICY:-speech_gate}" ${HEARSAY_FUSION:+--fusion "$HEARSAY_FUSION"} "$@"</code>. A template mounted at <code>/data/*.tsv</code> is also auto-detected by the runner when <code>--template</code> is absent and exactly one <code>.tsv</code> exists directly under <code>/data</code> (so NSA can drop the key file beside the audio); two or more → ignored with a notice. An empty <code>/data</code> exits non-zero (L6), which also catches a bad bind mount.</p>
+<p><code>docker/build.sh</code>: <code>set -euo pipefail</code>; <code>PROBE_DIR=${PROBE_DIR:-models/m1_wav2vec2-xls-r-300m_L7_20260926-0521}</code>; <code>HC_DIR=$(readlink -f models/hc_selected)</code> (must exist and contain <code>model.joblib</code>, else exit 1); <code>rm -rf docker/build &amp;&amp; mkdir -p docker/build &amp;&amp; cp -RL "$PROBE_DIR" docker/build/m1_shipped &amp;&amp; cp -RL "$HC_DIR" docker/build/hc_selected</code>; <code>STAMP=$(date +%Y%m%d-%H%M)</code>; <code>SHA=$(git rev-parse --short HEAD)</code>; <code>DIRTY=$(git status --porcelain | grep -q . &amp;&amp; echo dirty || echo clean)</code>; <code>docker buildx build --platform linux/amd64 --load --build-arg BUILD_INFO="sha=$SHA $DIRTY stamp=$STAMP probe=$(basename "$PROBE_DIR") hc=$(basename "$HC_DIR")" -t hearsay:$STAMP -t hearsay:latest .</code>; prints <code>docker image inspect hearsay:latest --format '{{.Size}} {{.Architecture}}'</code>. <code>docker/.gitignore</code> holds <code>build/</code>.</p>
+<h2 id="step-5-teststest_docker_imagepy-25-min">Step 5: <code>tests/test_docker_image.py</code> (25 min)</h2>
+<p>B1–B6 static asserts on the Dockerfile text (base tag, apt ffmpeg + cleanup in one RUN, the three ENV vars, <code>--frozen</code>, <code>--no-dev</code>, the three <code>--no-emit-package</code>, the nvidia/cuda/triton filter, the CPU index URL, torch/torchaudio versions equal to <code>uv.lock</code>'s, no COPY of <code>data</code>/<code>outputs</code>/<code>submissions</code>/<code>wavlm</code>/<code>.venv</code>/<code>.git</code>, COPY destinations equal to <code>hearsay.embed.REPO</code>-relative <code>weights/&lt;name&gt;</code> and <code>models/hc_selected</code>); B4/B5 with a 30-line dockerignore matcher (rules: leading <code>!</code> re-includes, <code>**</code> any depth, <code>*</code> within a segment, a bare name matches the path prefix) checked against a list of must-ignore and must-keep paths; B7 <code>build.sh</code> resolution via a <code>--print-args</code> dry-run mode on a tmp tree with a symlink and with a dangling one; B8 <code>bash -n</code> and grep for <code>set -euo pipefail</code>, <code>--require-offline</code>, the env names; B9 no lightgbm; B10 assets freeze/verify; B11/B12 truncation on a tiny <code>Wav2Vec2Config(do_stable_layer_norm=True, num_hidden_layers=6, hidden_size=32, ...)</code>: identity for L=3 with 4 modules kept, <code>ValueError</code> for L=7, <code>--no-truncate</code> path leaves 6; B13 <code>@pytest.mark.slow @pytest.mark.needs_weights</code>: real XLS-R, one 3 s clip, <code>embed_segment</code> layer 7 equal (<code>np.array_equal</code>) between the full model and the 8-module copy; skips without weights.</p>
+<h2 id="step-6-dockerparitypy-dockersmokesh-and-p1p4-25-min">Step 6: <code>docker/parity.py</code>, <code>docker/smoke.sh</code> and P1–P4 (25 min)</h2>
+<p><code>parity.py compare A.tsv B.tsv [--n N] [--spearman-min 0.99] [--max-abs 0.05] [--ignore-order]</code>: reads both with <code>csv</code> (tab), aligns on <code>filename</code> (mismatch → exit 2 naming the first offender), takes the first N of A's order, prints Spearman (<code>scipy.stats.spearmanr</code>), max abs diff, the count over <code>--max-abs</code>, and whether B's order equals A's; exit 1 on a threshold failure. <code>pcm-hash DIR --ids id1 id2 ... [--template T --n N] --out hashes.json</code>: <code>hash_one</code> per file; <code>pcm-diff a.json b.json</code> → lists differing ids, exit 1 if any.</p>
+<p><code>smoke.sh</code>: builds a 3-file set under <code>outputs/docker/smoke/</code> (not <code>/tmp</code>: Colima mounts only <code>$HOME</code>) (<code>sine.wav</code> 16 kHz via ffmpeg, <code>sine.mp3</code>, <code>sine.flac</code>) plus a reversed template; <code>docker run --rm --network none -v $tmp/data:/data:ro -v $tmp/out:/out -e HEARSAY_TEMPLATE=/data/template.tsv hearsay:latest</code>; asserts 4 lines, header, order equals the template, exit 0; runs again into <code>out2</code> and <code>cmp</code>s the two TSVs; runs a third time with <code>-e HEARSAY_DETECTORS=m1b,spectra,handcrafted</code> and checks three cache files exist. Prints the run.json preflight block. Before the runs, three one-line image self-checks: <code>python -c "import hearsay.embed as e; assert (e.REPO/'weights'/'wav2vec2-xls-r-300m'/'config.json').exists()"</code> (REPO resolves to /app), <code>python -c "import numpy as np, librosa; librosa.feature.mfcc(y=np.zeros(16000,'f4'), sr=16000)"</code> (numba JIT under Rosetta), and <code>python docker/assets.py verify --root /app --manifest /app/models/assets.json --full</code>.</p>
+<p>Tests P1–P4 in <code>test_docker_image.py</code>: synthetic TSV pairs for <code>compare</code>; two tiny WAVs for <code>pcm-hash</code>; static greps on <code>smoke.sh</code> and <code>build.sh</code>.</p>
+<h2 id="step-7-hermetic-gates-t1t3-10-min">Step 7: hermetic gates T1–T3 (10 min)</h2>
+<p><code>uv run pytest -q tests/test_docker_image.py tests/test_docker_runner.py</code>; <code>uv run ruff check .</code>; <code>uv run pytest -q</code> (all); <code>uv run pytest -q -m "needs_weights and slow" tests/test_docker_image.py</code>. Fix until green.</p>
+<h2 id="step-8-build-in-the-background-mac-parity-in-the-foreground-t4-t5">Step 8: build in the background, Mac parity in the foreground (T4, T5)</h2>
+<p><code>bash docker/build.sh &gt; outputs/docker_build.log 2&gt;&amp;1 &amp;</code> (background; expected 30–60 min: 2.5 GB context, Rosetta pip installs). Meanwhile T4: <code>uv run python scripts/run_pipeline.py --data data/nsa/HackGTHearsayTesting --template data/nsa/HearsayScoreKey4TeamX.tsv --out outputs/docker/k-mac --probe models/m1_wav2vec2-xls-r-300m_L7_20260926-0521 --policy none --limit 50 --device cpu</code> then <code>uv run python docker/parity.py compare outputs/docker/k-mac/teamName_predictions-limit50.tsv submissions/20260926-0522_M1_m1_wav2vec2-xls-r-300m_L7_20260926-0521.tsv --n 50</code> and <code>pcm-hash</code> of the 50 into <code>outputs/docker/k-mac/pcm.json</code>. If Spearman or max abs fail, stop: the fault is in the runner (compare the cached logits against <code>outputs/detector_scores/m1b_v3.csv</code> test rows for the same files to localise it), not in Docker.</p>
+<h2 id="step-9-image-checks-t6-t7-t8">Step 9: image checks (T6, T7, T8)</h2>
+<p>Colima bind-mounts only paths under <code>$HOME</code> (verified by the probe: a <code>/private/tmp</code> mount appeared empty inside the container), so every <code>-v</code> source is under the repo (<code>outputs/docker/...</code>, gitignored) or <code>$HOME</code>; <code>smoke.sh</code> creates its temp set under <code>outputs/docker/smoke/</code>.</p>
+<p>When the build finishes: <code>docker run --rm --platform linux/amd64 hearsay:latest python -c "import platform, torch; print(platform.machine(), torch.__version__)"</code>; <code>bash docker/smoke.sh</code>; T7: <code>docker run --rm --network none -v data/nsa/HackGTHearsayTesting:/data:ro -v $PWD/outputs/docker/k-img:/out -e HEARSAY_TEMPLATE=/data/../HearsayScoreKey4TeamX.tsv ... hearsay:latest --limit 50 --policy none</code> (mount the template read-only at <code>/tmpl/key.tsv</code> instead of relying on <code>/data</code>), then <code>parity.py compare</code> against the logged TSV and <code>pcm-diff</code> against the Mac hashes; T8: the full set in the background with <code>time</code>, written to <code>outputs/docker/k-full</code>. Under Rosetta the risk agent measured 1.56 s per 8 s clip through 8 layers on the Mac's native CPU and expects 3–8× that under emulation, so the full set is a 1.5–4 h background job; if it has not finished by the hard stop, the run spec records the measured per-file rate from T7 and the extrapolation, marked as such, and the native amd64 timing is deferred to the Sunday rebuild (a Linux box or NSA's own run). The <code>NNPACK</code> and <code>LOAD REPORT</code> (unexpected <code>quantizer.*</code> keys of the pretraining checkpoint) lines in the logs are expected noise.</p>
+<h2 id="step-10-docs-run-spec-results-commit-audits-30-min">Step 10: docs, run spec results, commit, audits (30 min)</h2>
+<p>README Docker section (build, run, env vars, mounts, outputs, smoke and parity commands, the placeholder team name, the note that the TSV is not auto-logged); conditional edits (STATUS row, CLAUDE.md bullet, architecture 10.7) staged as my hunk only via <code>git diff -- &lt;file&gt; &gt; /tmp/p.diff</code> edited to my hunk and <code>git apply --cached</code>, or deferred with a dated note; run spec Results filled with T1–T9 numbers; <code>git add</code> by path: <code>Dockerfile .dockerignore docker/ scripts/run_pipeline.py tests/test_docker_image.py tests/test_docker_runner.py README.md docs/specs/2026-09-26_k-docker-image.md docs/reports/2026-09-26_k-docker-image-plan.md docs/reports/2026-09-26_k-docker-image-plan-review.md</code>; commit <code>feat(K): offline CPU amd64 Docker image and scripts/run_pipeline.py (audio -&gt; detectors -&gt; fusion -&gt; TSV)</code>; Claude critique loop; <code>bash .claude/review-audit.sh docs/specs/2026-09-26_k-docker-image.md</code>; fix findings; re-audit; report.</p>
+<h2 id="risks-and-mitigations-risk-agent-0640-all-verified-unless-marked">Risks and mitigations (risk agent, 06:40; all VERIFIED unless marked)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Risk</th><th>Mitigation in this plan</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td>A hashed export leaves orphan <code>--hash</code> lines after the grep and forces <code>--require-hashes</code></td><td><code>--no-hashes</code> on the export (present); 72 requirement lines, 0 hash lines verified</td></tr>
+<tr><td>2</td><td>Every weights/models lookup is <code>REPO</code>-relative (<code>embed.py:21</code>, <code>spectra.py:38</code>, <code>_learned.py:26</code>, <code>speaker_drift.py:32</code>): a non-editable install would resolve to site-packages</td><td>editable install plus <code>PYTHONPATH=/app/src</code>; smoke self-check asserts <code>hearsay.embed.REPO/weights/...</code> exists</td></tr>
+<tr><td>3</td><td>Rosetta throughput: full 1,671 files is hours per heavy model</td><td>50-file parity is the gate; the full set runs in the background and is extrapolated if unfinished (step 9); 8-layer truncation for M1</td></tr>
+<tr><td>4</td><td>Colima bind-mounts only <code>$HOME</code>; other sources mount empty without error</td><td>all <code>-v</code> sources under the repo; the runner exits non-zero on an empty <code>/data</code></td></tr>
+<tr><td>5</td><td><code>docker run --cpus=N</code> quota vs <code>os.cpu_count()</code> oversubscription</td><td>entrypoint derives threads from <code>cpu.max</code> and affinity; exports <code>OMP_NUM_THREADS</code>, <code>MKL_NUM_THREADS</code></td></tr>
+<tr><td>6</td><td>numba/llvmlite JIT (librosa, on the handcrafted and speech-gate paths) unverified under Rosetta; default cache dir may be read-only</td><td><code>NUMBA_CACHE_DIR=/tmp/numba</code> in the image; smoke self-check runs <code>librosa.feature.mfcc</code>; <code>NUMBA_CPU_NAME=generic</code> documented as the fallback</td></tr>
+<tr><td>7</td><td><code>append_log</code> targets <code>/app/submissions/log.csv</code>, absent in the image</td><td>the runner never calls <code>append_log</code> (D10)</td></tr>
+<tr><td>8</td><td><code>COPY</code> of the symlinked <code>models/hc_selected</code> copies a dangling link when the tree is copied; <code>!</code> re-includes under an excluded parent re-include only the link</td><td>staging dir <code>docker/build/</code> populated with <code>cp -RL</code>; <code>models/</code> excluded from the context; weights included by not excluding them</td></tr>
+<tr><td>9</td><td><code>compression</code> detector needs <code>models/cmp_selected</code>, not shipped</td><td>the runner names its detectors explicitly and never iterates the registry</td></tr>
+<tr><td>10</td><td>transformers 5.17 and a local <code>pytorch_model.bin</code> offline</td><td>loads with <code>weights_only=True</code>, <code>mmap</code>, <code>local_files_only</code> forced by the env; verified against a dead endpoint (5.6 s)</td></tr>
+<tr><td>11</td><td>Spectra <code>model.py</code> and the hub id</td><td>patched by <code>load_spectra</code>; <code>PyTorchModelHubMixin.from_pretrained</code> takes the local-dir branch; verified against a dead endpoint (13.0 s)</td></tr>
+<tr><td>12</td><td>Memory in a 5.8 GiB VM</td><td>XLS-R (8 layers, 8 s clip) 1.07 GiB peak, Spectra with a 16-window batch 1.51 GiB; one model resident at a time</td></tr>
+<tr><td>13</td><td>Import-time side effects</td><td>none; <code>splits/nsa_test_durations.csv</code> is not needed at test time</td></tr>
+<tr><td>14</td><td>joblib pickles across arm64 → x86_64</td><td>explicit little-endian dtypes, same sklearn/numpy; the <code>Probe</code> class must be importable (editable install)</td></tr>
+<tr><td>15</td><td>ffmpeg 5.1.9 vs 7.1.1 decode</td><td>md5 of the decoded f32 stream identical for an NSA WAV on both; PCM parity (T7) confirms on 50 files</td></tr>
+<tr><td>16</td><td>buildx <code>--load</code> size limits, context upload</td><td>containerd snapshotter, no tar export; 1.26 GB COPY measured at 60 s wall, so 2–3 min for the weights</td></tr>
+<tr><td>17</td><td>Rosetta CPU features</td><td><code>avx2</code>, <code>fma</code>, <code>f16c</code> exposed, no avx512; torch reports AVX2</td></tr>
+</tbody>
+</table></div>
+<h2 id="toolchain-probe-result-0630-amd64-container-under-rosetta-6-vcpu">Toolchain probe result (06:30, amd64 container under Rosetta, 6 vCPU)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Step</th><th>Wall</th><th>Size</th>
+</tr></thead>
+<tbody>
+<tr><td>apt update + ffmpeg</td><td>59 s</td><td>+473 MB (libavdevice pulls X11/SDL; acceptable)</td></tr>
+<tr><td>uv export + grep</td><td>1 s</td><td>271 → 252 lines, 72 package lines, 65 install on linux/py3.12</td></tr>
+<tr><td>requirements install (<code>--no-deps</code>, cold cache)</td><td>9 s</td><td>venv 608 MB</td></tr>
+<tr><td>CPU torch + torchaudio from the PyTorch index</td><td>13 s</td><td>venv 1.3 GB (torch 711 MB)</td></tr>
+<tr><td>editable install</td><td>1 s</td><td>needs README.md</td></tr>
+<tr><td>leftover uv cache</td><td></td><td>1.4 GB, removed in-layer</td></tr>
+</tbody>
+</table></div>
+<p>Verified inside the venv: <code>torch 2.14.0+cpu, torchaudio 2.11.0+cpu, transformers 5.17.0, sklearn 1.9.1, numpy 2.5.3, scipy 1.18.1</code>; <code>torch.cuda.is_available()</code> False; no nvidia/cuda/triton/lightgbm packages; <code>torchaudio.functional.preemphasis</code> present; <code>platform.machine()</code> x86_64; matmul 2048² median 0.30 s; a 768-wide transformer layer on 49 frames 27 ms. Notes: <code>tzdata</code> (the Python package) does not install on Linux, so the runner avoids pandas timezone features (it uses the <code>csv</code> and <code>json</code> modules and stdlib <code>datetime</code>); <code>torchaudio.load</code> would need <code>torchcodec</code>, which the project never calls (all decoding is FFmpeg via <code>hearsay.audio</code>).</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/reports/2026-09-26_k-docker-image-plan.md</code> <span class="hash">1cf2089d23fb</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Detector contract and safe runner · HEARSAY</title>
+<meta name="description" content="Every detector takes the same read-only clip and returns the same kind of result: a score that rises with synthetic likelihood, one sentence of evidence, named ">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html" aria-current="page">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>Detector contract and safe runner</h1>
+<p class="lead">Every detector takes the same read-only clip and returns the same kind of result: a score that rises with synthetic likelihood, one sentence of evidence, named features and a status. A wrapper guarantees that a crashing detector becomes a neutral, flagged result and never costs a file its row.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Rules and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>Ten detectors from four people had to plug into one pipeline in a weekend. The contract is the agreement that made that possible: what a detector gets, what it must return, and what happens when it fails. The rules are enforced, not assumed: a score outside [0, 1] or a missing evidence sentence raises an error rather than being quietly fixed, so a detector cannot slip a bad value into fusion.</p>
+<h2 id="io">What goes in and comes out</h2>
+<ul>
+<li><strong>In:</strong> a <code>ClipContext</code>: the path, the decoded audio (read-only, decoded once), the header probe (computed once), and a per-clip memo cache that detectors share expensive intermediates through.</li>
+<li><strong>Out:</strong> a <code>DetectorResult(name, score, evidence, features, status, error)</code>.</li>
+<li><strong>Through:</strong> <code>safe_run(detector, ctx)</code>, which never raises.</li>
+</ul>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py" title="src/hearsay/detectors/base.py (GitHub; assumes main is public)">src/hearsay/detectors/base.py</a>: <code>ClipContext</code>, <code>DetectorResult</code>, the <code>Detector</code> protocol, <code>safe_run</code>, and the <code>Registry</code>. The engineered detectors register themselves through <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/engineered.py" title="src/hearsay/detectors/engineered.py (GitHub; assumes main is public)">engineered.py</a>.</p>
+<h2 id="params">Rules and where each is set</h2>
+<ul>
+<li><code>score</code> must be a real number, not a bool, finite, in [0, 1]; violations raise <code>ValueError</code> and values are never clipped (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py#L125" title="src/hearsay/detectors/base.py line 125 (GitHub; assumes main is public)">base.py, lines 125–127</a>).</li>
+<li><code>evidence</code> must be a non-empty string; <code>features</code> a mapping of non-empty names to finite floats (copied, so a detector cannot mutate a result after the fact); <code>status</code> one of <code>ok</code>, <code>skipped</code>, <code>error</code>, and only an error carries an error string (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py#L128" title="src/hearsay/detectors/base.py line 128 (GitHub; assumes main is public)">base.py, lines 128–143</a>).</li>
+<li><strong>The neutral score</strong> is <span class="num" data-src="src/hearsay/detectors/base.py#L40">0.5</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py#L40" title="Source: src/hearsay/detectors/base.py line 40 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/base.py line 40 (GitHub; assumes main is public)</span></a>. <code>safe_run</code> turns a raised exception, a wrong return type, a name mismatch or a non-ok status from <code>run</code> into <code>status="error"</code> at that score with the evidence "detector failed: …"; a detector whose <code>applies()</code> is false is <code>skipped</code> without running (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py#L163" title="src/hearsay/detectors/base.py line 163 (GitHub; assumes main is public)">base.py, lines 163–192</a>). Keyboard interrupts still propagate.</li>
+<li><strong>The audio is decoded once</strong> and marked read-only; a decode failure is cached and re-raised without a second FFmpeg call (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py#L70" title="src/hearsay/detectors/base.py line 70 (GitHub; assumes main is public)">base.py, lines 70–84</a>).</li>
+<li><strong>The registry</strong> rejects duplicate or empty names and iterates in sorted name order, so fusion columns are stable (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py#L195" title="src/hearsay/detectors/base.py line 195 (GitHub; assumes main is public)">base.py, lines 195–217</a>).</li>
+<li><strong>Detectors never read filenames or filesystem timestamps</strong>, because git, zip and Docker rewrite them (a project rule in <a class="srclink" href="../library/claude-md.html#detector-contract" title="CLAUDE.md, section detector-contract">CLAUDE.md</a>).</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built and frozen. A change to <code>DetectorResult</code> fields must name the affected detector owners; none was made after the D-track began.</p>
+<h2 id="numbers">Numbers</h2>
+<p>Every learned detector exports one file per detector with columns path, fold, split, score and logit over the same <span class="num" data-src="README.md#the-detector-contract">21,671</span><a class="src" href="../library/readme.html#the-detector-contract" title="Source: README.md, section the-detector-contract"><span class="sr">source: README.md, section the-detector-contract</span></a> rows (the training clips and the test files); fusion reads only those exports, so any detector can be swapped or ablated without touching the others.</p>
+<h2 id="limits">Known limits</h2>
+<p>The neutral <span class="num" data-src="src/hearsay/detectors/base.py#L40">0.5</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/base.py#L40" title="Source: src/hearsay/detectors/base.py line 40 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/base.py line 40 (GitHub; assumes main is public)</span></a> on a skipped or errored result is a placeholder, not evidence: the fusion code imputes such a column at its training centre instead (see <a href="fusion-rule.html">the fusion rule</a>). The role labels in the runner's code tag Spectra-AASIST as "fused" although the rule only lets it suppress; the reports and this site say "suppressor".</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_detector_contract.py</code>, thirty-odd cases named B1–B9: invalid scores rejected and never clipped, valid scores coerced to float, score direction, exceptions become error results, bad return values become errors, evidence required, bad features rejected, registry rejects duplicates and sorts, the same clip scored twice is identical, audio is read-only, decoded once, decode failure cached, memo computes once, not-applicable is skipped, results unhashable but comparable, status and error coherence. <code>tests/test_engineered_registry.py</code> pins the seven registered engineered names.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/claude-md.html#detector-contract" title="CLAUDE.md, section detector-contract">CLAUDE.md, "Detector contract"</a>; <a class="srclink" href="../library/architecture.html#5-the-detector-contract" title="docs/architecture.md, section 5-the-detector-contract">Architecture §5</a>; <a class="srclink" href="../library/readme.html#the-detector-contract" title="README.md, section the-detector-contract">the README</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="audio-loader.html">← Audio loader and probe</a><a class="next" rel="next" href="segment-preparation.html">Segment preparation and band match →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/specs/detector-contract.frag</code> <span class="hash">e29a25200362</span>, <code>src/hearsay/detectors/base.py</code> <span class="hash">c841e38bdacc</span>, <code>CLAUDE.md</code> <span class="hash">e6756765556f</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consult: fusion, selection, false alarms and the "default answer" (Sat Sep 26, 2026, ~03:30 EDT; updated ~04:30 with In-the-Wild and band-limit findings; ~05:50 with the band-matched v3 numbers, M3 and the fusion v0 readout) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#your-role">Your role</a></li><li><a href="#the-problem">The problem</a></li><li><a href="#data-and-validation">Data and validation</a></li><li><a href="#current-numbers">Current numbers</a></li><li><a href="#real-world-stress-test-in-the-wild-evaluation-only-never-trained-on">Real-world stress test (In-the-Wild, evaluation only, never trained on)</a></li><li><a href="#what-i-want-ranked">What I want (ranked)</a></li><li><a href="#hard-lines">Hard lines</a></li><li><a href="#output-format">Output format</a></li></ul></details>
+<h1 id="consult-fusion-selection-false-alarms-and-the-default-answer-sat-sep-26-2026-0330-edt-updated-0430-with-in-the-wild-and-band-limit-findings-0550-with-the-band-matched-v3-numbers-m3-and-the-fusion-v0-readout">Consult: fusion, selection, false alarms and the "default answer" (Sat Sep 26, 2026, ~03:30 EDT; updated ~04:30 with In-the-Wild and band-limit findings; ~05:50 with the band-matched v3 numbers, M3 and the fusion v0 readout)</h1>
+<p><strong>Target:</strong> a frontier LLM, for strategic and technical opinion.
+<strong>Scope:</strong> everything <strong>except</strong> the M5 fine-tune recipe, which has its own consult: <code>2026-09-26_m5-extra-data-finetune_CONSULTATION.md</code>.
+<strong>Blocking?</strong> Partly. The fusion and selection answers decide what we send for NSA's one-time draft review on Saturday afternoon.</p>
+<p>Copy below the line.</p>
+<hr>
+<h2 id="your-role">Your role</h2>
+<p>You are an applied researcher in audio deepfake detection and in detection-cost evaluation (ASVspoof, NIST SRE-style DCF). Push back hard on any wrong premise. We have about 26 hours left in a hackathon (final TSV due in about 23). Practical beats ideal.</p>
+<h2 id="the-problem">The problem</h2>
+<ul>
+<li><strong>Task.</strong> The NSA "HEARSAY" challenge at HackGT 13: output P(synthetic) per audio file, with 1.0 = synthetic.</li>
+<li><strong>Test set.</strong> 1,671 unlabeled 16 kHz mono PCM WAVs, 3.0–13.6 s long (median 3.4 s), English. NSA says "approximately 70% of the files are real."</li>
+<li><strong>Judging.</strong>
+<ul>
+<li><strong>60% MinDCF.</strong> Points are (1 − ours)/(1 − best) × 60, where "best" is the best team's minDCF.</li>
+<li><strong>20%</strong> for diversity and depth of techniques. The brief itemizes: container/metadata, spectral, prosody, ENF, compression, speaker-embedding consistency, deep anti-spoofing, splice, and a bonus for "agentic orchestration" (choosing analyses per file).</li>
+<li><strong>20%</strong> for GitHub documentation "in your own words", including what did not work and explainability.</li>
+</ul></li>
+<li><strong>Stated cost.</strong> A false alarm (real called synthetic) costs 4× a miss. With π_synth = 0.3, our normalized minDCF is <strong>9.33·P_FA + P_miss</strong>. That is our selection metric; EER is logged alongside.</li>
+<li><strong>The sponsor's scoring code contradicts the instructions.</strong> Their MinDCF code (shipped to us) is the ASVspoof5 Track 1 evaluation package, unmodified:
+<ul>
+<li><code>Pspoof = 0.5, Cmiss = 1, Cfa = 4</code></li>
+<li><code>compute_det_curve(bona, spoof)</code> treats a <strong>higher score as bona fide</strong></li>
+<li>The instructions say 1.0 = synthetic.</li>
+<li>Scored with that code as shipped, every good detector of ours gets <strong>minDCF 1.00</strong>. Scored with our scores flipped, the same detectors get 0.09–0.13.</li>
+<li>Our decision is to follow the instructions (1.0 = synthetic) and never flip. We have asked the sponsor; there's no answer yet.</li>
+</ul></li>
+<li><strong>The instructions also say:</strong> "You will have to strategize and use some sort of Game Theory or Benchmark maxing to determine what the default answer to be if you cannot determine an answer for all of the files. This could be crucial!"</li>
+<li><strong>Deliverables.</strong> The TSV (before 8 AM Sunday), a Docker image that runs inference offline on CPU, and a README. We also get <strong>one optional early review of a draft TSV</strong> against the test labels.</li>
+</ul>
+<h2 id="data-and-validation">Data and validation</h2>
+<p><strong>Training data (sponsor-provided plus public):</strong></p>
+<ul>
+<li>DiffSSD spoof: 10 generators, 70k clips total, of which the training sample uses 1k per generator:
+<ul>
+<li>LJ-voice TTS/vocoders: grad_tts, diffgan_tts, pro_diff, wavegrad2</li>
+<li>multi-speaker: openvoicev2, unit_speech, xtts_v2, your_tts</li>
+<li>commercial: elevenlabs, playht</li>
+</ul></li>
+<li>LJ Speech (real, <strong>one speaker</strong>): 6k in the sample.</li>
+<li>LibriSpeech dev+test (real, about 80 speakers): 4k in the sample.</li>
+</ul>
+<p><strong>Input path (identical for train and test):</strong></p>
+<ol>
+<li>Decode through FFmpeg to 16 kHz.</li>
+<li>Trim silence (relative 35 dB).</li>
+<li>Per-input z-normalization.</li>
+<li>No tiling; training crops are drawn from the test-duration distribution; test-time uses the whole clip.</li>
+</ol>
+<p><strong>Shortcuts found and neutralized:</strong></p>
+<ul>
+<li><strong>7.2 kHz band wall.</strong> Every NSA test file is low-passed at about 7.2 kHz: the median energy share in 7.5–8 kHz is 1.6e-8, against 6e-4 to 6e-3 in LJ, LibriSpeech and DiffSSD. That band was a train-only cue. It's now removed by an identical Kaiser low-pass on train and test, in both the deep and engineered paths (since ~04:20). <strong>All deep numbers below predate this fix</strong> and are being re-measured.</li>
+<li>peak level (AUC 0.66 on its own)</li>
+<li>leading silence (LibriSpeech 0.37 s vs test 0.06 s)</li>
+<li>a tiling seam from padding short clips</li>
+<li>container format</li>
+</ul>
+<p><strong>Folds</strong> (<code>splits/nsa_folds.csv</code>, groups: spoof by generator; bona fide by speaker, or chapter for LJ):</p>
+<ul>
+<li><strong>Outer holdout:</strong> playht + wavegrad2 + 26 bona fide groups (1,858 real / 2,000 spoof). Never used for training or selection.</li>
+<li><strong>Inner folds 0–4:</strong> leave-generator-out on the spoof side.</li>
+</ul>
+<p><strong>Leakage:</strong> no exact file or PCM duplicates between the test set and LJ, the NSA LJ subset, or In-the-Wild.</p>
+<h2 id="current-numbers">Current numbers</h2>
+<p>Normalized minDCF at π = 0.3 unless stated. Holdout = outer holdout.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Detector</th><th>Inner-fold OOF minDCF</th><th>Holdout minDCF</th><th>Holdout EER</th><th>Sponsor code as-is / flipped</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>M1:</strong> frozen XLS-R 300M, layer 7 mean-pooled, logistic regression</td><td>0.250</td><td><strong>0.146</strong></td><td>2.5%</td><td>1.00 / 0.090</td></tr>
+<tr><td>Handcrafted: 75 spectral + prosody features, LightGBM</td><td>0.614</td><td>0.255</td><td>4.3%</td><td>1.00 / 0.127</td></tr>
+<tr><td>Compression forensics</td><td>0.931</td><td>0.900</td><td>20%</td><td>1.00 / 0.590</td></tr>
+<tr><td>Container/metadata, ENF, splice</td><td>1.00</td><td>1.00</td><td>35–50%</td><td>no signal (inputs are uniformly decoded)</td></tr>
+<tr><td><strong>Stack:</strong> logistic on inner OOF of M1 + handcrafted</td><td>0.250</td><td>0.146</td><td>2.5%</td><td>puts essentially all weight on M1</td></tr>
+<tr><td><strong>Mean</strong> of z-scored logits, M1 + handcrafted (no fitting)</td><td>0.258</td><td><strong>0.066</strong></td><td>1.3%</td><td>– / 0.043</td></tr>
+</tbody>
+</table></div>
+<p><strong>Detail:</strong></p>
+<ul>
+<li>M1 per held-out generator: playht 0.032, wavegrad2 0.214 (the LJ-voice vocoder is the hard one).</li>
+<li>M1 per bona fide source: <strong>LJ 0.088 vs LibriSpeech 0.159</strong>.</li>
+<li>Handcrafted per bona fide source: LJ 0.10 vs LibriSpeech 0.32. Unfamiliar real voices draw more false alarms.</li>
+<li>M1 layer sweep, inner CV: L6 0.284, <strong>L7 0.250</strong>, L8 0.282, L12 0.281, L20+ ≥ 0.40.</li>
+</ul>
+<p><strong>M1 on the NSA test set:</strong></p>
+<ul>
+<li>Score distribution: 28% of files above 0.9 and 40% above 0.5 (NSA says about 30% synthetic).</li>
+<li>Preflight: <strong>pure silence scores 0.9996 and a synthetic music chord scores 1.0</strong>, i.e. confidently wrong on non-speech. The test set looks all-speech (median voiced fraction 0.8).</li>
+</ul>
+<h2 id="real-world-stress-test-in-the-wild-evaluation-only-never-trained-on">Real-world stress test (In-the-Wild, evaluation only, never trained on)</h2>
+<p>The sample is 2,000 real clips from 54 speakers plus 1,000 fakes, web-sourced celebrity audio. "Inner threshold" is the threshold that minimizes inner-fold out-of-fold DCF.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>M1 (NSA-only real)</th><th>M1b (+ASVspoof 2019 LA real: 40 VCTK speakers, 5.1k clips, plus a 2.5k A01–A06 anchor)</th>
+</tr></thead>
+<tbody>
+<tr><td>NSA holdout minDCF</td><td>0.146</td><td>0.079 (better on every slice; inside holdout noise)</td></tr>
+<tr><td>Inner-fold CV minDCF</td><td>0.250</td><td>0.248</td></tr>
+<tr><td><strong>In-the-Wild minDCF</strong></td><td><strong>0.374</strong></td><td>0.405</td></tr>
+<tr><td>In-the-Wild P_FA at the inner threshold</td><td><strong>1.2%</strong></td><td>5.7%</td></tr>
+</tbody>
+</table></div>
+<p><strong>Update ~05:40 (band-matched v3 and M3):</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Detector</th><th>NSA holdout minDCF</th><th>In-the-Wild minDCF</th><th>In-the-Wild real P_FA</th><th>Test share &gt; 0.5 (prior ~30%)</th>
+</tr></thead>
+<tbody>
+<tr><td>M1 v3 (band-matched)</td><td>0.159</td><td>0.380</td><td>0.7%</td><td>28.9% (v2 was 39.6%)</td></tr>
+<tr><td>M1b v3 (band-matched, +VCTK)</td><td>0.072</td><td>0.342</td><td>0.8%</td><td>26.8%</td></tr>
+<tr><td><strong>M3 Spectra-AASIST</strong> (pretrained, frozen, band-matched)</td><td>pending (~06:00)</td><td><strong>0.065</strong></td><td><strong>0.0%</strong> (0 of 2,000)</td><td>26.5% (200-clip pilot)</td></tr>
+<tr><td>Handcrafted v4 (234 features, LightGBM)</td><td>0.170</td><td>1.00 (AUC 0.76)</td><td>0.65%</td><td>41%</td></tr>
+</tbody>
+</table></div>
+<p><strong>Fusion v0 readout (05:32; rules pre-declared, nothing fit on holdout, In-the-Wild or test). Inputs: M1b v3 and handcrafted v4.</strong> Each detector's logit is standardized on its inner out-of-fold rows. <code>zmean</code> = mean of standardized logits; <code>rankmean</code> = mean of per-detector ECDF ranks; <code>stack_nonlj</code> = logistic stacker fit on inner rows with LJ real speech excluded (one speaker on both sides of every fold), so its inner number is in-sample and not shown.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Rule</th><th>Inner OOF</th><th>Holdout</th><th>Holdout LibriSpeech real</th><th>ITW minDCF</th><th>ITW real P_FA</th><th>ITW P_miss</th><th>Test share &gt; 0.5</th>
+</tr></thead>
+<tbody>
+<tr><td>M1b v3 alone</td><td>0.301 (folds include the extra real rows)</td><td>0.072</td><td>0.102</td><td>0.342</td><td>0.8%</td><td>27.8%</td><td>26.8%</td></tr>
+<tr><td>handcrafted v4 alone</td><td>0.434</td><td>0.170</td><td>0.217</td><td>1.00</td><td>0.65%</td><td>97%</td><td>56%</td></tr>
+<tr><td>zmean</td><td>0.259</td><td><strong>0.018</strong></td><td>0.022</td><td>0.387</td><td><strong>0.15%</strong></td><td>58.5%</td><td><strong>39.6%</strong></td></tr>
+<tr><td>rankmean</td><td>0.254</td><td><strong>0.015</strong></td><td>0.015</td><td>0.379</td><td><strong>0.15%</strong></td><td>59.5%</td><td>31.8%</td></tr>
+<tr><td>stack_nonlj</td><td>(in-sample)</td><td>0.044</td><td>0.066</td><td><strong>0.317</strong></td><td>0.7%</td><td>31.6%</td><td>27.5%</td></tr>
+</tbody>
+</table></div>
+<p>Reading: fusing the two cuts the holdout by 4× and In-the-Wild false alarms by 5×, but doubles In-the-Wild misses and pushes the test-set share of files called synthetic from 27% to 32–40%, against a 30% prior. The handcrafted column contributes almost no real-world detection (ITW P_miss 97%), so its In-the-Wild "gain" is a threshold effect. The stacker sits between.</p>
+<p><strong>Diagnosis of the test-share rise (05:55).</strong> The handcrafted column carries a residual train-to-test shift that band matching did not remove: the test recordings are darker below 7 kHz, codec-like. Its 234 columns tell train from test at AUC 0.99 (the 75 v3 columns alone: 0.97), and 84% of the shifted columns move in the "fake" direction, so under a 0.3-prior Platt map it calls 56% of the test set synthetic (v3: 49%; the deep models: 27%). No single feature family is responsible (leave-one-family-out: 54–57%), and pruning the shifted columns makes it worse (60–68%; the survivors still separate train from test at 0.98). Training-side augmentation as fit-only extra rows (codec round-trips, random tilt and low-pass; "v5b") helps partially: clean holdout 0.137 (v4 0.170), holdout-real false alarms at the calibrated threshold 6.3% (from 9.1%), In-the-Wild real P_FA 0.40% (from 0.65%), test share 51% (from 56%), at an inner-fold cost (0.418 → 0.469; pro_diff 0.30 → 0.63). So the fusion rules' test-share rise is this column's offset, not the deep models'. The remaining remedy on the table is re-centering that detector's logit on the unlabeled test distribution before fusion, or down-weighting it.</p>
+<p><strong>Spectra-AASIST's training data is undisclosed.</strong> Its card reports 1.46% EER on In-the-Wild, and it separates our NSA inner rows perfectly (AUC 1.0). So its In-the-Wild and inner-fold numbers may be in-sample. Band matching fixed the test-distribution shift but left the M1 In-the-Wild gap unchanged. <strong>New question: how should we weight a detector whose validation rows may be in its training data?</strong></p>
+<ul>
+<li><strong>Both models are 3–5× worse on real-world audio</strong> than on the NSA-domain holdout. The brief says the test's real audio may include smartphone, telephony and field recordings.</li>
+<li><strong>Adding VCTK read speech did not help on In-the-Wild.</strong> An earlier consult predicted it would.</li>
+<li>Part of the gap may be the 7.2 kHz band mismatch (In-the-Wild isn't low-passed either); the re-measurement will show.</li>
+</ul>
+<h2 id="what-i-want-ranked">What I want (ranked)</h2>
+<p>For each question: your recommendation, a concrete procedure we can run in under 1 hour of CPU, and EV × effort.</p>
+<ol>
+<li><strong>Selection under disagreement.</strong> The inner folds say the M1 + handcrafted mean is slightly worse than M1 (0.258 vs 0.250). The holdout says it is much better (0.066 vs 0.146). The logistic stacker trusts the inner OOF and zeroes out the handcrafted detector.
+<ul>
+<li>What is the principled choice?</li>
+<li>What is the likely reason for the disagreement?
+<ul>
+<li>The inner folds are leave-one-generator-out on 8 generators.</li>
+<li>The holdout has only 2 generators.</li>
+<li>The handcrafted inner OOF is weak on grad_tts and pro_diff (1.0).</li>
+</ul></li>
+<li>Would rank averaging, per-fold weight stability, a constrained stacker (non-negative weights, a shrink toward equal weights) or nested CV of the fusion rule resolve it without peeking at the holdout?</li>
+<li>Is it acceptable to use the one-time draft review to choose between two candidates? Which two should we send?</li>
+<li><strong>With the fusion v0 table above:</strong> the unfitted rules (zmean, rankmean) win the holdout and In-the-Wild false alarms by a wide margin but raise In-the-Wild misses from 28% to 59% and the test share above 0.5 from 27% to 32–40%. The stacker fit on non-LJ rows is in between on everything. Which of the four do we ship at 14:00? The rising test share is now diagnosed as the handcrafted column's domain offset (above): is re-centering one detector's logit on the unlabeled test set's own mean and spread legitimate under our no-pseudo-label rule, and if so, per column or only for columns with a measured train-to-test shift?</li>
+<li><strong>Weighting a pretrained detector whose validation rows may be in-sample.</strong> M3 (Spectra-AASIST) separates our inner rows perfectly (AUC 1.0) and reports In-the-Wild real P_FA 0.0%, but its training data is undisclosed and LJ, LibriSpeech, DiffSSD and In-the-Wild are all public. A stacker fit on inner rows will give it all the weight. How should its weight be set: holdout only, rank mean with equal weight, a cap, or excluded from stacking and used only as a gate?</li>
+</ul></li>
+<li><strong>The "default answer" / game-theory hint.</strong>
+<ul>
+<li>With a rank-based MinDCF at π = 0.3 and C_FA = 4, where should files we "cannot determine" sit in the ranking? Examples: decode failures, non-speech, detector disagreement, low confidence.</li>
+<li>Is there a smarter policy than the prior?
+<ul>
+<li>Push uncertain files to the real end, because false alarms dominate.</li>
+<li>Break ties deliberately.</li>
+<li>Account for the minDCF threshold sweep.</li>
+</ul></li>
+<li>How does the answer change if NSA actually runs their shipped code unmodified (a higher score treated as bona fide, Pspoof = 0.5)?</li>
+<li>Is there any hedge that is safe under both directions, or is the draft review the only real protection?</li>
+</ul></li>
+<li><strong>Channel robustness: false alarms on real-world real speech.</strong> This is now the top question. Our real training data is one LJ speaker, about 80 LibriSpeech readers, and optionally 40 VCTK speakers, all clean read speech. In-the-Wild shows 3–5× worse minDCF, and more read-speech speakers didn't help. The test's real audio may include smartphone, telephony and field recordings.
+<ul>
+<li>What is the cheapest effective lever in the next ~20 hours, using In-the-Wild real-speech P_FA as the proxy?
+<ul>
+<li>channel augmentation on both classes: telephony band-limit, codecs, RIR, noise, RawBoost convolutive</li>
+<li>score normalization</li>
+<li>test-statistics standardization or CORAL on the unlabeled test embeddings</li>
+<li>which bona fide corpora actually add channel variety (not just more read speech)</li>
+<li>center-loss or one-class objectives (another consult warned these are contraindicated with narrow bona fide data)</li>
+</ul></li>
+<li>What is safe to do with the unlabeled test set? We have ruled out pseudo-labeling.</li>
+<li>Is checking whether test real clips are LJ-like (nearest-neighbor to LJ embeddings) useful or a trap?</li>
+</ul></li>
+<li><strong>Explainability and the diversity score.</strong> Our engineered detectors carry no signal because every test file is identical in format. Should we:
+<ul>
+<li>keep them in the orchestrator anyway (to cover the rubric),</li>
+<li>replace them with techniques that work on decoded 16 kHz audio (e.g. speaker-embedding drift within a clip, breath/pause statistics, formant or phase features), or</li>
+<li>just document them honestly as "no effect"?</li>
+<li>What would a judge value for "agentic orchestration" beyond rule-based routing?</li>
+</ul></li>
+<li><strong>The non-speech failure.</strong> Silence and music score about 1.0. What is the right gate (a VAD threshold on voiced fraction, a speech/music classifier), and what score should gated files get, given question 2?</li>
+<li><strong>Time allocation.</strong> About 26 h remain (23 to the final TSV), and one person owns the deep models, fusion, TSV and the draft review; a fine-tune, a pretrained-detector scoring run and the engineered detectors run in parallel lanes; Docker is unowned. What would you cut, and what single change do you expect to move holdout minDCF the most?</li>
+</ol>
+<h2 id="hard-lines">Hard lines</h2>
+<ul>
+<li>No training or selection on the outer holdout.</li>
+<li>Never train on In-the-Wild.</li>
+<li>No pseudo-labeling of the test set.</li>
+<li>Output 1.0 = synthetic (instructions).</li>
+<li>Offline CPU inference in Docker, no hosted APIs.</li>
+<li>Training on external datasets is allowed by the brief.</li>
+</ul>
+<h2 id="output-format">Output format</h2>
+<ol>
+<li>A one-line <strong>verdict</strong> on our current direction.</li>
+<li>A <strong>ranked actions table</strong>: action | expected minDCF impact | effort | risk | do / maybe / skip.</li>
+<li>For each of the six questions: a recommendation with concrete numbers and one runnable procedure.</li>
+<li>The <strong>draft-review plan</strong>: which TSV(s) to send, what to learn from the returned score, and how to act on it.</li>
+<li><strong>Failure modes we haven't named</strong>, especially around the 4× false-alarm cost and the sponsor-code direction.</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md</code> <span class="hash">9d1ccbe17fed</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

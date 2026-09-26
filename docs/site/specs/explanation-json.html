@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The routing log and explanation JSON · HEARSAY</title>
+<meta name="description" content="For every file the runner writes one JSON record: every detector&#x27;s score, status, sentence and features, the fusion inputs and arithmetic, the routing log, and ">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html" aria-current="page">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>The routing log and explanation JSON</h1>
+<p class="lead">For every file the runner writes one JSON record: every detector's score, status, sentence and features, the fusion inputs and arithmetic, the routing log, and the version of everything that produced it. It is the explainability deliverable and the frontend's data.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">The record's shape</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>The brief asks for explainable results: which techniques said what, and why the file got its number. The record answers that in plain sentences a person can check, one per detector, plus a routing log that says what each rule decided. The eight worked examples on <a href="../how-it-decides.html#eight-files">How it decides</a> are these records, printed.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: the outputs of <code>analyze_clip</code> for one file. Out: <code>results/&lt;basename&gt;.json</code>, and the same object as the API's response.</p>
+<h2 id="where">Where it lives</h2>
+<p><code>analyze_clip</code>, <code>detector_entry</code>, <code>fusion_block</code>, <code>routing_log</code> and <code>fusion_line</code> in <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/pipeline.py#L537" title="src/hearsay/pipeline.py line 537 (GitHub; assumes main is public)">pipeline.py, lines 537–750</a>.</p>
+<h2 id="params">The record's shape</h2>
+<ul>
+<li><strong>Top level:</strong> <code>filename</code>, <code>duration_s</code>, <code>probability_synthetic</code>, <code>verdict</code>, <code>is_speech</code>, <code>default_answer_applied</code>, <code>fusion</code>, <code>detectors</code>, <code>routing_log</code>, <code>flag</code> (empty or <code>decode_error</code>), <code>seconds</code>, <code>version</code> (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/pipeline.py#L737" title="src/hearsay/pipeline.py line 737 (GitHub; assumes main is public)">pipeline.py, lines 737–750</a>).</li>
+<li><strong>Each detector entry:</strong> <code>name</code>, <code>role</code> (fused, evidence, routing, gate), <code>status</code>, <code>score</code>, <code>evidence</code>, <code>features</code>, <code>seconds</code>, <code>error</code>.</li>
+<li><strong>The fusion block:</strong> <code>rule</code>, <code>inputs</code>, <code>weights</code>, <code>terms</code>, <code>fused</code>, <code>p_fused</code>, <code>imputed</code>, a <code>detail</code> with the rule's name, the base rank and whether the Spectra step fired, and the block bounds (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/pipeline.py#L671" title="src/hearsay/pipeline.py line 671 (GitHub; assumes main is public)">pipeline.py, lines 671–674</a>).</li>
+<li><strong>The routing log</strong> is a list of lines in a fixed order: decode, container, compression, enf, splice, speaker_drift, speech_gate, fusion. The fusion line prints the weighted terms and the Spectra outcome, for example "M3 margin +9.50, no suppression (M3 never promotes)" (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/pipeline.py#L574" title="src/hearsay/pipeline.py line 574 (GitHub; assumes main is public)">pipeline.py, lines 574–596</a>).</li>
+<li><strong>The version block</strong> names the git commit, every model directory with the M5 checkpoint's hash prefixes, the constants file, the rule, the policy and the polarity, so a record can be traced to the exact build that made it (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/pipeline.py#L730" title="src/hearsay/pipeline.py line 730 (GitHub; assumes main is public)">pipeline.py, lines 730–736</a>).</li>
+<li><strong>The verdict</strong> is "undetermined" if the file did not decode or has no speech, else "synthetic" when the pre-map fused probability is at least <span class="num" data-src="src/hearsay/pipeline.py#L652">0.5</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/pipeline.py#L652" title="Source: src/hearsay/pipeline.py line 652 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/pipeline.py line 652 (GitHub; assumes main is public)</span></a>, else "real" (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/pipeline.py#L650" title="src/hearsay/pipeline.py line 650 (GitHub; assumes main is public)">pipeline.py, lines 650–653</a>).</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built; contract version v0. The frontend reads a static dump of these records for the test set under the shipped rule, and the live API returns the same object.</p>
+<h2 id="numbers">Numbers</h2>
+<p>None of its own; the record carries the detectors' numbers.</p>
+<h2 id="limits">Known limits</h2>
+<p>The verdict label ignores <code>--flip</code> and uses the pre-map probability; the ranking the metric scores is <code>probability_synthetic</code>. The frontend contract's line reference into the gate module is stale.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_pipeline.py</code>: the response shape and required version keys, the routing-log order and wording, the fusion line lists every weighted term, the verdict rule.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/handoffs-2026-09-26-frontend-contract.html" title="docs/handoffs/2026-09-26_frontend-contract.md">The frontend contract</a>; <a class="srclink" href="../library/reports-2026-09-26-worked-examples.html" title="docs/reports/2026-09-26_worked-examples.md">the worked examples</a>; <a class="srclink" href="../library/reports-2026-09-26-runner-docker.html" title="docs/reports/2026-09-26_runner-docker.md">the runner report</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="runner-routing.html">← The runner and its routing rules</a><a class="next" rel="next" href="local-api.html">The local API →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/specs/explanation-json.frag</code> <span class="hash">63fada221e06</span>, <code>src/hearsay/pipeline.py</code> <span class="hash">a03abc98e587</span>, <code>docs/handoffs/2026-09-26_frontend-contract.md</code> <span class="hash">a5af585ee893</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

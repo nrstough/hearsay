@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run spec: M5, XLS-R 300M fine-tune on vast.ai (Sat Sep 26, 2026, ~02:50) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_m5-xlsr-finetune.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/specs/2026-09-26_m5-xlsr-finetune.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#problem">Problem</a></li><li><a href="#solution">Solution</a></li><li><a href="#acceptance-criteria">Acceptance criteria</a></li><li><a href="#test-commands">Test commands</a></li><li><a href="#standing-failure-modes-project-plan-review-skill">Standing failure modes (project plan-review skill)</a></li><li><a href="#docs">Docs</a></li><li><a href="#results">Results</a></li><li><a href="#appendix-p2-failure-mode-tables-frozen-0305-ids-referenced-by-the-plan-and-tests">Appendix: P2 failure-mode tables (frozen 03:05; ids referenced by the plan and tests)</a></li></ul></details>
+<h1 id="run-spec-m5-xls-r-300m-fine-tune-on-vastai-sat-sep-26-2026-0250">Run spec: M5, XLS-R 300M fine-tune on vast.ai (Sat Sep 26, 2026, ~02:50)</h1>
+<p>Status: P1 and P2 frozen (deep mode). Plan: <code>docs/reports/2026-09-26_m5-xlsr-finetune-plan.md</code>.</p>
+<ul>
+<li><strong>Worktree:</strong> branch <code>main</code>, <code>~/Projects/hearsay</code>, shared with the main chat and the CPU-detector chat. Stage only M5 files.</li>
+<li><strong>Handoff:</strong> <code>docs/handoffs/2026-09-26_m5-finetune-handoff.md</code>.</li>
+<li><strong>Consult:</strong> <code>docs/consults/2026-09-26_m5-extra-data-finetune_{CONSULTATION,RESPONSE}.md</code> (non-blocking).</li>
+<li><strong>Rung:</strong> M5.</li>
+<li><strong>Time box:</strong>
+<ul>
+<li>about 3 h of build (to roughly 05:30)</li>
+<li>about 3 h on the box: pilot, ablation, 5 fold models plus 1 full model</li>
+</ul></li>
+<li><strong>Hard stop:</strong> Sat 12:00 EDT. If M5 hasn't beaten M1's outer-holdout minDCF (π = 0.3) by then, M1 stays the primary deep detector (the <code>docs/plan.md</code> gate).</li>
+</ul>
+<h2 id="problem">Problem</h2>
+<p>M1 is a frozen XLS-R 300M plus a logistic probe on one layer. The frozen representation was never adapted to modern diffusion or commercial TTS, to NSA's length distribution (3.0–13.6 s, median 3.41 s), or to laundering.</p>
+<ul>
+<li><strong>Why M5:</strong> fine-tuning the upper transformer layers usually gives the largest single gain in SSL anti-spoofing.</li>
+<li><strong>Where:</strong> it runs on a rented H100, because the local MPS GPU belongs to the main chat.</li>
+<li><strong>What M5 must do:</strong>
+<ul>
+<li>keep the level, silence, tiling and container shortcuts closed</li>
+<li>never see the outer holdout</li>
+<li>produce out-of-fold scores the fusion stacker can use</li>
+<li>ship a single checkpoint the Docker image runs on CPU</li>
+</ul></li>
+</ul>
+<h2 id="solution">Solution</h2>
+<h3 id="d1-data-core-plus-extra-extra-is-training-only">D1. Data: core plus extra (extra is training-only)</h3>
+<ul>
+<li><strong>Core:</strong> the 20,000-row NSA sample (<code>outputs/manifests/nsa_train_sample.csv</code>), with folds from <code>splits/nsa_folds.csv</code>. The fold file is read-only and its sha is pinned by a test.</li>
+<li><strong>Extra:</strong>
+<ul>
+<li><strong>Rest of the NSA manifest</strong> (<code>nsa_train_full.csv</code>). Rows inherit their fold from the fold file's group → fold map. Real rows from groups that aren't in the fold file get fold <code>extra</code> (train-only for every model). Any <code>playht</code> or <code>wavegrad2</code> row is dropped.</li>
+<li><strong>ASVspoof 2019 LA, train + dev:</strong> all bona fide, and spoof subsampled with a fixed seed to about 1:1 with bona fide. <em>Amended 03:20:</em> trimmed ASV19 bona fide (median 1.9 s) is shorter than its spoof (2.1 s, p90 4.6 s), so both classes are restricted to trimmed duration ≥ 2.0 s and spoof is histogram-matched to bona fide by trimmed duration (0.25 s bins).</li>
+<li><strong>MLAAD English:</strong> spoof only. Its matching bona fide (M-AILABS) is unavailable: both hosts gave no response at 02:36 EDT.</li>
+</ul></li>
+<li><strong>Every extra row is train-only.</strong> No extra row ever gets a score in <code>m5_xlsr_ft.csv</code> or appears in any readout except the per-source training diagnostics.</li>
+<li><strong>In-the-Wild</strong> is never trained on. <em>Amended 03:25 (consult):</em> it is read out, bona fide only, as the MLAAD drop-rule probe (ΔP_FA &gt; +1 point at the inner-fold threshold → drop MLAAD).</li>
+<li><em>Amended 03:25 (consult):</em> extra DiffSSD spoof capped at ~2k per inner generator (not all 50k); ASV19 = all 40-speaker bona fide plus a ~2.5k spoof channel anchor; MLAAD at ~28% of the spoof side, ≤ 120 clips per model, gated by a CPU corpus probe (MLAAD vs DiffSSD spoof on handcrafted features). Batch mix constant: real 25/35/40 LJ/LibriSpeech/ASV19, spoof 62/28/10 DiffSSD/MLAAD/ASV19.</li>
+<li><strong>Family exclusion.</strong> The model for fold k never trains on an extra generator from the same family as fold k's validation generators.
+<ul>
+<li>fold 1: <code>openvoicev2</code>, excluding MLAAD OpenVoiceV2</li>
+<li>fold 2: <code>xtts_v2</code>, excluding MLAAD xtts_v1.1, xtts_v2 and vixTTS</li>
+<li>fold 4: <code>elevenlabs</code>, excluding MLAAD ElevenLabs Turbo v2.5, v2 Multilingual and v3</li>
+<li>An extra generator matching a <strong>holdout</strong> family (<code>playht</code>, <code>wavegrad</code>) makes the build refuse.</li>
+</ul></li>
+</ul>
+<h3 id="d2-bundle">D2. Bundle</h3>
+<ul>
+<li><strong>Per clip:</strong> <code>load_audio</code> (16 kHz mono), then <code>trim_silence</code>, then cap at 15 s, then 16-bit FLAC. A clip that peaks above 0.999 is scaled to 0.999 first; that's harmless, because training normalizes each input.</li>
+<li><strong>Too-short clips:</strong> under 0.5 s after trimming, a clip is dropped and counted.</li>
+<li><strong>Decode failures:</strong> listed; the build fails if they exceed 0.5%.</li>
+<li><strong>Codec round-trips:</strong> MP3, Opus, AAC, AMR-NB (8 kHz) and μ-law (8 kHz). Each is decoded back through <code>load_audio</code> and re-trimmed. <em>Amended 03:20 (plan section 0):</em> the copies are made <strong>on the box</strong> at setup (32 cores, apt ffmpeg), not on the Mac, because the home disk has 14 GiB free and five variants would multiply a 6.7 GB upload. The same script runs locally in tests with the local ffmpeg. Encoders a box lacks are recorded and skipped, not faked.</li>
+<li><strong>Manifest columns:</strong> id, original path, label, generator, source, group, fold, <code>train_scope</code>, duration, codec-copy ids.</li>
+<li><strong>Test set:</strong> 1,671 WAVs in <code>nsa_test.csv</code> order.</li>
+<li><strong>Identity:</strong> the bundle's tree-sha is written into its manifest.</li>
+<li><strong>Weights:</strong> shipped with a sha manifest.</li>
+<li><strong>Location:</strong> <code>r2:pa-source/hearsay/bundle/</code> <strong>only</strong>.</li>
+</ul>
+<h3 id="d3-lengths">D3. Lengths</h3>
+<ul>
+<li><strong>Training crop length:</strong> drawn per batch, 70% from <code>test_duration_sampler</code> and 30% uniform over 3–14 s, capped at the longest length both classes can reach (C4).</li>
+<li><strong>Crops:</strong> a fresh random offset each epoch. A clip shorter than the drawn length is used whole, with zero padding plus <code>attention_mask</code>; there's <strong>no tiling or padding by repetition</strong>.</li>
+<li><strong>Normalization:</strong> zero-mean, unit-variance over <strong>valid samples only</strong>, identical to <code>normalize_windows</code> on the unpadded clip.</li>
+<li><strong>Test time:</strong> <code>prepare_segment(x, max_s=14)</code>, i.e. the whole trimmed clip, then normalization, identical to training with no crop and no augmentation.</li>
+<li><strong>Holdout readouts:</strong>
+<ul>
+<li>test-length crops, fixed seed</li>
+<li>whole clips up to 14 s</li>
+<li>length buckets: ≤ 4 s, 4–6 s, &gt; 6 s</li>
+</ul></li>
+</ul>
+<h3 id="d4-augmentation">D4. Augmentation</h3>
+<p>Applied to both classes with the same probability; a test fails if the per-class augmentation rate diverges.</p>
+<ul>
+<li><strong>Precomputed codec copies:</strong> MP3, Opus, AAC, AMR-NB, μ-law.</li>
+<li><strong>On the fly:</strong>
+<ul>
+<li>additive noise at 5–30 dB SNR</li>
+<li>band-limiting at 3.4, 4 and 7 kHz</li>
+<li>synthetic reverb: exponential-decay RIR with the direct path aligned</li>
+<li>gain plus hard clipping. Pure gain is a no-op after normalization, so it isn't used alone.</li>
+<li><em>Amended 03:25 (consult):</em> RawBoost's convolutive (linear + nonlinear) algorithm at p = 0.25; training-only trim jitter (30–40 dB, 0–200 ms edges); overall p_aug = 0.65 with band-limit upweighted. Realized augmentation rates are logged per source × class and must match across classes.</li>
+</ul></li>
+<li><strong>Scoring:</strong> the clean path applies nothing. The augmented holdout slice is fixed by seed and is the same for every model.</li>
+<li><strong>Physical replay isn't covered</strong> (simulated reverb only). The report says so.</li>
+</ul>
+<h3 id="d5-model">D5. Model</h3>
+<ul>
+<li><strong>Backbone:</strong> XLS-R 300M from the local weights (sha-pinned).
+<ul>
+<li>The CNN feature encoder is frozen.</li>
+<li><em>Amended 03:20:</em> only the first <code>keep_layers</code> transformer layers are kept. <em>Amended 03:25 (consult):</em> default <code>keep_layers = 12</code>, all retained layers trainable (fallback 16 if the learned layer weights concentrate at the top); <code>layerdrop</code> 0; SpecAugment on.</li>
+<li><em>Amended 03:25 (consult):</em> pooling = learned softmax-weighted layer sum → masked attentive statistics pooling (mean + std); masked mean is the fallback.</li>
+</ul></li>
+<li><strong>Head:</strong> a linear head outputting a logit, where <strong>high = synthetic</strong>; score = sigmoid(logit).</li>
+<li><strong>Optimization:</strong>
+<ul>
+<li>bf16 on CUDA</li>
+<li><em>Amended 03:25 (consult):</em> AdamW, backbone 1e-5 with layer-wise decay 0.85, head 5e-4, weight decay 0.01, 8% warmup + cosine, BCE with label smoothing 0.05</li>
+<li>label-balanced batches with the constant source mix in D1</li>
+</ul></li>
+<li><strong>Consult:</strong> its answer may change N, the LRs, the augmentation probabilities, the ratios and the pooling, as config only.</li>
+<li><strong>Device rules:</strong> training refuses any device but CUDA. <code>--cpu-smoke</code> is for tests and uses a tiny random-init config.</li>
+</ul>
+<h3 id="d6-fold-protocol-and-selection">D6. Fold protocol and selection</h3>
+<ul>
+<li><strong>Pilot:</strong> trains on folds 0–3 and validates on fold 4. It measures throughput and loss, checks the fold-4 minDCF readout and the AUC &gt; 0.5 direction tripwire, and fixes the epoch count E.</li>
+<li><strong>Ablation:</strong> NSA-only vs NSA+extra, on inner folds only, at most about 2 H100-hours. The winner is chosen on inner-fold minDCF at π = 0.3. The readings at π = 0.5 and both sponsor-code directions are reported, with a flag if the decision flips.</li>
+<li><strong>Final models:</strong>
+<ul>
+<li>5 fold models, each for E epochs, produce <code>inner_oof</code> scores for all 16,142 inner rows</li>
+<li>1 full model trained on folds 0–4 for E epochs scores the holdout (3,858) and the test set (1,671)</li>
+</ul></li>
+<li><strong>The holdout is never used for selection.</strong></li>
+</ul>
+<h3 id="d7-outputs">D7. Outputs</h3>
+<ul>
+<li><strong><code>outputs/detector_scores/m5_xlsr_ft.csv</code>:</strong>
+<ul>
+<li>columns <code>path, fold, split, score, logit</code></li>
+<li><code>split</code> is one of <code>inner_oof</code>, <code>holdout</code>, <code>test</code>, matching <code>handcrafted_v1.csv</code>. The handoff said <code>stack</code>; the main chat will be told.</li>
+</ul></li>
+<li><strong><code>models/m5_xlsr_ft_&lt;stamp&gt;/meta.json</code>:</strong>
+<ul>
+<li><code>hearsay.metrics.report</code> for clean and augmented holdout, per generator, per bona fide source, per length bucket and per augmentation type</li>
+<li>both sponsor-code readings</li>
+<li>the M1 bar and the margin</li>
+<li>config hash, bundle tree-sha, weights sha, git sha</li>
+<li>spend</li>
+</ul></li>
+<li><strong>Checkpoint:</strong> a private HF Hub repo, or a GitHub release if there's no HF token. It is downloaded again and sha-verified.</li>
+<li><strong>CPU parity:</strong> on 50 test clips, CPU fp32 vs the box's bf16 must have Spearman above 0.99 and max absolute logit difference below 0.05.</li>
+<li><strong>Report:</strong> <code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code>.</li>
+<li><strong>No TSVs, and nothing in <code>submissions/</code>.</strong> The main chat turns the scores into submissions.</li>
+</ul>
+<h3 id="d8-cloud">D8. Cloud</h3>
+<ul>
+<li><strong>GPU:</strong> <em>Amended 03:20:</em> A100 SXM4 boxes (about $0.67–0.80/h, 32 cores, CUDA ≥ 12.8) instead of an H100 ($2.20/h, 2 offers, one with a driver too old for current torch). Several boxes run at once so the 6 final models land before the gate.</li>
+<li><strong>Scripts:</strong> the Powerlifting-Analyzer vast scripts, adapted into <code>scripts/cloud/</code>.</li>
+<li><strong>Path guard:</strong> all R2 paths go through a guard that refuses anything outside <code>r2:pa-source/hearsay/</code>.</li>
+<li><strong>Budget guard:</strong> refuse a launch if credit is below the estimated cost plus $1.50.</li>
+<li><strong>Pilot before fan-out.</strong></li>
+<li><strong>Checkpointing:</strong> a checkpoint goes to R2 every epoch, and a run can resume from it.</li>
+<li><strong>Self-destroy:</strong> <code>trap</code> destroy on EXIT/ERR plus destroy at DONE. After every run the box is verified gone with <code>vastai show instances</code>.</li>
+<li><strong>Ledger:</strong> one row per rental in <code>docs/reports/cloud-expense-ledger.md</code>.</li>
+<li><strong>Secrets:</strong> the API key is never printed.</li>
+<li><strong>Rentals need Nathan's go-ahead.</strong></li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ol>
+<li><p><strong>Tests:</strong></p>
+<ul>
+<li><code>uv run pytest -q</code>: the 215 existing tests (the handoff's 152 was stale; <code>docs/STATUS.md</code> says 215) plus about 70 new ones all pass.</li>
+<li><code>uv run ruff check .</code>: clean.</li>
+<li>Every item in the P2 failure-mode tables (A1–A10, B1–B8, C1–C7, D1–D9, E1–E10, F1–F8, G1–G6) maps to a test, or to a named runtime check recorded in the report.</li>
+</ul></li>
+<li><p><strong>Pilot:</strong> throughput measured, loss falling, fold-4 minDCF finite, AUC &gt; 0.5, and one resume from an R2 checkpoint.</p></li>
+<li><p><strong>Outputs:</strong></p>
+<ul>
+<li>F1–F6 pass on the real files.</li>
+<li><code>meta.json</code> is complete.</li>
+<li>The gate result (M5 vs M1 v2 = 0.1458 on the outer holdout at π = 0.3, <strong>and</strong> pooled 5-fold OOF minDCF, per the consult: a holdout gap under 0.15 is within noise) is recorded honestly. A failed gate is a valid outcome.</li>
+</ul></li>
+<li><p><strong>Spend:</strong> within the credit, 0 instances at the end, and a ledger row for every rental.</p></li>
+<li><p><strong>Checkpoint:</strong> downloadable and sha-verified.</p></li>
+<li><p><strong>No diff</strong> in:</p>
+<ul>
+<li><code>src/hearsay/embed.py</code></li>
+<li><code>scripts/{extract_embeddings,train_probe,make_probe_csv}.py</code></li>
+<li><code>splits/nsa_folds.csv</code></li>
+<li><code>submissions/</code></li>
+<li>the CPU chat's files</li>
+</ul>
+<p>No MPS use.</p></li>
+</ol>
+<h2 id="test-commands">Test commands</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay
+uv run pytest -q tests/test_m5_manifest.py tests/test_m5_bundle.py tests/test_m5_crops.py tests/test_augment.py tests/test_m5_model.py tests/test_m5_scores.py tests/test_cloud_scripts.py
+uv run pytest -q
+uv run ruff check .
+git diff --stat -- src/hearsay/embed.py scripts/extract_embeddings.py scripts/train_probe.py scripts/make_probe_csv.py splits/ submissions/</code></pre>
+<h2 id="standing-failure-modes-project-plan-review-skill">Standing failure modes (project plan-review skill)</h2>
+<ol>
+<li><strong>Laundering, telephony and replay:</strong>
+<ul>
+<li>clean and augmented holdout slices, plus per-augmentation-type readouts (D4, F5)</li>
+<li>physical replay is waived; there's no hardware</li>
+</ul></li>
+<li><strong>Overfitting to known generators or speakers:</strong>
+<ul>
+<li>fold file, family exclusion (A3), out-of-fold scoring (F2), per-generator readouts</li>
+<li>the report states the gap between inner-fold and holdout scores</li>
+</ul></li>
+<li><strong>Class imbalance and prior:</strong>
+<ul>
+<li>per-fold class counts (A9) and label-balanced sampling (E4)</li>
+<li>decisions reported under all four metric readings, flagging any flip</li>
+</ul></li>
+<li><strong>Shortcuts:</strong>
+<ul>
+<li>per-source AUC of post-trim duration, peak and leading silence on the training stream; each must be below 0.85</li>
+<li>the MLAAD-vs-LibriSpeech LightGBM probe on handcrafted features</li>
+<li>clean vs transcoded readouts</li>
+</ul></li>
+<li><strong>Loader format conversion:</strong> the B1 format fixtures (including MP4/AAC) and the B3 clipping check.</li>
+</ol>
+<h2 id="docs">Docs</h2>
+<ul>
+<li><strong>Create:</strong>
+<ul>
+<li>this run spec</li>
+<li>the plan and its Codex review</li>
+<li>the results report</li>
+<li>the cloud expense ledger</li>
+<li>the consult records (already written)</li>
+</ul></li>
+<li><strong>Update:</strong> the "how used" lines in <code>CLAUDE.md</code>'s AI-use disclosure for XLS-R (M5), ASVspoof 2019, MLAAD and LibriSpeech, plus vast.ai.</li>
+<li><strong>Conditional, confirmed at execution:</strong>
+<ul>
+<li>an M5 row in <code>docs/STATUS.md</code>, which the main chat owns</li>
+<li><code>docs/plan.md</code>, only if the gate outcome changes the ladder or the cut order</li>
+</ul></li>
+</ul>
+<h2 id="results">Results</h2>
+<h3 id="execution-notes-dated-deviations-from-the-plan">Execution notes (dated; deviations from the plan)</h3>
+<ul>
+<li><strong>03:40</strong> ASV19 rows come from the main chat's <code>splits/nsa_folds_plus_asv19.csv</code> (commit c7a3275: 5,128 bona fide + 2,520 A01–A06 anchor, speaker-grouped into inner folds) instead of a second selection here; they keep their fold (never trained on by that fold's model) and are <code>extra_asv19</code>, never exported. The bundle applies the ≥ 2.0 s cut and the 0.5× duration matching on top (2,496 bona fide + 1,092 spoof kept).</li>
+<li><strong>03:58</strong> Bundle <code>m5_bundle/v1</code>: 44,850 training rows (3,724 short extras dropped, 0 decode errors, 0 cross-scope PCM collisions, 0 core clips identical to a test clip), 1,671 test rows, 5.3 GB; trivial-feature AUCs per scope all ≤ 0.64 (<code>diagnostics.json</code>). Extra DiffSSD spoof capped at 1,000 per generator.</li>
+<li><strong>04:00</strong> Main chat commit 133e536 made <code>prepare_segment</code> band-limit at 7.25 kHz by default. Adopted: <code>hearsay.handcrafted.band_limit</code> runs once per clip, after augmentation, on every clip the model sees; the bundle stays raw (trimmed only). Fusion exports use the 8 s default cap (<code>DEPLOY_MAX_S</code>); 14 s whole clips are <code>diag_*_14s.csv</code> only. The 7 kHz augmentation op was dropped (3.4 and 4 kHz telephony only).</li>
+<li><strong>04:05</strong> Gate extended (main chat + oversight): beat M1 on the outer holdout <strong>and</strong> the pooled 5-fold OOF <strong>and</strong> In-the-Wild bona fide P_FA at the OOF minDCF threshold ≤ M1's (read from M1's <code>meta.json</code> stress block). The bar is the NSA-only M1 selected by its <code>train</code> field, not by timestamp; M1b is reported beside it.</li>
+<li><strong>04:30</strong> MLAAD probe A (<code>outputs/m5_probe_a.json</code>): MLAAD-vs-DiffSSD spoof AUC 0.90 on augmented handcrafted features; LibriSpeech 66% and VCTK 90% land on the MLAAD side → MLAAD capped at <strong>12%</strong> of the spoof side (config), pending the ITW read-out.</li>
+<li><strong>04:29–04:51</strong> Pilot #1 (A100, instance 52716242, $0.61/h): setup 9 min, codec pass 16,015 variants in 273 s (no AMR-NB encoder on the image; MP3/Opus/AAC/μ-law), then FAIL: the trainer's tree check ran stale code (code.tgz built before the <code>codecs</code>-dir exclusion patch). Reaper destroyed the box within 60 s. Fix: <code>scripts/cloud/push_code.sh</code> rebuilds code.tgz + TREE_SHA + meta and pushes them in one step. Also found and fixed: the box's rclone config needed <code>no_check_bucket = true</code> (R2 writes were 403 while reads worked); the reaper exited before any job existed and used bash-4 arrays on macOS bash 3.2.</li>
+<li><strong>04:54</strong> Pilot #2 launched (instance 52718897) with the codec variants pulled from R2. 600 steps in 7 min; fold-4 minDCF 0.81 (LR decayed to zero: a throughput run).</li>
+<li><strong>05:10–06:40</strong> Ablation on folds 0 and 4 (2,500 steps): NSA-only fine-tune 0.528 / 0.762; NSA+extra fine-tune 0.515 / 0.410 (replicate 0.377); <strong>frozen backbone + NSA+extra 0.520 / 0.308</strong> vs M1 v3 0.524 / 0.415. Decision: the frozen recipe (D5 amended: <code>train_top = 0</code>) for all six final models. Two more rentals were lost to my own config-string bug (zsh <code>$VAR:e</code> modifier emptied a base64 config; fixed with <code>${VAR}</code>), one to a stale <code>code.tgz</code> (fixed with <code>push_code.sh</code>).</li>
+<li><strong>06:40–07:33</strong> Finals: frozen folds 1, 2, 3 and the full model (3,000 steps) on boxes 1 and 2 (box 2 reaped after a FAIL; the full model ran on box 1). All boxes destroyed at 07:34; spend $5.09.</li>
+<li><strong>07:50</strong> Claude critique (Overall: Fail): the CPU scorer's transform order did not match the exported scores (max |Δ| 0.28 on one of 50 clips) → <code>deploy_transform</code> now trims before band-limiting; the trainer had no end-to-end test → <code>tests/test_m5_train.py</code> (synthetic bundle, tiny model: fold and full smoke, resume, CUDA refusal, tree-sha refusal, sampler quotas, E9, E7); HF revision now pinned in <code>bundle_meta.json</code> (<code>xlsr_hf_revision</code>) and <code>box_setup.sh</code>; fold-file agreement asserted; report's recipe paragraph and selection-bias caveat corrected; ledger completed.</li>
+<li><strong>07:41</strong> Assembled: <code>outputs/detector_scores/m5_xlsr_ft.csv</code> (16,142 / 3,858 / 1,671), <code>models/m5_xlsr_ft_20260926-0741/meta.json</code>, checkpoint on the HF Hub (sha-verified), report <code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code>.</li>
+</ul>
+<h3 id="acceptance-criteria-0745">Acceptance criteria (07:45)</h3>
+<ol>
+<li><strong>Tests:</strong> <code>uv run pytest -q</code> → <strong>453 passed</strong> after the audit rounds (the M5 files: <code>tests/test_m5_{manifest,bundle,codecs,crops,model,scores,train}.py</code>, <code>tests/test_augment.py</code>, <code>tests/test_cloud_scripts.py</code>); <code>uv run ruff check .</code> clean. Every P2 row maps to a test or a runtime check; runtime checks recorded in the report: C4 shortcut gate (worst AUC 0.62), D6 realized rates (0.645–0.657), E3 direction tripwire (validation AUC 0.78–0.94 at step 250 across the runs, never ≤ 0.5), G2/G3/G5 (reaper log, budget guard, no key on any box).</li>
+<li><strong>Pilot:</strong> throughput measured (190 clips/s fine-tune, ~2× for frozen), loss falling, fold-4 minDCF finite, AUC &gt; 0.5. <strong>Resume from R2 (G4): met on a box at 08:56</strong> (<code>outputs/m5_runs/resume_probe/</code>, instance 52747172): a 300-step run pushed its checkpoint to R2; a second job with the local checkpoint deleted pulled it back, logged <code>resumed step 300</code>, continued to 600 and exported (<code>run_meta.steps</code> = 600). The CPU tests cover the local, stub-R2 and failure paths (<code>tests/test_m5_train.py</code>). Cost of the two probe attempts $0.33 (the first failed setup on a tree-sha mismatch I introduced by pulling codec variants into the Mac's bundle dir; fixed in bb277d8).</li>
+<li><strong>Outputs:</strong> F1–F5 asserted by the assembler on the real files; F6 parity after the critique fix (the raw scorer now trims before band-limiting, the exported order): Spearman 0.9999 / median |Δ| 0.0007 / max 0.012 over 50 clips — within the 0.05 WAV-vs-FLAC bound, marginally above the plan's 1e-2 CPU-vs-GPU bound on the single worst clip (recorded). <strong>Gate result: not passed</strong> (holdout 0.363 vs 0.159; pooled OOF 0.302 vs 0.257; ITW P_FA 0.45% vs 0.7% passes). A failed gate is a valid outcome; M5 is a stacker column.</li>
+<li><strong>Spend:</strong> $5.42 of $38.37 ($5.09 through the finals + $0.33 for the resume probes); 0 instances at the end (<code>teardown_check.sh</code>); one ledger row per rental plus the total.</li>
+<li><strong>Checkpoint:</strong> <code>nrs124554433/hearsay-m5-xlsr</code> (private), re-downloaded and sha-verified against <code>hashes.json</code>.</li>
+<li><strong>No diff</strong> in <code>src/hearsay/embed.py</code>, the M1 scripts, <code>splits/</code>, <code>submissions/</code> or the CPU chat's files (<code>git log --stat</code> on this chat's commits touches only M5 files, <code>CLAUDE.md</code> disclosure lines and the ledger). No MPS use: the only local model runs were CPU (<code>m5_score.py</code>, the tiny-config tests).</li>
+</ol>
+<p><strong>Docs delivered:</strong> this spec, the plan + Codex review, the report, the ledger, the consult records, the M3 handoff, the <code>CLAUDE.md</code> disclosure lines. <strong>Conditional items:</strong> <code>docs/STATUS.md</code> (main chat owns; M5 line offered in the oversight report), <code>docs/plan.md</code> (ladder unchanged: M5 did not replace M1).</p>
+<p><strong>Credential exception (D8, authorized by the handoff):</strong> the vast.ai API key is read from <code>~/.config/vastai/vast_api_key</code> and the R2 credentials from <code>~/.config/cloudflare-r2-pa-source.txt</code>, the two files the M5 handoff names as the tooling to reuse (<code>.env</code> holds no cloud credentials in this repo); the vast key never leaves the Mac, and the R2 access key travels to a box once, over ssh stdin, into <code>/root/.config/rclone/rclone.conf</code> (mode 600) on a box that is destroyed at the end of its job. <code>VAST_API_KEY</code> in <code>.env</code> overrides the file if present.</p>
+<p><strong>Provenance note (critique round 2):</strong> the boxes that produced the shipped checkpoint fetched <code>facebook/wav2vec2-xls-r-300m</code> from the Hub with only the <code>config.json</code> sha checked, before the revision pin existed; the pin (<code>xlsr_hf_revision</code>, now written by <code>m5_build_bundle.py</code>/<code>push_code.sh</code> and required by <code>box_setup.sh</code>) applies to future rentals. Untested runtime tripwires: E3 (AUC ≤ 0.5 abort; live readings 0.78–0.94) and the E7 <code>SystemExit</code> path (the non-finite loss is unit-tested, the exit lines are checked as source).</p>
+<p><strong>Review scorecards:</strong> Claude critique round 1 (07:50): Overall <strong>Fail</strong> (Test coverage Fail: F6 parity, untested trainer, resume; Plan adherence / Review compliance / Documentation Needs work). All 11 findings fixed or disclosed (execution note above). Round 2 (08:20): Overall <strong>Acceptable</strong> (Plan adherence / Test coverage / Review compliance / Documentation Acceptable; Scope, Freeze, Regression Pass); four MINOR residuals: R1 fixed (revision produced by code, box refuses without it), R2–R4 disclosed above. Codex audit round 1 (08:30): Overall <strong>Fail</strong> (Plan adherence, Scope, Test coverage, Review compliance, Documentation Fail; Freeze, Regression Acceptable), 9 findings, all fixed or disclosed in commit bc34ea9: (1) clean-vs-transcoded holdout readout per codec added (<code>outputs/m5_runs/codec_readout.json</code>, scored on the Mac CPU with the shipped model: transcoded 0.328 vs clean 0.363 on the same 3,858 rows; μ-law 0.22, Opus 0.27, MP3 0.36, AAC 0.37; merged into <code>meta.json</code> under <code>val_diagnostics</code>); (2) shortcut AUCs measured on the realized training stream after sampling/crop/augmentation/band-limit, per source (<code>outputs/m5_runs/stream_shortcut.json</code>: worst 0.7333, DiffSSD duration, under the 0.85 gate; pooled duration 0.6881); (3) <code>train_top = 0</code> now freezes every backbone parameter (test asserts no backbone parameter moves); the shipped checkpoint's ~3k trainable backbone params (final LayerNorm + masked_spec_embed) are disclosed in the report; (4) <code>--resume</code> exits on a failed R2 pull or a missing checkpoint, and a checkpoint push that fails after three tries aborts the run instead of printing DONE (both tested with a stub <code>rclone</code>); a real on-box R2 restore was exercised at 08:56 (acceptance criterion 2 above); (5) parity isolated: same-input CPU vs GPU max |Δ| 0.00445 / Spearman 1.0 (inside 1e-2), raw-WAV vs bundled-FLAC on CPU max 0.01117 (inside 0.05); (6) resumable bundle builds reuse a FLAC only when the source's size:mtime stamp is unchanged (<code>sources.json</code>); (7) the box downloads the pinned Hub revision and sha-checks the weight files against <code>xlsr_hf_weight_sha256</code> in <code>bundle_meta.json</code> (the unverified R2 weights path is gone); the shipped checkpoint's base weights were fetched before that existed, and their identity is established after the fact: the Hub repo has had no commit since 2022-08-10, so the unpinned download was revision <code>1a640f32</code>, and its <code>pytorch_model.bin</code> LFS sha256 (<code>d5e49057…</code>) matches the Mac's local copy (<code>outputs/m5_runs/weights_provenance.json</code>); (8) the credential exception is recorded above; (9) the report's sampling mix corrected to 78/12/10. Codex audit round 2 (08:35): Overall <strong>Fail</strong> (Plan adherence, Test coverage, Review compliance Fail on the unexercised on-box R2 restore, silent checkpoint-push failures and the shipped base-weight provenance; Scope Excellent; Documentation Acceptable). Fixed: on-box R2 restore exercised (above); push failures abort with retries (tested); provenance established from the Hub's commit history and LFS sha (<code>outputs/m5_runs/weights_provenance.json</code>); docstring and wording corrected. Codex audit round 3 (09:05): Overall <strong>Fail</strong> on one item — <code>launch.sh</code> wrote PROVISIONED even when the script transfer or chain start over ssh failed, so its cleanup trap would have skipped the box; fixed (PROVISIONED only after the chain is confirmed running, stale job state reset, mocked launcher test <code>test_g2_launcher_destroys_a_box_whose_chain_never_starts</code>); spend reconciled to $5.42. Codex audit round 4 (09:15): Overall <strong>Fail</strong> on two items — the assembler's newest-run selection would have picked the 600-step resume probe over the delivered fold-4 model on a rerun (fixed: a 2,500-step minimum budget, an explicit pin file <code>models/m5_xlsr_ft_20260926-0741/final_runs.json</code> honoured by <code>--pinned</code>, and a test that a newer short run is never selected); the reaper marked a box DESTROYED without confirming the destroy (fixed: confirmed absence only, retried otherwise, mocked test). Stale $5.09 figures updated to $5.42 in <code>CLAUDE.md</code> and <code>meta.json</code>. Codex audit round 5 (09:25): Overall <strong>Fail</strong> on two items — the launcher forgot an instance whose destroy failed during provisioning (fixed: the instance id is persisted the moment it is created, destroys are confirmed against <code>show instances</code> with bounded retries, an unremovable box is marked ORPHAN and the reaper destroys ORPHANs first; two mocked launcher tests); the new reaper test pointed its copied script at a temp repo root (fixed; the test now passes with the real interpreter and a temp ledger). Stale $5.09 in <code>CLAUDE.md</code> corrected; <code>docs/STATUS.md:41</code> and <code>README.md:198</code> are the main chat's lines and were reported to oversight, not edited. Codex audit round 6 (09:40): Overall <strong>Fail</strong> on two cleanup-lifecycle items — a relaunch under a job name erased its live CID/ORPHAN record (fixed: the launcher refuses to reuse a job whose instance is still listed, exit 4, and only clears state once the box is confirmed absent; mocked test); a swap's HOLD could survive an ssh failure and let a held box outlive the deadline (fixed: HOLD released on every exit path, timestamped, expired by the reaper after 15 min, and never allowed to defer the deadline or an ORPHAN; mocked tests for both). README's M5 sentence now says $5.42 (one-number change on my own figure; flagged to oversight). Codex audit round 7 (09:55): Overall <strong>Fail</strong> on two items — the launcher cleared a job's record when the instance query failed (fixed: only an explicit <code>no</code> clears it; a failed or malformed query refuses; test); the reaper applied DONE/FAIL before a fresh HOLD, so a stale FAIL could still kill a box mid-swap (fixed: ORPHAN → deadline → fresh HOLD → status rules; test). README rental count corrected to nine. Codex audit round 8 (10:10): Overall <strong>Fail</strong> on two items — the absence helpers treated a failed/<code>null</code>/<code>{}</code> answer as "gone" (fixed: only a successful query returning a JSON list counts, else <code>unknown</code>, which never clears a record or ends a watch; parametrized tests); relaunching a job name left the previous generation's R2 STATUS and DESTROYED marker for the reaper to act on (fixed: the launcher retires the old STATUS before creating a box, holds the reaper until the chain is up, releases the hold on every exit; test). (Launcher boot/network retry counts became env-configurable so the mocked tests run in seconds; production defaults unchanged.) Codex audit round 9 (10:40): Overall <strong>Fail</strong> on the same validation gap in three more callers (the launcher's budget guard, <code>teardown_check.sh</code>, the reaper's final check) plus an unused variable in a test (fixed: one <code>instances()</code> helper — a successful query returning a JSON list, or failure — feeds every caller; the budget guard refuses when commitments are unknown, teardown exits 2 when it cannot confirm, the reaper keeps watching on <code>?</code>; parametrized tests per caller; README rental count nine). Codex audit round 10 (10:50): Overall <strong>Fail</strong> on the relaunch isolation (a stale STATUS deletion could fail silently) and two test gaps (fixed: every launch is a generation — the launcher writes <code>GEN</code>, the box prefixes each STATUS with it, and the reaper treats a STATUS from any other generation as "no status"; the launcher appends a ledger row the moment an instance is created; the <code>gone()</code> probes include the <code>instances()</code> helper and assert present/absent; ledger reconciled to 12 instances, six of which never booted). Codex audit round 11 (11:05): Overall <strong>Fail</strong> — the round-10 "ledger row at creation" write, combined with mocked launcher tests that ran the real launcher, had appended six fabricated rows (ids 4242/4343/5151) to the tracked expense ledger. Fixed: the rows are removed; <code>LEDGER</code> is env-overridable in launch/reaper/teardown; an autouse fixture in <code>tests/test_cloud_scripts.py</code> points every test at a temp ledger and asserts the tracked file is byte-identical afterwards (verified by sha before/after the test run). Plan adherence, Review compliance were Acceptable. <strong>Codex audit round 12 (11:20): Overall Acceptable</strong> (Scope Excellent; Plan adherence, Test coverage, Review compliance, Freeze, Regression, Documentation Acceptable). Remaining disclosed limitations: recipe-selection bias on the fold-0/4 OOF rows, 2,500- vs 3,000-step budgets, ~3k unintentionally trainable backbone parameters in the shipped checkpoint, E3/E7 abort branches not executed by tests, and repository-wide lint failing in another lane's <code>analyzer.py</code>. The report's "two hosts never booted" was corrected to six.</p>
+<h2 id="appendix-p2-failure-mode-tables-frozen-0305-ids-referenced-by-the-plan-and-tests">Appendix: P2 failure-mode tables (frozen 03:05; ids referenced by the plan and tests)</h2>
+<p><strong>A. Manifest and fold discipline</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>A1</td><td>A holdout row (fold <code>holdout</code>, generator <code>playht</code>/<code>wavegrad2</code>, or a holdout bona fide group, including extra rows from <code>nsa_train_full</code>) reaches any training set</td><td>absent from all 6 training sets</td></tr>
+<tr><td>A2</td><td>Fold k's validation rows appear in fold k's training set</td><td>per-fold disjointness</td></tr>
+<tr><td>A3</td><td>An extra generator from fold k's validation family trains fold k's model</td><td>exclusion test + counterfactual (empty exclusion map must fail)</td></tr>
+<tr><td>A4</td><td>A holdout-family alias sneaks in through extra data</td><td>build refuses loudly</td></tr>
+<tr><td>A5</td><td>Extra NSA rows get the wrong fold</td><td>inherit from the group → fold map; synthetic manifest</td></tr>
+<tr><td>A6</td><td>Extra rows duplicate sample rows</td><td>dedupe by path</td></tr>
+<tr><td>A7</td><td>In-the-Wild paths end up in the manifest</td><td>refused</td></tr>
+<tr><td>A8</td><td><code>splits/nsa_folds.csv</code> modified</td><td>sha256 tripwire</td></tr>
+<tr><td>A9</td><td>A fold has only one class</td><td>both classes in all 6 training and 5 validation sets</td></tr>
+<tr><td>A10</td><td>ASV19 subsampling not reproducible</td><td>fixed seed → identical rows</td></tr>
+</tbody>
+</table></div>
+<p><strong>B. Bundle</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>B1</td><td>Format conversion errors</td><td>fixtures WAV int16/float32, 22 kHz stereo, MP3, FLAC, MP4/AAC, Opus → 16 kHz mono</td></tr>
+<tr><td>B2</td><td>Trim differs between bundle and test time</td><td>bundled clip == <code>trim_silence(load_audio(x))</code> up to FLAC quantization</td></tr>
+<tr><td>B3</td><td>16-bit FLAC clips peaks above 1.0</td><td>1.5-peak input → 0.999, unchanged after normalization</td></tr>
+<tr><td>B4</td><td>Length cap / very short clips</td><td>cap 15 s; extras &lt; 0.5 s dropped with a count; core/test never dropped</td></tr>
+<tr><td>B5</td><td>Codec copies shift time, add lead silence, or change label</td><td>length ±5%, lag &lt; 50 ms, lead &lt; 30 ms after re-trim, label unchanged; each codec</td></tr>
+<tr><td>B6</td><td>Decode failures drop rows silently</td><td>extras: listed, abort &gt; 0.5%; core/test: abort</td></tr>
+<tr><td>B7</td><td>Stale or mismatched bundle</td><td>tree-sha over every file; trainer refuses on mismatch</td></tr>
+<tr><td>B8</td><td>Test bundle order/count drift</td><td>1,671 rows in <code>nsa_test.csv</code> order</td></tr>
+</tbody>
+</table></div>
+<p><strong>C. Lengths and crops</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>C1</td><td>Crops not reproducible</td><td>same (seed, epoch) → same crop; new epoch → new offset</td></tr>
+<tr><td>C2</td><td>Tiling or repeat-padding returns</td><td>2 s clip under 5 s crop stays 2 s + zeros, mask 0, no repeated samples</td></tr>
+<tr><td>C3</td><td>Length mix wrong</td><td>70% ± 3% test-duration draws over 10k; all in [3, 14]</td></tr>
+<tr><td>C4</td><td>Length becomes a label shortcut</td><td>per-scope and pooled <code>max(AUC,1−AUC)</code> of duration ≤ 0.85 on the model's training rows; gate in the trainer</td></tr>
+<tr><td>C5</td><td>Normalization includes padding</td><td>valid region == <code>normalize_windows(clip)</code></td></tr>
+<tr><td>C6</td><td>Train/test preprocessing diverge</td><td><code>test_transform</code> == training transform with no crop/augment, bit for bit</td></tr>
+<tr><td>C7</td><td>Mixed crop lengths within a batch</td><td>one length per batch</td></tr>
+</tbody>
+</table></div>
+<p><strong>D. Augmentation</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>D1</td><td>Changes length or label</td><td>parametrized over every op</td></tr>
+<tr><td>D2</td><td>SNR inaccurate</td><td>measured within ±0.5 dB</td></tr>
+<tr><td>D3</td><td>Band-limit leaks</td><td>&gt; 40 dB down above cutoff</td></tr>
+<tr><td>D4</td><td>Reverb shifts onset or zeroes output</td><td>lag &lt; 5 ms; finite, non-zero</td></tr>
+<tr><td>D5</td><td>Gain a no-op after normalization</td><td>gain + hard clip changes the output; pure gain documented invariant</td></tr>
+<tr><td>D6</td><td>Augmentation rate depends on class</td><td>per-class rate within 3 points; counterfactual</td></tr>
+<tr><td>D7</td><td>NaN/inf on silent input</td><td>all-zero clip stays finite</td></tr>
+<tr><td>D8</td><td>"Clean" evaluation not clean</td><td>identity</td></tr>
+<tr><td>D9</td><td>Augmented holdout slice differs between models</td><td>fixed-seed determinism</td></tr>
+</tbody>
+</table></div>
+<p><strong>E. Model and training</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>E1</td><td>Wrong layers train</td><td>CNN + lower layers unchanged after a step; top N change; counterfactual N = 0</td></tr>
+<tr><td>E2</td><td>Attention mask ignored</td><td>padded vs unpadded logit within 1e-4</td></tr>
+<tr><td>E3</td><td>Score direction flips</td><td>spoof = 1; runtime abort if fold AUC ≤ 0.5</td></tr>
+<tr><td>E4</td><td>Sampler breaks quotas</td><td>balance ± 5%, NSA ≥ 50%, MLAAD ≤ cap, excluded families absent</td></tr>
+<tr><td>E5</td><td>Non-deterministic</td><td>seeded first-step loss identical</td></tr>
+<tr><td>E6</td><td>Config/artifact drift</td><td>hashes in <code>meta.json</code>; scorer refuses on mismatch</td></tr>
+<tr><td>E7</td><td>NaN loss continues</td><td>abort, nonzero exit</td></tr>
+<tr><td>E8</td><td>Checkpoint doesn't round-trip</td><td>save/load identical logits</td></tr>
+<tr><td>E9</td><td>Selection touches the holdout</td><td>training/validation row sets disjoint from holdout; gate values unchanged when holdout rows are perturbed</td></tr>
+<tr><td>E10</td><td>Training on the local MPS GPU</td><td>trainer refuses non-CUDA except <code>--cpu-smoke</code></td></tr>
+</tbody>
+</table></div>
+<p><strong>F. Scores and readouts</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>F1</td><td>Schema/count mismatch</td><td>columns; <code>split</code> ∈ {inner_oof, holdout, test}; 16,142 / 3,858 / 1,671 (or zero <code>inner_oof</code> with <code>stackable:false</code>)</td></tr>
+<tr><td>F2</td><td>OOF row scored by a model that saw its fold</td><td><code>fold</code> == scoring model's fold; each row once</td></tr>
+<tr><td>F3</td><td>Paths don't join</td><td>exact match with <code>nsa_folds.csv</code> and <code>nsa_test.csv</code></td></tr>
+<tr><td>F4</td><td>Non-finite, out of range, wrong direction</td><td>finite, [0, 1], 1 = synthetic</td></tr>
+<tr><td>F5</td><td><code>meta.json</code> incomplete</td><td>required keys</td></tr>
+<tr><td>F6</td><td>CPU differs from box; bundled differs from raw</td><td>fp32 box vs Mac max Δlogit &lt; 1e-2, Spearman &gt; 0.999; WAV vs FLAC max Δlogit &lt; 0.05</td></tr>
+<tr><td>F7</td><td>13.6 s clip truncated</td><td>scored whole</td></tr>
+<tr><td>F8</td><td>Code writes into another lane</td><td>static: no <code>submissions/</code>, no <code>.tsv</code> writing, no write-mode <code>nsa_folds.csv</code></td></tr>
+</tbody>
+</table></div>
+<p><strong>G. Cloud and spend</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>G1</td><td>A script touches powerlifting data in R2</td><td>every rclone destination in <code>scripts/cloud/*.sh</code> and <code>scripts/m5_*.py</code> starts with <code>r2:pa-source/hearsay/</code>; guard refuses otherwise</td></tr>
+<tr><td>G2</td><td>A box outlives a crash or DONE</td><td>launcher trap; reaper on DONE/FAIL/stall/11:45; 0 instances verified</td></tr>
+<tr><td>G3</td><td>Overspend</td><td>guard: credit − running commitments ≥ est + $1.50; ledger row per launch</td></tr>
+<tr><td>G4</td><td>Box dies mid-run</td><td>checkpoint to R2 every eval; resume exercised in the pilot</td></tr>
+<tr><td>G5</td><td>vast API key leaks</td><td>no <code>set -x</code>, never echoed, never on the box</td></tr>
+<tr><td>G6</td><td>Wrong weights on the box</td><td>HF revision pinned; config sha checked; tree-sha checked</td></tr>
+</tbody>
+</table></div>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/specs/2026-09-26_m5-xlsr-finetune.md</code> <span class="hash">ee2ce6bf18c4</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

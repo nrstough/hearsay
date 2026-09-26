@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HEARSAY: The Audio Authentication Challenge (NSA sponsor brief) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/nsa-challenge.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/nsa-challenge.md</code>; the markdown file is the record.</p>
+
+<h1 id="hearsay-the-audio-authentication-challenge-nsa-sponsor-brief">HEARSAY: The Audio Authentication Challenge (NSA sponsor brief)</h1>
+<blockquote>
+<p>Text of <code>docs/nsa-challenge.pdf</code> (from a teammate's email, Fri Sep 25, 22:40), extracted with <code>pdftotext -layout</code>. This is the authoritative spec; where it and the slides or notes differ, it wins.</p>
+</blockquote>
+<pre><code class="language-text">HEARSAY: The Audio Authentication Challenge
+Welcome to HEARSAY
+Hello, and welcome to your first assignment with the National Security Agency's
+Multimedia Forensics and Authentication team. Three seconds. That's all a modern voice-
+cloning system needs to impersonate a head of state, a battlefield commander, or your
+company’s CEO. A single fabricated audio clip can move markets, empty a bank account,
+redirect troops, or end a career before anyone thinks to ask "is that real?"
+
+The stakes have never been higher. Your adversaries are already deploying synthetic-voice
+systems at scale. The question isn't whether the fake call will come — it's whether we'll
+know it's fake when it does.
+
+Your mission: Build an AI system that can autonomously analyze an audio file and
+determine whether it is real or synthesized. Real audio clips might be augmented with
+noise and other perturbations.
+
+
+
+
+The Challenge
+Develop an intelligent audio authentication framework that can:
+
+   •   Accept any audio file as input (WAV, MP3, M4A, MP4 audio, OGG, etc…)
+   •   Automatically orchestrate multiple forensic analysis techniques which may include
+       audio, spectrograms, signal processing and file metadata.
+   •   Output a synthetic probability score (0.0 to 1.0), 1.0 means synthetic.
+   •   You will receive a training dataset along with a separate, held-out test set for
+       evaluation.
+   •   You can record your own audio in various scenarios (e.g. cartoonish voices, rapid
+       speaking) if desired to gain confidence or skepticism in your techniques.
+   •   Clips will be at least 2 seconds and in English.
+   •   Provide explainable results: what techniques were used to determine a clip was
+       synthetic. Tell us what worked and what had no effect.
+   You have 36 hours. Cloud services, open-source LLMs, LLM resources provided by
+   HexLabs or your own university resources, speech models, and signal-processing
+   toolkits are all fair game. How you combine them is up to you.
+
+
+
+
+What Makes This Hard
+State-of-the-art systems can:
+
+   •   Clone a voice from as little as 3 seconds of reference audio (zero-shot TTS)
+
+   •   Convert one speaker's voice into another's in real time while preserving cadence
+       and emotion
+
+   •   Insert or replace individual words in an otherwise-genuine recording
+
+   •   Fabricate background acoustics to place a speaker in a room they were never in or
+       indoor vs. outdoor, added electrical background, sirens, or birdsong.
+
+   •   Launder artifacts through re-encoding, phone-quality downsampling, or added
+       noise to defeat naive detectors.
+
+   •   Spoof container metadata so the file claims a device and timestamp that never
+       produced it. Modify the MAC (Modified, Accessed, Created).
+
+A single detector won't cut it. You'll need to think like the forger and the forensic analyst:
+What inconsistencies did the AI miss? What statistical fingerprints did it leave behind?
+Does the metadata match up?
+
+
+
+
+Test Dataset
+NSA will provide a curated, labeled dataset that may span:
+
+       •   Bona fide speech — studio, smartphone, telephony, and field recordings across
+           codecs and bitrates
+       •   Fully synthetic speech — modern zero-shot TTS and neural vocoders
+       •   Voice-converted speech — real source speaker, cloned target identity
+       •   Replay attacks — a recording of a playback
+       •   Scene manipulation — authentic voice, fabricated or replaced ambient
+           background
+       •   Laundered fakes — synthetics passed through transcoding, band-limiting, or
+           noise to hide artifacts
+       •   Metadata-spoofed containers
+The sample training dataset contains labeled ground truth: synthetic (spoof) vs. real
+(bonafide).
+
+A sample test set is also provided where labels are held out and used for system evaluation
+to determine the detection performance score as part of the scoring rubric. Submit the
+output tab-delimited file ( .tsv ) for this sample test set.
+
+Note: To help each team refine their approach, NSA will offer a one-time review of each
+team's draft tab-delimited file to better assess their current performance snapshot. This is
+optional but recommended prior to official submission so there’s sufficient time for the
+team to address any gaps.
+
+
+
+
+Scoring Rubric
+1. Detection Performance (60%)
+
+   •   Synthetic probability score (0.0 to 1.0)
+
+
+2. Forensic Diversity and Breadth of Detector Types (20%)
+
+   •   Points for each distinct technique your system actually leverages
+
+   •   Container, digital file forensics &amp; metadata analysis (encoder tags, timestamps,
+       codec chain, MAC (Modified, Accessed, Created))
+
+   •   Spectral / frequency-domain analysis (spectrograms, band-limiting, vocoder
+       harmonics)
+
+   •   Prosody &amp; phonetics (breath, pause, coarticulation, pitch-contour naturalness,
+       repeatability, monotonicity, emotion)
+
+   •   Acoustic-environment consistency (ENF mains-hum)
+
+   •   Compression forensics (double-encoding, transcoding artifacts)
+   •   Speaker-embedding consistency (does the voice drift across the clip?)
+
+   •   Deep-learning anti-spoofing detectors
+
+   •   Splice / discontinuity detection (phase breaks, DC offset, background seams)
+
+   •   Agentic orchestration bonus: Does your system choose which analyses to run
+       based on file type, codec, initial findings, or confidence — rather than brute-forcing
+       everything?
+
+3. Documentation and Presentation (20%)
+
+   •   How well is approach documented / communicated?
+   •   Can algorithm provide insight into why an audio is synthetic/real?
+
+
+
+
+Recommended Resources &amp; Tools
+You're free to use any open-source or commercial tools. Here are some battle-tested
+starting suggestions:
+
+Signal processing &amp; inspection
+
+   •   librosa, torchaudio, scipy.signal, PyWavelets
+   •   FFmpeg / ffprobe / MediaInfo — container, codec, and stream inspection
+   •   SoX, Praat — acoustic analysis, pitch/formant extraction
+   •   ExifTool, libExiv2 – Metadata Analysis
+
+Anti-spoofing &amp; deepfake detectors
+   • AASIST / RawNet2 / RawNet3 — end-to-end spoof detection
+   • wav2vec 2.0 / WavLM / Whisper encoders as front-ends for spoof classifiers
+   • ECAPA-TDNN / x-vectors — speaker embeddings for intra-clip consistency checks
+   • ASVspoof challenge baselines (LFCC-GMM, LCNN)
+
+Datasets for training / calibration
+   • ASVspoof 2019 LA / 2021 LA+DF / ASVspoof 5
+   • WaveFake, In-the-Wild, MLAAD — multi-vocoder synthetic speech
+   • ADD Challenge (Audio Deepfake Detection) sets — includes partial fakes
+   • VCTK / LibriSpeech / VOiCES — bona fide references
+
+Agentic frameworks
+   • LangChain / LangGraph — multi-step forensic workflows with LLM reasoning
+   •   CrewAI — multi-agent (e.g., metadata agent, spectrum agent, embedding agent,
+       adjudicator)
+   •   HuggingFace Transformers / SpeechBrain — model deployment
+
+References
+   • ASVspoof &amp; ADD challenge overview papers (Interspeech / ICASSP)
+   • DARPA SemaFor program — semantic forensics
+
+
+
+
+Submission Requirements
+Your submission must include:
+
+   1. Source code
+      Provide a GitHub/GitLab repository containing your full implementation. The
+      repository must include a README that clearly documents your approach, system
+      architecture/design, and instructions for running your solution.
+   2. Docker container
+      Supply a Docker image that allows judges to run your system for reproducibility. The
+      container should execute inference on the provided test set without major
+      configuration changes.
+   3. Prediction file (Tab-Delimited file)
+      Submit a tab-delimited output file ( .tsv ) generated from the sample test set. The file
+      must include a header row with the following columns:
+      • filename: The name of the audio file being evaluated, including its extension
+         (string).
+      • cm-score: The predicted probability that the audio is synthetic, expressed as a
+         float from 0.0 to 1.0. Highest probability a file is synthetic is 1.0.
+
+
+Example Format:
+       teamName_predictions.tsv
+       filename cm-score
+       file1.wav 0.80
+       file2.mp3 0.10
+       file3.m4a 0.40
+       file4.m4a 1.00
+Why This Matters
+This isn't hypothetical. The techniques you build this weekend could:
+
+   •   Protect your own family once you know what today's voice-cloning scammers can
+       do
+   •   Flag a cloned-voice order before a unit acts on it
+   •   Authenticate an intercepted call before it drives a national-level assessment
+   •   Kill a CEO-voice wire-fraud attempt in the first 30 seconds
+   •   Determine whether a viral "leaked recording" of a foreign leader is real before it
+       shapes policy
+   •   Stand up in a courtroom when the evidence is a voice, not a document
+The fake voices are already out there. Your detector needs to be too.
+
+
+
+
+Questions?
+Join NSA’s discord channel through HexLabs or visit the NSA booth where technical
+mentors will be available for questions.
+
+Good luck. The nation's information integrity depends on your ingenuity.</code></pre>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/nsa-challenge.md</code> <span class="hash">91d03aee0ea0</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

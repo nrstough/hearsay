@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run spec: channel robustness on the frozen deep path (Sat Sep 26, 2026, 12:30) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_channel-robustness.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/specs/2026-09-26_channel-robustness.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#problem">Problem</a></li><li><a href="#scope-from-the-frozen-p1">Scope (from the frozen P1)</a></li><li><a href="#design-decisions">Design decisions</a></li><li><a href="#acceptance-criteria">Acceptance criteria</a></li><li><a href="#failure-modes--tests-teststest_channel_robustnesspy-hermetic">Failure modes → tests (tests/testchannelrobustness.py, hermetic)</a></li><li><a href="#documentation">Documentation</a></li><li><a href="#codex-plan-review-1245-findings-and-dispositions">Codex plan review (12:45): findings and dispositions</a></li><li><a href="#results-1320">Results (13:20)</a></li></ul></details>
+<h1 id="run-spec-channel-robustness-on-the-frozen-deep-path-sat-sep-26-2026-1230">Run spec: channel robustness on the frozen deep path (Sat Sep 26, 2026, 12:30)</h1>
+<p><strong>Rung:</strong> channel robustness, from <code>docs/handoffs/2026-09-26_channel-robustness-handoff.md</code>. P1 frozen by Nathan ~12:25 with a compressed process: P2 and the plan written together, one Codex plan review in the background while A (read-only) starts, audits once at the end. <strong>Hard stop 16:00.</strong> Nothing here touches the 12:03 draft send or the shipped TSV.</p>
+<h2 id="problem">Problem</h2>
+<p>Both deep detectors reach 0.007–0.07 minDCF on the NSA holdout and 0.23–0.34 on In-the-Wild real speech. Training real speech is all clean read speech; the 1,671 test files all share a ~7.2 kHz wall that may be one codec round-trip. How much In-the-Wild should weigh in any rule choice depends on how wild the test set is, which nobody has measured. Both shipped rules (fusion_v1 and the now-shipped fusion_v2) use M3 (Spectra-AASIST, training data undisclosed) as a false-alarm suppressor, and nobody has checked whether its holdout skill is memorisation.</p>
+<h2 id="scope-from-the-frozen-p1">Scope (from the frozen P1)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Action</th><th>Runs</th><th>Output</th>
+</tr></thead>
+<tbody>
+<tr><td>A</td><td>λ̂: the test set's wild-domain weight from label-free channel statistics</td><td>yes, first</td><td>λ̂ with bootstrap interval, sent to the oversight chat before anything else</td></tr>
+<tr><td>E</td><td>Three M3 leakage probes (perturbation sensitivity; M1b–M3 rank agreement on holdout vs test; M3 on unseen MLAAD spoof), plus the model card</td><td>yes</td><td>a one-line verdict on M3's false-alarm-suppression role</td></tr>
+<tr><td>B</td><td>Is the 7.2 kHz wall a codec? LJ + LibriSpeech inner clips through a codec grid vs the test files</td><td>yes, beside E</td><td>codec-match table, or a recorded negative</td></tr>
+<tr><td>C</td><td>Symmetric codec round-trip refit of M1b</td><td><strong>only if</strong> B finds a match <strong>and</strong> the extraction can start by 13:45 (frozen P1, 12:16). Runs locally (MPS extraction, CPU refit), so no rental approval is needed; the column changes nothing until Nathan ratifies it through the main chat's <code>scripts/fuse_sweep_m5.py --refit-m1b</code> (acceptance contract: <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>, Addendum 2)</td><td>recorded as "not run" with the reason otherwise</td></tr>
+<tr><td>D</td><td>One wild bona fide corpus</td><td><strong>dropped</strong> (time box)</td><td>recorded as not attempted</td></tr>
+</tbody>
+</table></div>
+<h2 id="design-decisions">Design decisions</h2>
+<ul>
+<li><strong>D1 (A features).</strong> Every clip goes through the same preparation: <code>load_audio</code> → <code>hearsay.compression.features</code> with no crop and the pipeline's band match (which runs <code>band_limit</code> → <code>trim_silence</code>), plus six added channel statistics computed on the same prepared signal: noise-floor level (10th-percentile frame energy relative to the 90th), noise-floor stationarity (std over 0.5 s blocks of each block's 10th-percentile energy), a reverberation proxy (median energy-decay slope in the 120 ms after speech offsets), spectral flatness, frame-loudness std, and pause fraction. Trimming removes corpus-specific lead silence (a known shortcut, <code>architecture.md</code> §11) from every set alike. No labels, filenames or durations enter.</li>
+<li><strong>D2 (A classifier).</strong> Standardized logistic regression (C = 1, balanced) separating holdout real (<code>splits/nsa_folds.csv</code>, fold <code>holdout</code>, bona fide, 1,858 clips) from In-the-Wild real (2,000 clips, 54 speakers). Out-of-fold scores by 5-fold <strong>grouped</strong> CV (group = holdout <code>group</code> / ITW speaker); no speaker spans a train and a validation fold.</li>
+<li><strong>D3 (A estimators).</strong> Two, both reported: (i) the memo's mean posterior P(wild) over the 1,671 test files; (ii) adjusted classify-and-count, λ̂ = clip((q − FPR) / (TPR − FPR), 0, 1), with q the test share above 0.5 and TPR/FPR from the out-of-fold scores; refused (NaN plus a message) when TPR − FPR &lt; 0.2. Bootstrap 1,000× over test files (and over the out-of-fold rows for (ii)); 95% percentile interval. Also on the subset the shipped rule calls real (lowest 70% of the 12:03 draft's scores), and a per-feature position t = (median_test − median_clean) / (median_wild − median_clean). A novelty share (test files beyond the 99th percentile of the training Mahalanobis distance) says how much of the test set is neither. The memo's crossover is 0.32.</li>
+<li><strong>D4 (B grid).</strong> 50 LJ + 50 LibriSpeech clips from inner folds (seed 0). Variants: raw; Kaiser <code>band_limit</code> alone; each of mp3 {32, 48, 64, 96} kbps and aac {32, 48, 64} kbps at {16, 44.1} kHz through <code>hearsay.compression.launder</code>, alone and followed by <code>band_limit</code>. Statistics on the unfiltered result (the diagnosis compares what the test file is, not what the pipeline does to it): band levels at 6.5–7.75 kHz relative to 1–3 kHz, the 7.5-vs-6.5 kHz drop, roll-off slope over 6.5–8 kHz, high-band (6–7 kHz) flatness, <code>deep_hole_frac</code>, <code>local_hole_frac</code>, <code>floor_p2_db</code>. The same statistics on all 1,671 test files. Distance = mean over statistics of |median_variant − median_test| / IQR_test.</li>
+<li><strong>D5 (B match rule, pre-declared).</strong> A codec variant "matches" if its distance is at least 20% below the Kaiser-alone distance <strong>and</strong> it is closer to the test medians than Kaiser on both hole statistics. Otherwise B is negative and C does not run.</li>
+<li><strong>D6 (E perturbation probe).</strong> 500 inner clips (250 real, 250 spoof, stratified by fold and generator, seed 0), each decoded, silence-trimmed and cropped once to a test-length segment (seeded; no band match yet), then: none, MP3 64 kbps at 16 kHz round-trip, white noise at 20 dB SNR, ±2% speed (resampling), one-sample circular shift. The perturbed raw segment is scored with the runner's own <code>Models</code> paths (<code>m1_logit</code>, <code>spectra_logit</code>, <code>m5_logit</code>; CPU, the shipped probe, zero-pad Spectra, M1 fp16 rounding), which apply their own band match and trim exactly as at test time. Readouts per model and perturbation: AUC, ΔAUC vs clean, Spearman(clean, perturbed), and the share of spoof clips crossing M3's suppression threshold (logit &lt; −3) under each perturbation.</li>
+<li><strong>D7 (E agreement probe).</strong> Spearman(M1b, M3) on holdout rows vs test rows from the existing exports, with a 1,000× bootstrap interval on the difference.</li>
+<li><strong>D8 (E unseen-spoof probe).</strong> 600 MLAAD English spoof clips (stratified by model, seed 0, test-length crop), scored by M1b, M3 and M5 as in D6. Readouts: each model's miss rate at its own inner-OOF brief-cost threshold, and <strong>the share of MLAAD spoof with M3 logit &lt; −3</strong>, which is exactly the shipped rule's exposure (suppression can only create misses). M5 trained on MLAAD, so its number is in-sample and reported as such.</li>
+<li><strong>D9 (E verdict rule, pre-declared).</strong> M3's suppression role is <strong>at risk</strong> if any of: (a) M3's mean |ΔAUC| over perturbations exceeds twice M1b's and 0.02 absolute; (b) holdout-minus-test Spearman exceeds 0.2 with the interval excluding 0; (c) more than 5% of MLAAD spoof falls below −3. Otherwise <strong>kept</strong>. The verdict is advice to the main chat; changing the shipped rule goes through <code>scripts/fuse_sweep_m5.py</code> and Nathan.</li>
+<li><strong>D10 (discipline).</strong> No training or selection on holdout, In-the-Wild or test labels beyond D2's domain classifier, which uses only domain membership of real clips (never spoof-vs-real labels on eval sets). Nothing written under <code>data/</code>. No edits to <code>embed.py</code>, <code>probe.py</code>, <code>spectra.py</code>, <code>pipeline.py</code>, fold files, extraction/training/fusion scripts.</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ol>
+<li>A: λ̂ (both estimators) with intervals in the report and sent to the oversight chat; grouped-CV AUC of the domain classifier reported; the grouped CV provably never splits a group (test).</li>
+<li>B: the full grid table and the pre-declared D5 verdict in the report.</li>
+<li>E: the three probes' tables and the D9 verdict in the report; model-card check recorded.</li>
+<li>C and D recorded with their disposition (not run / not attempted, and why).</li>
+<li>New tests pass; <code>uv run pytest -q</code> and <code>uv run ruff check .</code> stay green; <code>tests/test_docs_consistency.py</code> green after doc edits.</li>
+<li>Report <code>docs/reports/2026-09-26_channel-robustness.md</code>, a <code>docs/STATUS.md</code> row, a <code>CLAUDE.md</code> disclosure bullet.</li>
+</ol>
+<h2 id="failure-modes--tests-teststest_channel_robustnesspy-hermetic">Failure modes → tests (<code>tests/test_channel_robustness.py</code>, hermetic)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Stage</th><th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>A features</td><td>NaN/inf on silence, very short or clipped audio</td><td>all-zero, 0.3 s and full-scale-square inputs return finite dicts</td></tr>
+<tr><td>A features</td><td>a statistic that does not move with its cause (vacuous feature)</td><td>added white noise raises floor level; an added exponential reverb tail raises the decay proxy (slower decay); a stationary vs gated noise floor orders stationarity</td></tr>
+<tr><td>A features</td><td>nondeterminism</td><td>same input twice → identical dict</td></tr>
+<tr><td>A features</td><td>level shortcut</td><td>scaling the input by 0.1 leaves every statistic within tolerance</td></tr>
+<tr><td>A classifier</td><td>group leakage across CV folds</td><td>every group lands in exactly one validation fold; counterfactual: a clip-level split on the same data is detected as leaking</td></tr>
+<tr><td>A estimators</td><td>biased mixture estimate</td><td>synthetic two-Gaussian domains with a known 0.3 mix: both estimators within ±0.08</td></tr>
+<tr><td>A estimators</td><td>degenerate classifier</td><td>TPR − FPR &lt; 0.2 → NaN plus reason, never a number</td></tr>
+<tr><td>A estimators</td><td>clipping</td><td>q below FPR → 0, above TPR → 1</td></tr>
+<tr><td>A per-feature t</td><td>sign/scale errors</td><td>known medians give the expected t, including t &lt; 0 and t &gt; 1</td></tr>
+<tr><td>B stats</td><td>codec wall not measured</td><td>a signal low-passed at 7 kHz shows a larger 7.5-vs-6.5 drop than one low-passed at 7.75 kHz</td></tr>
+<tr><td>B distance</td><td>wrong normalisation</td><td>identical distributions → 0; shifted by one IQR → 1</td></tr>
+<tr><td>B match rule</td><td>guard removed</td><td>a variant 25% better on distance but worse on one hole statistic is <strong>not</strong> a match; one better on both is</td></tr>
+<tr><td>E perturbations</td><td>a perturbation that does nothing, or changes the length or label</td><td>each perturbation changes the signal; noise hits 20 ± 0.5 dB SNR; shift is exactly one sample; speed changes length by ±2% ± 1 sample</td></tr>
+<tr><td>E metrics</td><td>ΔAUC sign</td><td>a scorer that is perfect clean and random perturbed gives ΔAUC ≈ −0.5</td></tr>
+<tr><td>E verdict</td><td>guard removed</td><td>each of (a), (b), (c) alone flips the verdict to "at risk"; none → "kept"</td></tr>
+<tr><td>E agreement</td><td>bootstrap interval wrong</td><td>identical rankings on both sets → difference 0 with a tight interval</td></tr>
+</tbody>
+</table></div>
+<p>Scripts read real data and weights and are exercised by running them; their pure functions are what the tests pin.</p>
+<h2 id="documentation">Documentation</h2>
+<ul>
+<li>Create: this spec; <code>docs/reports/2026-09-26_channel-robustness-plan.md</code>; <code>docs/reports/2026-09-26_channel-robustness.md</code>.</li>
+<li>Update: <code>docs/STATUS.md</code> (one row), <code>CLAUDE.md</code> (one disclosure bullet).</li>
+<li>Conditional (confirm at execution): <code>docs/architecture.md</code> §11 shortcut ledger, only if A or B finds a new train-vs-test fingerprint.</li>
+</ul>
+<h2 id="codex-plan-review-1245-findings-and-dispositions">Codex plan review (12:45): findings and dispositions</h2>
+<p>Review: <code>docs/reports/2026-09-26_channel-robustness-plan-review.md</code>. Every finding is adopted; the design above is amended as follows (these amendments override D2, D3, D6–D9 where they differ).</p>
+<ol>
+<li><strong>Mean posterior is not a mixture estimate.</strong> λ̂ is the adjusted classify-and-count estimate; the mean posterior is descriptive only. Tests cover overlapping domains and endpoint mixtures (0, 0.3, 0.7, 1 at two separations), and pin the mean posterior's bias.</li>
+<li><strong>Synthetic files in the test set; no identifiability check.</strong> Never-trained controls (VCTK clean read, DiffSSD spoof, inner real, inner real after one MP3 round-trip) are scored. A pre-declared rule (<strong>D3b</strong>) must pass before λ̂ is read against the crossover: AUC ≥ 0.8, VCTK and DiffSSD each read wild under 25%, LJ-excluded estimate within 0.15. Otherwise λ̂ is "unidentifiable". The likely-real subset is a sensitivity readout, not the estimate. Added after the first full run: refits without the dominant feature and without all floor/hole features, so a one-feature answer is visible.</li>
+<li><strong>LJ grouped by chapter.</strong> The domain classifier groups by speaker (<code>speaker</code> column; LJ = one speaker). Scaling is inside each fold (pipeline). The interval resamples reference speakers, not rows. LJ-excluded sensitivity reported.</li>
+<li><strong>E baseline in-sample.</strong> The perturbation probe uses 500 <strong>outer-holdout</strong> clips (250 real by source, 250 spoof by generator), out of sample for M1b v3, M5 and handcrafted v5; M3's exposure is the question being probed. The holdout is read, never selected on: no model, threshold or weight is chosen from it (the fused minDCF readouts are the rule's own, unchanged).</li>
+<li><strong>D7 cannot establish memorisation.</strong> The M1b–M3 Spearman gap is reported as descriptive and removed from the D9 verdict.</li>
+<li><strong>Exposure mislabelled.</strong> Exposure is now the actual conjunction, computed by <code>FusionConstants.fuse</code> on <code>models/fusion_v2/constants.json</code> (<code>e_applied</code>: M3 logit &lt; −3 and base rank &gt; 0.5). The M3-only share is reported as an upper bound. Fused minDCF with and without the step (base vs final), and minDCF and EER per model, under every perturbation.</li>
+<li><strong>Codec delay/padding.</strong> Codec round-trips in E are aligned to their input by cross-correlation within ±4,000 samples and cut or zero-padded to the input length (<code>align_to</code>, tested). B trims silence before its statistics.</li>
+<li><strong>Degenerate cases.</strong> <code>feature_position</code> returns NaN below a 1e-9 median gap; the Mahalanobis covariance carries a 1e-3 ridge (tested on a constant column); the adjusted estimate refuses TPR − FPR &lt; 0.2; a bootstrap with more than 10% refused resamples has no interval; any NaN verdict input gives "inconclusive", never "kept" (tested).</li>
+<li><strong>Submission/log disposition.</strong> This rung is diagnostic only: it writes <strong>no TSV and no <code>submissions/log.csv</code> row</strong> (log rows record TSVs; the shipped TSV is the main chat's). Any new column goes through <code>scripts/fuse_sweep_m5.py</code> in the main chat.</li>
+<li><strong>Cache identity.</strong> A's cache is keyed by path plus codec spec. E's cache is keyed path|perturbation|seed, with the model identities (<code>Models.version()</code>) and constants path stored beside it; a mismatch refuses to resume.</li>
+<li><strong>Bounds.</strong> No new compute starts after 15:00; an unfinished E probe makes the verdict "inconclusive". Telephony and physical replay are untested and stated as such.</li>
+</ol>
+<p><strong>D9 revised (E verdict).</strong> "At risk" if (a) M3's mean |ΔAUC| over the four perturbations exceeds twice M1b's and 0.02, or (c) the shipped rule damps more than 5% of unseen MLAAD spoof (<code>e_applied</code>), or (d) under any perturbation the step raises the fused holdout minDCF by more than 0.01. "Inconclusive" on any missing number; "kept" otherwise.</p>
+<h2 id="results-1320">Results (13:20)</h2>
+<p>Report: <code>docs/reports/2026-09-26_channel-robustness.md</code>. Commits: a0018a8 (A), 32d6402 (B, λ̂ correction, E script), and the E commit.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Outcome</th>
+</tr></thead>
+<tbody>
+<tr><td>A</td><td>λ̂ = 0.51 (95% CI 0.12–0.64), identifiable, but only just (VCTK control 24.7% vs a 25% limit). The first run's 0.947 is withdrawn: <code>clip_floor_db</code> read the 7–8 kHz stopband and was added to the &gt;7 kHz drop list (a deviation from D1's feature list, made under D1's own rule).</td></tr>
+<tr><td>B</td><td>No codec match (Kaiser 1.081, best codec 1.045: 3% where D5 needs 20% and both hole statistics).</td></tr>
+<tr><td>C</td><td>Not run: B negative. The laundering path was built and smoke-tested, then removed unused (<code>scripts/channel_launder.py</code> is not committed).</td></tr>
+<tr><td>D</td><td>Not attempted (time box, frozen P1).</td></tr>
+<tr><td>E</td><td><strong>Kept</strong> under D9 revised: M3 mean |ΔAUC| 0.0008 vs M1b 0.0041; MLAAD damped 1.2%; the M3 step never raised fused minDCF (it lowered it by 0.008–0.020 in 4 of 5 conditions). Agreement gap 0.175 (descriptive). New: 20 dB noise drops handcrafted v5 to AUC 0.64 and the shipped rule to 0.269 holdout minDCF.</td></tr>
+</tbody>
+</table></div>
+<p>Acceptance criteria:</p>
+<ol>
+<li>λ̂, both estimators and intervals, sent to oversight first (12:33), with the correction at 12:57. Grouped CV tested.</li>
+<li>B's grid table and D5 verdict are in the report.</li>
+<li>E's three probes, the D9 verdict and the model-card check are in the report.</li>
+<li>C and D dispositions are recorded.</li>
+<li>Tests: <code>tests/test_channel_robustness.py</code>, 42 passing. Full-suite and lint results are recorded at commit.</li>
+<li>Report, STATUS row and CLAUDE.md bullet are done.</li>
+</ol>
+<p><strong>No TSV and no <code>submissions/log.csv</code> row:</strong> this rung is diagnostic only (plan-review disposition 9).</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/specs/2026-09-26_channel-robustness.md</code> <span class="hash">1b73a0ad9f3e</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

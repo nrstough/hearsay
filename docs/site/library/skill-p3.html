@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/p3 — Execute · HEARSAY</title>
+<meta name="description" content="&quot;Execute an approved plan — code, test, commit&quot;">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>.claude/skills/p3/SKILL.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#pre-flight">Pre-flight</a></li><li><a href="#execute">Execute</a></li><li><a href="#present-results">Present results</a></li><li><a href="#rules">Rules</a></li><li><a href="#hearsay-rules-project-specific">HEARSAY rules (project-specific)</a></li></ul></details>
+<h1 id="p3--execute">/p3 — Execute</h1>
+<p>Execute an already-approved implementation plan. The plan should exist as a durable
+markdown file (this project's plan directory — commonly <code>.claude/plans/</code> or <code>docs/reports/</code>)
+and have been reviewed by the user.</p>
+<h2 id="pre-flight">Pre-flight</h2>
+<ol>
+<li><code>git branch --show-current</code> + <code>pwd</code> — verify correct branch AND worktree</li>
+<li>Read the plan file</li>
+<li>Scope check: <code>git status</code> — stash/commit unrelated changes first</li>
+<li><strong>Resolve the project's full test command</strong> — do not assume. In order: an explicit
+command in the plan → <code>CLAUDE.md</code> / <code>AGENTS.md</code> → project config (<code>package.json</code>
+<code>scripts.test</code>, <code>Makefile</code> <code>test</code> target, <code>pyproject.toml</code> / <code>pytest.ini</code>,
+<code>Cargo.toml</code>, <code>go.mod</code>). If no test command exists, say so explicitly in the results
+rather than silently skipping regression.</li>
+</ol>
+<h2 id="execute">Execute</h2>
+<p>Complete ALL planned steps without stopping:</p>
+<ul>
+<li>Code every step in the plan</li>
+<li>Run all tests specified in the plan</li>
+<li>Run the full regression suite (the command resolved in pre-flight)</li>
+<li>Update affected documentation (doc-sync)</li>
+<li>Commit with conventional commit prefix</li>
+</ul>
+<h2 id="present-results">Present results</h2>
+<ul>
+<li>Test results (pass/fail counts)</li>
+<li>Any deviations from plan and why</li>
+<li>Issues encountered</li>
+</ul>
+<h2 id="rules">Rules</h2>
+<ul>
+<li>Go step by step. Do not skip or reorder without documenting why.</li>
+<li>Do NOT stop to ask questions after starting. Only exception: scope-level blocker.</li>
+<li>If tests fail, fix and re-run before committing. Document the fix as a deviation.</li>
+</ul>
+<h2 id="hearsay-rules-project-specific">HEARSAY rules (project-specific)</h2>
+<ul>
+<li>If the change touches a detector or the submission path, finish with a fresh <strong>valid
+TSV</strong> and a new row in <code>submissions/log.csv</code> (timestamp, rung, validation score,
+submission path), or name the blocker. Never overwrite a previously submitted TSV; write
+a new file.</li>
+<li>Report validation by held-out generator and speaker groups (fold file), with the
+clean-only score next to any augmented one. Never train on the validation split.</li>
+<li>Respect the plan's time box (rungs are capped at a few hours; the build ends 8 AM
+Sunday). When it runs out, stop and report the state — do not push through.</li>
+<li>After the Sunday-morning freeze, execute only TSV- or Docker-breaking fixes.</li>
+<li>Do not change the detector contract (<code>src/hearsay/detectors/base.py</code>) unless the plan
+says so and names the affected detector owners.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>.claude/skills/p3/SKILL.md</code> <span class="hash">939dc65ad81a</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

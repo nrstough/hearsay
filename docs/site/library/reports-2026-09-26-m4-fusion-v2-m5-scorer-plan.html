@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: M4 fusion v2, M5 as a live scorer in the runner (Sat Sep 26, 2026, written 10:10, revised 10:20 after the critique agent) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m4-fusion-v2-m5-scorer-plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_m4-fusion-v2-m5-scorer-plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#ground-truth-the-plan-rests-on-measured-by-the-agents-read-only">Ground truth the plan rests on (measured by the agents, read-only)</a></li><li><a href="#schedule-and-stops-1020--1500">Schedule and stops (10:20 → 15:00)</a></li><li><a href="#step-0-pre-flight">Step 0. Pre-flight</a></li><li><a href="#step-1-scriptsfuse_sweep_m5py-gate-first-then-write">Step 1. scripts/fusesweepm5.py: gate first, then write</a></li><li><a href="#step-2-srchearsaypipelinepy-constants-and-the-loader">Step 2. src/hearsay/pipeline.py: constants and the loader</a></li><li><a href="#step-3-srchearsaypipelinepy-the-m5-scorer-identity-gate-entries-analyze_clip">Step 3. src/hearsay/pipeline.py: the M5 scorer, identity gate, entries, analyzeclip</a></li><li><a href="#step-4-scriptsrun_pipelinepy">Step 4. scripts/runpipeline.py</a></li><li><a href="#step-5-teststest_pipelinepy">Step 5. tests/testpipeline.py</a></li><li><a href="#step-6-runner-subset-suite-and-lint-stop-1">Step 6. Runner-subset suite and lint (stop 1)</a></li><li><a href="#step-7-live-parity-stop-2">Step 7. Live parity (stop 2)</a></li><li><a href="#step-8-srchearsayapipy-and-teststest_apipy">Step 8. src/hearsay/api.py and tests/testapi.py</a></li><li><a href="#step-9-full-suite-and-lint">Step 9. Full suite and lint</a></li><li><a href="#step-10-docs-commit-messages">Step 10. Docs, commit, messages</a></li><li><a href="#step-11-post-commit-gates">Step 11. Post-commit gates</a></li><li><a href="#verification-map">Verification map</a></li><li><a href="#risks-and-mitigations">Risks and mitigations</a></li><li><a href="#codex-plan-review-1017-docsreports2026-09-26_m4-fusion-v2-m5-scorer-plan-reviewmd-and-how-each-finding-was-addressed">Codex plan review (10:17, docs/reports/2026-09-26m4-fusion-v2-m5-scorer-plan-review.md) and how each finding was addressed</a></li></ul></details>
+<h1 id="plan-m4-fusion-v2-m5-as-a-live-scorer-in-the-runner-sat-sep-26-2026-written-1010-revised-1020-after-the-critique-agent">Plan: M4 fusion v2, M5 as a live scorer in the runner (Sat Sep 26, 2026, written 10:10, revised 10:20 after the critique agent)</h1>
+<p>Run spec: <code>docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md</code> (decisions D1–D10 with the 10:15 amendments, tests T1–T25, acceptance A1–A11). Worktree <code>main</code> at <code>28d26fe</code> (later commits by other lanes do not touch the cited files; the critique agent re-verified every line number at <code>244064d</code>). Baseline: 452 passed (full suite, 09:45). Deep mode: three exploration agents (architecture, file impact, risk) and a critique agent; the critique's sixteen findings are folded in below and listed in the spec's amendments.</p>
+<h2 id="ground-truth-the-plan-rests-on-measured-by-the-agents-read-only">Ground truth the plan rests on (measured by the agents, read-only)</h2>
+<ul>
+<li>The v2 candidate rule reproduces both 09:14 candidate TSVs from the exports with max |Δ| 6.7e-16 (our direction) and 7.2e-16 (flipped) when the blend is accumulated in weights order as <code>base = 0.0; for d in ranked: base += w[d] * rank[d]</code>. For v1 that loop is provably bit-identical to today's <code>(1 - a) * r1 + a * rh</code> (<code>0.0 + y == y</code>, <code>1.0 - 0.2 == 0.8</code>; 0 mismatches over all 16,143 × 9 v1 rank pairs). Never <code>np.dot</code> or <code>sum()</code>. The v2 rule is one ulp off the sweep script's <code>(0.8 - w)</code> (0.6000000000000001 vs the file's rounded 0.6), which is the 6.7e-16.</li>
+<li>Perturbing every M5 test logit by the recorded live-vs-export gap (±0.012): max |Δp| 0.0017, 0 verdict crossings, 0 E-rule flips; 5 rows within 0.003 of the base boundary, 4 within 0.05 of the M3 margin boundary. The A4 gate (max 0.005, mean 5e-4, Spearman 0.9999, no flips) is strict but passable; the M5-logit gate (≤ 0.02) catches a transform-order regression (the pre-fix bug read 0.279).</li>
+<li><code>deploy_transform</code> then <code>collate</code> normalizes twice; the export did the same (<code>scripts/m5_train.py:186-197, 434-435</code>); skipping <code>collate</code> moves logits by up to 2.5e-5. Zero clips, sub-second clips and clips over 8 s are finite; an input under 400 samples raises inside the XLS-R CNN and <code>analyze_clip</code>'s per-scorer <code>except Exception</code> (<code>pipeline.py:584-585</code>) turns that into an error entry, imputed at 0.5 (T24 pins it; D6's loudness clause makes a systematic failure visible).</li>
+<li><code>load_m5</code> verifies three hashes on every load (~11 s cold for 657 MB); eval mode, <code>layerdrop=0.0</code>, <code>apply_spec_augment=False</code>; fp32 throughout; the export is batch 16 on the A100 (the <code>full</code> model, <code>m5_assemble.py:176</code>).</li>
+<li><code>open_cache</code> (<code>run_pipeline.py:254</code>) compares <code>header.get(k) == v</code> for every identity key except <code>created</code>, so an old v1 header without <code>m5</code> still matches a v1 identity with <code>m5=None</code>; any non-None value moves the file aside.</li>
+<li><code>hearsay.pipeline</code> imports no torch at module top; <code>from hearsay.pipeline import M5_DIR</code> in the sweep script is side-effect-free. <code>.gitignore</code> covers both ends of the candidate move. Nothing in <code>docker/</code> or <code>tests/test_docker_image.py</code> loads every staged fusion file; a staged <code>fusion_v2</code> in an image without the checkpoint is inert (<code>--fusion</code> to it fails loudly on the missing <code>hashes.json</code>).</li>
+<li><code>speaker_drift.py:67</code> halves torch's thread count globally when ECAPA first loads. Not this lane's file; M5's per-clip time is reported as measured.</li>
+</ul>
+<h2 id="schedule-and-stops-1020--1500">Schedule and stops (10:20 → 15:00)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Step</th><th>Budget</th><th>Lands by</th>
+</tr></thead>
+<tbody>
+<tr><td>0 pre-flight + Docker heads-up</td><td>10</td><td>10:30</td></tr>
+<tr><td>1 sweep script gate, <code>--write</code>, compare, move</td><td>25</td><td>10:55</td></tr>
+<tr><td>2 loader</td><td>35</td><td>11:30</td></tr>
+<tr><td>3 M5 scorer, gate, entries, <code>analyze_clip</code></td><td>40</td><td>12:10</td></tr>
+<tr><td>4 runner</td><td>45</td><td>12:55</td></tr>
+<tr><td>5 <code>tests/test_pipeline.py</code></td><td>50</td><td>13:45</td></tr>
+<tr><td>6 runner-subset suite + ruff</td><td>10</td><td>13:55 (<strong>stop 1: 14:00</strong>)</td></tr>
+<tr><td>7 live 50-file v2 and v1; full run started in the background</td><td>20</td><td>14:15 (<strong>stop 2: A4 by 14:30</strong>)</td></tr>
+<tr><td>8 API + <code>tests/test_api.py</code></td><td>25</td><td>14:40</td></tr>
+<tr><td>9 full suite + ruff</td><td>10</td><td>14:50</td></tr>
+<tr><td>10 docs, commit, messages</td><td>25</td><td>15:15</td></tr>
+<tr><td>11 critique loop, Codex audit</td><td>30</td><td>15:45</td></tr>
+</tbody>
+</table></div>
+<p><strong>Final deadline 15:45 for everything</strong>: the full-set run (started at step 7, ~35 min) must have landed with A5 met by 15:00; the critique loop is at most two rounds and the Codex audit one round plus one fix commit. At 15:45 whatever gate is still open is reported as open in the run spec, with the fallback stated: option 2 (ship the candidate TSV, image on <code>e_on_a</code>) needs none of this, and the branch stays uncommitted if stop 1 or stop 2 was missed.</p>
+<h2 id="step-0-pre-flight">Step 0. Pre-flight</h2>
+<ol>
+<li><code>git branch --show-current</code> = <code>main</code>; <code>pwd</code> = <code>/Users/nathanstough/Projects/hearsay</code>; <code>git status --short</code> shows only the other lanes' known uncommitted files (<code>scripts/cloud/launch.sh</code>, <code>scripts/cloud/reaper.sh</code>, <code>tests/test_cloud_scripts.py</code>, the two <code>m5-xlsr-finetune</code> spec files) plus this lane's spec and plan. Never stage theirs.</li>
+<li>Tell the Docker chat (SendMessage, "Docker handoff plan review"): the runner is about to change (M5 as an optional fourth scorer, <code>fusion_v2</code> executable via <code>--fusion</code>, default unchanged), the commit is backward compatible, nothing to stage until the switch, their next build will list <code>fusion_v2</code> in BUILD_INFO and the file is inert without <code>models/m5_shipped</code>. Not their approval, a notification.</li>
+<li><code>cp models/fusion_v2_candidate/constants.json &lt;scratchpad&gt;/fusion_v2_candidate_0914.json</code> (the 09:14 original; step 1 compares against it). Do <strong>not</strong> run the sweep script yet (at HEAD it rewrites that file).</li>
+<li><code>uv run python scripts/fuse_sweep.py</code> (read-only for <code>models/</code>; it writes <code>outputs/fusion/sweep_report.json</code>) must print inner 0.1395 / holdout 0.014 / ITW brief 0.2603 for <code>E_on_A_alpha0.2</code>: the export-drift tripwire.</li>
+</ol>
+<h2 id="step-1-scriptsfuse_sweep_m5py-gate-first-then-write">Step 1. <code>scripts/fuse_sweep_m5.py</code>: gate first, then write</h2>
+<p>Current: no argparse (L1-22 docstring, imports, dynamic import of <code>fuse_sweep.py</code> as <code>fs</code>); <code>main()</code> L23; winner block L101-126 writes <code>outputs/fusion/sweep_m5_final_test.csv</code> (L106-110) and <code>models/fusion_v2_candidate/constants.json</code> (L112-126) unconditionally; report JSON L127-129.</p>
+<ol>
+<li>Add <code>import argparse</code>; in <code>main()</code> parse <code>--write</code> (<code>action="store_true"</code>, help "write models/fusion_v2/constants.json (the runner's file); without it nothing under models/ is written"). Docstring L1-6: usage <code>[--write]</code>; the report and <code>sweep_m5_final_test.csv</code> are always written, the constants only with <code>--write</code>.</li>
+<li>Keep L101-110 unconditional. Wrap L112-126 in <code>if args.write:</code>; target <code>cdir = REPO / "models" / "fusion_v2"</code>; drop <code>"status"</code>; add <code>"how": "rank_d = searchsorted(rank_ref[d], logit_d)/len; base = sum(weights[d] * rank_d) over m1b_v3, handcrafted_v5, m5_xlsr_ft, accumulated in that order; if m3_logit &lt; -3 and base &gt; 0.5: base *= 0.5; p = determinate_map(base)"</code> and <code>"m5_checkpoint": {"dir": str(M5_DIR.relative_to(REPO)), **{k: hashes[k] for k in ("backbone_sha256", "head_sha256", "config_hash")}}</code> with <code>hashes = json.loads((M5_DIR / "hashes.json").read_text())</code>, <code>from hearsay.pipeline import M5_DIR</code> (M5_DIR is added in step 2.2; do step 2.2 first, or define the path locally and switch to the import at step 2). <code>weights</code> stays <code>{"m1b_v3": round(0.8 - w, 2), "handcrafted_v5": 0.2, "m5_xlsr_ft": w}</code>; the print at L126 names the new path.</li>
+<li>Read-only run: <code>uv run python scripts/fuse_sweep_m5.py</code> must print <code>{'inner_oof': 16142, 'holdout': 3858, 'test': 1671, 'itw': 3000}</code>, <code>t_F = -3.8985</code>, A3_w0.2_E inner 0.1351 / holdout 0.0065 / ITW brief 0.228 / averse 0.2385, winner <code>A3_w0.2_E</code>; afterwards <code>ls models/</code> shows no <code>fusion_v2</code> and <code>cmp models/fusion_v2_candidate/constants.json &lt;scratchpad&gt;/fusion_v2_candidate_0914.json</code> is silent (A9).</li>
+<li><code>uv run python scripts/fuse_sweep_m5.py --write</code>, then a scratch comparison (read-only) of <code>models/fusion_v2/constants.json</code> against the 09:14 original: weights equal; each reference <code>np.array_equal</code>; <code>platt.a</code>/<code>platt.b</code> deltas printed and ≤ 1e-9 (A2); <code>how</code>, <code>m5_checkpoint</code>, <code>pi_synth</code> 0.3 present. Record the deltas in the run spec.</li>
+<li><code>mkdir -p outputs/fusion &amp;&amp; mv models/fusion_v2_candidate outputs/fusion/fusion_v2_candidate</code> (the original; both paths gitignored). Record the move.</li>
+</ol>
+<h2 id="step-2-srchearsaypipelinepy-constants-and-the-loader">Step 2. <code>src/hearsay/pipeline.py</code>: constants and the loader</h2>
+<ol>
+<li>Module docstring L2 "the two deep scorers" → "the deep scorers"; L18-29: add a <code>fusion_v2</code> bullet (<code>scripts/fuse_sweep_m5.py --write</code>, <code>A3_w0.2_E</code>: <code>weights</code> over m1b_v3, handcrafted_v5, m5_xlsr_ft; same M3 step; the default file is still <code>fusion_v1</code>) and an <code>m5_xlsr_ft</code> score-path bullet (<code>hearsay.m5_data.deploy_transform</code> → <code>collate</code> → <code>hearsay.m5_model.score_batch</code>, the <code>scripts/m5_score.py</code> sequence; trim before band-limit, cap 8 s, no fp16, no truncation).</li>
+<li>Paths L62-68: add <code>CONSTANTS_V2_PATH = REPO / "models" / "fusion_v2" / "constants.json"</code>; <strong><code>DEFAULT_CONSTANTS_PATH = CONSTANTS_V1_PATH</code> unchanged</strong> (T19; <code>tests/test_docker_image.py:112,114</code> pin it). After <code>HC_DIR</code>: <code>M5_DIR = REPO / "models" / "m5_xlsr_ft_20260926-0741" / "model"</code> with a comment naming the export it produced (byte-identical to that dir's <code>scores.csv</code>).</li>
+<li>L75 <code>DETECTOR_ORDER = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist")</code> ("every fused column, canonical order; a constants file names the subset it uses"). L76 delete <code>RANKED</code>. L77 <code>SCORER_FLAGS</code> add <code>"m5": "m5_xlsr_ft"</code>. L79 <code>DEEP = ("m1b_v3", "m5_xlsr_ft", "spectra_aasist")</code> (<code>collect_logits</code> L622 keys on it). L87-91 <code>ROLE</code> add <code>"m5_xlsr_ft": "fused"</code> (else an errored M5 entry is labelled "evidence" via <code>_error_entry</code> L418-420 → L411).</li>
+<li><code>FusionConstants</code> fields L110-128: add <code>ranked: tuple[str, ...] = ()</code>, <code>rank_weights: dict[str, float] | None = None</code>, <code>m5_checkpoint: dict[str, str] | None = None</code>. Keep <code>alpha</code>.</li>
+<li><code>_from_v1</code> L136-160, the middle becomes:
+<pre><code class="language-python">refs = c["rank_ref_inner_oof_sorted"]
+alpha, weights = c.get("alpha_handcrafted"), c.get("weights")
+if (alpha is None) == (weights is None):
+    raise ValueError("constants: give exactly one of alpha_handcrafted (fusion_v1) or weights (fusion_v2)")
+if weights is None:
+    if not 0.0 &lt;= float(alpha) &lt;= 1.0:
+        raise ValueError(f"constants: alpha_handcrafted must be in [0, 1], got {alpha!r}")   # test L153-156 matches "alpha"
+    weights, alpha = {"m1b_v3": 1.0 - float(alpha), "handcrafted_v5": float(alpha)}, float(alpha)
+else:
+    weights = {d: float(v) for d, v in weights.items()}
+    bad = [d for d in weights if d not in DETECTOR_ORDER or d == "spectra_aasist"]
+    if bad or not weights:
+        raise ValueError(f"constants: weights must name fused columns other than spectra_aasist, got {sorted(weights)}")
+    if not all(math.isfinite(v) and v &gt; 0 for v in weights.values()) or abs(sum(weights.values()) - 1.0) &gt; 1e-9:
+        raise ValueError(f"constants: weights must be finite, &gt; 0 and sum to 1, got {weights}")
+ranked = tuple(d for d in DETECTOR_ORDER if d in weights)
+rank_ref = {}
+for d in ranked:
+    if d not in refs:
+        raise ValueError(f"constants: no rank reference for {d!r}")
+    ref = np.asarray(refs[d], dtype=np.float64)
+    if ref.ndim != 1 or ref.size == 0 or not np.all(np.isfinite(ref)):
+        raise ValueError(f"constants: rank reference for {d!r} must be a non-empty 1-D array of finite values")
+    if not np.all(np.diff(ref) &gt;= 0):
+        raise ValueError(f"constants: rank reference for {d!r} is empty or not sorted")        # test L149-152 matches "sorted"
+    rank_ref[d] = ref
+ck = c.get("m5_checkpoint")
+if "m5_xlsr_ft" in ranked and (not isinstance(ck, dict)
+                               or any(k not in ck for k in ("dir", "backbone_sha256", "head_sha256", "config_hash"))):
+    raise ValueError("constants: a rule that weights m5_xlsr_ft must record m5_checkpoint {dir, backbone_sha256, head_sha256, config_hash}")</code></pre>
+<p>then the existing <code>platt</code>/<code>e_rule</code> checks (L150-155) and the constructor with <code>detectors=(*ranked, "spectra_aasist")</code>, <code>alpha=alpha</code> (None for v2), <code>ranked=ranked</code>, <code>rank_weights=weights</code>, <code>m5_checkpoint=dict(ck) if ck else None</code>, <code>how=c.get("how")</code>.</p></li>
+<li><code>weights()</code> L211-219: rank branch returns <code>{**self.rank_weights, "spectra_aasist": 0.0}</code> (v1 → exactly the three keys of test L191-192).</li>
+<li><code>fuse()</code> L236-273: L243 <code>for d in self.ranked:</code>; L249-250 →
+<pre><code class="language-python">base = 0.0
+for d in self.ranked:            # weights order; bit-identical to (1 - a) * r1 + a * rh for a v1 file
+    base += self.rank_weights[d] * terms[d]</code></pre>
+<p>Imputation, the M3 strict <code>&lt;</code>/<code>&gt;</code>, <code>detail</code>, Platt unchanged.</p></li>
+<li><code>fusion_line()</code> L447-451 →
+<pre><code class="language-python">terms = " + ".join(f"{w[k]:.1f} x rank({k})" for k in fo.terms)   # rank rule: fo.terms holds exactly the ranked detectors, in order
+line = f"fusion: {fo.rule} ({d.get('final')}): {terms} = {d.get('base', fo.fused):.3f}"</code></pre>
+<p>v1 output character-identical (test L355; README L24/L42 and the worked examples quote it). M3 clauses L452-460 unchanged.</p></li>
+</ol>
+<h2 id="step-3-srchearsaypipelinepy-the-m5-scorer-identity-gate-entries-analyze_clip">Step 3. <code>src/hearsay/pipeline.py</code>: the M5 scorer, identity gate, entries, <code>analyze_clip</code></h2>
+<ol>
+<li><p><code>Models.__init__</code> L316-319: add <code>m5_dir: str | Path = M5_DIR, load_m5: bool = False</code>; L326 <code>self.with_m5 = load_m5</code> (never <code>self.load_m5</code>, which would shadow the imported function name); <code>self.m5_dir = Path(m5_dir)</code>; L336 <code>self.probe = self.backbone = self.spectra = self.m5 = None</code>; <code>self.m5_hashes: dict[str, str] | None = None</code>. Docstring L312-314 lists M5.</p></li>
+<li><p>Split <code>load_deep</code> L340-357 into <code>load_m1()</code> (L341-352 as is, truncation included), <code>load_spectra_model()</code> (L354-357), and</p>
+<pre><code class="language-python">def load_m5_model(self) -&gt; None:
+    from hearsay.m5_model import load_m5 as _load_m5     # lazy: m5_model imports torch + transformers at module top
+    t = time.time()
+    self.m5_hashes = json.loads((self.m5_dir / "hashes.json").read_text())
+    self.m5 = _load_m5(self.m5_dir, self.device)          # sha-verified, eval mode, layerdrop 0, no spec-augment
+    self.load_seconds["m5"] = round(time.time() - t, 2)</code></pre>
+<p><code>load_deep()</code> = <code>self.load_m1(); if self.with_spectra: self.load_spectra_model(); if self.with_m5: self.load_m5_model()</code>. Truncation never touches M5 (saved at 12 layers; <code>M5Net.layer_logits</code> has 13 entries, <code>m5_model.py:85</code>).</p></li>
+<li><p>After <code>spectra_logit</code> (L372-378):</p>
+<pre><code class="language-python">def m5_logit(self, x: np.ndarray) -&gt; float:
+    """scripts/m5_score.py's sequence on one clip: deploy_transform (trim -&gt; band-limit -&gt; cap 8 s -&gt;
+    normalize) -&gt; collate (normalizes again, as the export did) -&gt; score_batch; fp32, batch 1."""
+    from hearsay.m5_data import collate, deploy_transform
+    from hearsay.m5_model import score_batch
+    if self.m5 is None:
+        raise RuntimeError("M5 was not loaded (load_m5=False)")
+    xs, mask = collate([deploy_transform(x)])
+    return float(score_batch(self.m5, xs, mask, self.device)[0])</code></pre></li>
+<li><p><code>version()</code> L387-391: add <code>"m5": self.m5_name()</code> (the parent directory's name when the dir is called <code>model</code>, else its own name; <code>""</code> when M5 is not loaded), <code>"m5_backbone_sha"</code> and <code>"m5_head_sha"</code> (12 hex chars from <code>self.m5_hashes</code>, <code>""</code> when not loaded).</p></li>
+<li><p>New module functions after <code>m1_only</code> (L285):</p>
+<pre><code class="language-python">def m5_identity_from_dir(m5_dir: str | Path) -&gt; dict[str, str]:
+    """hashes.json of a checkpoint dir; the cheap pre-load gate reads this, never the 657 MB file."""
+    p = Path(m5_dir) / "hashes.json"
+    if not p.exists():
+        raise RuntimeError(f"M5 checkpoint {m5_dir} has no hashes.json")
+    return json.loads(p.read_text())
+
+def check_m5_identity(hashes: Mapping[str, str] | None, consts: FusionConstants | None) -&gt; None:
+    """Refuse a rule that weights M5 when M5 is absent or is not the checkpoint the rank reference
+    was built from (D6). Called before the load with hashes.json and after it with the loaded net's."""
+    if consts is None or "m5_xlsr_ft" not in consts.ranked:
+        return
+    if not hashes:
+        raise RuntimeError("the fusion rule weights m5_xlsr_ft but M5 is not loaded (load_m5=False)")
+    ck = consts.m5_checkpoint or {}
+    bad = [k for k in ("backbone_sha256", "head_sha256", "config_hash") if hashes.get(k) != ck.get(k)]
+    if bad:
+        raise RuntimeError(f"M5 checkpoint does not match the fusion constants on {', '.join(bad)} "
+                           f"(constants expect {ck.get('dir')})")</code></pre>
+<p>Callers pass <code>models.m5_hashes</code> (post-load) or <code>m5_identity_from_dir(m5_dir)</code> (pre-load).</p></li>
+<li><p><code>_deep_entry</code> L423-432: <code>elif name == "m5_xlsr_ft": why = f"XLS-R fine-tuned head (M5): logit {logit:+.2f} ({'synthetic' if logit &gt; 0 else 'real'}-like, P={p:.2f})"</code>; Spectra stays the <code>else</code>.</p></li>
+<li><p><code>analyze_clip</code> L546-565: signature <code>scorers: Sequence[str] | None = None</code>; first line of the body <code>scorers = tuple(scorers) if scorers is not None else (consts.detectors if consts is not None else ("m1b_v3",))</code> (with the four-column default every existing caller that omits <code>scorers</code> would otherwise request M5); L564-565 →</p>
+<pre><code class="language-python">deep = [(n, getattr(models, attr)) for n, attr in (("m1b_v3", "m1_logit"), ("m5_xlsr_ft", "m5_logit"),
+                                                     ("spectra_aasist", "spectra_logit")) if n in scorers]</code></pre>
+<p>(lazy: fakes without <code>m5_logit</code> keep working under v0/v1; order = <code>DEEP</code> order).</p></li>
+<li><p>L595-597: <code>ver.setdefault("fusion", "none" if consts is None else ("/".join(Path(consts.source).parts[-2:]) if consts.source != "&lt;dict&gt;" else consts.source))</code> → <code>fusion_v1/constants.json</code>; <code>toy</code> stays <code>toy</code>.</p></li>
+</ol>
+<h2 id="step-4-scriptsrun_pipelinepy">Step 4. <code>scripts/run_pipeline.py</code></h2>
+<ol>
+<li><p>Docstring L17-21: both files (<code>fusion_v1</code> default; <code>fusion_v2</code> via <code>--fusion</code>, four scorers; <code>--m5</code>); <code>--fusion</code> help L96-99 and <code>--app-root</code> help L118-119 likewise. Imports L55-75: add <code>DEEP</code>, <code>M5_DIR</code>, <code>check_m5_identity</code>, <code>m5_identity_from_dir</code>.</p></li>
+<li><p>After <code>--hc</code> (L123): <code>ap.add_argument("--m5", type=Path, default=_env_path("HEARSAY_M5"), help="M5 checkpoint dir ($HEARSAY_M5; default &lt;app-root&gt;/models/m5_shipped or the pinned 0741 checkpoint); loaded only when the fusion file weights m5_xlsr_ft")</code>.</p></li>
+<li><p>After <code>default_probe</code> (L148-153):</p>
+<pre><code class="language-python">def default_m5(app_root: Path) -&gt; Path:
+    shipped = app_root / "models" / "m5_shipped"          # docker/build.sh's staging name (Docker lane, at the switch)
+    if (shipped / "hashes.json").exists():
+        return shipped
+    pinned = app_root / M5_DIR.relative_to(REPO)
+    return pinned if (pinned / "hashes.json").exists() or app_root != REPO else M5_DIR
+
+def scorers_for(consts: FusionConstants | None) -&gt; tuple[str, ...]:
+    """The fused columns a run computes: the constants file's detectors (v1: three, v2: four), M1 alone otherwise."""
+    return consts.detectors if consts is not None else ("m1b_v3",)</code></pre></li>
+<li><p><code>resolve_scorers</code> L131-145: delete the note (L142-144); keep the return <code>DETECTOR_ORDER, fusion</code> (tests L522-531). <code>cache_identity</code> L215-222: add <code>m5: str | None = None</code> and key <code>"m5": m5</code> after <code>"hc"</code>.</p></li>
+<li><p><code>main</code> L372-426, reordered: L372 <code>resolve_scorers</code> unchanged in return value, plus <code>requested = {SCORER_FLAGS[f] for f in args.detectors.split(",") if f.strip()}</code> (the flags actually typed, not the maximal set the resolver returns); L384-385 probe/hc; <strong>then</strong> the constants load (today L395-402) with the <code>sys.exit</code> messages as they are; <code>scorers = scorers_for(consts)</code>; <code>missing = set(scorers) - requested; if consts is not None and missing: print(f"note: the fusion file needs {', '.join(sorted(missing))} beyond --detectors {args.detectors!r}; running them too")</code> (a default <code>--detectors</code> run under v2 prints it once, naming M5; under v1 it is silent); <code>m5_dir = args.m5 or default_m5(args.app_root)</code>; <code>m5_hashes = None</code>; if <code>"m5_xlsr_ft" in scorers</code>: <code>try: m5_hashes = m5_identity_from_dir(m5_dir); check_m5_identity(m5_hashes, consts) except RuntimeError as e: sys.exit(f"error: {e}")</code> (the pre-load gate, before the cache and the 11 s load); then <code>cache_identity(..., m5=(m5_hashes or {}).get("head_sha256", "")[:12] or None)</code> and <code>open_cache</code> (today L392-393). <code>kw</code> (L405) and the print (L406-408) use <code>scorers</code>.</p></li>
+<li><p><code>version</code> L410: <code>"fusion": "/".join(fusion.parts[-2:]) if fusion else "none"</code>.</p></li>
+<li><p><code>Models(...)</code> L424-426: add <code>m5_dir=m5_dir, load_m5="m5_xlsr_ft" in scorers</code>; after <code>version["models"] = models.version()</code> (L427): <code>try: check_m5_identity(models.m5_hashes, consts) except RuntimeError as e: sys.exit(f"error: {e}")</code>. Print L430-431 adds <code>m5 {m5_dir}</code> when loaded.</p></li>
+<li><p><code>preflight</code> L284-311 (D6 loudness): after the <code>preflight_consistent(pa, pb)</code> check add <code>if not preflight_consistent(a["fusion"]["p_fused"], b["fusion"]["p_fused"]): raise RuntimeError(f"preflight {name}: fused probability not reproducible: ...")</code> and <code>bad = [n for n in kw.get("scorers", ()) if not any(d["name"] == n and d["status"] == "ok" for d in a["detectors"])]</code> → <code>raise RuntimeError(f"preflight {name}: scorer(s) not ok: {', '.join(bad)}")</code> (for <code>m1b_v3</code>, <code>m5_xlsr_ft</code>, <code>spectra_aasist</code> the entry name is the scorer; <code>handcrafted_v5</code>'s entry is <code>handcrafted</code>: map through <code>FUSED_FROM_DETECTOR</code>).</p></li>
+<li><p>Timings: L436 <code>new_timings = not timings_path.exists()</code> → read the first line when the file exists; if it differs from the current header, rename <code>timings.csv.stale-&lt;stamp&gt;</code> and start fresh. Header L442-443: <code>["filename", "seconds", "engineered_s", *(f"{n}_s" for n in DEEP), "probability_synthetic", "is_speech", "flag"]</code>; L473 <code>eng = sum(v for n, v in by.items() if n not in DEEP)</code>; L474 row <code>*(by.get(n, "") for n in DEEP)</code>.</p></li>
+<li><p>Scorer-error tally (D6), computed over the <strong>completed <code>docs</code> collection after the loop</strong> (cached rows take the early <code>continue</code> at L448-457 and must count too), with two pure helpers so the logic is testable without models:</p>
+<pre><code class="language-python">def scorer_error_counts(docs: Mapping[str, dict], scorers: Sequence[str]) -&gt; dict[str, int]:
+    """Errored entries per fused column over every row (cached or fresh); the handcrafted column's
+    entry is named `handcrafted` and is mapped back through FUSED_FROM_DETECTOR."""
+    entry_of = {col: det for col, (det, _key) in FUSED_FROM_DETECTOR.items()}
+    counts = {n: 0 for n in scorers}
+    for doc in docs.values():
+        status = {d["name"]: d["status"] for d in doc.get("detectors", [])}
+        for n in scorers:
+            if status.get(entry_of.get(n, n)) == "error":
+                counts[n] += 1
+    return counts
+
+def scorer_error_exit(counts: Mapping[str, int], scorers: Sequence[str], n_rows: int, strict: bool) -&gt; int:
+    """4 when a weighted scorer errored on any row (strict, i.e. a --compare-tsv run) or on more than
+    1% of rows; else 0. spectra_aasist only suppresses and is excluded."""
+    limit = 0 if strict else 0.01 * n_rows
+    return 4 if any(counts.get(n, 0) &gt; limit for n in scorers if n != "spectra_aasist") else 0</code></pre>
+<p>In <code>main</code>, after the loop: <code>errs = scorer_error_counts(docs, scorers)</code>; <code>meta["n_scorer_errors"] = errs</code> beside <code>meta["flags"]</code> (L491-493); print it in the <code>done:</code> line; after the TSV and <code>run_meta.json</code> are written, <code>code = scorer_error_exit(errs, scorers, len(items), bool(args.compare_tsv))</code>; if <code>code</code>: print the counts to stderr and <code>return code</code> (the TSV exists; the exit code says not to trust it; the entrypoint passes it through). T26 pins the helpers on synthetic docs: a fresh failure, a cached failure (a doc with no <code>seconds</code> field, as cached rows look), a <code>handcrafted</code> error counted under <code>handcrafted_v5</code>, the 1% boundary, and strict mode.</p></li>
+</ol>
+<h2 id="step-5-teststest_pipelinepy">Step 5. <code>tests/test_pipeline.py</code></h2>
+<p>Fixtures:</p>
+<ul>
+<li>L20-32 imports: add <code>CONSTANTS_V2_PATH</code>, <code>DEFAULT_CONSTANTS_PATH</code>, <code>check_m5_identity</code>.</li>
+<li>L36-38: <code>CONSTANTS_V2 = REPO/"models"/"fusion_v2"/"constants.json"</code>, <code>CANDIDATE_V2 = REPO/"outputs"/"fusion"/"fusion_v2_candidate"/"constants.json"</code>; split <code>EXPORTS</code> into <code>EXPORTS_V1</code> (three columns, so the existing v0/v1 data-gated tests at L701/L718 gain no new dependency) and <code>EXPORTS_V2</code> (four); <code>TSV_V2 = {False: submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv, True: ..._CANDIDATE_FLIPPED_only_if_NSA_scores_inverted.tsv}</code>.</li>
+<li>After <code>TOY_V1</code> (L83-95): <code>TOY_V2</code> (refs m1b <code>[-10,-5,0,5,10]</code>, hc <code>[-4,-2,0,2,4]</code>, m5 <code>[-3,-1,0,1,3]</code>; <code>weights {0.6, 0.2, 0.2}</code>; same <code>e_rule</code>; <code>platt</code> a 17.7, b −8.15, prior_shift log(0.3/0.7); <code>final "A3_w0.2_E"</code>; <code>m5_checkpoint {"dir": "models/m5_toy/model", "backbone_sha256": "b"*64, "head_sha256": "h"*64, "config_hash": "c"*64}</code>; a <code>how</code> line), <code>LOGITS_V2 = {m1b_v3: 1.0, handcrafted_v5: 3.0, m5_xlsr_ft: 0.5, spectra_aasist: -7.0}</code> (ranks 0.6 / 0.8 / 0.6, base 0.64 exactly, suppressed → 0.32; verified with numpy), <code>TOY_V2_4PT = {**TOY_V2, "rank_ref_inner_oof_sorted": {d: [-2.0, -1.0, 1.0, 2.0] for d in three}}</code> for T5. Fixture <code>consts_v2</code>.</li>
+<li><code>FakeModels</code> L281-300: <code>m5=None</code>, <code>m5_fail=False</code>, <code>m5_hashes=&lt;toy hashes&gt;</code>; <code>m5_logit(x)</code> appends <code>x</code> to <code>self.m5_inputs</code>, raises on <code>m5_fail</code>, returns <code>self._m5</code>; <code>version()</code> gains <code>"m5": "m5_toy"</code>. <code>fake_models_v2()</code> beside <code>fake_models_v1</code>.</li>
+<li>The nine assertions the 4-tuple breaks: L118, L121, L166-167 (v0: compare with <code>TOY["detectors"]</code>), L190 (v1: the three names), L329 (<code>[n for n in DEEP if n in scorers]</code>), L436 (<code>set(consts.detectors)</code>), L691 (needs_data v0: three), L526/L528 unchanged.</li>
+</ul>
+<p>Tests (hermetic unless marked): T1, T2 (nine broken dicts incl. a zero weight), T3 (equal <code>FusionOutput</code>s on the three logit sets <strong>and</strong> <code>fo.detail["base"] == (1 - 0.2) * 0.6 + 0.2 * 0.8</code> exactly), T4, T5 (the 4-point fixture: logits 0.0 → base 0.5 not suppressed; m5 1.5 → 0.55 suppressed; margin −3.0 vs −3.0000001 on <code>TOY_V2</code>), T6 (<code>"fusion: e_on_a (A3_w0.2_E): 0.6 x rank(m1b_v3) + 0.2 x rank(handcrafted_v5) + 0.2 x rank(m5_xlsr_ft) = 0.640"</code>), T7 (<code>tmp_path/"models"/"fusion_v1"/"constants.json"</code> → <code>"fusion_v1/constants.json"</code>; <code>source="toy"</code> → <code>"toy"</code>), T8 (fake: <code>fm.m5_inputs[0] is ctx.audio</code>; real <code>Models(load_deep=False)</code> with a tiny net and a spy on <code>score_batch</code>: array equals <code>collate([deploy_transform(x)])[0]</code>), T9, T10 (<code>build_model(M5Config(keep_layers=2, spec_augment=False), tiny=True).eval()</code> as <code>tests/test_m5_model.py:75-76</code>; 0.3 s, zeros, 10 s → finite), T11 (<code>hashes.json</code> in <code>tmp_path/"m5"</code>; monkeypatch <code>hearsay.m5_model.load_m5</code>; <code>Models(load_deep=False, m5_dir=...).load_m5_model()</code>: hashes read, layer count unchanged, <code>version()["m5"] == "m5"</code>, both sha prefixes, <code>load_seconds["m5"]</code>), T12 (<code>check_m5_identity(toy hashes, consts_v2)</code> passes; a changed <code>head_sha256</code> → <code>RuntimeError</code> matching "head_sha256"; <code>None</code> with <code>consts_v2</code> → "not loaded"; anything with <code>consts_v1</code> → no-op), T13 (<code>rp.scorers_for</code>: v1 → three, v2 → four, <code>None</code> → <code>("m1b_v3",)</code>; <code>rp.resolve_scorers</code> unchanged), T14 (<code>cache_identity</code> v1 vs v2 differ; <code>open_cache</code> with a v1 header and a v2 identity moves the file aside, pattern of L579-600; a header without <code>m5</code> matches an identity with <code>m5=None</code>), T15, T16, T17, T18, T19, T24, T25 (<code>rp.preflight(fake_models_v2(m5_fail=True), consts_v2, "e_on_a", tmp_path, scorers=consts_v2.detectors)</code> raises matching <code>m5_xlsr_ft</code>; the same fake under <code>consts_v1</code> with its three scorers passes), T20 (<code>needs_data</code>, skip unless <code>CONSTANTS_V2</code> and <code>CANDIDATE_V2</code> exist), T21 (<code>slow</code>, <code>needs_data</code>, the twin of L716-732 with <code>EXPORTS_V2</code>, max |Δ| ≤ 1e-9 for both polarities).</p>
+<h2 id="step-6-runner-subset-suite-and-lint-stop-1">Step 6. Runner-subset suite and lint (stop 1)</h2>
+<pre><code>uv run pytest -q tests/test_pipeline.py tests/test_docker_image.py tests/test_docs_consistency.py
+uv run pytest -q -m "slow or needs_data" tests/test_pipeline.py -k "v2 or m5"
+uv run ruff check .</code></pre>
+<p>Every existing test passes, the new ones pass, ruff clean. <code>tests/test_docker_image.py</code> is the Docker lane's file: if B6 or B8 fails, stop and report rather than editing it. (<code>tests/test_api.py</code> runs in step 9, after step 8.)</p>
+<h2 id="step-7-live-parity-stop-2">Step 7. Live parity (stop 2)</h2>
+<ol>
+<li>50 files, v2 (A4, A11):
+<pre><code>uv run python scripts/run_pipeline.py --data data/nsa/HackGTHearsayTesting --out outputs/runner/v2_50 --template data/nsa/HearsayScoreKey4TeamX.tsv --fusion models/fusion_v2/constants.json --limit 50 --compare-tsv submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code></pre>
+<p>under <code>/usr/bin/time -l</code> (resident memory). Read <code>run_meta.json</code>: <code>compare</code>, <code>preflight</code>, <code>n_scorer_errors</code>, <code>version.models.m5*</code>, <code>model_load_seconds</code>, <code>load_seconds.m5</code>, exit code 0. Scratch join (read-only) of <code>results.jsonl</code> with the exports on those files: M5 max |Δlogit| ≤ 0.02; E-rule flag and verdict identical row by row; batch-1 vs batch-8 delta by scoring the same 50 decoded clips through <code>scripts/m5_score.py</code>'s <code>score_paths</code> against the runner's logits (recorded, not gated).</p></li>
+<li>50 files, v1 default (A6): the same command without <code>--fusion</code>, <code>--out outputs/runner/v1_50_after</code>, <code>--compare-tsv submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv</code>: Spearman 1.0, max ≤ 3e-5; <code>run_meta.json</code> shows three scorers and no <code>m5</code> load time.</li>
+<li>Full set, v2, in the background (A5): first <strong>without</strong> <code>--flip</code>, <code>--out outputs/runner/v2_full --compare-tsv &lt;the our-direction candidate&gt;</code> (the runner writes one polarity per invocation); record wall time, mean s/file, mean <code>m5_xlsr_ft_s</code>, the compare block, <code>n_scorer_errors</code>, exit code. Then rerun the same <code>--out</code> with <code>--flip --compare-tsv submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_FLIPPED_only_if_NSA_scores_inverted.tsv</code> (re-fuses the cache in ~0.1 s per file; the compare is against the flipped reference). Both compares: 1,671 shared rows, the A4 marks, and the scratch join's row-by-row verdict and E-rule check on all rows.</li>
+<li>Log the parity artifact (CLAUDE.md: every experiment gets a log row; the K spec's "log a container TSV once parity passes" rule): copy the full-set our-direction TSV to <code>submissions/20260926-HHMM_M4_runner_fusion_v2_M5_live_PARITY_our_direction.tsv</code> (a new file, never an overwrite) and <code>append_log("M4", &lt;path&gt;, validation_score=0.0065, notes="runner-made live TSV, fusion_v2 (A3_w0.2_E), PARITY artifact not a submission; vs 20260926-0914 candidate: spearman S, max abs diff D, n&gt;0.01 N; M5 live vs export max |dlogit| L; not shipped; default remains fusion_v1")</code>. If A5 fails, no copy and no row; the failure is the named blocker in the run spec.</li>
+</ol>
+<h2 id="step-8-srchearsayapipy-and-teststest_apipy">Step 8. <code>src/hearsay/api.py</code> and <code>tests/test_api.py</code></h2>
+<ol>
+<li>Docstring L13-19: <code>HEARSAY_M5</code>; first-load time "about 5 s" → "about 16 s under fusion_v2 (the M5 hash check and load)". <code>settings()</code> L56-76: <code>"m5": Path(os.environ.get("HEARSAY_M5", M5_DIR))</code>; <code>"scorers"</code>: when not m1-only, <code>file_scorers(fusion_path)</code> = <code>FusionConstants.load(path).detectors</code> (the file has no <code>detectors</code> field; the loader derives it from the layout, v1 → three, v2 → four), memoized on <code>(str(path), st_mtime_ns)</code> (one parse of ~1 MB per path, ~10 ms), falling back to the env-derived list (<code>DETECTOR_ORDER</code>, four names) only when the file does not exist, which <code>/health</code> then labels <code>"scorers_from": "env (fusion file missing)"</code> vs <code>"constants"</code>.</li>
+<li><code>get_models()</code> L79-90: <code>scorers = consts.detectors if consts is not None else ("m1b_v3",)</code>; pre-load gate <code>check_m5_identity(m5_identity_from_dir(s["m5"]), consts)</code> when M5 is in <code>scorers</code>; <code>Models(..., m5_dir=s["m5"], load_m5="m5_xlsr_ft" in scorers)</code>; post-load <code>check_m5_identity(models.m5_hashes, consts)</code>; <code>RuntimeError</code> → <code>HTTPException(500, str(e))</code> with the failure cached in <code>_state["error"]</code> so later requests return it without reloading; <code>_state["scorers"] = scorers</code>.</li>
+<li><code>_analyze_path</code> L147-155: <code>scorers=_state["scorers"]</code>. <code>health()</code> L119: <code>_state["scorers"]</code> when loaded else <code>s["scorers"]</code>; L122 <code>"fusion": "/".join(s["fusion"].parts[-2:]) if s["fusion"] else "none"</code>.</li>
+<li><code>tests/test_api.py</code>: L31 <code>_state</code> gains <code>"scorers": None, "error": None</code>; L47 → conditional on <code>DEFAULT_CONSTANTS_PATH.exists()</code> (the real v1 file's three detectors and <code>scorers_from == "constants"</code> when present; <code>list(DETECTOR_ORDER)</code>, four names, and <code>"env (fusion file missing)"</code> when absent); T22/T23 use writer-shaped JSON (a v1 dict with <code>alpha_handcrafted</code>, a v2 dict with <code>weights</code>), never a hand-added <code>detectors</code> key; L48 <code>"fusion_v1/constants.json"</code>; T22 (<code>HEARSAY_FUSION</code> → <code>tmp_path/"fusion_v2"/"constants.json"</code> holding <code>TOY_V2</code>, <code>HEARSAY_M5</code> → a tmp dir with a matching <code>hashes.json</code>, <code>api_mod.Models</code> monkeypatched with a recorder returning <code>fake_models_v2()</code>: <code>load_m5=True</code>; with <code>tmp_path/"fusion_v1"/"constants.json"</code> holding <code>TOY_V1</code>: <code>load_m5=False</code>); T23 (<code>/health</code> before load: three and <code>"fusion_v1/constants.json"</code> under the v1 toy, four and <code>"fusion_v2/constants.json"</code> under the v2 toy).</li>
+</ol>
+<h2 id="step-9-full-suite-and-lint">Step 9. Full suite and lint</h2>
+<pre><code>uv run pytest -q &amp;&amp; uv run ruff check .</code></pre>
+<p>A1: ≥ 452 passed plus the new tests, ruff clean.</p>
+<h2 id="step-10-docs-commit-messages">Step 10. Docs, commit, messages</h2>
+<ol>
+<li>Run spec: Results (steps 0, 1, 6, 7, 9 numbers), Deviations, the moved candidate dir.</li>
+<li><code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>: one dated line under "Nathan's decision (09:25)" (v2 file written, Platt deltas, runner executes it with <code>--fusion</code>, default unchanged, candidate moved); L106 gets the new path in place; L107 and L112 get a dated "superseded, see below" note.</li>
+<li><code>docs/reports/2026-09-26_runner-docker.md</code>: a "v3" section (parity table, timing, ECAPA thread note, what did not change) and the synopsis lines L102, L110-114, L127, L240; the pre-existing test-count staleness at L65 and L140-146 is left with a one-line note (not this change's).</li>
+<li><code>docs/handoffs/2026-09-26_m4-fusion-handoff.md</code>: a dated note under "What to do next" step 3 (runner part done, sha, <code>--fusion</code>, <code>--write</code>, <code>RANKED</code> gone, candidate moved).</li>
+<li>Commit, staged by path: <code>scripts/fuse_sweep_m5.py src/hearsay/pipeline.py src/hearsay/api.py scripts/run_pipeline.py tests/test_pipeline.py tests/test_api.py docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md docs/reports/2026-09-26_m4-fusion-v2-m5-scorer-plan.md docs/reports/2026-09-26_m4-fusion-v2-m5-scorer-plan-review.md docs/reports/2026-09-26_fusion-sweep-predeclared.md docs/reports/2026-09-26_runner-docker.md docs/handoffs/2026-09-26_m4-fusion-handoff.md</code>. Message: <code>feat(M4): runner executes fusion_v2 (M5 as a fourth ranked scorer, weights dict); default stays fusion_v1</code>.</li>
+<li>Messages. <strong>Docker chat</strong> (directly; sent at step 0 and again with the sha): backward compatible, default <code>fusion_v1</code>, nothing to stage until the switch; at the switch stage <code>M5_DIR</code> as <code>models/m5_shipped</code> (+0.63 GB, ~4.2 GiB resident), move the B6 pin, BUILD_INFO will list <code>fusion_v2</code> (inert without the checkpoint); their spec L96/L106 and <code>build.sh</code> L2-6 are stale in passing. <strong>Oversight chat</strong>: STATUS L41-44 (M5 "column only", "suite 444", the rebuild sentence), architecture L24/L42/L218 and <code>docs/img/architecture-flow.mmd:9</code>, the oversight handoff L16/L29, <code>docs/handoffs/2026-09-26_draft-review-handoff.md:13</code> and STATUS L42 (old candidate path), code map (no <code>pipeline.py</code> entry; <code>load_m5:199</code> → 202), CLAUDE.md disclosure at the switch. <strong>README chat</strong>: L89, L101, L141 (the placeholder), L275; at the switch L19-20, L131, L283, L306, L317. <strong>Frontend (Hrushi, via oversight)</strong>: <code>frontend-wiring-handoff.md:71-75</code> keys rule text on the rule name; under v2 the name is unchanged and the weights are 0.6/0.2/0.2, so read <code>fusion.weights</code> or <code>fusion.detail.final</code>; <code>frontend-contract.md:31-32,71</code> gain <code>m5_xlsr_ft</code> and <code>version.models.m5*</code>; nothing removed. Never treat a reply as Nathan's approval.</li>
+</ol>
+<h2 id="step-11-post-commit-gates">Step 11. Post-commit gates</h2>
+<p>Claude critique agent against <code>.claude/codex-audit-prompt.md</code> (at most two rounds), then <code>bash .claude/review-audit.sh docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md</code> (one round plus one fix commit and re-audit); record both in the run spec; anything still open at 15:45 is recorded as open.</p>
+<h2 id="verification-map">Verification map</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Criterion</th><th>Proven at</th>
+</tr></thead>
+<tbody>
+<tr><td>A1</td><td>steps 6, 9</td></tr>
+<tr><td>A2</td><td>step 1.4 + T20</td></tr>
+<tr><td>A3</td><td>T21</td></tr>
+<tr><td>A4</td><td>step 7.1</td></tr>
+<tr><td>A5</td><td>step 7.3</td></tr>
+<tr><td>A6</td><td>step 7.2</td></tr>
+<tr><td>A7</td><td>T12, T14</td></tr>
+<tr><td>A8</td><td>T19; <code>git status</code> shows nothing under <code>submissions/</code>; <code>shasum -a 256 submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv</code> starts <code>096f3f0c</code></td></tr>
+<tr><td>A9</td><td>step 1.3</td></tr>
+<tr><td>A10</td><td>T18</td></tr>
+<tr><td>A11</td><td>T25; step 7.1 and 7.3 <code>n_scorer_errors</code></td></tr>
+</tbody>
+</table></div>
+<h2 id="risks-and-mitigations">Risks and mitigations</h2>
+<ul>
+<li><strong>v1 bit-identity after the loop rewrite:</strong> proven by the critique agent's exhaustive check; T3's exact <code>==</code> and the existing L716-732 parity test (4.4e-16) pin it.</li>
+<li><strong>Fakes without <code>m5_logit</code>:</strong> lazy binding; <code>analyze_clip</code>'s default scorers come from the constants, so v0/v1 callers never request M5.</li>
+<li><strong>Silent M5 failure:</strong> D6 loudness (preflight <code>ok</code> requirement, <code>n_scorer_errors</code>, non-zero exit); T25 is the counterfactual.</li>
+<li><strong>The stale candidate shipping in an image:</strong> moved out of <code>models/</code> in step 1.5; the Docker chat is told twice.</li>
+<li><strong>Platt last-digit drift:</strong> measured in step 1.4 against the 09:14 original; A2/A3 tolerances absorb it; the candidate TSVs are not rewritten.</li>
+<li><strong>M5 slower than 0.2 s/clip (ECAPA thread halving):</strong> measured in step 7, reported, not fixed (D-track file).</li>
+<li><strong>Memory:</strong> measured with <code>/usr/bin/time -l</code> in step 7.1.</li>
+<li><strong>Time:</strong> the schedule table and two stops; the API is severable and lands last.</li>
+</ul>
+<h2 id="codex-plan-review-1017-docsreports2026-09-26_m4-fusion-v2-m5-scorer-plan-reviewmd-and-how-each-finding-was-addressed">Codex plan review (10:17, <code>docs/reports/2026-09-26_m4-fusion-v2-m5-scorer-plan-review.md</code>) and how each finding was addressed</h2>
+<ol>
+<li>Error tally missed cached rows and misnamed the handcrafted column → step 4.10 now counts over the completed <code>docs</code> collection with <code>FUSED_FROM_DETECTOR</code> normalization, as two pure helpers pinned by T26.</li>
+<li><code>--flip</code> emits one polarity, so the full-set check compared the wrong file → step 7.3 runs our direction first, then <code>--flip</code> against the FLIPPED reference on the same cache.</li>
+<li>No submission-log row → step 7.4 logs the full-set parity TSV as a new labelled file with its row; A8 amended in the spec; failure is the named blocker.</li>
+<li>The constants have no <code>detectors</code> field → the API's <code>file_scorers</code> uses <code>FusionConstants.load(...).detectors</code>; <code>/health</code> says where the list came from; tests use writer-shaped JSON.</li>
+<li>Outer holdout used in the pre-declared selection → recorded in the spec (standing failure mode 2): this change reproduces the frozen candidate, the holdout condition was a veto not the objective, and NSA's draft-review number on the test set is the pending independent evaluation; no re-selection here.</li>
+<li>Unbounded schedule → a single 15:45 deadline, A5 by 15:00, the critique loop and audit bounded.</li>
+<li>NaN/malformed constants → finite, 1-D, non-empty checks in step 2.5; T2 gains NaN weight and NaN reference cases.</li>
+<li><code>requested</code> was the maximal set → the typed flags are parsed separately (step 4.5), so the note fires exactly when <code>--detectors</code> omitted a column the file needs.</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/reports/2026-09-26_m4-fusion-v2-m5-scorer-plan.md</code> <span class="hash">d7f1e49e0c92</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

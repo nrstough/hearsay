@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 m5 xlsr finetune (plan review) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m5-xlsr-finetune-plan-review.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/reports/2026-09-26_m5-xlsr-finetune-plan-review.md</code>; the markdown file is the record.</p>
+
+<ol>
+<li><p><strong>Critical — Training preprocessing uses validation data.</strong> <code>LengthMixer.cap</code> is computed from the entire labeled bundle, and bundle-wide shortcut diagnostics determine whether training proceeds. That includes the outer holdout and each model’s validation fold. Compute caps, matching statistics and training gates exclusively from <code>training_rows(m, fold)</code>; test that changing held-out labels or durations cannot change training configuration.</p></li>
+<li><p><strong>Critical — Cross-dataset leakage checks are missing.</strong> Path deduplication and generator-name exclusions do not detect identical audio under different paths or public-data speaker overlap. <code>docs/plan.md</code> explicitly requires audio-hash deduplication, and <code>scripts/hash_audio.py</code> already exists. Audit extras against core validation/holdout and test audio before training, enforce known speaker exclusions, and document unresolved voice overlap.</p></li>
+<li><p><strong>Critical — The cloud bundle is not self-contained.</strong> <code>test_duration_sampler()</code> reads <code>splits/nsa_test_durations.csv</code>, which the bundle omits; fold-file verification also needs <code>splits/nsa_folds.csv</code>. Setup does not explicitly install the packaged <code>hearsay</code> source. Include the required split artifacts and install/import configuration, then run a smoke test using only the extracted bundle outside the repository.</p></li>
+<li><p><strong>Critical — The shortcut gate misses strong shortcuts and cannot handle MLAAD.</strong> AUC below 0.15 is just as predictive as AUC above 0.85, while MLAAD contains only spoof, making within-source label AUC undefined. Bundle-level measurements also miss changes caused by cropping and augmentation. Use <code>max(AUC, 1−AUC)</code>, explicitly handle single-class strata, measure the actual training stream, and implement the spec’s omitted MLAAD-versus-LibriSpeech corpus probe.</p></li>
+<li><p><strong>Critical — Allowed dropped rows contradict mandatory output counts.</strong> The bundle permits short clips and up to 0.5% decode failures to disappear, but assembly requires every core and test row. Restrict dropping to training extras; preserve required row identities and define flagged fallback scoring or an early blocking failure. Test corrupt and short core/test files through assembly.</p></li>
+<li><p><strong>Critical — Fusion scores use different inference policies.</strong> Inner OOF scores come from fixed short crops, while test scores use whole clips up to 14 seconds; assembly does not specify which holdout stream enters fusion. Export OOF, holdout and test scores using the same deployment transform. Keep cropped and augmented evaluations as separate diagnostics.</p></li>
+<li><p><strong>Critical — The pilot cannot reliably select E or exercise resume.</strong> A 300-step pilot may finish before its first epoch checkpoint, and validation every 250 steps provides only one scheduled readout. Nevertheless, the plan requires an R2 resume and selects an epoch count from this run. Define epoch length, checkpoint at step limits and normal exit, and choose a consistent step/epoch budget with enough validation checkpoints to support selection.</p></li>
+<li><p><strong>Critical — The proposed disk allocation is insufficiently sized.</strong> The plan estimates 6.7 GB per audio variant; clean audio plus five variants already approaches 40 GB before weights, optimizer states, downloads and temporary codec files. Size storage from a measured pilot with headroom, or generate a bounded subset of variants and remove temporary files promptly.</p></li>
+<li><p><strong>Critical — Bundle identity and resumption can accept stale artifacts.</strong> Existing FLACs are skipped without validating their provenance; the tree hash covers neither manifests nor code/configuration; checking 200 files cannot verify the whole tree. Reducing the manifest also will not reduce a recursive <code>rclone copy</code> of existing files. Use immutable bundle versions, manifest-driven transfer lists, verified resumable outputs, and hashes covering all training inputs.</p></li>
+<li><p><strong>Critical — Cloud cleanup does not cover launcher failures.</strong> The destruction trap is installed after <code>pip install</code>, and failures between instance creation and starting <code>box_chain.sh</code> leave no protected cleanup path. A box-local watchdog also cannot handle an unreachable machine. Add launcher-side cleanup, an external deadline/reaper, and aggregate budget accounting across concurrent instances; verify these with mocked failure-path tests.</p></li>
+<li><p><strong>Critical — The reduced fallback violates the output contract.</strong> Fold-4-only scoring cannot satisfy the required 16,142 OOF rows. Fold 4 also selects the checkpoint, so it is not an untouched stacking set. Specify a separately agreed fusion interface and independent selection split for this fallback, or stop and report M5 blocked without emitting a nominally complete score file.</p></li>
+<li><p><strong>Critical — Submission completion has no concrete handoff.</strong> The spec assigns TSV creation to the main chat, but this plan ends without a verified new TSV/log row or a named blocking outcome. Add an explicit owner and completion check using <code>write_submission</code> and <code>append_log</code>, including preflight and template-order validation, while preserving previous submissions.</p></li>
+<li><p><strong>Critical — Secret handling conflicts with project policy.</strong> Reading the Vast key from <code>~/.config/vastai/vast_api_key</code> and sending inline rclone configuration does not satisfy the stated <code>.env</code>-only rule. Specify an approved credential-injection mechanism, prevent credentials entering bundles/logs, and define remote cleanup.</p></li>
+<li><p><strong>Suggestion — Verify raw-audio deployment parity, not only device parity.</strong> Comparing CPU and GPU on the same FLAC bundle misses differences introduced by PCM16 quantization, peak scaling and repeated trimming. Compare original-file scoring with bundled-file scoring, including quiet, over-range and silence-boundary fixtures.</p></li>
+<li><p><strong>Suggestion — Make the time-box exit operational.</strong> The schedule spans roughly eight hours, starts bundle construction before its writer is implemented, and gives boxes six-hour watchdogs that can outlive noon. Define bounded phase cutoffs, a shared absolute rental deadline, and exactly which artifacts and blocker report are produced when time expires.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/reports/2026-09-26_m5-xlsr-finetune-plan-review.md</code> <span class="hash">9508b3ae0c25</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

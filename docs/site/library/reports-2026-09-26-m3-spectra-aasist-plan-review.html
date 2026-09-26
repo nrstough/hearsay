@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 m3 spectra aasist (plan review) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m3-spectra-aasist-plan-review.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/reports/2026-09-26_m3-spectra-aasist-plan-review.md</code>; the markdown file is the record.</p>
+
+<ol>
+<li><p><strong>Critical — Resume does not fingerprint the crop recipe completely.</strong> The hash omits <code>--train-manifest</code>, whose row order determines crop lengths and offset seeds. Reordering it would allow old scores and newly cropped scores into one export. Hash the training manifest, scoring script, and loaded Spectra model implementation/configuration; test that changing manifest order rejects resume.</p></li>
+<li><p><strong>Critical — Non-finite model outputs bypass the failure gate.</strong> Only <code>RuntimeError</code> produces <code>model_error</code>; a successful forward returning NaN or infinity remains “ok.” The direction check then excludes those rows, potentially allowing an invalid stream through. Validate output shape and finiteness, including the derived margin, count invalid outputs as failures, and test NaN/inf-returning models.</p></li>
+<li><p><strong>Critical — Accepted decode failures can crash metric generation.</strong> The plan allows up to 5% NaN scores, but existing <code>metrics.report</code>, <code>by_group</code>, and <code>roc_auc_score</code> do not filter them. Specify a shared finite-row mask applied consistently to scores, labels, and metadata before every readout, with explicit empty/one-class results and coverage counts. Exercise failures in inner, holdout, and stress rows.</p></li>
+<li><p><strong>Critical — Final publication is neither atomic nor protected from stale exports.</strong> Only checkpoints use atomic replacement. Writing the fusion file before metadata completes lets another chat consume a partial or incompletely validated run; a failed rerun can also leave an older same-name fusion file appearing current. Write immutable run artifacts, finish validation and metadata first, then atomically publish the completed stream with its run identity.</p></li>
+<li><p><strong>Critical — The provisional stress readout cannot be produced by the listed commands.</strong> The pilot runs before the stress scores exist, while manifest mode has no input for saved pilot thresholds. Step 7 therefore cannot report In-the-Wild P_FA at the pilot threshold before launching the full export. Add a postprocessing command that combines the saved selected-mode pilot scores and stress scores, and test that exact workflow without rerunning inference.</p></li>
+<li><p><strong>Critical — The submission handoff lacks a completion condition.</strong> The handoff assigns TSV ownership to the main chat, so M3 should respect that boundary. However, the plan ends without a new TSV/log row or a named blocker. Add an explicit handoff to that owner and require either the resulting immutable TSV plus <code>submissions/log.csv</code> entry, or a recorded blocker before declaring the rung complete.</p></li>
+<li><p><strong>Suggestion — The global failure threshold hides concentrated failures.</strong> Five percent of 21,671 rows permits 1,083 failures—nearly 65% of the test set. Report and gate failure rates separately for inner, holdout, and test splits, and report class/generator coverage so selectively missing difficult examples cannot make validation look better.</p></li>
+<li><p><strong>Suggestion — Two verification checks conflict with the proposed lifecycle.</strong> C14 tries to truncate a checkpoint after successful completion has deleted it; create an interrupted-run checkpoint explicitly. C10 snapshots real output-tree mtimes while another chat may legitimately write there; verify this scorer’s write destinations without asserting that the shared workspace stayed idle.</p></li>
+<li><p><strong>Suggestion — The standing laundering checks remain untested.</strong> Band matching and In-the-Wild evaluation do not establish robustness to codec laundering, telephony, or simulated replay. Add a small paired clean/transformed diagnostic with separate clean-only metrics, or explicitly record these checks as deferred limitations alongside physical replay.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/reports/2026-09-26_m3-spectra-aasist-plan-review.md</code> <span class="hash">bb489baffb44</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

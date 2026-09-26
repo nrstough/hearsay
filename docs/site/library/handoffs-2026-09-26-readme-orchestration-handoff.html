@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: the README, the explanation report and orchestration credit (Sat Sep 26, 2026, ~08:30) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_readme-orchestration-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_readme-orchestration-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-the-readme-must-contain-in-our-own-words-no-boilerplate">What the README must contain (in our own words, no boilerplate)</a></li><li><a href="#orchestration-credit-make-routing-visible-and-measured-about-2-h">Orchestration credit: make routing visible and measured (about 2 h)</a></li><li><a href="#rules">Rules</a></li></ul></details>
+<h1 id="handoff-the-readme-the-explanation-report-and-orchestration-credit-sat-sep-26-2026-0830">Handoff: the README, the explanation report and orchestration credit (Sat Sep 26, 2026, ~08:30)</h1>
+<p><strong>Paste this into an idle chat (the CPU chat is the best fit: it wrote most of the "what worked / what didn't" material and owns the engineered detectors).</strong> Not a <code>/plan-review</code> rung; it is writing plus one small build.</p>
+<p><strong>Purpose of this chat:</strong> produce the two things worth 40% of the grade that nobody owns yet: the README in our own words (20%) and the evidence that our per-file orchestration and explanations are real (the 20% diversity-and-depth bucket, including the "agentic orchestration" bonus). The fusion consult's Item 8 says what judges want; <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code> item 10 summarises it. Deadline: a complete draft by <strong>Sat 20:00</strong>, final polish Sun 05:00–07:30.</p>
+<p>Read first: <code>README.md</code> (placeholder), <code>CLAUDE.md</code> (the AI-use disclosure and the "what we built vs what AI did" section, both graded), <code>docs/STATUS.md</code>, <code>docs/architecture.md</code>, <code>docs/code-map.md</code>, every report under <code>docs/reports/</code>, and <code>docs/handoffs/2026-09-26_frontend-contract.md</code> (the per-file JSON that already carries evidence sentences and a routing log).</p>
+<h2 id="what-the-readme-must-contain-in-our-own-words-no-boilerplate">What the README must contain (in our own words, no boilerplate)</h2>
+<ol>
+<li><strong>What HEARSAY is and how it decides</strong>, one screen: any audio in, P(synthetic) out, with the routing log and per-detector evidence; the system-flow figure from <code>docs/img/architecture-flow.svg</code>.</li>
+<li><strong>Approach and architecture</strong>: the detector contract, the deep detectors (frozen XLS-R probe with layer 7, Spectra-AASIST as a false-alarm suppressor, the fine-tune that did not clear its gate and why), the eight engineered techniques, the fusion rule as frozen at 08:13 and the reason equal-weight fusion was rejected (In-the-Wild misses doubling), the non-speech gate and the pinned-block default-answer policy with the direction-robust argument.</li>
+<li><strong>Validation</strong>: generator- and speaker-grouped folds, the outer holdout read once, In-the-Wild as the eval-only stress set, the resolution-floor argument (a holdout gap under 0.15 is noise), and the draft-review decoding table.</li>
+<li><strong>What worked</strong> and <strong>what did not</strong>, each with its mechanism. The material exists: the five shortcuts (level, silence, tiling, container, the 7.2 kHz wall), the container-is-the-label finding, band matching (90% → 42% of test files called synthetic), length parity, LightGBM over logistic, the v4 families that see pro_diff and ElevenLabs, the corpus-cue columns that could not be pruned, the augmentation trade-off, VCTK helping once band-matched, ENF and splice as evidence only, compression as pipeline-not-class, speaker drift finding that fakes are the most self-consistent voices, the fine-tune losing to the frozen probe, the equal-weight fusion rejected, the pretrained model's possible in-sample rows. Every null result gets one line with its mechanism.</li>
+<li><strong>Numbers table</strong>: one row per detector and per fusion rule with inner OOF, holdout, In-the-Wild (both cost weightings) and the test share; sourced from <code>submissions/log.csv</code> and the model <code>meta.json</code> files, never retyped from memory.</li>
+<li><strong>Reproduce it</strong>: setup, the runner command, the Docker command, the parity numbers, and where each artifact lives.</li>
+<li><strong>AI use and credits</strong>: copy the disclosure from <code>CLAUDE.md</code> after updating it (it stops at the CPU chat's work; add M1 TSVs, M1b, band-match, both consults, M3, M5, v4, the runner, API, Docker, and these docs), and fill "what we built vs what AI did" per component. Credit every framework, model and dataset with license.</li>
+</ol>
+<h2 id="orchestration-credit-make-routing-visible-and-measured-about-2-h">Orchestration credit: make routing visible and measured (about 2 h)</h2>
+<p>The runner already emits a routing log per file from detector features. Judges want proof that routing changed decisions and that the delta was measured:</p>
+<ul>
+<li>A short <code>scripts/orchestration_ablation.py</code> that runs the shipped pipeline on the holdout and In-the-Wild rows with the router on and off (off = every detector always runs, no gate, no M3 suppression, no default block) and reports minDCF for both, plus how many files each rule touched. A measured null delta is itself rubric-positive.</li>
+<li>Five to ten worked examples in <code>docs/reports/2026-09-26_worked-examples.md</code>: real test files, their routing log, each detector's evidence sentence, the fused score, and one paragraph on why the system said what it said. Pick them to show variety: a confident real, a confident fake, a file where M3 suppressed a false alarm, a file with a seam or hum flagged as evidence, a low-voiced-fraction file near the gate, a disagreement case.</li>
+<li>One paragraph in the README on the abstention path (the pinned block) as part of orchestration.</li>
+</ul>
+<h2 id="rules">Rules</h2>
+<p>Numbers come from files, never from memory; cite the file for each. No hardware or demo wording (the docs test bans it). Do not use the bare word CSV in living docs (write <code>.csv</code> or TSV) and mention no prior other than 0.3. Stage only your own files (<code>README.md</code>, <code>CLAUDE.md</code> disclosure sections, the new report and script, <code>docs/STATUS.md</code> rows); never <code>-A</code>; do not push. Keep <code>uv run pytest -q tests/test_docs_consistency.py</code> green after every README edit. Report to the oversight chat when the draft exists.</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-26_readme-orchestration-handoff.md</code> <span class="hash">c2feacc7dc9c</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

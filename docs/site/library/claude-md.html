@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HEARSAY (CLAUDE.md) · HEARSAY</title>
+<meta name="description" content="Rendered from CLAUDE.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>CLAUDE.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-hearsay-is">What HEARSAY is</a></li><li><a href="#team-and-ownership">Team and ownership</a></li><li><a href="#detector-contract">Detector contract</a></li><li><a href="#model-ladder-and-model-rules">Model ladder and model rules</a></li><li><a href="#conventions">Conventions</a></li><li><a href="#working-rules-for-claude-code">Working rules for Claude Code</a></li><li><a href="#sources-of-truth">Sources of truth</a></li><li><a href="#pre-event-work">Pre-event work</a></li><li><a href="#ai-use-disclosure">AI use disclosure</a></li><li><a href="#when-a-teammate-opens-this-repo">When a teammate opens this repo</a></li></ul></details>
+<h1 id="hearsay">HEARSAY</h1>
+<h2 id="what-hearsay-is">What HEARSAY is</h2>
+<p>HEARSAY is a software-only audio authentication system, built at HackGT 13 (Sep 25–27, 2026) for the NSA HEARSAY challenge.</p>
+<ul>
+<li><strong>Input and output.</strong> Any audio file in; out comes a probability that the voice is synthetic (0.0 real, 1.0 synthetic), plus a plain-English explanation of why.</li>
+<li><strong>How it decides.</strong> A rule-based orchestrator picks forensic detectors per file, and a logistic stacker fuses their scores.</li>
+<li><strong>Deliverables.</strong> <code>CrossExam_predictions.tsv</code> (team Cross Exam) on NSA's 1,671-file test set and a README. A Docker image that runs inference offline was listed in the brief but is not required (NSA, Sat Sep 26 ~12:00); ours is built and kept as reproducibility evidence.</li>
+<li><strong>Validation.</strong> Every rung is measured on a generator- and speaker-held-out split, and there is always a valid TSV on hand.</li>
+</ul>
+<p>The earlier device-and-demo design is dropped (cut); see <code>docs/plan.md</code>.</p>
+<h2 id="team-and-ownership">Team and ownership</h2>
+<p>Four-person team.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Area</th><th>Owner</th>
+</tr></thead>
+<tbody>
+<tr><td>Deep detectors (XLS-R probe, Spectra-AASIST, fine-tune), fold file, fusion, orchestrator, TSV</td><td>Nathan (@nrstough)</td></tr>
+<tr><td>Engineered detectors: container/metadata and compression forensics</td><td>Teammate A (<em>fill in</em>)</td></tr>
+<tr><td>Engineered detectors: spectral and prosody</td><td>Teammate B (<em>fill in</em>)</td></tr>
+<tr><td>Engineered detectors: speaker-embedding drift, splice, ENF; Docker image from Sat morning</td><td>Teammate C (<em>fill in</em>)</td></tr>
+</tbody>
+</table></div>
+<h2 id="detector-contract">Detector contract</h2>
+<p>Every detector builds against <code>src/hearsay/detectors/base.py</code>.</p>
+<ul>
+<li><strong>Input.</strong> A <code>ClipContext</code>: path, 16 kHz mono audio decoded once and read-only, probe metadata, and a shared per-clip cache.</li>
+<li><strong>Output.</strong> A <code>DetectorResult</code> with these fields:
+<ul>
+<li><code>name</code></li>
+<li><code>score</code>: finite, in [0, 1], and <strong>increasing with synthetic likelihood</strong></li>
+<li><code>evidence</code>: a non-empty plain-English reason</li>
+<li><code>features</code>: a flat dict of finite floats</li>
+<li><code>status</code>: <code>ok</code>, <code>skipped</code> or <code>error</code></li>
+<li><code>error</code></li>
+</ul></li>
+<li><strong>Validation.</strong> Violations raise <code>ValueError</code>; values are never clipped.</li>
+<li><strong>Running.</strong> Always through <code>safe_run</code>, which never loses a row: a crash becomes <code>status="error"</code> with score 0.5.</li>
+<li><strong>Fusion.</strong> Fusion v1 uses one column per detector, <code>logit(clip(score, 1e-4, 1 − 1e-4))</code>, when the status is <code>ok</code>; otherwise it adds a missing indicator.</li>
+<li><strong>Rules.</strong> A change to <code>DetectorResult</code> fields must name the affected detector owners. Detectors never use filesystem timestamps or filenames.</li>
+</ul>
+<h2 id="model-ladder-and-model-rules">Model ladder and model rules</h2>
+<p><strong>Ladder</strong> (full table and gates in <code>docs/plan.md</code>):</p>
+<ul>
+<li>M0: loader, TSV writer, constant rollback, fold file</li>
+<li>M1: frozen XLS-R probe, first learned TSV</li>
+<li>D-track: teammates' engineered detectors</li>
+<li>M3: Spectra-AASIST</li>
+<li>M5: fine-tuned XLS-R on the H100</li>
+<li>M4: fusion, orchestrator and explanation report</li>
+<li>K: Docker</li>
+<li>DOC: README and experiment log</li>
+</ul>
+<p><strong>Model rules</strong></p>
+<ul>
+<li>Validate by generator and speaker, not by clip, using nested folds from the fold file.</li>
+<li>Log every TSV with its validation score.</li>
+<li>Cap any rung at a few hours.</li>
+<li>Keep a clean-only validation score beside any augmented one.</li>
+</ul>
+<h2 id="conventions">Conventions</h2>
+<ul>
+<li><strong>NSA metric and format.</strong> Sources: <code>docs/nsa-challenge.md</code>, <code>data/nsa/HEARSAY_HackGT2026_Instructions.pdf</code>, and the kickoff notes in <code>docs/reports/2026-09-25_sponsor-questions.md</code>.
+<ul>
+<li>Judged 60% on MinDCF, with false alarms (real called synthetic) costing 4× a miss; about 70% of test files are real.</li>
+<li><code>hearsay.metrics</code> uses <code>C_FA = 4</code>, <code>C_miss = 1</code>, <code>π_synth = 0.3</code>, i.e. normalized minDCF = 9.33·P_FA + P_miss. Only score ranking matters.</li>
+<li>Select everything on normalized minDCF and report EER alongside.</li>
+<li>The sponsor's scoring code treats a higher score as bona fide. That's an open question with NSA; see <code>docs/plan.md</code>, "Score direction".</li>
+<li>Submit <code>teamName_predictions.tsv</code>: header <code>filename&lt;TAB&gt;cm-score</code>, probabilities (1.0 = synthetic), all rows in the template's order. <code>hearsay.submission.write_submission</code> enforces the header, unique filenames, finite scores in [0, 1] and no-overwrite; the template's row order comes from the manifest passed to the submission scripts. The final file is due 8 AM Sunday.</li>
+</ul></li>
+<li><strong>16 kHz mono everywhere.</strong> Every loader resamples and downmixes at the boundary; nothing downstream sees another format.</li>
+<li><strong>Every experiment appends a row to <code>submissions/log.csv</code></strong> with timestamp, rung, validation score and submission path.
+<ul>
+<li>Columns: <code>timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes</code>. <code>csv_path</code> is the historical column name for the submission path.</li>
+<li>The clean-only column exists because of the model rule above; leave it equal to <code>validation_score</code> when no augmentation is used.</li>
+<li><code>validation_score</code> is normalized minDCF on the outer holdout; put EER in <code>notes</code>.</li>
+</ul></li>
+<li><strong>Offline scoring path.</strong> No hosted API or LLM on the scoring path; the Docker image runs offline.</li>
+<li><strong>Secrets in <code>.env</code> only, never committed.</strong> <code>.env</code> is gitignored.</li>
+<li><strong>Environment.</strong> Run <code>uv sync</code> once, then <code>uv run &lt;cmd&gt;</code> from the repo root (Python 3.12, pinned in <code>.python-version</code>). Data, weights, model outputs, submission TSVs and audio files are gitignored; only <code>submissions/log.csv</code> is tracked.</li>
+<li><strong>Tests and lint.</strong>
+<ul>
+<li>Tests: <code>uv run pytest</code> (tests in <code>tests/</code>). Markers <code>needs_data</code>, <code>needs_weights</code> and <code>slow</code> are for anything that needs gitignored assets.</li>
+<li>Lint: <code>uv run ruff check .</code></li>
+<li><code>tests/test_docs_consistency.py</code> pins these docs to the code: metric constants, no dropped-hardware wording, and the plan's technique coverage.</li>
+</ul></li>
+<li>Doc layout: run specs in <code>docs/specs/</code>, plan files and reports in <code>docs/reports/</code>, handoffs in <code>docs/handoffs/</code>, consult records in <code>docs/consults/</code>. No feature-spec layer.</li>
+<li>Codex review: <code>.claude/review-plan.sh &lt;plan.md&gt;</code> and <code>.claude/review-audit.sh &lt;run-spec.md&gt;</code>, with HEARSAY rubrics in <code>.claude/codex-*-prompt.md</code>. Requires the Codex CLI; without it, the plan-review Claude critique is the gate.</li>
+<li>Known setup gotcha: the installed torchaudio (2.11) cannot <code>torchaudio.load()</code> files without the separate <code>torchcodec</code> package, which is not installed. <code>soundfile</code> and <code>librosa</code> load audio fine.</li>
+<li>Known setup gotcha: LightGBM and torch each ship their own <code>libomp.dylib</code>; importing both in one process on macOS segfaults or hangs (either order). Only <code>scripts/train_handcrafted.py</code> imports lightgbm; bundles store the dumped trees and <code>hearsay.trees</code> runs them in numpy, so detectors, tests and the orchestrator never import it. A test pins this.</li>
+</ul>
+<h2 id="working-rules-for-claude-code">Working rules for Claude Code</h2>
+<ul>
+<li>Use <code>/plan-review</code> for any rung expected to take more than an hour.</li>
+<li>Never overwrite a submitted TSV. Every submission gets a new file and a new log row.</li>
+<li>Never train on the validation split (including scalers, calibration, and stacking folds).</li>
+<li>Ask before renting a cloud GPU.</li>
+<li>When a time box runs out, stop and report rather than push through.</li>
+<li>Freeze is Sunday morning (Sep 27): after it, only fixes that unbreak the TSV or the Docker image.</li>
+</ul>
+<h2 id="sources-of-truth">Sources of truth</h2>
+<ul>
+<li><code>docs/nsa-challenge.md</code> and <code>data/nsa/HEARSAY_HackGT2026_Instructions.pdf</code>: the NSA brief and instructions. Authoritative on rules and scoring.</li>
+<li><code>docs/plan.md</code>: the working plan (software-only, rewritten Sep 26).</li>
+<li><code>docs/scoping.md</code> and <code>docs/master-doc.md</code>: historical, pre-rescope background.</li>
+</ul>
+<p>Where these and this file disagree, the NSA documents win on rules, <code>docs/plan.md</code> wins on plan and scope, and <code>submissions/log.csv</code> wins on numbers.</p>
+<h2 id="pre-event-work">Pre-event work</h2>
+<p>Done before the coding window opened at 8:00 pm Friday, Sep 25, 2026. Copy into Devpost.</p>
+<ul>
+<li>Created the repository scaffold: <code>pyproject.toml</code>, <code>.python-version</code>, <code>.gitignore</code>, and empty directories (<code>data/</code>, <code>weights/</code>, <code>docs/</code>, <code>submissions/</code>, <code>scripts/</code>, <code>src/hearsay/</code>).</li>
+<li>Installed the Python dependencies (torch, torchaudio, transformers, huggingface_hub, librosa, soundfile, numpy, scipy, scikit-learn, lightgbm, pandas, pydub, ffmpeg-python) into a uv-managed virtualenv, and confirmed ffmpeg is installed. Added pytest and ruff as dev dependencies.</li>
+<li>Downloaded pretrained weights and public datasets into the gitignored <code>weights/</code> and <code>data/</code> directories (event rules allow pre-event downloads): the models and datasets listed under AI use disclosure. Nothing was trained or run on them before the event.</li>
+<li>Copied general-purpose Claude Code skills (plan-review, p3, handoff, consult, diagnose, validate-training-data, test-runner, doc-sync, zoom-out) into <code>.claude/skills/</code> and added HEARSAY-specific notes to them.</li>
+<li>Copied the Codex plan-review and audit scripts into <code>.claude/</code> and added HEARSAY-specific checks to their rubrics.</li>
+<li>Added project boilerplate: <code>README.md</code>, <code>.env.example</code>, <code>.claude/settings.json</code> (Claude Code permissions), pytest and ruff config, and empty <code>tests/</code> and <code>docs/</code> subdirectories.</li>
+<li>Wrote this <code>CLAUDE.md</code>, added the planning docs (<code>docs/scoping.md</code>, the external scoping memo; <code>docs/plan.md</code>, the working plan), a header-only <code>submissions/log.csv</code>, and <code>scripts/first-commit.sh</code> (repo creation and first commit, run at 8:00 pm).</li>
+<li>No application code (loader, pipeline, model, scoring) was written before the event.</li>
+</ul>
+<h2 id="ai-use-disclosure">AI use disclosure</h2>
+<p>Keep this current through the weekend; copy into Devpost. The rules require crediting frameworks and stating what AI was used for vs. what we built.</p>
+<p><strong>AI tools</strong></p>
+<ul>
+<li>Claude Code (Anthropic): used for environment setup, writing project docs and scripts, and as the coding assistant throughout the event, in parallel sessions that each started from a written handoff under <code>docs/handoffs/</code> and reported back to an oversight session. What it wrote, by lane:
+<ul>
+<li>the loader, the TSV writer and the metrics, including the re-implementation of the sponsor's ASVspoof5 scoring code (<code>hearsay.metrics.sponsor_min_dcf</code>)</li>
+<li>the fold file and the nested validation scheme (<code>scripts/make_folds.py</code>, <code>splits/nsa_folds.csv</code>), the manifests and the data pulls (LJ Speech, LibriSpeech, ASVspoof 2019, In-the-Wild, MLAAD)</li>
+<li>the software-only rescope (Sep 25–26): plan, detector contract, doc-consistency tests</li>
+<li>reading the NSA brief, instructions and scoring code; the sponsor-question notes were taken by the team at the kickoff and transcribed</li>
+<li>M0 and M1 (main chat, Fri night to Sat morning): the constant rollback TSV, the XLS-R embedding and probe pipeline (<code>hearsay.embed</code>, <code>hearsay.probe</code>, <code>scripts/extract_embeddings.py</code>, <code>scripts/train_probe.py</code>), the shortcut inventories (level, leading silence, tiling), the segment-mode fix, the M1 v2 and v3 TSVs, the band match of the deep path (<code>prepare_segment</code>), and <strong>M1b</strong> with the ASVspoof 2019 real speakers as inner-fold-only extra rows (<code>docs/reports/2026-09-26_m1b-asv19-bonafide.md</code>); the In-the-Wild stress readouts for every deep detector</li>
+<li>the D-track engineered detectors (Sat Sep 26, CPU-only chat): handcrafted spectral + prosody, compression forensics, container/metadata, ENF and splice detectors, their fold-validated training and fusion score exports (<code>outputs/detector_scores/*.csv</code>), the container and high-band inventories, and the test-set band-match finding (<code>docs/reports/2026-09-26_cpu-detectors.md</code>); then the six added feature families with their per-column gate (<code>hearsay.hc_v4</code>, <code>docs/reports/2026-09-26_handcrafted-v4.md</code>), the test-domain-shift diagnosis and the augmented v5 training (<code>--extra-rows-from</code>), the non-speech gate and the pinned-block default-answer policy, the speaker-drift detector on ECAPA embeddings (<code>docs/reports/2026-09-26_gate-and-drift.md</code>), the numpy tree evaluator that keeps LightGBM out of inference, the orchestration ablation (<code>scripts/orchestration_ablation.py</code>), the worked examples (<code>docs/reports/2026-09-26_worked-examples.md</code>) and the README rewrite (Sat Sep 26, README chat)</li>
+<li>M3 (Sat Sep 26, Spectra-AASIST chat): the Spectra-AASIST score stream through the shared band-matched input path with test-length crops (<code>scripts/score_spectra.py</code>, <code>hearsay.spectra</code>), its short-clip pad-mode pilot, direction and failure gates, the hermetic tests (<code>tests/test_spectra.py</code>) and the report (<code>docs/reports/2026-09-26_m3-spectra.md</code>)</li>
+<li>the M5 rung (Sat Sep 26, vast.ai chat): the consult question on extra data and fine-tuning, the data bundle, fold-disciplined manifest, augmentation, trainer/scorer/assembler, the vast.ai launch/reaper scripts, the ablation and the report (<code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code>); rented A100 boxes on vast.ai ($5.42 of credit, <code>docs/reports/cloud-expense-ledger.md</code>) with Cloudflare R2 as the transfer store</li>
+<li>fusion (main chat, Sat Sep 26): the first fusion script and the 06:02 TSVs (<code>scripts/fuse.py</code>), the fusion consult question, the pre-declared sweep and the frozen rule (<code>scripts/fuse_sweep.py</code>, <code>models/fusion_v1/constants.json</code>, <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>), the 08:13 draft-review payload with its pre-flipped twin, and the decoding table for NSA's returned number</li>
+<li>the end-to-end runner and the API (main chat, Sat Sep 26): <code>scripts/run_pipeline.py</code>, <code>hearsay.pipeline</code>, <code>hearsay.api</code>, the per-file explanation JSON and routing log, the parity checks against the logged TSVs (<code>docs/reports/2026-09-26_runner-docker.md</code>), and the frontend contract (<code>docs/handoffs/2026-09-26_frontend-contract.md</code>)</li>
+<li>K (Sat Sep 26, Docker chat): the offline CPU linux/amd64 inference image (<code>Dockerfile</code>, <code>.dockerignore</code>, <code>docker/</code>: build, entrypoint, smoke, shipped-asset manifest, PCM parity), the Colima + Rosetta build setup on this Mac, the hermetic build-file tests (<code>tests/test_docker_image.py</code>), and the smoke and 50-file parity checks of the image against the logged fusion TSV (<code>docs/specs/2026-09-26_k-docker-image.md</code>)</li>
+<li>the channel-robustness rung (Sat Sep 26, 12:25–13:30): the λ̂ estimate of the test set's wild-domain weight (<code>scripts/channel_lambda.py</code>), the codec diagnosis of the 7.2 kHz wall (<code>scripts/channel_codec.py</code>), the M3 leakage probes through the shipped fusion rule (<code>scripts/m3_probes.py</code>), their hermetic tests (<code>tests/test_channel_robustness.py</code>) and the report (<code>docs/reports/2026-09-26_channel-robustness.md</code>); reviewed by Codex (plan) and a Claude critique</li>
+<li>the documents: <code>docs/plan.md</code>, <code>docs/architecture.md</code>, <code>docs/code-map.md</code>, <code>docs/STATUS.md</code>, every report, run spec, handoff and consult record under <code>docs/</code>, this disclosure, and <code>README.md</code></li>
+<li>an oversight session (Sat Sep 26) that relayed the team's decisions between lanes, reviewed commits and kept <code>docs/STATUS.md</code> current</li>
+</ul></li>
+<li><code>/plan-review</code> workflow (a Claude Code skill): used to plan and review rungs taking over an hour. Its plan review and post-commit audit call OpenAI Codex (Codex CLI, via <code>.claude/review-*.sh</code>) when the CLI is installed. Used for the software-only rescope (Sep 25–26), M3, M5 and the Docker image: Codex plan review and post-commit audit, Claude critique and exploration agents. The plan reviews and audits are under <code>docs/reports/*-plan-review.md</code> and <code>docs/specs/*-audit.md</code>.</li>
+<li><code>/consult</code> workflow (a Claude Code skill) with VeriLM's "Deep Think" memo service (two experts, Claude and Gemini, with a synthesis): two written consults, each drafted by Claude Code from the repository's own numbers, sent by the team, and recorded verbatim with the adopted items marked: extra data and fine-tuning for M5 (<code>docs/consults/2026-09-26_m5-extra-data-finetune_*.md</code>) and fusion strategy, false alarms and the default answer (<code>docs/consults/2026-09-26_fusion-strategy_*.md</code>). The fusion memo's recommendations (M1b-dominant rank blend, a pre-declared sweep, M3 as a capped or suppression-only input, the pinned block strictly below every determinate score, the draft-review decoding table) are what the 08:13 rule implements.</li>
+</ul>
+<p><strong>Pretrained models / checkpoints</strong> (name, source, license, how used)
+Downloaded before the event to <code>weights/</code>; fill in "how used" as each is actually used.</p>
+<ul>
+<li>XLS-R 300M, <code>facebook/wav2vec2-xls-r-300m</code> (Hugging Face, Meta), Apache-2.0: core SSL front end. M1: frozen, layer-7 probe. M5: the first 12 transformer layers kept frozen with a learned layer-weighted sum, attentive statistics pooling and a linear head trained on vast.ai (A100), with laundering augmentation; checkpoint on the HF Hub (private <code>nrs124554433/hearsay-m5-xlsr</code>). See <code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code>.</li>
+<li>WavLM Large, <code>microsoft/wavlm-large</code> (Hugging Face, Microsoft): downloaded as a bake-off challenger; <strong>not used</strong> in any run or shipped artifact. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT).</li>
+<li>WavLM Base, <code>microsoft/wavlm-base</code> (Hugging Face, Microsoft): downloaded as a bake-off / speed spare; <strong>not used</strong>. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT).</li>
+<li>Spectra-AASIST, <code>lab260/Spectra-AASIST</code> (Hugging Face): M3 score stream (<code>outputs/detector_scores/spectra_aasist.csv</code>), run off the shelf with no training through the shared band-matched input path, as a second deep score for fusion beside the XLS-R probe. License unclear: repo header says Apache-2.0, model card text says MIT. Output index 0 = spoof, 1 = bonafide.</li>
+<li>ECAPA-TDNN speaker embeddings, <code>speechbrain/spkrec-ecapa-voxceleb</code> (Hugging Face, SpeechBrain), Apache-2.0, fetched Sat Sep 26 to <code>weights/spkrec-ecapa-voxceleb</code> (89 MB): the speaker-drift detector (<code>hearsay.detectors.speaker_drift</code>, rubric technique 6), loaded from the local directory. Docker must include it.</li>
+</ul>
+<p><strong>Public datasets</strong> (name, source, license, how used)
+Downloaded before the event to <code>data/</code>; fill in "how used" as each is actually used.</p>
+<ul>
+<li>ASVspoof 2019 LA (University of Edinburgh DataShare, doi handle 10283/3336), Open Data Commons Attribution License: public shakedown of the M1 pipeline; its train+dev bona fide (40 VCTK speakers) plus a 2.5k A01–A06 anchor are training-only extra rows for M1b and M5 (<code>splits/nsa_folds_plus_asv19.csv</code>), never scored or held out.</li>
+<li>In-the-Wild (Müller et al. 2022; <code>mueller91/In-The-Wild</code> on Hugging Face), license listed as CC-BY-SA-4.0 on Hugging Face and Apache-2.0 on deepfake-total.com: held-out stress test only, never trained on.</li>
+<li>MLAAD (<code>mueller91/MLAAD</code> on Hugging Face, gated, non-commercial notice): 6,180 unique English synthetic clips pulled during the event (30 per model across 143 models, plus 300 per model for the ElevenLabs, Gemini and Qwen3 families named on the kickoff slide; the two pulls overlap by 210). Used by M5 as training-only spoof data, capped at 12% of the spoof side per batch and ≤ 120 clips per model, with the OpenVoice / XTTS / ElevenLabs families excluded from the fold models that validate on those generators.</li>
+<li>NSA HEARSAY data (provided by the sponsor during the event): 1,671-file test set, a resampled LJ Speech subset (real), DiffSSD (synthetic, Purdue), and the ASVspoof5 evaluation code for MinDCF.</li>
+<li>Full LJ Speech 1.1 (keithito.com, public domain): 13,100 clips of one speaker; 6,000 in the NSA training sample, the rest training-only extra rows for M5 (the sponsor's resampled subset is under <code>data/nsa/LJRealResampled</code>).</li>
+<li>LibriSpeech dev-clean/test-clean (openslr.org/12, CC BY 4.0): 5,323 multi-speaker bona fide clips; 4,000 of them in the NSA training sample, the rest training-only extra rows for M5.</li>
+</ul>
+<p><strong>Planned, not yet downloaded or used</strong> (move each item up to the list above once it is actually used):</p>
+<ul>
+<li>VCTK as a second multi-speaker bona fide source (LibriSpeech dev+test is in use; see above).</li>
+<li>ReplayDF (optional).</li>
+<li>ExifTool, for metadata forensics. <em>Not used: ffprobe (FFmpeg) covered the embedded fields, and the test set carries none beyond one encoder tag.</em></li>
+</ul>
+<p><strong>Frameworks and libraries</strong></p>
+<ul>
+<li>PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, SpeechBrain (ECAPA speaker embeddings), librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, pydub, ffmpeg-python, FFmpeg.</li>
+</ul>
+<p><strong>What we built vs. what AI did</strong></p>
+<p>The short version: the team decided what to build and why, and Claude Code built it. Every design decision below is recorded with its reason in <code>docs/plan.md</code>, <code>docs/architecture.md</code> or a report; every line of application code, every test and every document was written by Claude Code sessions under the team's direction and reviewed by the team and by Codex. Nothing on the scoring path calls a hosted model.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Component</th><th>The team (Nathan unless noted)</th><th>Claude Code</th><th>Outside review</th>
+</tr></thead>
+<tbody>
+<tr><td>Problem framing and rules</td><td>The software-only scope; 1.0 = synthetic and never flipped; validate by generator and speaker; never train on the holdout or In-the-Wild; the model ladder and the cut order; the pre-event repository, <code>CLAUDE.md</code> and the working plan's first version</td><td>The rescope plan and its detector contract; the doc-consistency tests</td><td>Codex plan review of the rescope</td></tr>
+<tr><td>Data and folds</td><td>Chose the corpora; obtained the sponsor data; asked the sponsor's questions at the kickoff and took the notes</td><td>Manifests, the fold file, the leakage and shortcut inventories, the data pulls</td><td></td></tr>
+<tr><td>Loader, TSV writer, metrics</td><td>The conventions (16 kHz mono everywhere, never overwrite a TSV, log every run)</td><td><code>hearsay.audio</code>, <code>hearsay.submission</code>, <code>hearsay.metrics</code> and their tests</td><td></td></tr>
+<tr><td>M1 / M1b (frozen XLS-R probe)</td><td>Which layer-selection metric to use; approving M1b's extra data as inner-fold-only rows; sending each TSV</td><td>Embedding and probe pipeline, segment mode, band match of the deep path, M1b, the In-the-Wild readouts, the reports</td><td></td></tr>
+<tr><td>M3 (Spectra-AASIST)</td><td>The decision to admit it only as a false-alarm suppressor because its training data is undisclosed</td><td>The score stream, pad-mode pilot, gates, tests, report</td><td>Codex plan review and audit</td></tr>
+<tr><td>M5 (XLS-R fine-tune)</td><td>Approving the GPU rental and the budget; the gate criteria set before the run; accepting the gate's verdict</td><td>The consult question, data bundle, trainer, cloud scripts, ablation, report</td><td>VeriLM consult on extra data; Codex plan review and audit</td></tr>
+<tr><td>Handcrafted spectral + prosody (v3, v4 families, v5 augmentation)</td><td>The rubric mapping; approving the feature-family brief; choosing v5 for fusion on the false-alarm evidence</td><td>Features, the per-column gate, the trainer, the numpy tree evaluator, the domain-shift diagnosis, augmentation, reports</td><td></td></tr>
+<tr><td>Compression, container, ENF, splice</td><td>The rule that these are evidence and routing, not score, once the mechanism was shown</td><td>Detectors, laundering-equalized training, inventories, tests</td><td></td></tr>
+<tr><td>Speech gate and default-answer policy</td><td>The direction-robust placement (from the fusion consult's item 5), adopted as a decision</td><td>Gate cues set from the test set's extremes, <code>apply_default_answer</code>, tests</td><td>VeriLM consult</td></tr>
+<tr><td>Speaker drift</td><td>Adopting it as evidence only after the "fakes are the most consistent voices" finding</td><td>ECAPA windows, calibration on synthetic splices, tests</td><td></td></tr>
+<tr><td>Fusion</td><td>Rejecting equal-weight fusion; the pre-declared selection rule; freezing the 08:13 rule; ratifying the pre-declared M5 candidate (A3 w0.2 + E) as the shipped rule at ~12:05 Sat once the Docker image was no longer required; the draft-review payload and its decoding table</td><td>The fusion scripts, the sweep, the constants, the consult question, the reports</td><td>VeriLM fusion consult</td></tr>
+<tr><td>Orchestrator, runner, API, explanation JSON</td><td>The routing policy (which facts route, which detectors are trusted)</td><td><code>hearsay.pipeline</code>, <code>scripts/run_pipeline.py</code>, <code>hearsay.api</code>, the routing log, parity checks</td><td></td></tr>
+<tr><td>Frontend</td><td>Hrushi built the UI against the JSON contract</td><td>The contract (<code>docs/handoffs/2026-09-26_frontend-contract.md</code>) and the static dump it reads</td><td></td></tr>
+<tr><td>Docker image</td><td>Colima + Rosetta on this Mac; shipping the M1b v3 probe; offline enforcement</td><td>Dockerfile, build/entrypoint/smoke/parity scripts, asset manifest, tests, spec</td><td>Codex plan review and audit</td></tr>
+<tr><td>Orchestration ablation and worked examples</td><td>Asked for proof that routing changed decisions</td><td><code>scripts/orchestration_ablation.py</code>, <code>docs/reports/2026-09-26_worked-examples.md</code></td><td></td></tr>
+<tr><td>Documentation and README</td><td>Set the rule that every number is cited to a file; reviewed</td><td>All of it, including this disclosure</td><td></td></tr>
+</tbody>
+</table></div>
+<h2 id="when-a-teammate-opens-this-repo">When a teammate opens this repo</h2>
+<p>The skills in <code>.claude/skills/</code> and the permissions in <code>.claude/settings.json</code> load automatically when you run Claude Code in this repo; nothing to install. Setup: <code>uv sync</code>, then <code>cp .env.example .env</code>. For Codex review in <code>/plan-review</code>, install the Codex CLI (<code>npm install -g @openai/codex</code>) and run <code>codex login</code>; it's optional. Personal overrides go in <code>.claude/settings.local.json</code> (gitignored). The skills:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Skill</th><th>Use it for</th>
+</tr></thead>
+<tbody>
+<tr><td><code>/plan-review</code></td><td>Any rung or change expected to take over an hour: problem → failure modes and tests → plan → execute. Includes this project's standing failure modes.</td></tr>
+<tr><td><code>/p3</code></td><td>Executing a plan that has already been approved.</td></tr>
+<tr><td><code>/diagnose</code></td><td>A bug you can reproduce, e.g. wrong scores, loader output, or a detector that errors.</td></tr>
+<tr><td><code>/validate-training-data</code></td><td>Before training on a new dataset or split: generator leakage, imbalance, format leaks.</td></tr>
+<tr><td><code>/test-runner</code></td><td>Running the tests and diagnosing failures.</td></tr>
+<tr><td><code>/doc-sync</code></td><td>Checking this file and <code>docs/</code> against the code, especially the disclosure and log.</td></tr>
+<tr><td><code>/handoff</code></td><td>Ending a session: writes a prompt so the next chat (or teammate) picks up cleanly.</td></tr>
+<tr><td><code>/consult</code></td><td>Writing a self-contained question for an outside LLM or expert, and saving the answer.</td></tr>
+<tr><td><code>/zoom-out</code></td><td>Getting a map of an unfamiliar part of the code (e.g. someone else's detector).</td></tr>
+</tbody>
+</table></div>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>CLAUDE.md</code> <span class="hash">e6756765556f</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

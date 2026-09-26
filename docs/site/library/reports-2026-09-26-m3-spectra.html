@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M3: Spectra-AASIST as the second deep score stream (Sat Sep 26, 2026) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m3-spectra.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_m3-spectra.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-m3-is">What M3 is</a></li><li><a href="#input-path-the-same-function-scores-every-row">Input path (the same function scores every row)</a></li><li><a href="#pilot-choosing-the-short-clip-mode-cpu-05020509">Pilot: choosing the short-clip mode (CPU, 05:02–05:09)</a></li><li><a href="#direction-baseline-untouched-scriptsspectra_directionpy-raw-path-no-trim-no-crop-no-band-match-repeat-pad">Direction baseline (untouched scripts/spectradirection.py, raw path: no trim, no crop, no band match, repeat-pad)</a></li><li><a href="#peak-normalization-arm-rejected">Peak-normalization arm (rejected)</a></li><li><a href="#in-the-wild-stress-set-3000-clips-2000-real--1000-spoof-seed-200-crops-zero">In-the-Wild stress set (3,000 clips, 2,000 real / 1,000 spoof, seed-200 crops, zero)</a></li><li><a href="#full-export-outer-holdout-test-set-timing-mps-05220600">Full export: outer holdout, test set, timing (MPS, 05:22–06:00)</a></li><li><a href="#what-spectra-is-blind-to-and-what-this-rung-does-not-test">What Spectra is blind to, and what this rung does not test</a></li><li><a href="#notes-for-fusion-m4">Notes for fusion (M4)</a></li><li><a href="#timing">Timing</a></li><li><a href="#reproduce">Reproduce</a></li></ul></details>
+<h1 id="m3-spectra-aasist-as-the-second-deep-score-stream-sat-sep-26-2026">M3: Spectra-AASIST as the second deep score stream (Sat Sep 26, 2026)</h1>
+<p>Run spec: <code>docs/specs/2026-09-26_m3-spectra-aasist.md</code>. Plan and Codex review: <code>docs/reports/2026-09-26_m3-spectra-aasist-plan{,-review}.md</code>. Code: <code>src/hearsay/spectra.py</code>, <code>scripts/score_spectra.py</code>, <code>tests/test_spectra.py</code> (40 collected: 39 hermetic plus one weights-gated CPU test). Export for fusion: <code>outputs/detector_scores/spectra_aasist.csv</code> (<code>path, fold, split, score, logit</code>; <strong><code>logit</code> is the raw model margin, <code>score</code> its sigmoid, nothing fitted</strong>), sidecar <code>spectra_aasist_summary.json</code>, raw companion <code>outputs/spectra/spectra_aasist_raw.csv</code>, run directory <code>models/m3_spectra_&lt;stamp&gt;/</code>.</p>
+<h2 id="what-m3-is">What M3 is</h2>
+<p>Spectra-AASIST (<code>lab260/Spectra-AASIST</code>, Hugging Face; XLS-R 300M front end, AASIST graph-attention back end, trained by its authors on undisclosed data) run <strong>off the shelf, with no training</strong>, over the NSA fold file (20,000 rows) and the test set (1,671 files). Its value for fusion is a second deep score whose training differs from the M1 probe, not a higher number than M1. The model's margin <code>synth_logit = logit_spoof − logit_bonafide</code> increases with synthetic likelihood; direction is checked on NSA inner rows before anything is exported.</p>
+<h2 id="input-path-the-same-function-scores-every-row">Input path (the same function scores every row)</h2>
+<p><code>load_audio</code> (16 kHz mono) → <code>hearsay.embed.prepare_segment</code> with default arguments, i.e. the shared band match (7.25 kHz Kaiser low-pass matching the test set's 7.2 kHz wall, commit 133e536), silence trim, optional test-length crop, cap at 8 s → short-clip handling → 64,600-sample windows at 50% hop → pre-emphasis → model → mean of the window logits.</p>
+<p><strong>Crop parity.</strong> Fold rows (inner and holdout) are cropped to test-duration lengths with exactly the draws M1 and the handcrafted detector used (<code>test_duration_sampler(0)</code>, one draw per <code>nsa_train_sample.csv</code> row in order, offset seed = row index), so fusion sees the same audio per file across all three detectors. Test rows are scored whole. Without the crops, four in five test rows would be padded and almost no training row would be, which is the tiling seam M1 v2 removed.</p>
+<p><strong>Short clips.</strong> 81% of NSA test clips are shorter than one Spectra window (4.04 s; test median 3.41 s), so how a short clip is padded is the test condition. Three modes were measured on inner rows only: <code>repeat</code> (tile to one window, the model card's own <code>pad_random</code>, in-distribution for the model but a seam), <code>zero</code> (zero-pad to one window), <code>whole</code> (the clip at its own length; the AASIST positional table covers 8 s).</p>
+<h2 id="pilot-choosing-the-short-clip-mode-cpu-05020509">Pilot: choosing the short-clip mode (CPU, 05:02–05:09)</h2>
+<p>First 400 fold rows (322 inner rows, 171 bona fide / 151 spoof; holdout rows skipped) plus the first 200 test rows, all three modes in one decode pass, 401 s at 0.77 s per clip on the loaded CPU (three forwards per short clip). No decode or model failures. 434 of 522 prepared clips were shorter than one window.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Mode</th><th>Inner minDCF (π_synth = 0.3)</th><th>Inner EER</th><th>Inner AUC</th><th>Spoof / bona fide median margin</th><th>Test share with margin &gt; 0 (prior ≈ 0.30)</th><th>Test share under the card's threshold</th>
+</tr></thead>
+<tbody>
+<tr><td>repeat</td><td>0.0066</td><td>0.6%</td><td>1.000</td><td>+10.2 / −7.7</td><td>0.310</td><td>0.290</td></tr>
+<tr><td><strong>zero</strong></td><td><strong>0.0000</strong></td><td><strong>0.0%</strong></td><td><strong>1.000</strong></td><td>+10.4 / −6.5</td><td><strong>0.265</strong></td><td>0.260</td></tr>
+<tr><td>whole</td><td>0.0000</td><td>0.0%</td><td>1.000</td><td>+11.5 / −7.3</td><td>0.280</td><td>0.275</td></tr>
+</tbody>
+</table></div>
+<p>Selection rule (frozen in P2): inner minDCF, ties within 0.02 broken by inner AUC, then <code>zero</code>. All three tied, so <strong><code>zero</code> was chosen</strong>, the handoff's option (b). Two honest caveats: 322 rows make one bona fide false alarm worth 0.055 in normalized minDCF, so the pilot can only say "all three are near-perfect on inner rows"; and <code>repeat</code> is the in-distribution choice for the model while <code>zero</code> and <code>whole</code> are out of distribution, which the numbers did not punish here. Per generator on the inner rows, every DiffSSD generator scored minDCF 0.0 in <code>zero</code> mode, including <code>grad_tts</code>, <code>pro_diff</code> and ElevenLabs, the three the handcrafted detector is blind to.</p>
+<p><strong>Level.</strong> Spectra does not level-normalize its input. Within the bona fide class the margin is uncorrelated with clip peak level (Spearman 0.00), within the spoof class it rises with level (Spearman 0.36 for <code>zero</code>, 0.27–0.29 for the others). Level is doing some of the work on the synthetic side; it cannot create a false alarm on quiet real speech, but it is a shortcut to keep in mind if the test set's synthetic clips were normalized differently from DiffSSD.</p>
+<h2 id="direction-baseline-untouched-scriptsspectra_directionpy-raw-path-no-trim-no-crop-no-band-match-repeat-pad">Direction baseline (untouched <code>scripts/spectra_direction.py</code>, raw path: no trim, no crop, no band match, repeat-pad)</h2>
+<p>300 inner rows (150 per class, seed 0, <code>outputs/manifests/nsa_inner_direction300.csv</code>), MPS, 05:19: AUC 1.000, EER 0.0%, median margin +10.5 for spoof and −7.7 for bona fide, EER threshold at a margin of 6.5, 0.43 s per clip (uncapped 5–9 s clips, up to 16 windows). The script's own gate passed. Raw scores: <code>outputs/spectra/nsa_inner300_scores.csv</code>. So the direction and the separation do not depend on the shared input path; the path is there for parity with the other detectors and for the test set's band, not to make Spectra work.</p>
+<h2 id="peak-normalization-arm-rejected">Peak-normalization arm (rejected)</h2>
+<p>After the pilot's level flag, the main chat proposed scaling every prepared clip to peak 0.95 (Spectra sets <code>normalize_waveform=False</code>; training real audio peaks about 0.5, NSA test clips and some spoof generators about 1.0). The arm ran on MPS on the same 322 inner and 200 test rows, <code>zero</code> mode (<code>--peak-norm</code>, run <code>outputs/spectra/pilot/20260926-0517_pilot_peaknorm</code>):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Arm</th><th>Inner minDCF</th><th>Inner EER</th><th>Inner AUC</th><th>LJ Speech bona fide minDCF</th><th>Test share with margin &gt; 0</th><th>Within-spoof Spearman(peak, margin)</th>
+</tr></thead>
+<tbody>
+<tr><td>raw (shipped)</td><td>0.0000</td><td>0.0%</td><td>1.0000</td><td>0.000</td><td>0.265</td><td>0.36</td></tr>
+<tr><td>peak 0.95</td><td>0.0331</td><td>0.6%</td><td>0.9997</td><td>0.033</td><td>0.265</td><td>0.40</td></tr>
+</tbody>
+</table></div>
+<p>Rejected by the rule recorded in the spec (outside the 0.02 tie band, and the correlation did not drop). The correlation with the <em>pre-normalization</em> peak survived normalization, so level is a proxy for something else (the loud generators are also the easy ones), not the cue the model uses; normalizing only cost a little on the real side. Shipped configuration: <code>zero</code> mode, band match from <code>prepare_segment</code>, no level normalization.</p>
+<h2 id="in-the-wild-stress-set-3000-clips-2000-real--1000-spoof-seed-200-crops-zero">In-the-Wild stress set (3,000 clips, 2,000 real / 1,000 spoof, seed-200 crops, <code>zero</code>)</h2>
+<p><code>outputs/manifests/itw_stress.csv</code> scored on CPU (1,086 s, 0.36 s per clip, no failures), band-matched, test-length crops, zero-pad, no level normalization; the same function that scores every NSA row. Run: <code>outputs/spectra/itw_stress/{scores.csv, meta.json}</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>Spectra (M3)</th><th>M1 v3 (band-matched probe)</th><th>M1b v3 (+ASVspoof bona fide)</th>
+</tr></thead>
+<tbody>
+<tr><td>In-the-Wild minDCF (π_synth = 0.3)</td><td><strong>0.065</strong></td><td>0.380</td><td>0.342</td></tr>
+<tr><td>In-the-Wild EER</td><td><strong>3.2%</strong></td><td></td><td></td></tr>
+<tr><td>AUC</td><td>0.996</td><td></td><td></td></tr>
+<tr><td>Real P_FA at the detector's own inner-row threshold</td><td><strong>0.0%</strong> (0 of 2,000)</td><td>0.7%</td><td>0.8%</td></tr>
+<tr><td>Spoof P_miss at that threshold</td><td>7.8% (EER threshold) / 13.8% (minDCF threshold)</td><td></td><td></td></tr>
+<tr><td>Median margin, spoof / real</td><td>+9.8 / −3.2</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<p>The threshold is Spectra's own, not M1's number (the score spaces differ). Final values from the full run's 16,142 inner rows: the minDCF-optimal margin is 6.92 (real P_FA 0.00%, spoof P_miss 13.80%) and the EER margin is 5.41 (P_FA 0.00%, P_miss 7.80%); the table's row uses the EER threshold, which is what the pilot's minDCF sweep also landed on. Readouts: <code>outputs/spectra/itw_stress/readout_{provisional,final}.json</code>. The real side of In-the-Wild sits closer to the boundary (median −3.2) than NSA real speech does (−6.5 to −7.7), which is the channel shift this set is for, and the margin still leaves zero false alarms. M1's numbers are the main chat's, on the same 3,000 clips.</p>
+<p><strong>Flag: possibly optimistic.</strong> The model card lists In-the-Wild only as an evaluation set (the authors report 1.46% EER on it) and does not disclose the training data at all (arena tier "unpublished / proprietary"), so this readout cannot be shown to be uncontaminated. The NSA holdout and the test-set share below are the evidence that does not depend on that.</p>
+<h2 id="full-export-outer-holdout-test-set-timing-mps-05220600">Full export: outer holdout, test set, timing (MPS, 05:22–06:00)</h2>
+<p>Run <code>models/m3_spectra_20260926-0522</code> (config hash <code>d7138ffc8569…</code>, git <code>47c106f6</code>): 21,671 rows, <strong>0 decode or model failures</strong> in any split, 2256 s at 0.104 s per clip on MPS (decode in 4 threads, forward on the GPU). Published 06:00:23.</p>
+<p><strong>Outer holdout</strong> (3,858 rows: the <code>playht</code> and <code>wavegrad2</code> generators plus 26 real-speech speaker groups, never seen by any of our fitting, and not selected on: read once). The comparator is the band-matched M1 v3 probe on the same fold file (<code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0518</code>).</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Holdout reading</th><th>Spectra (M3)</th><th>M1 v3</th>
+</tr></thead>
+<tbody>
+<tr><td>minDCF, π_synth = 0.3 (the judged number)</td><td><strong>0.0120</strong></td><td>0.1593</td></tr>
+<tr><td>EER</td><td><strong>0.16%</strong></td><td>2.85%</td></tr>
+<tr><td>AUC</td><td>1.0000</td><td>0.9959</td></tr>
+<tr><td>Actual DCF at the Bayes threshold on the raw margin</td><td>0.0653</td><td>0.1679</td></tr>
+<tr><td>minDCF at π = 0.5</td><td>0.0063</td><td>0.1087</td></tr>
+<tr><td>Sponsor code as shipped (higher = bona fide), as-is / flipped</td><td>1.0000 / 0.0022</td><td>1.0000 / 0.1051</td></tr>
+</tbody>
+</table></div>
+<p>The sponsor-code reading confirms the direction question is the sponsor's, not ours: as-is our synthetic-high scores read as the worst possible file, flipped they read near-perfect. We submit 1.0 = synthetic and never flip (<code>docs/plan.md</code>).</p>
+<p><strong>Per held-out generator</strong> (that generator's spoofs against every holdout bona fide clip) and <strong>per real source</strong> (that source's bona fide clips against every holdout spoof), the <code>by_group</code> shape the handcrafted trainer uses:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Group</th><th>Spectra minDCF</th><th>Spectra EER</th><th>M1 v3 minDCF</th><th>M1 v3 EER</th>
+</tr></thead>
+<tbody>
+<tr><td>playht (holdout generator, MP3 source)</td><td>0.0100</td><td>0.18%</td><td>0.0350</td><td>0.60%</td></tr>
+<tr><td>wavegrad2 (holdout generator)</td><td>0.0120</td><td>0.21%</td><td>0.2304</td><td>3.89%</td></tr>
+<tr><td>LibriSpeech real (held-out speakers)</td><td>0.0111</td><td>0.13%</td><td>0.2050</td><td>3.80%</td></tr>
+<tr><td>LJ Speech real</td><td>0.0080</td><td>0.21%</td><td>0.0832</td><td>1.94%</td></tr>
+</tbody>
+</table></div>
+<p>One fold-file limitation applies to every detector, not only M3: LJ Speech is grouped by chapter, so its single speaker appears in both inner and holdout rows. The LJ real row above is held out by corpus slice, not by speaker; the LibriSpeech row is the speaker-held-out one.</p>
+<p><strong>Inner rows, pooled</strong> (16,142 rows; a diagnostic, and possibly in-sample for Spectra, see the caveat below): minDCF 0.0045, EER 0.11%, AUC 1.0000. Per generator: diffgan_tts 0.0000, elevenlabs 0.0173, grad_tts 0.0031, openvoicev2 0.0010, pro_diff 0.0010, unit_speech 0.0010, xtts_v2 0.0010, your_tts 0.0000. Per real source: LibriSpeech 0.0025, LJ Speech 0.0048. ElevenLabs is the hardest inner generator for Spectra as it is for the handcrafted detector, at a level three orders of magnitude lower.</p>
+<p><strong>Test set</strong> (1,671 files, unlabeled; the sanity check that does not depend on our corpora): 29.26% of files have a positive margin (prior about 30%; M1 v3 28.9%, M1b v3 26.8% after band matching), 28.31% sit under the model card's own classify threshold, and the in-sample Platt diagnostic would put 27.41% above one half. Score mean 0.299, std 0.448, 1671 distinct values. Margins run -9.36 to +11.95 across all rows.</p>
+<p><strong>Disagreement with M1 v3 on the test set</strong> (<code>submissions/20260926-0522_M1_…0518.tsv</code>, joined on filename, 1671 files): Spearman between the two score columns 0.569. At each detector's own midpoint (M1 probability 0.5, Spectra zero margin): both call synthetic 409, both real 1108, <strong>Spectra only 80, M1 only 74</strong>: 154 files (9.22%) where the two deep detectors disagree. A rank correlation of only 0.57 between two detectors that both separate the holdout well is the point of M3: they are wrong on different files, and a stacker can use that.</p>
+<p><strong>Level</strong> on all inner rows: within-spoof Spearman(peak, margin) 0.31, within-bona fide -0.07; the same picture as the pilot, and the peak-normalization arm above showed it is a proxy, not the cue.</p>
+<p><strong>Caveat: the inner rows may be in-sample for Spectra.</strong> The model's training data is undisclosed; LJ Speech, LibriSpeech and DiffSSD are public and plausible training corpora, and the inner rows score AUC 1.0. <code>meta.json</code> records <code>caveats.inner_rows_possibly_in_sample = true</code>. Fusion should not treat the <code>inner_oof</code> column of this detector as out-of-fold evidence the way it does for M1 and the handcrafted detector; the holdout (also DiffSSD and public real speech, so not immune), the test-set share and In-the-Wild are the readings that depend least on it. The draft-review score is the only fully independent check.</p>
+<h2 id="what-spectra-is-blind-to-and-what-this-rung-does-not-test">What Spectra is blind to, and what this rung does not test</h2>
+<p>On our data Spectra trails M1 nowhere: every holdout group is at or under 0.012 minDCF. What it is blind to, we cannot see from labeled data we own: the two deep detectors disagree on 154 test files, the real side of In-the-Wild sits within 3.2 margin units of the boundary (median −3.2 against −6.3 on NSA real speech), and 13.8% of In-the-Wild spoofs fall under the NSA-derived minDCF threshold, so unseen generators under channel shift are where misses will come from. The level proxy (loud synthetic generators are the easy ones) is the one measured shortcut.</p>
+<p>Not tested here, by construction of a scoring rung with nothing trained: robustness to codec laundering, telephony band-limiting and simulated replay (M5's augmentation is where those are measured), and physical replay (no hardware). The band match and the In-the-Wild readout are the only channel-shift evidence in this report.</p>
+<h2 id="notes-for-fusion-m4">Notes for fusion (M4)</h2>
+<ul>
+<li>Read the <code>logit</code> column directly and standardize it per detector on inner rows (commit 944380c). Spectra's margins run about ±10 to ±17; <code>logit(clip(score, 1e-4))</code> would saturate them to ±9.2 and lose the ranking in the bona fide tail where the minDCF threshold lives.</li>
+<li><code>inner_oof</code> rows are not out-of-fold in any learned sense: nothing was fit locally, but whether Spectra's own training overlapped our inner or holdout corpora is unknown (see the caveat above), so neither split is guaranteed out-of-sample for this model. The label keeps the file shape uniform with the learned detectors; do not weight this column as out-of-fold evidence.</li>
+<li>NaN rows (decode or model failures) stay NaN in both columns for imputation and are counted in the summary sidecar.</li>
+</ul>
+<h2 id="timing">Timing</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Stage</th><th>Device</th><th>Clips</th><th>Seconds</th><th>s per clip</th>
+</tr></thead>
+<tbody>
+<tr><td>Pad-mode pilot, 3 modes in one pass</td><td>CPU (loaded, 4 threads, nice 10)</td><td>522</td><td>401</td><td>0.77</td></tr>
+<tr><td>Peak-norm arm</td><td>MPS</td><td>522</td><td>81</td><td>0.16</td></tr>
+<tr><td>Direction baseline (raw path, uncapped)</td><td>MPS</td><td>300</td><td>129</td><td>0.43</td></tr>
+<tr><td>In-the-Wild stress</td><td>CPU (loaded)</td><td>3,000</td><td>1,086</td><td>0.36</td></tr>
+<tr><td>Full export</td><td>MPS</td><td>21,671</td><td>2256</td><td>0.104</td></tr>
+</tbody>
+</table></div>
+<p>Wall clock: P2 frozen 04:20, build and tests 04:50–05:02, pilot 05:02–05:09, GPU released by the main chat 05:17, export 05:22–06:00, report and commit after 06:05. The 45-minute box in the ladder covered the pilot and the export; the frozen P2 test list (37 tests) took the build past it, as the run spec records.</p>
+<h2 id="reproduce">Reproduce</h2>
+<pre><code class="language-bash">nice -n 10 uv run python scripts/score_spectra.py --limit 400 --test-limit 200 --pad-modes repeat,zero,whole --device cpu --threads 4 --name pilot
+nice -n 10 uv run python scripts/score_spectra.py --manifest outputs/manifests/itw_stress.csv --name itw_stress --pad-mode zero --device cpu --threads 4
+uv run python scripts/score_spectra.py --readout inner=outputs/spectra/pilot/&lt;stamp&gt;_pilot/scores_zero.csv stress=itw=outputs/spectra/itw_stress/scores.csv --out outputs/spectra/itw_stress/readout_provisional.json
+nohup nice -n 10 uv run python scripts/score_spectra.py --pad-mode zero --device mps &gt; outputs/spectra/score_spectra.log 2&gt;&amp;1 &amp;
+uv run python scripts/score_spectra.py --readout inner=outputs/spectra/spectra_aasist_raw.csv test=outputs/spectra/spectra_aasist_raw.csv stress=itw=outputs/spectra/itw_stress/scores.csv m1_tsv=submissions/&lt;M1 v3 tsv&gt; pilot=outputs/spectra/pilot/&lt;stamp&gt;_pilot/meta.json --final --out outputs/spectra/itw_stress/readout_final.json --merge-into models/m3_spectra_&lt;stamp&gt;/meta.json</code></pre>
+<p>The last command is how the In-the-Wild block, the M1 disagreement, the pilot table and the caveats got into the run's <code>meta.json</code> (as its <code>readout</code> block); the export itself ran without <code>--stress</code> so its end could not depend on a file another process was still writing. <code>--resume</code> restarts an interrupted full run from its checkpoint; <code>--max-chunks 1</code> is a dry run. At risk (gitignored): <code>outputs/detector_scores/spectra_aasist*.csv</code>, <code>outputs/spectra/</code>, <code>models/m3_spectra_*/</code>.</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/reports/2026-09-26_m3-spectra.md</code> <span class="hash">0e625ef65124</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

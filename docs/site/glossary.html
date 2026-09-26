@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary · HEARSAY</title>
+<meta name="description" content="Every term that carries a tooltip on this site, defined once.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="story" data-search-index="search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The story</a>
+<ul><li><a href="index.html">Home</a></li><li><a href="how-it-decides.html">How it decides</a></li><li><a href="metric.html">The metric and the default answer</a></li><li><a href="what-worked.html">What worked and what did not</a></li><li><a href="detectors.html">The ten detectors</a></li><li><a href="validation.html">Validation</a></li><li><a href="reproduce.html">Reproduce it</a></li><li><a href="credits.html">Credits and AI use</a></li><li><a href="glossary.html" aria-current="page">Glossary</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>Glossary</h1>
+<p class="lead">Every term that carries a tooltip on this site, defined once.</p>
+
+<dl class="glossary">
+<dt id="term-asvspoof-2019">ASVspoof 2019 <span class="aliases">(also: ASVspoof)</span></dt><dd>A public anti-spoofing benchmark. Its real speakers and a small set of its attacks were added to the training folds only, never to the holdout.</dd>
+<dt id="term-auc">AUC</dt><dd>Area under the ROC curve: the probability that a random synthetic file scores above a random real one. 1.0 is perfect separation, 0.5 is chance.</dd>
+<dt id="term-band-match">band match <span class="aliases">(also: band-matched, band-matching, Kaiser low-pass)</span></dt><dd>A low-pass filter applied to every clip, training and test alike, so that the test set's roll-off above about 7 kHz is no longer a fingerprint that separates test audio from training audio.</dd>
+<dt id="term-bayes-threshold">Bayes threshold <span class="aliases">(also: operating threshold)</span></dt><dd>The score at which calling a file synthetic starts to pay under the cost weights and the prior. With a false alarm this expensive it sits far above 0.5 on the probability scale, which is why "above 0.5" is not the decision rule.</dd>
+<dt id="term-compression-forensics">compression forensics <span class="aliases">(also: compression, codec traces)</span></dt><dd>Features that read the traces a lossy codec leaves in the upper band: spectral holes, floor depth, effective bandwidth. They describe a file's processing history, not the voice, so they are evidence and routing here.</dd>
+<dt id="term-container">container <span class="aliases">(also: metadata, header facts)</span></dt><dd>What the file header says: codec, sample rate, bit depth, encoder tags. Read for routing; never learned from, because on our training data the container is the label.</dd>
+<dt id="term-diffssd">DiffSSD</dt><dd>The sponsor's synthetic training corpus: clips from ten text-to-speech generators, including commercial ones.</dd>
+<dt id="term-draft-review">draft review <span class="aliases">(also: one-time draft review)</span></dt><dd>The sponsor's one-time offer to score an early submission and return its minDCF. We sent the exact file we ship and decided in advance what each returned value would mean.</dd>
+<dt id="term-ecapa">ECAPA <span class="aliases">(also: ECAPA-TDNN, speaker embedding)</span></dt><dd>A pretrained speaker-recognition network that turns a second of speech into a vector describing the voice. Comparing vectors from successive windows shows whether the voice stays the same within a clip.</dd>
+<dt id="term-eer">EER <span class="aliases">(also: equal error rate)</span></dt><dd>Equal error rate: the point on the threshold sweep where the false-alarm rate equals the miss rate. Reported alongside minDCF, never selected on.</dd>
+<dt id="term-enf">ENF <span class="aliases">(also: mains hum, electrical network frequency)</span></dt><dd>Electrical network frequency: the faint 50 or 60 Hz hum a mains-powered recording chain leaves in a recording, and how stable it is. Evidence about the recording environment.</dd>
+<dt id="term-evidence">evidence <span class="aliases">(also: evidence only)</span></dt><dd>A detector result that is reported in the explanation for a file but never enters the score. Four detectors are evidence-only because what they measure is real, but on this test set it does not separate real from synthetic.</dd>
+<dt id="term-explanation-json">explanation JSON <span class="aliases">(also: routing log, per-file report)</span></dt><dd>The record the runner writes for each file: every detector's score, status and one-sentence evidence, the fusion inputs, and the routing log of what each rule decided.</dd>
+<dt id="term-false-alarm">false alarm <span class="aliases">(also: P_FA, false-alarm rate)</span></dt><dd>A real recording that the system calls synthetic. P_FA is the share of real files scored above the threshold. This is the expensive mistake under the sponsor's cost.</dd>
+<dt id="term-generator">generator <span class="aliases">(also: TTS generator, vocoder)</span></dt><dd>A text-to-speech or voice-cloning system that produced synthetic clips. Folds hold out whole generators so that every readout is on synthetic speech from a system the model never saw.</dd>
+<dt id="term-gradient-boosted-trees">gradient-boosted trees <span class="aliases">(also: LightGBM, trees)</span></dt><dd>An ensemble of small decision trees trained one after another. LightGBM trains them; at inference the dumped trees are evaluated in numpy so that the training library is never imported.</dd>
+<dt id="term-handcrafted-detector">handcrafted detector <span class="aliases">(also: handcrafted, spectral + prosody)</span></dt><dd>Engineered spectral and prosody features (cepstral statistics, spectral shape, phase cues, pitch, loudness, pauses) fed to gradient-boosted trees, evaluated at inference in plain numpy.</dd>
+<dt id="term-holdout">holdout <span class="aliases">(also: outer holdout)</span></dt><dd>A slice of the training data that no model was ever fitted, tuned or selected on: two generators and a set of real-speech groups. Each model reads it once. With only two held-out generators it is noisy, so small differences on it are not evidence.</dd>
+<dt id="term-in-the-wild">In-the-Wild <span class="aliases">(also: ITW)</span></dt><dd>A public set of web-sourced real and fake speech, used only as a stress test for false alarms on unfamiliar real voices. Nothing was ever trained on it.</dd>
+<dt id="term-inner-folds">inner folds <span class="aliases">(also: inner fold)</span></dt><dd>The five training folds. Each holds out whole generators, so a model is always tested on synthetic speech from a system it never trained on. Scalers, calibration and fusion weights are fitted inside each fold as well.</dd>
+<dt id="term-laundering">laundering <span class="aliases">(also: laundered, laundering augmentation)</span></dt><dd>Passing audio through a codec round-trip, band-limit or added noise. Attackers do it to hide artifacts; we do it to both classes in training so a detector cannot learn "compressed means fake".</dd>
+<dt id="term-librispeech">LibriSpeech</dt><dd>A public multi-speaker read-speech corpus. The multi-speaker real side of the training data.</dd>
+<dt id="term-lj-speech">LJ Speech <span class="aliases">(also: LJ)</span></dt><dd>A public read-speech corpus of a single speaker. Part of the real side of the training data; being one voice, it is a shortcut risk of its own.</dd>
+<dt id="term-llr">LLR <span class="aliases">(also: log-likelihood ratio, calibrated log-likelihood ratio)</span></dt><dd>Log-likelihood ratio: the log of how much more likely the evidence is under "synthetic" than under "real". Positive means synthetic-like, negative real-like, zero is even. The XLS-R probe reports one per file.</dd>
+<dt id="term-m1b">M1b <span class="aliases">(also: M1, the probe, XLS-R probe)</span></dt><dd>Our primary detector: a frozen XLS-R with a small logistic classifier on one hidden layer. M1b is the version whose training folds also include a set of extra real speakers.</dd>
+<dt id="term-m5">M5 <span class="aliases">(also: fine-tuned head, M5 head)</span></dt><dd>A trained head on a truncated XLS-R: learned layer weights, attentive pooling and a linear output, trained on rented GPUs with heavy augmentation. It did not beat the plain probe on its own and ships as a minority vote in the fusion.</dd>
+<dt id="term-mindcf">minDCF <span class="aliases">(also: minimum detection cost, normalized minDCF)</span></dt><dd>Minimum detection cost function. The scorer sweeps every possible threshold over our scores and reports the lowest cost it finds, with a false alarm weighted far more than a miss and the whole thing scaled so that 1.0 equals the best constant answer and 0.0 is perfect. Because the threshold is chosen by the scorer, only the order of our scores matters.</dd>
+<dt id="term-miss">miss <span class="aliases">(also: P_miss, miss rate)</span></dt><dd>A synthetic recording that the system calls real. P_miss is the share of synthetic files scored below the threshold. The cheap mistake, relatively speaking.</dd>
+<dt id="term-mlaad">MLAAD</dt><dd>A public multi-generator synthetic-speech set. Its English clips were training-only data for the M5 model and a miss-rate readout on unseen generators for the others.</dd>
+<dt id="term-out-of-fold">out-of-fold <span class="aliases">(also: OOF, inner out-of-fold, inner OOF)</span></dt><dd>A score a model gives to a training row it never saw: the training data is split into folds, and each row is scored by the model fitted on the other folds. Every selection decision in this project uses out-of-fold scores.</dd>
+<dt id="term-pinned-block">pinned block <span class="aliases">(also: default answer, abstention, default-answer policy)</span></dt><dd>Files the system cannot judge (no speech, or a failed decode) are placed strictly below every judged file, at the real end of the ranking, in a deterministic order. Under the sponsor's cost, an uncertain file belongs there.</dd>
+<dt id="term-platt-map">Platt map <span class="aliases">(also: Platt, Platt scaling)</span></dt><dd>A one-dimensional logistic fit that turns a raw decision value into a probability. It is monotone, so it changes the numbers a reader sees without changing the ranking the metric scores.</dd>
+<dt id="term-pre-declared">pre-declared <span class="aliases">(also: pre-declared sweep, selection rule)</span></dt><dd>Written down before any result was looked at: the candidates, the readouts, and the rule that picks a winner. Once the rule has been applied there is no second try.</dd>
+<dt id="term-prosody">prosody</dt><dd>The rhythm and melody of speech: pitch movement, loudness changes, pauses, breaths. Synthetic speech tends to be more regular than a person.</dd>
+<dt id="term-rank-blend">rank blend <span class="aliases">(also: rank fusion, rank space)</span></dt><dd>Each detector's raw score is replaced by its rank among that detector's own out-of-fold training scores (the share of training rows scoring below it), and the ranks are combined with fixed weights. Ranking is all the metric sees, so fusing ranks avoids letting one detector's scale dominate.</dd>
+<dt id="term-router">router <span class="aliases">(also: orchestrator, orchestration, routing)</span></dt><dd>The fixed rules that decide what each detector's result is allowed to do for a given file: fused into the score, allowed only to lower it, or recorded as evidence. Every decision is written to a per-file routing log.</dd>
+<dt id="term-shortcut">shortcut <span class="aliases">(also: shortcuts)</span></dt><dd>A difference between training and test data that a model can exploit instead of listening to the voice: peak level, leading silence, clip length, container fields, a missing high band. Each one found was closed before it could be learned.</dd>
+<dt id="term-spectra-aasist">Spectra-AASIST <span class="aliases">(also: M3, Spectra)</span></dt><dd>An off-the-shelf anti-spoofing model run without any training. It is the strongest detector on every set we hold, but its training data is undisclosed, so it is allowed only to lower scores, never to raise them.</dd>
+<dt id="term-spectral">spectral <span class="aliases">(also: spectral features)</span></dt><dd>Features of the frequency content of the audio over time: energy per band, roll-off, flatness, cepstral coefficients (MFCC, LFCC, CQCC) and how they change from frame to frame.</dd>
+<dt id="term-speech-gate">speech gate <span class="aliases">(also: gate, non-speech gate)</span></dt><dd>Five cheap cues that decide whether a file contains speech at all (not silent, some voiced frames, pitch that moves, loudness that moves, not spectrally flat). A file that fails goes to the pinned block instead of fusion.</dd>
+<dt id="term-splice">splice <span class="aliases">(also: editing seam, seam)</span></dt><dd>A discontinuity where audio was cut or inserted: a single-sample click or a jump in the DC offset between windows. Evidence of editing, though on this data it mostly finds vocoder artifacts.</dd>
+<dt id="term-sponsor-code">sponsor code <span class="aliases">(also: sponsor-code reading, miss-averse cost, sponsor's scoring code)</span></dt><dd>The evaluation script the sponsor shipped. It reads a higher score as real, the opposite of the instructions, and puts the heavier weight on a missed fake. We report every result under both readings and never flip our scores.</dd>
+<dt id="term-suppression">suppression <span class="aliases">(also: suppressor, false-alarm suppression)</span></dt><dd>The one-way role given to Spectra-AASIST: when it is confident a voice is real and the fused rank is high, the rank is halved. It can never raise a score, so if it is wrong the cost is a miss, never a false alarm.</dd>
+<dt id="term-test-share">test share <span class="aliases">(also: share above 0.5, test share above 0.5)</span></dt><dd>The fraction of the test files scored above 0.5, watched against the roughly 30% synthetic the brief states. A smoke alarm for a broken model, never a selection signal, because any monotone rescaling changes it without changing minDCF.</dd>
+<dt id="term-tsv">TSV <span class="aliases">(also: prediction file)</span></dt><dd>The tab-separated submission: a header line, then one row per test file with the filename and the probability that it is synthetic, in the sponsor's template order.</dd>
+<dt id="term-xls-r">XLS-R <span class="aliases">(also: wav2vec2-xls-r-300m, XLS-R 300M)</span></dt><dd>A large self-supervised speech model from Meta, pretrained on many languages and never trained for spoof detection. Its middle layers carry the acoustic detail that separates vocoders from voices; we read one of those layers.</dd>
+</dl>
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="credits.html">← Credits and AI use</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/glossary.json</code> <span class="hash">0ffe4fc66b49</span>. The markdown is the record. <a href="about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/handoff — New-chat handoff prompt · HEARSAY</title>
+<meta name="description" content="&quot;Generate a self-contained handoff prompt to start a NEW chat that continues this project&#x27;s work. Inspects current state (branch, worktree, uncommitted/at-risk artifacts, recent commits/results) and writes a ready-to-paste prompt covering the new chat&#x27;s purpose, context, next steps, and — critically — the important tests + where run data lives (run data gets LOST when a job dir is cleaned). Use whenever the user says &#x27;write a handoff&#x27;, &#x27;hand this off&#x27;, &#x27;prompt for a new chat&#x27;, &#x27;continue this in a new session&#x27;, &#x27;wrap up for next time&#x27;, or is ending a work session and wants the next chat to pick up cleanly with nothing lost.&quot;">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>.claude/skills/handoff/SKILL.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#step-0--resolve-where-handoffs-live-automatic">Step 0 — Resolve where handoffs live (automatic)</a></li><li><a href="#step-1--inspect-state-read-it-dont-guess">Step 1 — Inspect state (read it; don't guess)</a></li><li><a href="#step-2--capture-the-tests-non-negotiable">Step 2 — Capture the tests (non-negotiable)</a></li><li><a href="#step-3--write-the-handoff-prompt">Step 3 — Write the handoff prompt</a></li><li><a href="#step-4--save--present">Step 4 — Save + present</a></li></ul></details>
+<h1 id="handoff--new-chat-handoff-prompt">/handoff — New-chat handoff prompt</h1>
+<p>Produce a <strong>ready-to-paste prompt for a fresh chat</strong> that continues the current work with zero context loss.</p>
+<p>Why this matters: run data, uncommitted outputs, and test state are the things that actually get lost between sessions — a job-dir cleanup deletes mid-run results silently, and nobody notices until the next chat can't reproduce a number. So a good handoff isn't just "what's next" — its real job is making the next chat able to <strong>find, re-run, and preserve everything that matters.</strong> Treat the tests/at-risk section as the part you must not skimp on.</p>
+<h2 id="step-0--resolve-where-handoffs-live-automatic">Step 0 — Resolve where handoffs live (automatic)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Thing</th><th>How to resolve</th><th>Fallback</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Handoff dir</strong></td><td>An existing dir of handoff docs (<code>docs/handoffs/</code>, <code>docs/sessions/</code>, …), or the location named in <code>CLAUDE.md</code> / <code>AGENTS.md</code></td><td><code>docs/handoffs/</code> (create)</td></tr>
+<tr><td><strong>Test command</strong></td><td><code>CLAUDE.md</code> / <code>AGENTS.md</code> → <code>package.json</code> <code>scripts.test</code> → <code>Makefile</code> <code>test</code> → <code>pyproject.toml</code>/<code>pytest.ini</code> → <code>Cargo.toml</code> → <code>go.mod</code></td><td>say explicitly that there is no test command</td></tr>
+<tr><td><strong>Archive location</strong></td><td>Where large/regenerable artifacts are kept (external drive, object storage, a data dir named in the project docs)</td><td>note "NOT archived" against each at-risk path</td></tr>
+</tbody>
+</table></div>
+<p>If the handoff dir already holds handoffs, read the newest one and match its shape.</p>
+<p><strong>HEARSAY:</strong> handoffs live in <code>docs/handoffs/</code>. There is no archive location for large
+artifacts except the external drive (<code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/</code>) —
+mark <code>data/</code>, <code>weights/</code>, <code>models/</code>, <code>outputs/</code>, and any submission TSV "NOT archived"
+unless someone has copied them there. Note: <code>submissions/*</code> is <strong>gitignored</strong> (only
+<code>submissions/log.csv</code> is tracked), so submitted TSVs are always at-risk artifacts.</p>
+<h2 id="step-1--inspect-state-read-it-dont-guess">Step 1 — Inspect state (read it; don't guess)</h2>
+<ul>
+<li><strong>Branch + worktree:</strong> <code>git branch --show-current</code>, and note which worktree you're in (<code>pwd</code>; <code>git worktree list</code> if the project uses them).</li>
+<li><strong>Uncommitted / at-risk:</strong> <code>git status --short</code> — anything uncommitted is at risk.</li>
+<li><strong>Recent commits:</strong> <code>git log --oneline -8</code>.</li>
+<li><strong>At-risk artifacts:</strong> run outputs, result JSONs, datasets, models living in job-tmp (<code>$CLAUDE_JOB_DIR/tmp</code>, <code>~/.claude/jobs/*/tmp</code>), a scratchpad dir, or anywhere regenerable-but-not-committed. Record their <strong>paths</strong> and whether they're <strong>archived</strong>. These are exactly what gets lost — a job-dir cleanup deletes them silently.</li>
+<li><strong>In-flight work:</strong> background jobs, cloud/remote runs, scheduled tasks, open PRs — anything that will still be running after this chat ends, plus how the next chat checks on it.</li>
+<li><strong>HEARSAY status:</strong> the current ladder rung (M0, M1, D-track, M3, M5, M4, K, DOC), the
+last few rows of <code>submissions/log.csv</code>, the path of the newest <strong>valid</strong> TSV, the best
+validation minDCF (clean-only and augmented, on the outer holdout), and hours left
+before 8 AM Sunday. Flag any pending detector-contract change and which owners it
+affects.</li>
+</ul>
+<h2 id="step-2--capture-the-tests-non-negotiable">Step 2 — Capture the tests (non-negotiable)</h2>
+<p>For the work in flight, list the tests/validation that matter:</p>
+<ul>
+<li>The <strong>exact</strong> command(s), copy-pasteable.</li>
+<li>The <strong>last-known / expected result</strong> (the number to reproduce).</li>
+<li>Any test or run artifact at risk + where it lives + archive status.</li>
+</ul>
+<p>If there genuinely are no tests yet, say so explicitly so the next chat doesn't assume coverage that isn't there.</p>
+<h2 id="step-3--write-the-handoff-prompt">Step 3 — Write the handoff prompt</h2>
+<p>Use this structure (adapt content, keep the sections):</p>
+<pre><code># Handoff — &lt;slug&gt; (&lt;date&gt;)
+
+**Purpose of this chat:** &lt;one line — what the new chat should achieve / convey&gt;
+
+## Context
+&lt;what's been done, current state — tight&gt;
+
+## Working branch / worktree
+&lt;branch&gt; in &lt;worktree&gt;; &lt;clean | N uncommitted&gt;
+
+## Environment / setup
+&lt;the exact commands to get a working session: env activation, bootstrap script, env vars&gt;
+
+## What to do next
+&lt;concrete, ordered next steps&gt;
+
+## IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)
+- Test: `&lt;exact command&gt;` → expected &lt;result&gt;
+- At-risk: &lt;path&gt; (&lt;archived where? / NOT archived&gt;)
+- In flight: &lt;job/run&gt; — check with `&lt;command&gt;`
+&lt;repeat as needed&gt;
+
+## Analytical notes
+&lt;key metrics, recent findings, gotchas, where data/models live&gt;
+
+## HEARSAY status
+Rung: &lt;M?&gt; · Latest valid TSV: &lt;path&gt; · Val minDCF (outer holdout): clean &lt;x&gt; / augmented &lt;y&gt;
+Time left to 8 AM Sun: &lt;h&gt; · Detector-contract changes pending: &lt;none | field → owners&gt;
+
+## Pointers
+&lt;relevant records / specs / memory files to read first&gt;</code></pre>
+<h2 id="step-4--save--present">Step 4 — Save + present</h2>
+<ul>
+<li>Save to <code>{handoff-dir}/&lt;YYYY-MM-DD&gt;_&lt;slug&gt;-handoff.md</code>.</li>
+<li>Present the full prompt text in-chat for copy-paste.</li>
+<li><strong>Reuse the current worktree/branch</strong> — do NOT spin up a new branch/worktree for a handoff, unless the project's own rules say otherwise. If the handoff records anything doc-worthy beyond itself, follow the project's doc-sync rule.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>.claude/skills/handoff/SKILL.md</code> <span class="hash">5b614ff141e9</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

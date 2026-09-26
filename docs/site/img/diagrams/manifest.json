@@ -1,0 +1,57 @@
+{
+  "cost": {
+    "sha256": "3e8543fa5006c3cbb62581f36264d03cd2849456f84f0bcb8f8de822cf850334",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "doc-103d91d1b85e": {
+    "sha256": "cde715a55917d0e3a80f7dbc086327c7b2d2a38326f247a606f5bfdc8d1de581",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "doc-2a2e6a48b124": {
+    "sha256": "948ab7be8e6f53e91f054040fe913502641482b93a655670ed4e133e2a78f1f0",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "doc-ac2fdc75ce3c": {
+    "sha256": "8d7b91f58d53119ed08f42d10eefa6e72078250ca5aa7b1417a579e2937e4831",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "doc-aca5f73cce68": {
+    "sha256": "179a6345f5886030daa9d741d8361aee4ffb4da2c92b5750e963d01dcde6c1ae",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "doc-d2e94ac1fec8": {
+    "sha256": "cb850ad22b3e4be952bc7f29f83aebb59a4c068aec22fac5e49747ed84b27cba",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "folds": {
+    "sha256": "6f24e1249c24f365e80ff52a75d1c061adc9c72cc3ccb77d0e2dc3babf498ed0",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "fusion-arith": {
+    "sha256": "e9088fbb9ea877f2f25fbaae48400716b55ac254c72a893e1ce1ffbc0890a716",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "pipeline": {
+    "sha256": "a2c46144ef72173882417369c35c1f384ebf0b322accef02962e638eea5de910",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "router": {
+    "sha256": "70a057a0296828b64ebf7bad07db03731b56a505f1f71ffde6df92dbc89cde17",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  },
+  "score-line": {
+    "sha256": "6280939b469c45aca303174af9211abfdf144073e6739957700392aee1ed26b0",
+    "mermaid": "11.17.2",
+    "chromium": "141.0.7390.37"
+  }
+}

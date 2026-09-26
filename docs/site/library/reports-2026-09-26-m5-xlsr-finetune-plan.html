@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: M5, XLS-R 300M fine-tune on vast.ai (Sat Sep 26, 2026, ~03:20; revised 03:25 after Codex + critique + the consult answer) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m5-xlsr-finetune-plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_m5-xlsr-finetune-plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#0-findings-that-shaped-the-plan">0. Findings that shaped the plan</a></li><li><a href="#1-timeline-and-cutoffs-edt">1. Timeline and cutoffs (EDT)</a></li><li><a href="#2-manifest-builder-srchearsaym5_datapy-part-1--scriptsm5_build_manifestpy">2. Manifest builder: src/hearsay/m5data.py (part 1) + scripts/m5buildmanifest.py</a></li><li><a href="#3-bundle-writer-scriptsm5_build_bundlepy--m5_datapy-part-2">3. Bundle writer: scripts/m5buildbundle.py + m5data.py (part 2)</a></li><li><a href="#4-crops-augmentation-model">4. Crops, augmentation, model</a></li><li><a href="#5-upload">5. Upload</a></li><li><a href="#6-trainer-scorer-assembler">6. Trainer, scorer, assembler</a></li><li><a href="#7-cloud-scriptscloud">7. Cloud: scripts/cloud/</a></li><li><a href="#8-runs-after-nathans-spend-approval">8. Runs (after Nathan's spend approval)</a></li><li><a href="#9-files">9. Files</a></li><li><a href="#10-verification">10. Verification</a></li><li><a href="#11-risks-and-mitigations">11. Risks and mitigations</a></li><li><a href="#12-review-findings--changes">12. Review findings → changes</a></li><li><a href="#13-consult-answer--changes-docsconsults2026-09-26_m5-extra-data-finetune_responsemd">13. Consult answer → changes (docs/consults/2026-09-26m5-extra-data-finetuneRESPONSE.md)</a></li></ul></details>
+<h1 id="plan-m5-xls-r-300m-fine-tune-on-vastai-sat-sep-26-2026-0320-revised-0325-after-codex--critique--the-consult-answer">Plan: M5, XLS-R 300M fine-tune on vast.ai (Sat Sep 26, 2026, ~03:20; revised 03:25 after Codex + critique + the consult answer)</h1>
+<p>Run spec: <code>docs/specs/2026-09-26_m5-xlsr-finetune.md</code> (D1–D8, acceptance criteria, appendix with the P2 failure-mode tables). Deep mode: three exploration agents (architecture, file impact, risk), a Codex plan review (<code>…-plan-review.md</code>, 15 findings) and a Claude critique (17 findings) fed this revision. Section 12 maps every review finding to what changed; section 13 maps the consult answer (<code>docs/consults/…_RESPONSE.md</code>). Worktree <code>~/Projects/hearsay</code>, branch <code>main</code>, shared with two other chats: stage only the files in section 9.</p>
+<p><strong>The bar:</strong> M1 v2 (<code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0302/meta.json</code>) outer-holdout <strong>minDCF 0.1458</strong> at π = 0.3 (EER 2.5%, AUC 0.997; wavegrad2 0.21, playht 0.03; LibriSpeech real 0.16, LJ real 0.09). M5 passes the gate if its whole-clip holdout minDCF is below 0.1458.</p>
+<h2 id="0-findings-that-shaped-the-plan">0. Findings that shaped the plan</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Finding</th><th>Effect</th>
+</tr></thead>
+<tbody>
+<tr><td>Suite is at <strong>215 passed</strong>, ruff clean.</td><td>Acceptance: 215 + new.</td></tr>
+<tr><td><strong>A100 SXM4 at $0.67–0.80/h</strong> (32 cores, CUDA ≥ 12.8) vs H100 $2.20 (2 offers; the cheap one has driver 555).</td><td>A100s, several at once. Filter <code>cuda_max_good &gt;= 12.8</code>, <code>cpu_cores_effective &gt;= 16</code>.</td></tr>
+<tr><td>Home disk 14 GiB free (a 20 GB redundant <code>DiffSSD.tar</code> sits in Downloads); external drive 76 GiB free.</td><td>Bundle under <code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/m5_bundle/v1/</code>.</td></tr>
+<tr><td><code>weights/wav2vec2-xls-r-300m/</code> holds <code>pytorch_model.bin</code>, not safetensors.</td><td>The box pulls the HF repo at a pinned revision and verifies <code>config.json</code> sha against the bundled copy; fallback = upload a locally converted safetensors copy.</td></tr>
+<tr><td><code>test_duration_sampler</code> reads <code>REPO/splits/nsa_test_durations.csv</code>.</td><td><code>code.tgz</code> ships <code>splits/nsa_test_durations.csv</code> and <code>splits/nsa_folds.csv</code>; a test unpacks the tarball into <code>tmp_path</code> and runs <code>--cpu-smoke</code> from there.</td></tr>
+<tr><td>Every extra <code>nsa_train_full</code> row maps to an existing fold-file group; 8,000 extra playht/wavegrad2 and 1,340 holdout-group bona fide must be dropped.</td><td>Pure group → fold lookup, holdout-fold rows dropped.</td></tr>
+<tr><td>ASV19 trims to bona fide median 1.9 s / spoof 2.1 s (p90 2.9 / 4.6).</td><td>≥ 2.0 s cut, spoof pre-sampled 3:1 then histogram-matched to 1:1 per 0.25 s bin.</td></tr>
+<tr><td>MLAAD unique = 6,180.</td><td>Dedupe; fix <code>CLAUDE.md:140</code>.</td></tr>
+<tr><td>Mask verified (2.6e-6 masked vs 0.63 unmasked); layerdrop 0.1 + SpecAugment on by default.</td><td>Always mask; masked mean; <code>layerdrop=0</code>; SpecAugment on.</td></tr>
+<tr><td>CPU inference 0.24 s per 3.4 s clip (Mac); 16 of 24 layers cuts 35–50%.</td><td><code>keep_layers=16</code>; the shipped checkpoint is the full truncated model (~850 MB safetensors).</td></tr>
+<tr><td>Image <code>pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime</code> ships torch 2.8.0+cu128; the cu128 index has no 2.14.0.</td><td>Use the image's torch; install <code>transformers==5.17.0</code> (needs torch ≥ 2.5), <code>safetensors</code>, <code>soundfile</code>, <code>scipy</code>, <code>pandas</code>, <code>scikit-learn</code>, <code>tqdm</code>. Mac/Docker load the safetensors under torch 2.14.0; parity test covers the gap.</td></tr>
+<tr><td>Codec round-trips through <code>load_audio</code>: MP3/Opus/μ-law 0 lead; AAC +128 tail; AMR-NB +320 tail, 159 lead.</td><td>Fine after re-trim.</td></tr>
+<tr><td>Nathan is awake now (messaging at 03:50).</td><td>Ask for a <strong>spend cap</strong> now, so the pilot can launch the minute the bundle is up.</td></tr>
+</tbody>
+</table></div>
+<h2 id="1-timeline-and-cutoffs-edt">1. Timeline and cutoffs (EDT)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>When</th><th>What</th><th>Cutoff rule</th>
+</tr></thead>
+<tbody>
+<tr><td>now–03:50</td><td>§2 manifest builder + tests; start the bundle build (§3) in the background at ~03:50</td><td></td></tr>
+<tr><td>03:50–05:30</td><td>§4 crops/augment/model, §6 trainer/scorer/assembler, §7 cloud scripts, all tests</td><td></td></tr>
+<tr><td>05:30–06:00</td><td>§5 upload (500 MB probe first), full suite, commit WIP</td><td>Bundle not in R2 by <strong>06:45</strong> → drop <code>extra/</code> from the upload (NSA-only arm)</td></tr>
+<tr><td>06:00–06:45</td><td>Pilot box: setup, HF pull, codec pass (30% subset + holdout), 600-step pilot, one resume</td><td>Pilot not green by <strong>07:45</strong> → skip the ablation</td></tr>
+<tr><td>06:45–07:30</td><td>Ablation, only if on time: <code>nsa</code> vs <code>nsa_extra</code> on folds 0 and 4 (2 boxes)</td><td></td></tr>
+<tr><td>07:30–10:00</td><td>Final 6 models on 3 boxes (2 jobs each, ≤ 45 min per model); full-model box scores holdout/test in fp32</td><td>Any fold model unfinished by <strong>11:00</strong> → fallback contract (§8.5)</td></tr>
+<tr><td>10:00–11:40</td><td>Pull, assemble, parity, <code>meta.json</code>, HF upload, report, commit, critique, Codex audit</td><td></td></tr>
+<tr><td><strong>11:45</strong></td><td>Absolute rental deadline: the reaper destroys every instance</td><td></td></tr>
+<tr><td>12:00</td><td>Gate</td><td></td></tr>
+</tbody>
+</table></div>
+<p>Spend: pilot 0.75 h + ablation 2 × 0.75 h + finals 3 × 2.5 h ≈ 9.75 A100-hours × ~$0.70 ≈ $7, plus storage/bandwidth ≈ $1. <strong>Ask: approval for up to $12 on A100-class boxes, and a $10 top-up.</strong></p>
+<h2 id="2-manifest-builder-srchearsaym5_datapy-part-1--scriptsm5_build_manifestpy">2. Manifest builder: <code>src/hearsay/m5_data.py</code> (part 1) + <code>scripts/m5_build_manifest.py</code></h2>
+<ul>
+<li><code>FOLDS_SHA256</code> constant; <code>check_folds_file(path)</code> raises on mismatch (A8).</li>
+<li><code>group_key(row)</code>: copy of <code>scripts/make_folds.py:28-33</code>.</li>
+<li><code>HOLDOUT_GENERATORS = {"playht", "wavegrad2"}</code>, <code>HOLDOUT_ALIASES = ("playht", "play.ht", "wavegrad")</code>, <code>FAMILY_EXCLUSIONS = {"1": ("openvoice",), "2": ("xtts", "vixtts"), "4": ("elevenlabs",)}</code> (substring, lower-cased <code>generator</code>/<code>model_name</code>).</li>
+<li><code>build_manifest(...) -&gt; DataFrame[id, path, label, generator, speaker, source, group, fold, train_scope, model_name]</code>:
+<ul>
+<li>core = fold file, <code>train_scope="core"</code>.</li>
+<li>extra NSA = full − sample paths; group via <code>group_key</code>; fold from the fold file's group → fold map (assert all known); <strong>drop fold == holdout</strong>; cap extra spoof at <strong>1,000 per generator</strong> (seeded; ~2k total per inner generator, consult §3), all extra bona fide kept; <code>train_scope="extra_nsa"</code>.</li>
+<li>ASV19 (train + dev, 40 bona fide speakers): <code>fold="extra"</code>, <code>train_scope="extra_asv19"</code>, <strong>all bona fide; spoof pre-sampled to 7,500 stratified over A01–A06</strong> (seeded), which the bundle's ≥ 2.0 s cut and duration matching reduce to a ~2.5k channel anchor (consult §2); <code>group="asv:&lt;speaker&gt;"</code> / <code>"gen:asv19_&lt;attack&gt;"</code>.</li>
+<li>MLAAD: union, dedupe by path, <code>fold="extra"</code>, <code>train_scope="extra_mlaad"</code>, <code>generator=model_name</code>.</li>
+<li>refuse on holdout alias in any extra name, or <code>in_the_wild</code> in any path.</li>
+</ul></li>
+<li><code>training_rows(m, fold)</code>: fold model k → core rows with fold ∉ {k, holdout} + extra_nsa with fold ≠ k + extra_asv19 + extra_mlaad − family exclusions for k; <code>fold=None</code> (full) → everything but holdout, no exclusions. Asserts both labels and no holdout row. <code>validation_rows(m, k)</code> → core fold k.</li>
+<li><code>tests/test_m5_manifest.py</code>: A1 (incl. holdout-group bona fide from <code>full</code>), A2, A3 + counterfactual, A4, A5, A6, A7, A8, A9, A10.</li>
+</ul>
+<h2 id="3-bundle-writer-scriptsm5_build_bundlepy--m5_datapy-part-2">3. Bundle writer: <code>scripts/m5_build_bundle.py</code> + <code>m5_data.py</code> (part 2)</h2>
+<ul>
+<li>Output <code>m5_bundle/v1/{core,extra,test}/&lt;id&gt;.flac</code>, <code>manifest.csv</code>, <code>test/manifest.csv</code>, <code>errors.csv</code>, <code>diagnostics.json</code>, <code>code.tgz</code>, <code>config_sha.txt</code>, <code>TREE_SHA</code>, <code>bundle_meta.json</code>.</li>
+<li><code>write_clip(path, out, max_s=15, min_s=None)</code>: <code>load_audio</code> → <code>trim_silence</code> → cap → peak-scale to 0.999 if above → PCM_16 FLAC. Returns <code>duration, peak, lead_s, pcm_sha256</code> (sha of the trimmed int16 samples, mirroring <code>scripts/hash_audio.py</code>).
+<ul>
+<li><strong>Core and test rows are never dropped</strong>: no <code>min_s</code>, and a <code>DecodeError</code> on a core/test row aborts the build (B4/B6 revised; Codex 5). Extras: <code>min_s=0.5</code> (ASV19: 2.0), decode failures listed, abort if &gt; 0.5% of extras.</li>
+</ul></li>
+<li>6 workers, <code>nice</code>, resumable: an existing file is reused only if <code>soundfile.info</code> opens it and its frame count matches the manifest (Codex 9).</li>
+<li>After durations: ASV19 ≥ 2.0 s cut on both classes, then spoof subsampled per 0.25 s duration bin to at most <strong>0.5×</strong> the bona fide count in that bin (target ≈ 2.5k spoof, consult §2).</li>
+<li><strong>Cross-scope dedup</strong> (Codex 2): refuse if any <code>pcm_sha256</code> appears in more than one of {core/test, extra_*}. Speaker overlap documented in the report (MLAAD = M-AILABS speakers, ASV19 = VCTK, LJ, LibriSpeech: disjoint by construction).</li>
+<li><code>diagnostics.json</code>: per <code>train_scope</code>, for each of duration/peak/lead_s, <code>max(AUC, 1−AUC)</code> of that scope's rows against the <strong>opposite class of the whole training pool</strong> (so MLAAD, spoof-only, is measured against all bona fide). Informational here; the gate is per model in §6.</li>
+<li><code>code.tgz</code> = <code>src/hearsay</code>, <code>scripts/m5_*.py</code>, <code>scripts/cloud/box_*</code>, <code>splits/nsa_test_durations.csv</code>, <code>splits/nsa_folds.csv</code>, <code>pyproject.toml</code>, <code>uv.lock</code>, <code>weights/wav2vec2-xls-r-300m/{config.json,preprocessor_config.json}</code>.</li>
+<li><code>TREE_SHA</code> = sha256 over sorted <code>(relpath, sha256)</code> of <strong>every</strong> file in the version dir (FLACs, manifests, code.tgz); <code>bundle_meta.json</code> carries it plus the manifest row counts and the HF revision to pull.</li>
+<li><code>tests/test_m5_bundle.py</code>: B1 (formats via <code>ffmpeg_sine</code>, incl. MP4/AAC), B2, B3, B4 (17 s → 15 s; a 0.3 s <strong>extra</strong> dropped and counted; a 0.3 s <strong>core</strong> kept), B6 (corrupt extra → errors; corrupt core → abort), B7 (tree-sha changes on any file change; manifest change included), B8, dedup refusal, smoke-from-tarball (<code>code.tgz</code> unpacked into <code>tmp_path</code>, <code>m5_train.py --cpu-smoke</code> runs from it).</li>
+</ul>
+<h2 id="4-crops-augmentation-model">4. Crops, augmentation, model</h2>
+<p><strong>Crops (<code>m5_data.py</code> part 3)</strong>: <code>LengthMixer(seed, p_test=0.7, lo=3.0, hi=14.0)</code> (no data-derived cap: the pooled gate in §6 replaces it); <code>crop(x, crop_s, rng)</code> never pads or tiles; <code>BatchLengthSampler</code> yields one length per batch; <code>collate</code> normalizes over valid samples only (<code>normalize_windows(x[None])[0]</code>), zero-pads, masks; <code>M5Dataset</code> re-seeds per epoch; <code>BalancedSourceSampler(batch, real_mix={lj:0.25, libri:0.35, asv19:0.40}, spoof_mix={diffssd:0.62, mlaad:0.28, asv19:0.10}, mlaad_cap_per_model=120)</code> (constant mix, no curriculum; consult §3); <code>test_transform(x) = normalize_windows(prepare_segment(x, max_s=14.0)[None])[0]</code>.
+<code>tests/test_m5_crops.py</code>: C1, <strong>C2</strong> (2 s clip under a 5 s crop → 2 s of audio then zeros, mask 0, autocorrelation shows no repeat), <strong>C3</strong> (10k draws: 70% ± 3% from test durations, all in [3, 14]), C5, C6 (bit-exact vs the training transform with no crop/augment), C7.</p>
+<p><strong>Augmentation (<code>augment.py</code>)</strong>: <code>add_noise</code> (white + pink, exact SNR), <code>band_limit</code> (order-8 Butterworth, <code>sosfiltfilt</code>), <code>reverb</code> (exponential-decay RIR, <code>h[0]=1</code>), <code>gain_clip</code>; codec op = swap in the clip's variant file if it has one. plus <code>rawboost_conv</code> (RawBoost's linear + nonlinear convolutive algorithm only, numpy) and <code>trim_jitter</code> (training-only: re-trim at a random 30–40 dB threshold, keep 0–200 ms of edge at random; applied before cropping). <code>Augmenter(p_aug=0.65, seed)</code> picks 1–2 ops class-blind with band-limit upweighted (×2) and <code>rawboost_conv</code> at p = 0.25; realized rates are logged per source × class; <code>.clean()</code> identity; <code>holdout_slice(rows, seed)</code> fixed. <code>tests/test_augment.py</code>: D1–D9 (D6 with the counterfactual).</p>
+<p><strong>Model (<code>m5_model.py</code>)</strong>: <code>M5Config</code> (<code>keep_layers=12, train_top=12, layer_weighted_sum=True, pooling="attn_stats", lr_backbone=1e-5, llrd=0.85, lr_head=5e-4, weight_decay=0.01, warmup=0.08, schedule="cosine", label_smoothing=0.05, batch_size=32, grad_clip=1.0, layerdrop=0.0, spec_augment=True, p_aug=0.65, p_test_len=0.7, seed=0, mix</code>; fallback <code>keep_layers=16</code> if the learned layer weights concentrate on the top layer in the pilot), <code>.hash()</code>. <code>build_model(cfg, weights_dir, tiny=False)</code>: load, truncate <code>encoder.layers[:keep_layers]</code>, <code>freeze_feature_encoder()</code>, freeze lower layers if <code>train_top &lt; keep_layers</code>; head = softmax-weighted sum over the retained layers' hidden states (init uniform) → masked attentive statistics pooling (mean + std, 128-d bottleneck) → <code>nn.Linear(2·hidden, 1)</code>. Forward uses <code>output_hidden_states=True</code> and the frame mask from <code>_get_feature_vector_attention_mask</code>; the learned layer weights are logged every eval; <strong>high logit = synthetic</strong>. Save = <code>backbone.save_pretrained(dir, safe_serialization=True)</code> (truncated config) + <code>head.safetensors</code> + <code>m5_config.json</code> + <code>hashes.json</code>. Masked-mean pooling stays as the <code>pooling="mean"</code> fallback. <code>tests/test_m5_model.py</code>: E1 (+ counterfactual <code>train_top=0</code>), E2, E3, E5, E8, E6 (loader refuses on hash mismatch).</p>
+<h2 id="5-upload">5. Upload</h2>
+<ul>
+<li><code>rclone copy --files-from &lt;list&gt; "&lt;bundle&gt;/v1" r2:pa-source/hearsay/bundle/v1/</code> in the order <code>code.tgz, bundle_meta.json, manifest.csv, test/, core/, extra/</code>; a 500 MB probe first. Uplink too slow for <code>extra/</code> by 06:45 → the NSA-only arm runs first and <code>extra/</code> follows for the finals if it lands.</li>
+<li><code>scripts/cloud/r2_guard.sh</code>: <code>r2_path()</code> refuses anything outside <code>r2:pa-source/hearsay/</code>; the same prefix check lives in <code>m5_train.py</code> (<code>assert prefix.startswith(...)</code>). Static test G1 covers <code>scripts/cloud/*.sh</code> <strong>and</strong> <code>scripts/m5_*.py</code>.</li>
+<li>HF revision: <code>huggingface_hub.model_info("facebook/wav2vec2-xls-r-300m").sha</code> recorded in <code>bundle_meta.json</code>; the box downloads that revision and asserts <code>sha256(config.json)</code> equals the bundled <code>config_sha.txt</code>.</li>
+</ul>
+<h2 id="6-trainer-scorer-assembler">6. Trainer, scorer, assembler</h2>
+<p><strong><code>scripts/m5_train.py</code></strong> (box; <code>--cpu-smoke</code> uses <code>tiny=True</code> and a 12-clip synthetic bundle)</p>
+<ul>
+<li>Args: <code>--bundle --fold {0..4,full} --arm {nsa,nsa_extra} --steps --steps-per-epoch 1000 --eval-every 250 --out --r2-prefix --resume --deadline &lt;unix ts&gt;</code>.</li>
+<li>Refuses: no CUDA (unless smoke); <code>TREE_SHA</code> mismatch (full recompute at setup, once per box, ~1 min); weights config sha mismatch; <strong>shortcut gate</strong>: on this model's <code>training_rows</code> only, <code>max(AUC,1−AUC)</code> per scope (vs the opposite class of that training set) and pooled AUC of <code>min(duration, 14)</code> under the sampler's expected weights, each must be ≤ 0.85; logged to <code>run_meta.json</code>. Never reads holdout durations or labels (Codex 1; tested: perturbing holdout rows leaves the gate values unchanged).</li>
+<li>Loop: AdamW with layer-wise LR decay (γ = 0.85 from the top retained layer; head 5e-4 without weight decay; weight decay 0.01 off biases/LayerNorm), 8% warmup + cosine over <code>--steps</code>, bf16 autocast, grad clip 1.0, BCEWithLogits with label smoothing 0.05. Every <code>eval_every</code> steps: validation on fold k's fixed test-length-crop slice → <code>report()</code>, <strong>abort if AUC ≤ 0.5 after 500 steps</strong>; abort on non-finite loss; checkpoint (full trainable state + rng) pushed to <code>r2:…/runs/&lt;job&gt;/ckpt/</code> every eval and at exit; <code>--resume</code> pulls the latest. <code>--deadline</code> stops training and proceeds to export.</li>
+<li>Export (all fold models and the full model) uses the <strong>deployment transform in fp32</strong> (whole clip ≤ 14 s, no augmentation, <code>torch.autocast</code> off): fold models write <code>scores_&lt;k&gt;.csv</code> for <code>validation_rows</code> (<code>split=inner_oof</code>); the full model writes <code>scores_holdout.csv</code>, <code>scores_test.csv</code>. Diagnostics (not exported to fusion): <code>diag_holdout_testlen.csv</code> (test-length crops), <code>diag_holdout_aug.csv</code> (fixed augmented slice, per-op tag; codec op uses the holdout variants made in §7), <code>train_log.jsonl</code> (incl. realized augmentation rates per source × class and the layer weights), <code>run_meta.json</code> (config hash, tree-sha, weights sha, git sha, clips/s, GPU, seconds, gate values). Prints <code>DONE</code>.</li>
+<li><strong>Selection is wall-clock fixed</strong>: <code>--steps</code> comes from the pilot's clips/s so a model takes ≤ 45 min; no checkpoint picking on validation folds (folds 3 and 4 hold one generator each). Ablation arm choice uses the end-of-run fold 0/4 minDCF (reported at π = 0.3, π = 0.5, both sponsor directions; a flip is flagged).</li>
+</ul>
+<p><strong><code>scripts/m5_score.py</code></strong> (CPU, the Docker path): loads the truncated safetensors model + head, refuses on hash mismatch, batches by length with masks, <code>test_transform</code>, writes <code>path, score, logit</code>. Parity (F6, revised): 50 test clips, box fp32 vs Mac CPU fp32, max |Δlogit| &lt; 1e-2 and Spearman &gt; 0.999; and (Codex 14) 20 original test WAVs through <code>load_audio</code> vs their bundled FLACs, max |Δlogit| &lt; 0.05.</p>
+<p><strong><code>scripts/m5_assemble.py</code></strong> (Mac): pulls runs, builds <code>outputs/detector_scores/m5_xlsr_ft.csv</code> (F1–F4 asserted: 16,142 <code>inner_oof</code> + 3,858 <code>holdout</code> + 1,671 <code>test</code>, unique paths, joined against <code>nsa_folds.csv</code>/<code>nsa_test.csv</code>, finite [0,1]); writes <code>models/m5_xlsr_ft_&lt;stamp&gt;/meta.json</code> (keys per spec D7, <code>by_group</code> copied from <code>train_handcrafted.py:75-88</code>, <code>m1_bar={val_min_dcf: 0.1458, model_dir}</code>, <code>oof_pooled{report}</code> (5-fold OOF minDCF, the larger-sample reading), <code>gate={holdout_passed, oof_passed, margin, rule: "both"}</code>, <code>score_duration_spearman</code> (OOF bona fide, consult failure mode 1), <code>itw_bonafide_pfa</code> (In-the-Wild bona fide read-out at the inner-fold threshold, per arm; Probe C), <code>stackable: true|false</code>, spend); copies the checkpoint dir. F5, F7, F8 tests in <code>tests/test_m5_scores.py</code>.</p>
+<h2 id="7-cloud-scriptscloud">7. Cloud: <code>scripts/cloud/</code></h2>
+<ul>
+<li><strong><code>launch.sh &lt;job&gt; &lt;offer-id...&gt;</code></strong>: budget guard = credit − Σ(dph × remaining est. hours of running instances) ≥ est_hours × dph + 1.50 (critique 7); re-checks the offer's <code>cuda_max_good</code>/cores; <code>create instance --image pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime --disk 60 --ssh</code>; <strong>launcher-side trap destroys the CID on any failure before the chain starts</strong> (Codex 10); NET-OK check; R2 creds piped over ssh <strong>stdin</strong> into <code>rclone config create</code> (never argv); starts <code>box_chain.sh</code> with <code>JOB</code>, <code>JOBS</code>, <code>DEADLINE</code>; appends a ledger row. The vast key stays on the Mac (read into a variable from <code>.env</code> <code>VAST_API_KEY</code> if set, else <code>~/.config/vastai/vast_api_key</code>; never echoed; <code>set -x</code> forbidden).</li>
+<li><strong>No API key on the box</strong> (critique 6): the box only writes <code>STATUS</code> (<code>SETUP</code>, <code>RUNNING &lt;job&gt;</code>, <code>DONE</code>, <code>FAIL &lt;reason&gt;</code>) to <code>r2:…/runs/&lt;job&gt;/</code>. <strong><code>reaper.sh</code></strong> on the Mac (under <code>caffeinate</code>) polls STATUS every 60 s and destroys an instance on <code>DONE</code>/<code>FAIL</code>, on no STATUS change for 40 min, or at 11:45 EDT; it appends the invoice total to the ledger and ends with <code>vastai show instances</code> = 0. <code>teardown_check.sh</code> is the manual backstop.</li>
+<li><strong><code>box_setup.sh</code></strong>: apt <code>ffmpeg</code>; pip <code>transformers==5.17.0 safetensors soundfile scipy pandas scikit-learn tqdm huggingface_hub rclone</code>-less (rclone via .deb); <code>PYTHONPATH=/root/m5/src</code>; pull <code>bundle/v1</code> with <code>--files-from</code> per arm; recompute <code>TREE_SHA</code>; HF download at the pinned revision + config sha check; <code>python -c "import torch; assert torch.cuda.is_available()"</code>; <code>SETUP-DONE</code>.</li>
+<li><strong><code>box_codecs.py</code></strong> (pilot box only): one random codec (mp3/opus/aac/amrnb/mulaw) for a seeded 30% of training clips and for <strong>every holdout clip</strong>, decoded back through <code>load_audio</code> + re-trim, 30 workers; writes <code>codec_manifest.csv</code>; pushed to <code>r2:…/bundle/v1/codecs/</code>; later boxes pull it. <code>tests/test_m5_codecs.py</code> runs it on 3 fixtures with the local ffmpeg (B5 tolerances; missing encoder → recorded, skipped).</li>
+<li><strong><code>box_chain.sh</code></strong>: <code>trap 'status FAIL' ERR EXIT</code> (status only; the reaper destroys), runs setup then each job, pushes logs; <code>DONE</code>.</li>
+<li><code>tests/test_cloud_scripts.py</code>: G1 (both dirs), G2 (reaper has the deadline and the DONE/FAIL branches; chain has the trap), G3 (guard arithmetic via a mocked <code>vastai</code> stub), G5, <code>bash -n</code> on all scripts, and a mocked-failure test for the launcher trap.</li>
+</ul>
+<h2 id="8-runs-after-nathans-spend-approval">8. Runs (after Nathan's spend approval)</h2>
+<ol>
+<li><strong>Pilot</strong> (1 box, fold 4, <code>nsa_extra</code>, 600 steps, eval every 250): clips/s, loss falling, minDCF finite, AUC &gt; 0.5; kill after the step-250 checkpoint and <code>--resume</code>. Fix <code>--steps</code> for ≤ 45 min per model.</li>
+<li><strong>Ablation</strong> (only if the pilot is green by 07:45): <code>nsa</code> vs <code>nsa_extra</code> (the consult mix), folds 0 and 4, 2 boxes; pre-declared criterion: mean fold minDCF at π = 0.3. Else <code>nsa_extra</code> is the arm and NSA-only is reported as "not run".
+<strong>MLAAD Probe A</strong> (Mac CPU, in the background during the build, non-GPU): LightGBM on handcrafted features (<code>scripts/extract_handcrafted.py</code> outputs) separating MLAAD spoof from DiffSSD spoof on augmented copies; project LJ/LibriSpeech/ASV19 bona fide onto that axis. AUC &gt; 0.95 with LibriSpeech on the MLAAD side → MLAAD share 12%; else 28%. Result recorded in <code>meta.json</code>. <strong>Probe C</strong> at assembly: In-the-Wild bona fide P_FA per arm at the inner-fold threshold; ΔP_FA &gt; +1 point → MLAAD dropped from the finals if they haven't started, else reported.</li>
+<li><strong>Finals</strong> (3 boxes × 2 jobs): folds 0–4 + full, chosen arm, same <code>--steps</code>; the full-model box scores holdout and test in fp32.</li>
+<li><code>pull_runs.sh</code> → <code>m5_assemble.py</code> (writes the gate as <strong>both</strong> holdout and pooled 5-fold OOF vs M1; a holdout gap under 0.15 is reported as within noise, per the consult) → parity → <code>hf upload nrs124554433/hearsay-m5-xlsr --private</code> (fallback <code>gh release</code>), re-download + sha check → reaper confirms 0 instances.</li>
+<li><strong>Fallback contract</strong> (Codex 11): if any fold model is missing at 11:00, the export contains <strong>no <code>inner_oof</code> rows at all</strong> (never a partial set); <code>meta.json</code> says <code>stackable: false</code>; the main chat can use M5 standalone or in a mean fusion. The report names it as a blocker.</li>
+<li><strong>Handoff to the main chat</strong> (Codex 12): message naming the score file, <code>meta.json</code>, the checkpoint repo and <code>m5_score.py</code> as the Docker entry point. TSVs stay theirs.</li>
+</ol>
+<h2 id="9-files">9. Files</h2>
+<p><strong>Create:</strong> <code>src/hearsay/{m5_data,augment,m5_model}.py</code>; <code>scripts/{m5_build_manifest,m5_build_bundle,m5_train,m5_score,m5_assemble}.py</code>; <code>scripts/cloud/{launch.sh,reaper.sh,box_setup.sh,box_chain.sh,box_codecs.py,r2_guard.sh,pull_runs.sh,teardown_check.sh}</code>; <code>tests/{test_m5_manifest,test_m5_bundle,test_m5_codecs,test_m5_crops,test_augment,test_m5_model,test_m5_scores,test_cloud_scripts}.py</code>; <code>docs/reports/cloud-expense-ledger.md</code>; <code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code>; plus spec/plan/consult files.
+<strong>Modify:</strong> <code>CLAUDE.md</code> disclosure (lines 131, 138, 140 → 6,180, 142, 148 → full LJ moved up; vast.ai under infrastructure) as a minimal diff. Conditional: <code>docs/STATUS.md:40</code>, <code>docs/plan.md:88/132/187</code>.
+<strong>Never touch:</strong> <code>src/hearsay/embed.py</code>, the M1 scripts, <code>splits/</code>, <code>submissions/</code>, other chats' files, the local GPU. Secrets: the vast key never leaves the Mac; R2 creds reach the box over ssh stdin only (documented exception to <code>.env</code>-only, in the spec).</p>
+<h2 id="10-verification">10. Verification</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay
+uv run pytest -q tests/test_m5_manifest.py tests/test_m5_bundle.py tests/test_m5_codecs.py tests/test_m5_crops.py tests/test_augment.py tests/test_m5_model.py tests/test_m5_scores.py tests/test_cloud_scripts.py
+uv run pytest -q            # 215 + new
+uv run ruff check .
+git diff --stat -- src/hearsay/embed.py scripts/extract_embeddings.py scripts/train_probe.py scripts/make_probe_csv.py splits/ submissions/   # empty
+uvx vastai show instances   # "No instances found." at the end</code></pre>
+<h2 id="11-risks-and-mitigations">11. Risks and mitigations</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Risk</th><th>Mitigation</th>
+</tr></thead>
+<tbody>
+<tr><td>A100 offers churn</td><td><code>launch.sh</code> takes several ids; relaxed filter fallback; H100 NVL last.</td></tr>
+<tr><td>Upload slow</td><td>probe; <code>extra/</code> optional; NSA-only arm first.</td></tr>
+<tr><td>GPU starved by augmentation</td><td>32-core boxes, 12 persistent workers, numpy ops ≤ 20 ms/crop, codec swap is a file read.</td></tr>
+<tr><td>Instability / collapse</td><td>bf16 train, fp32 export, LR 1e-5 + warmup, clip 1.0, layerdrop 0, AUC tripwire, R2 checkpoints.</td></tr>
+<tr><td>Length or corpus shortcut</td><td>ASV19 matching, per-model gate ≤ 0.85 on training rows only, pooled <code>min(dur,14)</code> gate, per-length-bucket readouts, cross-scope pcm dedup.</td></tr>
+<tr><td>Wall clock</td><td>3 boxes; ≤ 45 min per model; phase cutoffs in §1; deadline in the trainer; reaper at 11:45.</td></tr>
+<tr><td>Boxes outliving a crash or an asleep Mac</td><td>launcher trap, reaper, <code>caffeinate</code>, <code>teardown_check.sh</code>.</td></tr>
+<tr><td>Consult arrives late</td><td>defaults; config only.</td></tr>
+</tbody>
+</table></div>
+<h2 id="12-review-findings--changes">12. Review findings → changes</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Source</th><th>Change</th>
+</tr></thead>
+<tbody>
+<tr><td>Codex 1, critique 10</td><td>Gates from training rows only; pooled <code>min(dur,14)</code> gate; no data-derived cap</td><td>§6, §4</td></tr>
+<tr><td>Codex 2</td><td><code>pcm_sha256</code> cross-scope dedup; speaker overlap documented</td><td>§3</td></tr>
+<tr><td>Codex 3, critique 2</td><td><code>splits/*.csv</code> in <code>code.tgz</code>; smoke-from-tarball test; <code>PYTHONPATH</code></td><td>§3, §7</td></tr>
+<tr><td>Codex 4</td><td><code>max(AUC,1−AUC)</code>, opposite-class measurement handles MLAAD; MLAAD-vs-LibriSpeech handcrafted probe runs on the Mac in the background and is reported (non-blocking)</td><td>§3, §6</td></tr>
+<tr><td>Codex 5</td><td>Core/test rows never dropped; decode error on core aborts</td><td>§3</td></tr>
+<tr><td>Codex 6</td><td>All fusion exports use the deployment transform; crops/augmented are diagnostics</td><td>§6</td></tr>
+<tr><td>Codex 7, critique 12</td><td>Steps-per-epoch defined; eval + checkpoint every 250 and at exit; pilot 600 steps; selection is wall-clock fixed</td><td>§6, §8</td></tr>
+<tr><td>Codex 8, critique 3</td><td>Codec pass = 30% subset + holdout, once, on the pilot box; <code>--disk 60</code></td><td>§7</td></tr>
+<tr><td>Codex 9</td><td>Versioned <code>v1/</code>, tree-sha over every file, <code>--files-from</code>, resume verifies frames</td><td>§3, §5</td></tr>
+<tr><td>Codex 10, critique 6, 7</td><td>Launcher trap; Mac-side reaper with deadline; no key on the box; aggregate budget guard</td><td>§7</td></tr>
+<tr><td>Codex 11</td><td>Fallback = no <code>inner_oof</code> rows, <code>stackable:false</code></td><td>§8.5</td></tr>
+<tr><td>Codex 12</td><td>Named handoff to the main chat; TSVs stay theirs (handoff rule)</td><td>§8.6</td></tr>
+<tr><td>Codex 13</td><td>Secrets exception documented; creds over stdin</td><td>§7, §9</td></tr>
+<tr><td>Codex 14, critique 5</td><td>fp32 export; WAV-vs-FLAC parity</td><td>§6</td></tr>
+<tr><td>Codex 15, critique 8</td><td>Cutoffs table; deadline flag; spend approval asked now</td><td>§1</td></tr>
+<tr><td>critique 1</td><td>HF pull at pinned revision + config sha</td><td>§0, §5</td></tr>
+<tr><td>critique 4</td><td>Image torch 2.8.0; no reinstall</td><td>§7</td></tr>
+<tr><td>critique 9</td><td>ASV19 spoof 3:1 pre-sample</td><td>§2</td></tr>
+<tr><td>critique 11</td><td>Holdout codec variants</td><td>§7</td></tr>
+<tr><td>critique 13</td><td>Full truncated model saved</td><td>§4</td></tr>
+<tr><td>critique 14</td><td>G1 covers <code>scripts/m5_*.py</code></td><td>§5</td></tr>
+<tr><td>critique 15</td><td>P2 tables appended to the spec; C2/C3 mapped</td><td>spec appendix, §4</td></tr>
+<tr><td>critique 16</td><td>Ablation conditional; attn pooling cut; resume exercised once</td><td>§4, §8</td></tr>
+</tbody>
+</table></div>
+<h2 id="13-consult-answer--changes-docsconsults2026-09-26_m5-extra-data-finetune_responsemd">13. Consult answer → changes (<code>docs/consults/2026-09-26_m5-extra-data-finetune_RESPONSE.md</code>)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Item</th><th>Change</th>
+</tr></thead>
+<tbody>
+<tr><td>Kill the +50k DiffSSD spoof; ~2k per inner generator</td><td>extra spoof cap 1,000/generator (§2)</td></tr>
+<tr><td>All ASV19 bona fide (40 speakers); spoof ~2.5k stratified A01–A06</td><td>§2, §3</td></tr>
+<tr><td>MLAAD 28% of spoof side, ≤ 120/model, gated by Probe A; Probe C on In-the-Wild bona fide</td><td>sampler (§4), §8</td></tr>
+<tr><td>Real 25/35/40, spoof 62/28/10, constant mix</td><td>sampler (§4)</td></tr>
+<tr><td>L = 12, all retained layers trainable, layer-weighted sum, attentive statistics pooling</td><td><code>M5Config</code>, <code>build_model</code> (§4)</td></tr>
+<tr><td>LLRD 0.85, head 5e-4, wd 0.01, 8% warmup + cosine, label smoothing 0.05, no OC-softmax</td><td>§6</td></tr>
+<tr><td>p_aug 0.65, convolutive RawBoost 0.25, band-limit upweighted, trim jitter, per-cell rate logging</td><td>§4</td></tr>
+<tr><td>Score–duration coupling, OOF-pooled gate, "gap &lt; 0.15 is noise"</td><td>assembler (§6), §8.4</td></tr>
+<tr><td>Not adopted: half-epoch checkpoint selection (single-generator folds), frozen-backbone control (M1 is it), peak-norm before ZMUV (no-op)</td><td>recorded in the response synthesis</td></tr>
+<tr><td>Passed to the main chat: LJ single-speaker OOF bias in the stacker; decide M5-vs-M1 on OOF + holdout</td><td>§8.6</td></tr>
+</tbody>
+</table></div>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/reports/2026-09-26_m5-xlsr-finetune-plan.md</code> <span class="hash">1933e9cea320</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

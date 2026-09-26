@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · HEARSAY</title>
+<meta name="description" content="HEARSAY, the Cross Exam entry to the NSA HEARSAY audio authentication challenge at HackGT 13: what it is, how well it does, and how it decides.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="story" data-search-index="search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The story</a>
+<ul><li><a href="index.html" aria-current="page">Home</a></li><li><a href="how-it-decides.html">How it decides</a></li><li><a href="metric.html">The metric and the default answer</a></li><li><a href="what-worked.html">What worked and what did not</a></li><li><a href="detectors.html">The ten detectors</a></li><li><a href="validation.html">Validation</a></li><li><a href="reproduce.html">Reproduce it</a></li><li><a href="credits.html">Credits and AI use</a></li><li><a href="glossary.html">Glossary</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>HEARSAY: is this voice real?</h1>
+<p class="lead">HEARSAY is a software-only audio authentication system built in 36 hours at HackGT 13 for the NSA HEARSAY challenge. Give it an audio file in any format and it returns the probability that the voice is synthetic (<span class="num" data-src="README.md#hearsay">0.0</span><a class="src" href="library/readme.html#hearsay" title="Source: README.md, section hearsay"><span class="sr">source: README.md, section hearsay</span></a> real, <span class="num" data-src="README.md#hearsay">1.0</span><a class="src" href="library/readme.html#hearsay" title="Source: README.md, section hearsay"><span class="sr">source: README.md, section hearsay</span></a> synthetic) with a report that says which detectors ran, what each one found, and how the number was put together. Ten forensic detectors run on every file; a rule-based router decides what each result may do; a fusion rule chosen by a selection rule written down before any result combines the three that vote.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#verdict">The numbers</a></li><li><a href="#cost-title">The cost function we are judged on</a></li><li><a href="#how-it-decides">How it decides, in one picture</a></li><li><a href="#results">Results at a glance</a></li><li><a href="#read-next">Where to go next</a></li></ul></nav>
+<h2 id="verdict">The numbers</h2>
+<p>All figures are normalized <span class="term" tabindex="0" data-term="minDCF" aria-describedby="tip-1">minDCF<span class="tip-body" role="tooltip" id="tip-1">Minimum detection cost function. The scorer sweeps every possible threshold over our scores and reports the lowest cost it finds, with a false alarm weighted far more than a miss and the whole thing scaled so that 1.0 equals the best constant answer and 0.0 is perfect. Because the threshold is chosen by the scorer, only the order of our scores matters.</span></span> (lower is better). The rule was chosen by a <span class="term" tabindex="0" data-term="pre-declared" aria-describedby="tip-2">pre-declared<span class="tip-body" role="tooltip" id="tip-2">Written down before any result was looked at: the candidates, the readouts, and the rule that picks a winner. Once the rule has been applied there is no second try.</span></span> selection rule, applied once; the <span class="term" tabindex="0" data-term="out-of-fold" aria-describedby="tip-3">out-of-fold<span class="tip-body" role="tooltip" id="tip-3">A score a model gives to a training row it never saw: the training data is split into folds, and each row is scored by the model fitted on the other folds. Every selection decision in this project uses out-of-fold scores.</span></span> figure is the training-side readout, the <span class="term" tabindex="0" data-term="holdout" aria-describedby="tip-4">holdout<span class="tip-body" role="tooltip" id="tip-4">A slice of the training data that no model was ever fitted, tuned or selected on: two generators and a set of real-speech groups. Each model reads it once. With only two held-out generators it is noisy, so small differences on it are not evidence.</span></span> and <span class="term" tabindex="0" data-term="In-the-Wild" aria-describedby="tip-5">In-the-Wild<span class="tip-body" role="tooltip" id="tip-5">A public set of web-sourced real and fake speech, used only as a stress test for false alarms on unfamiliar real voices. Nothing was ever trained on it.</span></span> figures were each read once after the choice.</p>
+<div class="verdict-row">
+<div class="stat"><span class="label">Outer holdout</span><span class="value"><span class="num" data-src="README.md#results-at-a-glance">0.0065</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></span><span class="note">two unseen generators and 26 unseen real-speech groups</span></div>
+<div class="stat"><span class="label">In-the-Wild, brief cost</span><span class="value"><span class="num" data-src="README.md#results-at-a-glance">0.228</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></span><span class="note">web-sourced speech we never trained on; <span class="num" data-src="README.md#numbers">0.239</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> under the <span class="term" tabindex="0" data-term="sponsor code" aria-describedby="tip-6">sponsor code's<span class="tip-body" role="tooltip" id="tip-6">The evaluation script the sponsor shipped. It reads a higher score as real, the opposite of the instructions, and puts the heavier weight on a missed fake. We report every result under both readings and never flip our scores.</span></span> cost</span></div>
+<div class="stat"><span class="label">Inner out-of-fold</span><span class="value"><span class="num" data-src="README.md#results-at-a-glance">0.135</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></span><span class="note">pooled over the five inner folds</span></div>
+<div class="stat pending"><span class="label">NSA test set, draft review</span><span class="value">pending</span><span class="note">the returned minDCF, once NSA sends it</span></div>
+</div>
+<!-- scan:off --><section class="cost-panel" aria-labelledby="cost-title">
+<h2 id="cost-title">The cost function we are judged on</h2>
+<p class="cost-formula" aria-label="normalized minimum detection cost">
+<span class="cost-lhs">minDCF</span> <span class="cost-eq">=</span>
+<span class="cost-term cost-fa"><span class="cost-w">9.33</span> <span class="cost-var">×</span> <span class="cost-var">P<sub>FA</sub></span></span>
+<span class="cost-plus">+</span>
+<span class="cost-term cost-miss"><span class="cost-w">1</span> <span class="cost-var">×</span> <span class="cost-var">P<sub>miss</sub></span></span>
+</p>
+<p class="cost-read">One real file called synthetic costs as much as <strong>9.33 missed fakes</strong>.
+That single ratio shaped every decision in this system.</p>
+<dl class="cost-legend">
+<dt>P<sub>FA</sub></dt><dd>false-alarm rate: the share of real files scored above the threshold</dd>
+<dt>P<sub>miss</sub></dt><dd>miss rate: the share of synthetic files scored below it</dd>
+<dt>min</dt><dd>the best threshold is chosen by the scorer, so only the ranking of scores matters</dd>
+</dl>
+<p class="cost-derive">Built from the sponsor's weights <span class="num" data-src="src/hearsay/metrics.py#L29">C<sub>FA</sub> = 4</span>, C<sub>miss</sub> = 1 and a prior of <span class="num" data-src="src/hearsay/metrics.py#L29">0.3</span> synthetic
+(about 0.7 of files are real): cost = 4 · P<sub>FA</sub> · 0.7 + 1 · P<sub>miss</sub> · 0.3 = 2.8 · P<sub>FA</sub> + 0.3 · P<sub>miss</sub>,
+divided by the best constant decision, 0.3, so that 1.0 means "no better than always saying real" and 0.0 is perfect.
+<a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L29" title="Source: src/hearsay/metrics.py lines 29-31 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py lines 29-31 (GitHub; assumes main is public)</span></a></p>
+</section><!-- scan:on -->
+<h2 id="how-it-decides">How it decides, in one picture</h2>
+<p>One decode path, ten detectors behind one contract, a router that tells each result what it may do, and a fusion rule that reads only ranks: <a class="srclink" href="library/readme.html#how-it-decides" title="README.md, section how-it-decides">0.6 × rank(M1b) + 0.2 × rank(handcrafted) + 0.2 × rank(M5)</a>, then <span class="term" tabindex="0" data-term="Spectra-AASIST" aria-describedby="tip-7">Spectra-AASIST<span class="tip-body" role="tooltip" id="tip-7">An off-the-shelf anti-spoofing model run without any training. It is the strongest detector on every set we hold, but its training data is undisclosed, so it is allowed only to lower scores, never to raise them.</span></span> allowed only to pull a file toward real, then a <span class="term" tabindex="0" data-term="Platt map" aria-describedby="tip-8">Platt map<span class="tip-body" role="tooltip" id="tip-8">A one-dimensional logistic fit that turns a raw decision value into a probability. It is monotone, so it changes the numbers a reader sees without changing the ranking the metric scores.</span></span>, with undecidable files in the <span class="term" tabindex="0" data-term="pinned block" aria-describedby="tip-9">pinned block<span class="tip-body" role="tooltip" id="tip-9">Files the system cannot judge (no speech, or a failed decode) are placed strictly below every judged file, at the real end of the ranking, in a deterministic order. Under the sponsor's cost, an uncertain file belongs there.</span></span> at the real end. The full walk-through, with a real test file, is on <a href="how-it-decides.html">How it decides</a>.</p>
+<figure class="diagram"><img class="diagram-img diagram-light" src="img/diagrams/pipeline-light.svg" alt="The shipped pipeline: decode once, route, ten detectors, three fused by rank, Spectra as a one-way vote, Platt map, pinned block, TSV and explanation JSON." width="1027" height="1256"><img class="diagram-img diagram-dark" src="img/diagrams/pipeline-dark.svg" alt="" aria-hidden="true" width="1027" height="1256"><figcaption>The shipped pipeline: decode once, route, ten detectors, three fused by rank, Spectra as a one-way vote, Platt map, pinned block, TSV and explanation JSON. <a class="fullsize" href="img/diagrams/pipeline-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>%% The shipped pipeline, one file at a time. Numbers cited below.
+%% cites: README.md#how-it-decides, README.md#orchestration-what-routing-changes, README.md#the-eight-forensic-techniques
+flowchart TB
+  F["audio file · any container or codec"] --&gt; L["probe the header, then decode once&lt;br/&gt;FFmpeg → 16 kHz mono float32"]
+  L --&gt; C["ClipContext&lt;br/&gt;read-only audio + header facts + a per-clip cache"]
+  C --&gt; R["router: fixed rules on measured facts&lt;br/&gt;every detector runs; each result is told what it may do"]
+  R --&gt; FD["fused by rank&lt;br/&gt;XLS-R probe M1b · 0.6&lt;br/&gt;handcrafted spectral + prosody · 0.2&lt;br/&gt;M5 fine-tuned head · 0.2"]
+  R --&gt; SD["suppression only&lt;br/&gt;Spectra-AASIST · can only halve a high score"]
+  R --&gt; ED["evidence and routing, never scored&lt;br/&gt;compression · ENF hum · splice&lt;br/&gt;speaker drift · container"]
+  R --&gt; G["speech gate&lt;br/&gt;is there speech to judge?"]
+  FD --&gt; FU["base = 0.6 · rank(M1b) + 0.2 · rank(handcrafted) + 0.2 · rank(M5)"]
+  FU --&gt; S["Spectra step: margin below −3 and base above 0.5 → halve"]
+  SD --&gt; S
+  S --&gt; PL["Platt map → probability&lt;br/&gt;judged files score in [0.001, 1]"]
+  G --&gt;|"no speech, or the decode failed"| PB["pinned block · below 0.001&lt;br/&gt;at the real end of the ranking"]
+  PL --&gt; T["CrossExam_predictions.tsv"]
+  PB --&gt; T
+  ED --&gt; X["explanation JSON per file&lt;br/&gt;every detector's sentence + the routing log"]
+  PL --&gt; X
+  classDef fusedC fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef suppC fill:#fff3d1,stroke:#c37530,color:#101a2b
+  classDef evC fill:#ffffff,stroke:#c37530,color:#101a2b,stroke-dasharray:4
+  classDef gateC fill:#e9eff6,stroke:#005493,color:#101a2b
+  class FD,FU fusedC
+  class SD,S suppC
+  class ED,X evC
+  class G,PB gateC
+</code></pre></details></figure>
+<h2 id="results">Results at a glance</h2>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>Inner OOF</th><th>Holdout</th><th>In-the-Wild, brief cost</th><th>In-the-Wild, sponsor-code cost</th></tr></thead>
+<tbody>
+<tr><td><strong>Shipped rule</strong> (<a class="srclink" href="library/readme.html#numbers" title="README.md, section numbers">A3 w 0.2 + E</a>: M1b, handcrafted and M5 by rank, Spectra suppression)</td><td><span class="num" data-src="README.md#results-at-a-glance">0.135</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.0065</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.228</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#numbers">0.239</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td></tr>
+<tr><td>Previous rule (E on α 0.2, no M5), the fallback</td><td><span class="num" data-src="README.md#results-at-a-glance">0.140</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.014</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.260</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#numbers">0.267</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td></tr>
+<tr><td><span class="term" tabindex="0" data-term="M1b" aria-describedby="tip-10">M1b<span class="tip-body" role="tooltip" id="tip-10">Our primary detector: a frozen XLS-R with a small logistic classifier on one hidden layer. M1b is the version whose training folds also include a set of extra real speakers.</span></span> alone, the best single detector we trained</td><td><span class="num" data-src="README.md#results-at-a-glance">0.301</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.072</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.343</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#numbers">0.296</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td></tr>
+<tr><td><span class="term" tabindex="0" data-term="Spectra-AASIST" aria-describedby="tip-11">Spectra-AASIST<span class="tip-body" role="tooltip" id="tip-11">An off-the-shelf anti-spoofing model run without any training. It is the strongest detector on every set we hold, but its training data is undisclosed, so it is allowed only to lower scores, never to raise them.</span></span> off the shelf, a <span class="term" tabindex="0" data-term="suppression" aria-describedby="tip-12">suppressor<span class="tip-body" role="tooltip" id="tip-12">The one-way role given to Spectra-AASIST: when it is confident a voice is real and the fused rank is high, the rank is halved. It can never raise a score, so if it is wrong the cost is a miss, never a false alarm.</span></span> only</td><td colspan="2">not fused: its training data is undisclosed, so no row of ours is provably out-of-sample for it</td><td colspan="2"><span class="num" data-src="README.md#numbers">0.065</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a>, possibly in-sample for the same reason</td></tr>
+</tbody></table></div>
+<p>The test set has <span class="num" data-src="README.md#numbers">1,671</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> files. The shipped rule scores <span class="num" data-src="README.md#numbers">27.4%</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> of them above <span class="num" data-src="README.md#numbers">0.5</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> against the roughly <span class="num" data-src="README.md#numbers">30%</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> synthetic the brief states (the orchestration ablation, a different readout, reports <span class="num" data-src="README.md#orchestration-what-routing-changes">27.5%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>); the <span class="term" tabindex="0" data-term="speech gate" aria-describedby="tip-13">speech gate<span class="tip-body" role="tooltip" id="tip-13">Five cheap cues that decide whether a file contains speech at all (not silent, some voiced frames, pitch that moves, loudness that moves, not spectrally flat). A file that fails goes to the pinned block instead of fusion.</span></span> abstains on <span class="num" data-src="README.md#the-eight-forensic-techniques">0 of 1,671</span><a class="src" href="library/readme.html#the-eight-forensic-techniques" title="Source: README.md, section the-eight-forensic-techniques"><span class="sr">source: README.md, section the-eight-forensic-techniques</span></a>. Turning the <span class="term" tabindex="0" data-term="router" aria-describedby="tip-14">router<span class="tip-body" role="tooltip" id="tip-14">The fixed rules that decide what each detector's result is allowed to do for a given file: fused into the score, allowed only to lower it, or recorded as evidence. Every decision is written to a per-file routing log.</span></span> off moves the holdout from <span class="num" data-src="README.md#orchestration-what-routing-changes">0.0065</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> to <span class="num" data-src="README.md#orchestration-what-routing-changes">0.0200</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> and In-the-Wild from <span class="num" data-src="README.md#orchestration-what-routing-changes">0.229</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> to <span class="num" data-src="README.md#orchestration-what-routing-changes">0.274</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>.</p>
+<h2 id="read-next">Where to go next</h2>
+<ul class="cards">
+<li class="card"><h3><a href="how-it-decides.html">How it decides</a></h3><p>The pipeline, the router and the fusion arithmetic, on a real test file with its evidence sentences.</p></li>
+<li class="card"><h3><a href="metric.html">The metric and the default answer</a></h3><p>What minDCF is, why a false alarm costs so much, why only ranking matters, and where the undecidable files go.</p></li>
+<li class="card"><h3><a href="what-worked.html">What worked and what did not</a></h3><p>The honest log: every shortcut found, every idea rejected, with its number and its mechanism.</p></li>
+<li class="card"><h3><a href="detectors.html">The ten detectors</a></h3><p>One card each, mapped to the sponsor's rubric, with its role, its numbers and one real evidence sentence.</p></li>
+<li class="card"><h3><a href="validation.html">Validation</a></h3><p>Folds by generator and speaker, the pre-declared sweeps, and the decoding table for the draft review.</p></li>
+<li class="card"><h3><a href="specs/index.html">Systems and subsystems</a></h3><p>One spec page per part of the system, every parameter cited to the line that sets it.</p></li>
+<li class="card"><h3><a href="library/index.html">The library</a></h3><p>Every document in the repository, rendered: reports, run specs, audits, handoffs, consult records.</p></li>
+<li class="card"><h3><a href="reproduce.html">Reproduce it</a></h3><p>The commands, verbatim, and where every artifact lives.</p></li>
+</ul>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="next" rel="next" href="how-it-decides.html">How it decides →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/pages/index.frag</code> <span class="hash">afaf5f37a6be</span>, <code>README.md</code> <span class="hash">3fe4ed9967b7</span>. The markdown is the record. <a href="about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

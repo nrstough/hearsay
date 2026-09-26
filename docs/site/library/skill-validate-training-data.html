@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/validate-training-data — Dataset / manifest validation · HEARSAY</title>
+<meta name="description" content="&quot;Validate an ML training dataset or manifest before training — label distribution and imbalance, feature/tensor integrity (shape, range, NaNs, all-zero rows), sequence-length stats, split leakage, and metadata/asset consistency. Use when the user says &#x27;validate the training data&#x27;, &#x27;check the dataset&#x27;, &#x27;is this manifest clean&#x27;, &#x27;why is the model degenerate&#x27;, or a new dataset/manifest has just been produced.&quot;">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>.claude/skills/validate-training-data/SKILL.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#step-0--resolve-the-artifact-and-its-schema-inspect-dont-assume">Step 0 — Resolve the artifact and its schema (inspect, don't assume)</a></li><li><a href="#checks">Checks</a></li><li><a href="#output-format">Output format</a></li><li><a href="#rules">Rules</a></li></ul></details>
+<h1 id="validate-training-data--dataset--manifest-validation">/validate-training-data — Dataset / manifest validation</h1>
+<p>The job is to catch the data problems that produce a confidently broken model, <strong>before</strong>
+the training run spends money. Every check reports numbers, not adjectives.</p>
+<p>Any arguments passed to this skill name the dataset, manifest, or split to validate. With
+no arguments, resolve the newest dataset artifact and say which one you picked.</p>
+<h2 id="step-0--resolve-the-artifact-and-its-schema-inspect-dont-assume">Step 0 — Resolve the artifact and its schema (inspect, don't assume)</h2>
+<ol>
+<li>Read <code>CLAUDE.md</code> / <code>AGENTS.md</code> and the training docs for where datasets live and which
+manifest is canonical. Regenerable data often lives <strong>outside the repo</strong> (an external
+drive, object storage) — resolve the real path rather than reading a stale local copy.</li>
+<li>Find the artifact: manifest JSON/JSONL, parquet or .csv tables, a TFRecord/webdataset shard set,
+or a label directory.</li>
+<li><strong>Derive the schema from the data</strong>, then state it back: record count, fields per
+record, feature shape/dtype, label vocabulary, group/split keys. Confirm it matches
+what the training code actually reads (<code>git grep</code> the loader and the field names) —
+a manifest field the loader ignores is a silent no-op, and a field the loader needs
+but the manifest lacks is a crash-at-epoch-0.</li>
+<li>Note which records are <strong>hand-curated ground truth</strong> vs <strong>draft / auto-labeled</strong>.
+Draft labels are not ground truth and must never be counted as such in the report.</li>
+</ol>
+<p><strong>HEARSAY specifics:</strong></p>
+<ul>
+<li>The split key is the <strong>generator</strong> (TTS / voice-conversion system). No generator may
+appear in both train and validation — clip-level splits are invalid for this project.
+Also check speaker and source-recording overlap across splits.</li>
+<li>Everything the model sees must be <strong>16 kHz mono</strong>. Report the sample-rate / channel /
+codec histogram <strong>per class</strong> — if fakes and reals differ in native format, the model
+can learn the codec instead of the voice (a leak, not a signal). Same for duration and
+leading/trailing silence per class.</li>
+<li>Compare our real/fake ratio with whatever is known about the NSA set, and report it.</li>
+<li>Augmented data (laundering: codec/telephony round-trips, noise, simulated replay/RIR,
+band-limiting) is tracked separately; the clean-only validation set must stay clean.
+Also compare duration and peak level per class against the NSA test inventory.</li>
+<li>The validation split is never trained on. Flag any path where it could leak into
+training (feature scalers, calibration, stacking folds).</li>
+</ul>
+<h2 id="checks">Checks</h2>
+<h3 id="1-label-distribution-and-imbalance">1. Label distribution and imbalance</h3>
+<ul>
+<li>Count each label per target/head (multi-output datasets need a per-head table, not a global one).</li>
+<li>Flag any head where one class exceeds ~80% — that's the classic degenerate-model cause
+(the model predicts the majority class and scores well on accuracy).</li>
+<li>Report the effective positive count, not just the ratio: 3% positives out of 200 rows is
+a different problem from 3% out of 200,000.</li>
+<li>Flag labels absent entirely, and labels outside the declared vocabulary.</li>
+</ul>
+<h3 id="2-feature--tensor-integrity">2. Feature / tensor integrity</h3>
+<ul>
+<li>Every record's feature shape matches the declared shape exactly. Report the histogram of
+shapes found, not just "mismatch".</li>
+<li>Value ranges: normalized features inside their stated range; confidences in <code>[0,1]</code>;
+any padding region actually zero.</li>
+<li><strong>NaN / Inf</strong> count, and which fields.</li>
+<li><strong>All-zero or constant rows/frames</strong> — usually an upstream detection or extraction
+failure that silently became training data. Report the rate; a few percent is normal,
+a fifth is a bug.</li>
+<li>Duplicate records (same content hash) — inflates apparent dataset size and leaks across
+splits.</li>
+</ul>
+<h3 id="3-sequence--shape-statistics-for-sequence-models">3. Sequence / shape statistics (for sequence models)</h3>
+<ul>
+<li>min / max / mean / median / p5 / p95 length.</li>
+<li>Count below the model's minimum useful length, and count at the upper clamp (records
+sitting exactly at the max are usually untrimmed, not long).</li>
+<li>Length distribution <strong>per class</strong> — if the classes differ in length, the model can
+learn length instead of the signal. This is a real leak; call it out.</li>
+</ul>
+<h3 id="4-segment--boundary-quality-when-records-are-trimmed-from-longer-sources">4. Segment / boundary quality (when records are trimmed from longer sources)</h3>
+<ul>
+<li>Trimmed vs fallback-to-full counts, and the length distribution of each.</li>
+<li>Fallback rate per source/venue/session — a rate concentrated in one source is a bug in
+that source's handling, not a data-quality fact.</li>
+</ul>
+<h3 id="5-split-integrity-and-leakage">5. Split integrity and leakage</h3>
+<ul>
+<li>Identify the grouping key that must not straddle splits (event, session, subject,
+source video, patient). <strong>Check it doesn't.</strong> Group leakage is the most common reason a
+validation number is unreproducible in the field.</li>
+<li>Report per-split counts and per-split label distribution — a split whose class balance
+differs from train invalidates the comparison.</li>
+<li>Flag any record appearing in two splits.</li>
+</ul>
+<h3 id="6-metadata-and-asset-consistency">6. Metadata and asset consistency</h3>
+<ul>
+<li>Every referenced asset path exists and is readable (report the missing count and a few
+examples). Sample a handful and confirm they're non-empty and the expected format.</li>
+<li>Cross-field consistency: declared type/class vs the label, declared resolution/duration
+vs the actual file, timestamps in range.</li>
+<li>Distribution across the categorical metadata (type, source, quality tier, camera/angle)
+— a category with a handful of records cannot support a per-category claim.</li>
+</ul>
+<h2 id="output-format">Output format</h2>
+<p>A summary table first:</p>
+<pre><code>| Check | Result | Verdict |
+|-------|--------|---------|
+| Records | 4,092 | — |
+| Label balance (head X) | 63% / 37% | OK |
+| Shape integrity | 4,090 ok / 2 wrong shape | FIX |
+| Group leakage | 0 straddling groups | OK |</code></pre>
+<p>Then a section per failed check with the specific offending record ids (up to ~20) and
+what to do about them.</p>
+<p>Close with a <strong>train / don't-train verdict</strong> and the blocking items, ranked.</p>
+<h2 id="rules">Rules</h2>
+<ol>
+<li><strong>Numbers, always.</strong> "Some clips are short" is not a finding; "412/4,092 (10.1%) under
+10 frames" is.</li>
+<li>Compute from the data. Never restate a count from a doc or a manifest header — those
+drift, and reconciling them is itself a finding.</li>
+<li><strong>Draft labels ≠ ground truth.</strong> Report them separately and never fold them into a
+ground-truth count.</li>
+<li>Name record ids for every flagged item so they can be quarantined or re-derived.</li>
+<li>Don't modify the dataset. Propose the quarantine/fix list; the user decides.</li>
+<li>If the artifact is large, sample — and state the sample size and method, so nobody
+mistakes a sampled rate for an exact count.</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>.claude/skills/validate-training-data/SKILL.md</code> <span class="hash">a9d399e204fc</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

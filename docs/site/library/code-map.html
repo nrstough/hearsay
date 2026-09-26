@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HEARSAY code map · HEARSAY</title>
+<meta name="description" content="Rendered from docs/code-map.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/code-map.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#repo-layout">Repo layout</a></li><li><a href="#handcrafted-features-d-track-feature-engineering-lane">Handcrafted features (D-track feature-engineering lane)</a></li><li><a href="#engineered-detectors-contract-rule-based-compression-tree-evaluator">Engineered detectors (contract, rule-based, compression, tree evaluator)</a></li><li><a href="#m1-deep-path-frozen-ssl-embedding---logistic-probe---submission">M1 deep path (frozen SSL embedding -&gt; logistic probe -&gt; submission)</a></li><li><a href="#m5-fine-tune-lane-xls-r-300m-fine-tune">M5 fine-tune lane (XLS-R 300M fine-tune)</a></li><li><a href="#m3-spectra-aasist-stream-and-shared-validationsubmission-machinery">M3 Spectra-AASIST stream and shared validation/submission machinery</a></li><li><a href="#documentation-docs-claudemd-readmemd">Documentation (docs/, CLAUDE.md, README.md)</a></li><li><a href="#how-to-recipes">How-to recipes</a></li><li><a href="#tests-what-pins-what">Tests: what pins what</a></li><li><a href="#known-gaps-and-stale-docs">Known gaps and stale docs</a></li><li><a href="#reading-order">Reading order</a></li></ul></details>
+<h1 id="hearsay-code-map">HEARSAY code map</h1>
+<p>HEARSAY scores audio clips for synthetic-speech likelihood: CPU contract detectors (rule-based and learned), frozen-SSL probes (M1), an off-the-shelf anti-spoof scorer (M3) and a fine-tune lane (M5) each export fold-validated scores, which are fused into one score per test file and written as a TSV submission judged by normalized minDCF (C_FA = 4, C_MISS = 1, pi_synth = 0.3).
+Read first: docs/STATUS.md (one-page state), docs/architecture.md (component diagram, built / in-flight / planned tags), then this file for where things live and where to plug in. Every entry below cites file:line as reported by the finder pass on Sat Sep 26; re-check a line before editing.</p>
+<h2 id="repo-layout">Repo layout</h2>
+<pre><code>src/hearsay/
+  audio.py          decode/resample (ffmpeg -&gt; 16 kHz mono float32), windows(), trim_silence()
+  embed.py          frozen SSL embedding: v1 window path, v2 prepare_segment + embed_segment
+  probe.py          M1 logistic probe on one SSL layer (load_embeddings, oof_scores, Probe)
+  handcrafted.py    v3 75-feature extractor, band_limit (NSA 7.25 kHz wall), _crop, ctx for v4 families
+  hc_v4.py          v4 feature families registry FAMILIES (lfcc, phase, cqcc, modulation, breath, jitter)
+  compression.py    compression-forensics features + launder() codec round-trip
+  trees.py          pure-numpy LightGBM inference and contributions (no lightgbm import at inference)
+  metrics.py        EER, minDCF, cost_at, report(); the NSA cost constants
+  submission.py     score_files, write_submission (TSV, never overwrites), append_log, preflight
+  spectra.py        Spectra-AASIST loader and scorer (M0-era version only)
+  m5_bundle.py, m5_data.py, m5_model.py    M5 fine-tune lane library
+  detectors/        contract (base.py), shared learned base (_learned.py), handcrafted, compression,
+                    container, enf, splice, engineered.py (single import point)
+scripts/            CLIs: extract_/train_handcrafted, eval_bundle, extract_embeddings, train_probe,
+                    make_probe_csv, make_folds, extend_folds, score_detector, extract_compression,
+                    m5_*, spectra_direction, manifest_*, pull_mlaad, hash_audio, bench_latency,
+                    make_constant_csv, inventory*
+scripts/cloud/      launch.sh, box_chain.sh, reaper.sh, r2_guard.sh, teardown_check.sh, box_codecs.py
+splits/             nsa_folds.csv (20,000 rows), nsa_folds_plus_asv19.csv (27,648), nsa_test_durations.csv (1,671)
+tests/              pytest suite, 301 collected
+docs/               STATUS.md, architecture.md, plan.md, nsa-challenge.md, handoffs/, reports/, specs/, consults/
+models/ outputs/ weights/ data/ submissions/    gitignored artifacts and logs</code></pre>
+<h2 id="handcrafted-features-d-track-feature-engineering-lane">Handcrafted features (D-track feature-engineering lane)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Path</th><th>Purpose</th><th>Key entry points</th>
+</tr></thead>
+<tbody>
+<tr><td>src/hearsay/hc_v4.py</td><td>v4 feature families; each is a function of a ctx dict registered in FAMILIES</td><td>FAMILIES:300, lfcc:59, phase:165, cqcc:174, modulation:197, breath:221, jitter:247</td></tr>
+<tr><td>src/hearsay/handcrafted.py</td><td>v3 extractor: band_limit -&gt; crop -&gt; RMS-normalize, then spectral + prosody features; <code>families</code> kwarg appends hc_v4 columns</td><td>features:72, features_for_path:143, ctx dict:136, band_limit:43, _crop:55</td></tr>
+<tr><td>scripts/extract_handcrafted.py</td><td>manifest -&gt; parallel feature extraction -&gt; outputs/handcrafted/&lt;name&gt;.csv + .meta.json sidecar</td><td>--families flag:48, families tuple:51, executor map:64, meta.json families:78</td></tr>
+<tr><td>scripts/train_handcrafted.py</td><td>trains logreg/LightGBM on a feature .csv via PredefinedSplit folds, exports fusion scores, saves bundle</td><td>META_COLS:46, META_SUFFIXES:48, FAMILY_PREFIXES:51, is_meta/dropped:55, side_meta read:138, bundle construction:216</td></tr>
+<tr><td>scripts/eval_bundle.py</td><td>eval-only: score any labeled feature .csv with a saved bundle at its own inner-OOF threshold (ITW stress)</td><td>best_threshold:30, main:37</td></tr>
+<tr><td>src/hearsay/detectors/_learned.py</td><td>FeatureModelDetector base: loads bundle, recomputes features with the bundle's families, scores, builds evidence</td><td>FeatureModelDetector.run:88, families kw:92, _evidence:102, contributions:51</td></tr>
+<tr><td>src/hearsay/detectors/handcrafted.py</td><td>contract wrapper registering <code>handcrafted</code>; owns LABELS</td><td>LABELS:21, HandcraftedDetector:101</td></tr>
+</tbody>
+</table></div>
+<p>Where to add</p>
+<ul>
+<li>New feature family: src/hearsay/hc_v4.py:300-303, the FAMILIES dict literal. Write <code>fn(ctx) -&gt; dict[str, float]</code> and add it under a new key (the key is the <code>--families</code> CLI name). ctx keys (built at src/hearsay/handcrafted.py:136-137): x (float32 audio), Z (complex STFT 512/160), S (power STFT), freqs, voiced (bool frame mask), rms_db, f0 (YIN track). Read Z/S from ctx; do not recompute the STFT.</li>
+<li>Column-name rules (scripts/train_handcrafted.py:46-48): unique, prefixed by family, not in META_COLS (path, label, generator, speaker, utt, source, filename, group, fold), not ending in _flag / _launder / _crop_s.</li>
+<li>Feature-content rules (tests/test_hc_v4.py): no content above 7000 Hz (FMAX), no absolute level, no duration or count features (means, stds, percentiles, rates only), offset-invariant (rel_tol 0.25 / abs_tol 0.05 on a shifted copy).</li>
+<li>scripts/train_handcrafted.py:51 FAMILY_PREFIXES: add <code>name -&gt; (prefix, ...)</code>. Without it, <code>FAMILY_PREFIXES.get(fam, (fam,))</code> (used at lines 143-144) matches the family name as a literal column prefix, which is wrong for families like phase (gd_/pc_).</li>
+<li>src/hearsay/detectors/handcrafted.py LABELS (ends line 92): one plain-English entry per new column (or a dict-comprehension block like lfcc/cqcc/mfcc). Missing entries fall back to the raw column name at src/hearsay/detectors/_learned.py:109; the brief treats labels as required for judged evidence quality.</li>
+<li>src/hearsay/handcrafted.py:133-139 needs no change: the families tuple flows straight into <code>FAMILIES[name](ctx)</code>.</li>
+<li>Add the family's expected key set to the EXPECTED dict in tests/test_hc_v4.py:33-44.</li>
+</ul>
+<p>Invariants you must keep</p>
+<ul>
+<li>features() maps every non-finite value to 0.0 at src/hearsay/handcrafted.py:140; families need not self-guard.</li>
+<li>Unknown family name raises KeyError (src/hearsay/handcrafted.py:139; tests/test_hc_v4.py test_unknown_family_raises).</li>
+<li>With families=() the extractor returns exactly the 75 v3 columns (tests/test_hc_v4.py, len(features(x)) == len(V3)).</li>
+<li>feat_cols = columns that are not is_meta and not dropped, in file order; that order is saved as bundle['features'] and is the order _learned.py builds the inference vector in.</li>
+<li>At inference kw['families'] = tuple(b['families']) (src/hearsay/detectors/_learned.py:92-93), so the bundle recomputes exactly the families it was trained with (tests/test_handcrafted_detector.py:141).</li>
+<li>scripts/eval_bundle.py:53 <code>assert not missing</code>: the feature file must already contain every bundle['features'] column; eval_bundle never recomputes features from audio.</li>
+<li>Output .csv of extract_handcrafted = manifest columns + hc_crop_s + one column per feature; failures are flagged in hc_flag (line 73), never dropped as rows.</li>
+</ul>
+<p>Gotchas</p>
+<ul>
+<li>hc_v4 is imported lazily inside features() only when families is non-empty (src/hearsay/handcrafted.py:134); importing hearsay.handcrafted alone does not pull it in. group_delay and cqcc import librosa/scipy inside the function body.</li>
+<li><code>--drop-columns</code> (exact name or <code>prefix*</code>) is a training-time gate: a variant trains without re-extracting, per the v4 report's corpus-cue blocklist.</li>
+<li>eval_bundle's threshold comes from the bundle's own detector_scores inner_oof rows joined to splits/nsa_folds.csv labels (scripts/eval_bundle.py:59-63), not from the --features file.</li>
+<li>band_limit is defined at src/hearsay/handcrafted.py:43 (one finder cited 44; 43 is correct).</li>
+</ul>
+<h2 id="engineered-detectors-contract-rule-based-compression-tree-evaluator">Engineered detectors (contract, rule-based, compression, tree evaluator)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Path</th><th>Purpose</th><th>Key entry points</th>
+</tr></thead>
+<tbody>
+<tr><td>src/hearsay/detectors/base.py</td><td>the contract: DetectorResult, ClipContext, Detector protocol, safe_run, name-sorted Registry</td><td>NEUTRAL_SCORE:40, ClipContext:44, from_array:56, audio property:71, probe property:87, memo:93, DetectorResult:110, <strong>post_init</strong>:122, Detector:149, safe_run:163, Registry:195, singletons:220</td></tr>
+<tr><td>src/hearsay/detectors/enf.py</td><td>rule-based mains-hum consistency check; always applies; never learned</td><td>_frames:35, analyze:51, EnfDetector:92, run:100, register guard:121</td></tr>
+<tr><td>src/hearsay/detectors/splice.py</td><td>rule-based editing-seam detector (clicks, DC-offset jumps)</td><td>constants:30-33, analyze:46, SpliceDetector:84, run:92, register guard:112</td></tr>
+<tr><td>src/hearsay/detectors/container.py</td><td>rule-based container/metadata score plus routing facts (lossy, is_pcm_wav, ffmpeg_written)</td><td>LOSSY/AI_TOOL_TERMS/SYNTH_TERMS:30-41, probe_container:44, tts word-boundary regex:80, classify_tags:88, ContainerDetector:100, run:108, routing features:117-128, register guard:144</td></tr>
+<tr><td>src/hearsay/compression.py</td><td>compression-forensics features (bandwidth, spectral holes, floor depth, tilt) and launder()</td><td>LAUNDER_CODECS:41, features:46, launder:105, draw_laundering:132, features_for_path:150</td></tr>
+<tr><td>src/hearsay/detectors/compression.py</td><td>thin wrapper wiring hearsay.compression.features into FeatureModelDetector</td><td>LABELS:24, latest_model_dir:49, CompressionDetector:53, register guard:64</td></tr>
+<tr><td>src/hearsay/detectors/_learned.py</td><td>shared machinery for the two learned detectors: bundle discovery, predictor, contributions, generic run()</td><td>TOP_K:28, latest_model_dir:31, predictor:41, contributions:51, FeatureModelDetector:61, bundle property:75, applies:85, run:88, clip:96, _evidence:102</td></tr>
+<tr><td>src/hearsay/trees.py</td><td>numpy re-implementation of LightGBM binary inference + Saabas contributions from dump_model()</td><td>Trees.<strong>init</strong>:25, decision_type check:41, raw:53, predict_proba:72, contrib:76</td></tr>
+<tr><td>src/hearsay/detectors/engineered.py</td><td>single import point registering all five D-track detectors; LEARNED vs RULE_BASED lists</td><td>import line:16, LEARNED/RULE_BASED:18-19</td></tr>
+</tbody>
+</table></div>
+<p>Where to add</p>
+<ul>
+<li>New rule-based contract detector: copy the shape of src/hearsay/detectors/enf.py (123 lines): module docstring with rationale and score calibration, <code>applies()</code> returning True, <code>run()</code> memoizing one <code>analyze(ctx.audio)</code> via ctx.memo, DetectorResult built from named constants, then <code>DETECTOR = X(); if NAME not in REGISTRY.names(): register(DETECTOR)</code> at module bottom (enf.py:121-123, container.py:144-145, detectors/compression.py:65-66). Constraint: name must be unique or register raises ValueError (base.py:206). Without label coverage keep scores mild (enf uses 0.4/0.5/0.6, enf.py:9-11 and 32; splice uses 0.5/0.6, splice.py:33).</li>
+<li>New learned contract detector: subclass FeatureModelDetector (src/hearsay/detectors/<em>learned.py:61-114) exactly as src/hearsay/detectors/compression.py does: define feature_fn (audio -&gt; dict[str, float]), a LABELS dict, set name/prefix/kind_label/memo_key/labels/feature_fn, register at import. Bundle must contain features, kind ('logreg' or 'lgbm'), feature_stats ({name: {real_mean, real_std, auc}}), crop_mode, band_match, and model or trees_dump (_learned.py docstring lines 7-12). prefix must match models/&lt;prefix&gt;</em>&lt;kind&gt;_&lt;stamp&gt;/ (_learned.py:31-38).</li>
+<li>Register the new module in src/hearsay/detectors/engineered.py:16-23 (import line plus LEARNED or RULE_BASED at lines 18-19); otherwise tooling that only imports engineered misses it.</li>
+<li>New AI-tool or synthesis vocabulary: src/hearsay/detectors/container.py:30-41 tuples; matching is substring except 'tts' (word-boundary regex, lines 80-81).</li>
+<li>Training-time laundering: src/hearsay/compression.py launder():105 (mp3 or aac only, ValueError otherwise at line 110), driven by scripts/extract_compression.py on a random half of both real and spoof rows.</li>
+</ul>
+<p>Invariants you must keep</p>
+<ul>
+<li>run() is only ever invoked through safe_run (base.py:163); it skips when applies() is False, and any exception, wrong type, name mismatch or non-ok status becomes status='error' with score NEUTRAL_SCORE = 0.5 (base.py:40).</li>
+<li>features values must be finite (base.py:104-105); DetectorResult.<strong>post_init</strong> (line 122) raises, never clips.</li>
+<li>safe_run wraps the result in dataclasses.replace (base.py:186), so a detector cannot keep mutating a returned features dict.</li>
+<li>Registry rejects duplicate names (base.py:205-206); names()/all_detectors() iterate sorted by name so fusion columns are stable.</li>
+<li>enf score is always in {0.4, 0.5, 0.6} (enf.py:32) and features include all analyze() keys (enf.py:118); splice score is always 0.5 or 0.6 (splice.py:33); classify_tags never raises and returns one of exactly three pairs.</li>
+<li>container routing features is_pcm_wav (container.py:119) and lossy (line 118) gate other detectors.</li>
+<li>hearsay.compression.features output is finite (compression.py:102); LAUNDER_CODECS weights MP3 3:1 over AAC (line 41).</li>
+<li>predict_proba is clipped away from 0/1 (_learned.py:96) before the logit.</li>
+<li>Trees.contrib + bias reproduces raw() exactly (tests/test_trees.py:32); raw()/predict_proba match real LightGBM within 1e-9 on tests/fixtures/lgbm_toy.json (tests/test_trees.py:22); no source or test file imports lightgbm (tests/test_trees.py:69).</li>
+</ul>
+<p>Gotchas</p>
+<ul>
+<li>NEUTRAL_SCORE is a sentinel: fusion never feeds it in as a real score, it imputes the fold-local train mean plus a missing indicator (base.py:14-17).</li>
+<li>src/hearsay/trees.py exists because lightgbm and torch each ship libomp and loading both in one process fails (trees.py:4-9); do not reintroduce a direct lightgbm import at inference.</li>
+<li>splice floor_range_db is reported in features/evidence (splice.py:66-71, 108) but does not move the score (docstring lines 12-14).</li>
+<li>container scoring is rule-based on purpose: on training data the container is the label and the NSA test set is uniform PCM16/16 kHz (container.py:13-17).</li>
+<li>enf's mild scores are a stated limitation (no hum in training corpora, enf.py:6-11), not an oversight.</li>
+<li>ContainerDetector.run raises RuntimeError when ffprobe finds no audio stream; safe_run turns that into an error result.</li>
+</ul>
+<h2 id="m1-deep-path-frozen-ssl-embedding---logistic-probe---submission">M1 deep path (frozen SSL embedding -&gt; logistic probe -&gt; submission)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Path</th><th>Purpose</th><th>Key entry points</th>
+</tr></thead>
+<tbody>
+<tr><td>src/hearsay/audio.py</td><td>single decode path plus windowing and silence trimming shared by every rung</td><td>load_audio:22, ffmpeg cmd:27-32, DecodeError raise:36, NaN zeroing:41, windows:74, tile padding:82, trim_silence:91, min_keep guard:106</td></tr>
+<tr><td>src/hearsay/embed.py</td><td>frozen backbone embedding: v1 windows averaged, v2 single prepared segment</td><td>REPO:18, MAX_SEGMENT_S:19, TEST_DURATIONS:20, load_backbone:28, clip_windows:32, normalize_windows:36, embed_windows:44, embed_clip:55, test_duration_sampler:71, prepare_segment:79, embed_segment:107</td></tr>
+<tr><td>src/hearsay/probe.py</td><td>standardized logistic regression on one layer, grouped CV, Platt calibration</td><td>load_embeddings:26, cv_groups:38, make_clf:43, oof_scores:49, PredefinedSplit branch:58, Probe fields:65-73, llr:79, p_synthetic:86, p_decision:90, save:94, load:99</td></tr>
+<tr><td>scripts/extract_embeddings.py</td><td>bulk, sharded, resumable extraction to outputs/embeddings/&lt;model&gt;/&lt;name&gt;/</td><td>main:43, crop draw:70, extract_meta.json:71-73, shard loop:78-132, skip-existing:81-86, segment branch:87-111, per-row seed:90, window branch:112-132, manifest write:134-136</td></tr>
+<tr><td>scripts/train_probe.py</td><td>per-layer grouped CV, Platt, refit, score val once, write models/m1_&lt;model&gt;<em>L&lt;layer&gt;</em>&lt;stamp&gt;/</td><td>main:32, --folds branch:46-60, --max-train:56-58, layer loop:70-75, extract_meta read:81-85, val block:87-106, auc assert:89, --stress:108-121, meta val:126</td></tr>
+<tr><td>scripts/make_probe_csv.py</td><td>score every test file with a saved probe, write submission TSV + sidecar, log</td><td>main:40, shift:55-57, score closure:60, segment branch:61, raw append:66, fb:74, preflight:75, raw.clear:76, raw_col:85-86</td></tr>
+<tr><td>scripts/make_folds.py</td><td>base outer-holdout + k inner folds grouped by generator/speaker</td><td>group_key:28, main:36, holdout selection:50-58, generator assert:51, min-per-class assert:69, straddle assert:71, columns:74, known limits:77-78</td></tr>
+<tr><td>scripts/extend_folds.py</td><td>append training-only rows into inner folds without touching holdout</td><td>main:23, group key + fold assign:34-40, overlap assert:41, straddle assert:43, holdout count:48</td></tr>
+<tr><td>src/hearsay/handcrafted.py (shared)</td><td>band_limit and _crop used by prepare_segment and the CPU detectors</td><td>BAND_MATCH:39, band_limit:43, _FIR cache:40, _crop:55, segment call:61-64, RMS normalize:68</td></tr>
+<tr><td>src/hearsay/metrics.py</td><td>NSA cost metrics used for layer selection and reporting</td><td>constants:29-31, cost_at:45, min_cost:54, decision_logit:67</td></tr>
+</tbody>
+</table></div>
+<p>Where to add</p>
+<ul>
+<li>Decode args (resample rate etc.): src/hearsay/audio.py:27-32 only; every consumer goes through load_audio. Changing SR (src/hearsay/<strong>init</strong>.py:3) requires re-extracting all embeddings.</li>
+<li>A new embedding mode: add a field to the Probe dataclass (src/hearsay/probe.py:65-73) and a branch in scripts/make_probe_csv.py:61, which currently switches on probe.segment.</li>
+<li>prepare_segment band_match flag (src/hearsay/embed.py:80): callers that already band-limited (handcrafted._crop, src/hearsay/handcrafted.py:62) pass band_match=False. MAX_SEGMENT_S (embed.py:19) caps v2 segments; changing it invalidates probes trained under the old cap.</li>
+<li>Extra training corpora: scripts/extend_folds.py:34-40 builds group = source + ':' + (generator if spoof else speaker) and assigns fold ids '0'..'k-1' as strings, never 'holdout'. Verify a new corpus needs band matching or is already band-limited (src/hearsay/handcrafted.py:26-30) or the probe may learn the wall as a cue.</li>
+<li>Generalization check: scripts/train_probe.py:108-121 <code>--stress</code> loads a never-fit-on embedding set and reports minDCF/EER at its own threshold and at the train-OOF Bayes threshold (line 114); it never refits.</li>
+<li>Resumable extraction: scripts/extract_embeddings.py:81-86 skips existing shard_XXXXX.npz; rerun the same command to resume.</li>
+</ul>
+<p>Invariants you must keep</p>
+<ul>
+<li>All train/test/live audio passes through load_audio (src/hearsay/audio.py:1-4); trim_silence never returns less than min_keep_s = 1.0 s (audio.py:106).</li>
+<li>embed_clip and the bulk window path produce identical features (tests/test_audio_and_submission.py:179).</li>
+<li>prepare_segment order is band -&gt; trim -&gt; crop -&gt; cap (embed.py:82-85, 96-104); it never pads or tiles a short clip (tests/test_audio_and_submission.py:270). scripts/extract_embeddings.py and scripts/make_probe_csv.py must call it identically or train/test features diverge.</li>
+<li>load_embeddings asserts every manifest row is covered exactly once (src/hearsay/probe.py:34) and reorders by row (line 35); a partial extraction fails loudly.</li>
+<li>CV, layer selection and Platt fit touch only train (or non-holdout fold rows); val is scored once (scripts/train_probe.py:87-106); <code>assert auc &gt; 0.5</code> at line 89.</li>
+<li>With a fold file, oof_scores uses PredefinedSplit (src/hearsay/probe.py:58-59), never a fresh StratifiedGroupKFold.</li>
+<li>make_folds: every fold has &gt;= --min-per-class per class (scripts/make_folds.py:69), no group straddles folds (line 71), output columns are exactly path,label,generator,speaker,source,group,fold (line 74). extend_folds: no path overlap with base (scripts/extend_folds.py:41), no group straddles folds (line 43), holdout count unchanged (line 48).</li>
+<li>write_submission never overwrites (src/hearsay/submission.py:85-86) and validates range, uniqueness and length.</li>
+<li>C_FA = 4.0, C_MISS = 1.0, PI_SYNTH = 0.3 (src/hearsay/metrics.py:29-31); scripts default --pi-synth to 0.3.</li>
+</ul>
+<p>Gotchas</p>
+<ul>
+<li>windows() tiles short clips (src/hearsay/audio.py:82-83); prepare_segment never does. The same manifest extracted with and without --segment yields structurally different statistics.</li>
+<li>Two different per-row randomness schemes: crop lengths come from one shared RNG stream in test_duration_sampler (embed.py:76) drawn once per manifest row in order (scripts/extract_embeddings.py:70), while the crop offset uses default_rng(args.seed + r) (embed.py:102, extract_embeddings.py:90). Manifest row order changes crops. Any rescoring script must reproduce both.</li>
+<li>Resuming after changing --seed, --crop, --win-s or --max-windows silently mixes settings across shards (scripts/extract_embeddings.py:81-86, 134-136); delete stale shards or use a new --name.</li>
+<li>If extract_meta.json is missing, train_probe silently defaults probe.segment=False (scripts/train_probe.py:81-85).</li>
+<li>cv_groups (src/hearsay/probe.py:38) is used only on the non-fold path of train_probe; the --folds path uses the fold file's group column.</li>
+<li>The sidecar llr column is NaN for rows flagged decode_error or score_error (scripts/make_probe_csv.py:85-86); fb (line 74) is sigmoid(shift), the prior-only posterior, not 0.5 in general.</li>
+<li>band_limit's _FIR cache (src/hearsay/handcrafted.py:40) is built once per process; changing BAND_MATCH (line 39) needs a restart.</li>
+<li>make_folds documents known leakage limits (DiffSSD multi-speaker generators share cloned targets; LJ-voice generators share the LJ voice) at scripts/make_folds.py:9-11 and 77-78; they are reported, not silently fixed.</li>
+<li>src/hearsay/metrics.py:13-15 flags an open sponsor-formula ambiguity (P_FA weighting), unresolved.</li>
+</ul>
+<h2 id="m5-fine-tune-lane-xls-r-300m-fine-tune">M5 fine-tune lane (XLS-R 300M fine-tune)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Path</th><th>Purpose</th><th>Key entry points</th>
+</tr></thead>
+<tbody>
+<tr><td>src/hearsay/m5_bundle.py</td><td>decode every clip once, trim as at test time, write 16 kHz PCM16 FLAC + shortcut features + PCM hash; tree-sha the bundle</td><td>MAX_CLIP_S:20, PEAK:21, prepare_clip:35, write_clip:44, clip_ok:75, tree_sha:86</td></tr>
+<tr><td>src/hearsay/m5_data.py</td><td>manifest construction with fold discipline, crop/batch pipeline, deployment transforms</td><td>FOLDS shas:28-29, FAMILY_EXCLUSIONS:36-40, MAX/MIN_CROP_S:42-43, DEPLOY_MAX_S:44, check_folds_file:55, group_key:63, build_manifest:81, ITW guard:150-151, training_rows:166, validation_rows:182, holdout_rows:189, shortcut_aucs:193, LengthMixer:223, crop:238, collate:247, deploy_transform:258, band_match:264, bundle_transform:272</td></tr>
+<tr><td>src/hearsay/m5_model.py</td><td>truncated XLS-R + layer-weighted sum + masked attentive stats pooling + linear head; hash-verified save/load</td><td>M5Config:22, keep_layers:23, train_top:24, pooling:26, bottleneck:27, mix:43-47, TINY config:53-57, AttnStatsPool:60, M5Net.forward:96, build_model:113, param_groups:138, save_m5:170, load_m5:202, hash refusal follows it, score_batch after (line numbers drifted by ~3 after the M5 lane's Codex rounds; <code>grep -n "^def " src/hearsay/m5_model.py</code> is authoritative)</td></tr>
+<tr><td>scripts/m5_build_manifest.py</td><td>writes outputs/manifests/m5_manifest.csv from build_manifest</td><td>main:32, --extra-spoof-cap:39, fold sha checks:44-46</td></tr>
+<tr><td>scripts/m5_build_bundle.py</td><td>materializes the bundle: parallel decode, drop rules, ASV19 duration matching, cross-scope PCM dedup, code.tgz, tree sha</td><td>DEFAULT_OUT:39, make_code_tgz:68, main:84, decode pool:133-142, drop rules:165-217, core FATAL:172, error-frac abort:174-175, duration matching:180-194, collision dedup:196-217</td></tr>
+<tr><td>scripts/m5_train.py</td><td>the trainer, one fold or full model, wall-clock-fixed steps, exports OOF/holdout/test scores</td><td>main:60, band_match after augment:104, --cpu-smoke:218, CUDA check:230, build_model:312</td></tr>
+<tr><td>scripts/m5_score.py</td><td>CPU inference path: manifest or file list -&gt; path/score/logit/flag .csv</td><td>score_paths:30, decode flag:36-38, main:49, --max-s:58</td></tr>
+<tr><td>scripts/m5_assemble.py</td><td>assembles pulled runs into exported scores + meta.json with the M1 gate decision</td><td>newest_m1_dir:41, find_runs:54, _m1b_comparison:68, --m1-itw-pfa:119, have_all_folds:133-137, oof assert:147, holdout/test asserts:151-152, itw comparison:190-204, gate block:205, holdout_passed:208, gate rule text:212-214</td></tr>
+<tr><td>scripts/cloud/launch.sh</td><td>rents one cloud instance, budget-guards, provisions, starts box_chain.sh; self-destroys on early failure</td><td>budget guard:33, NEED:39, COMMIT:40, refuse:41-42, cleanup trap:62</td></tr>
+<tr><td>scripts/cloud/box_chain.sh</td><td>runs on the instance: setup -&gt; JOBS -&gt; DONE, heartbeats STATUS to R2, polls for NEXT</td><td>fail():15, EXIT trap:16, run_jobs:30, NEXT poll:60-70</td></tr>
+<tr><td>scripts/cloud/reaper.sh</td><td>local watchdog: polls STATUS in R2, destroys on DONE/FAIL/stall/deadline, appends the ledger</td><td>caffeinate note:4, DEADLINE/STALL_MIN:11-12, main loop:21, ledger append:45, never-exit-while-active:50-55</td></tr>
+<tr><td>scripts/cloud/r2_guard.sh</td><td>every R2 path must be under r2:pa-source/hearsay/</td><td>HEARSAY_R2_PREFIX:4, r2_path:6, r2_copy:15</td></tr>
+<tr><td>scripts/cloud/teardown_check.sh</td><td>manual backstop: destroys every instance on the account (or --list)</td><td>main:10, nonzero-if-remaining:18</td></tr>
+</tbody>
+</table></div>
+<p>Where to add</p>
+<ul>
+<li>Exclude an extra spoof generator family from a fold's training: src/hearsay/m5_data.py:36-40 FAMILY_EXCLUSIONS (fold -&gt; substring tuples); must match that fold's validation generator families.</li>
+<li>Per-generator extra-spoof cap: scripts/m5_build_manifest.py:39 <code>--extra-spoof-cap</code> (default 1000).</li>
+<li>Bundle output location: scripts/m5_build_bundle.py:39 DEFAULT_OUT is a machine-specific path; override with --out.</li>
+<li>CPU test path: scripts/m5_train.py:218 <code>--cpu-smoke</code> runs the identical code on the TINY random-init config (src/hearsay/m5_model.py:53-57).</li>
+<li>Deployment cap: scripts/m5_score.py:58 <code>--max-s</code> (default DEPLOY_MAX_S = 8.0).</li>
+<li>ITW P_FA bar fallback: scripts/m5_assemble.py:119 <code>--m1-itw-pfa</code> (default 0.012); lines 187-188 prefer M1's own meta.json value.</li>
+<li>Watchdog timing: scripts/cloud/reaper.sh:11-12 DEADLINE / STALL_MIN env vars; NEXT wait: scripts/cloud/box_chain.sh:60-70 WAIT_MIN (default 45).</li>
+</ul>
+<p>Invariants you must keep</p>
+<ul>
+<li>MAX_CLIP_S = 15.0 and PEAK = 0.999 (src/hearsay/m5_bundle.py:20-21).</li>
+<li>Fold-file shas pinned (src/hearsay/m5_data.py:28-29) and enforced by check_folds_file (line 55); In-the-Wild paths never enter the training manifest (lines 150-151); DEPLOY_MAX_S = 8.0 shared with M1 and every detector (line 44); crops in [3.0, 14.0] s (lines 42-43).</li>
+<li>keep_layers = 12, train_top = 12 by default (src/hearsay/m5_model.py:23-24); load_m5 refuses on any hash mismatch (lines 206-212).</li>
+<li>Bundle build: core and test rows are never dropped, a core decode error is FATAL (scripts/m5_build_bundle.py:172); extra decode-error fraction under --max-error-frac (default 0.005) or abort (lines 174-175); cross-scope PCM collisions drop the extra row and log dropped_extra_collisions.csv (lines 206-210); core/test overlap is reported in test_overlap.csv, never hidden (lines 211-213).</li>
+<li>Trainer: trains where CUDA is available and exits otherwise unless --cpu-smoke (scripts/m5_train.py:230); refuses on bundle tree-sha or XLS-R config-sha mismatch (lines 9-10); refuses if any trivial shortcut AUC exceeds --shortcut-max on its own training rows (shortcut_aucs, src/hearsay/m5_data.py:193); one crop length per batch (LengthMixer, m5_data.py:223-235); steps are wall-clock-fixed, never checkpoint-picked on validation.</li>
+<li>band_match is applied to every clip the model sees, after augmentation (src/hearsay/m5_data.py:264, scripts/m5_train.py:104).</li>
+<li>Assembler: len(oof) == len(inner) == 16142 (scripts/m5_assemble.py:147); holdout 3858 and test 1671 (lines 151-152); no partial stacking set: a missing fold model means no inner_oof rows and stackable=false (lines 133-137); the M1 bar is the newest models/m1_* whose meta.json <code>train</code> is a single NSA set with no comma (lines 41-48), M1b reported beside it and never gated on.</li>
+<li>Cloud: no unprovisioned instance is left running (scripts/cloud/launch.sh:62-63); all R2 paths are under HEARSAY_R2_PREFIX (scripts/cloud/r2_guard.sh:4); status and log are pushed to R2 on EXIT (scripts/cloud/box_chain.sh:16); the reaper never exits while a job is active (scripts/cloud/reaper.sh:50-55).</li>
+</ul>
+<p>Gotchas</p>
+<ul>
+<li>scripts/m5_score.py flags decode errors per row (lines 36-38) rather than failing.</li>
+<li>deploy_transform (src/hearsay/m5_data.py:258) and bundle_transform (line 272) differ only in trim / band-limit order (tested to shift the boundary by at most 1 frame).</li>
+<li>The gate rule text (scripts/m5_assemble.py:212-214) names three conditions (holdout, pooled OOF, ITW P_FA) but only holdout_passed (line 208) is a computed boolean; the other two are separate fields a caller must AND itself.</li>
+<li>reaper.sh must run under caffeinate; Ctrl-C does not destroy instances (scripts/cloud/reaper.sh:4). teardown_check.sh destroys every instance on the account, not only M5 ones.</li>
+<li>m5_data.group_key (src/hearsay/m5_data.py:63) must stay identical to scripts/make_folds.py:group_key per its docstring; not diffed in the finder pass.</li>
+</ul>
+<h2 id="m3-spectra-aasist-stream-and-shared-validationsubmission-machinery">M3 Spectra-AASIST stream and shared validation/submission machinery</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Path</th><th>Purpose</th><th>Key entry points</th>
+</tr></thead>
+<tbody>
+<tr><td>src/hearsay/spectra.py</td><td>loads the Spectra-AASIST checkpoint from weights/Spectra-AASIST and produces synth_logit per clip; M0-era version only (63 lines)</td><td>WIN/HOP:26-27, load_spectra:30, spectra_logits:54, synth_logit:62</td></tr>
+<tr><td>src/hearsay/metrics.py</td><td>EER, minDCF (oracle and sponsor-code variants), act_dcf, report()</td><td>C_FA/C_MISS/PI_SYNTH:29-31, eer:34, cost_at:45, min_cost:54, bayes_llr_threshold:62, decision_logit:67, sponsor_min_dcf:78, report:99</td></tr>
+<tr><td>src/hearsay/submission.py</td><td>score every test file in fixed order, write a validated never-overwritten TSV, append the log</td><td>LOG_COLUMNS:29-31, score_files:44, bare except:60, write_submission:73, score_max:80, FileExistsError:86, read-back asserts:107-109, append_log:113, AUDIO_EXT:136, list_test_files:139, preflight:148</td></tr>
+<tr><td>scripts/spectra_direction.py</td><td>frozen direction guard: AUC &gt;= 0.5 and spoof median &gt; bonafide median; optional diagnostic Platt</td><td>main:45, direction fail:88-89, Platt fit:92-108, slope assert:95</td></tr>
+<tr><td>scripts/score_spectra.py</td><td>NOT PRESENT; spec D8 (docs/specs/2026-09-26_m3-spectra-aasist.md:54-55) describes its CLI</td><td>none</td></tr>
+<tr><td>scripts/make_constant_csv.py</td><td>M0 rollback: constant-score submission through the real loader</td><td>main:33, decision:44, log row:62</td></tr>
+<tr><td>scripts/manifest_nsa.py</td><td>NSA training manifest from DiffSSD + LJ Speech + LibriSpeech</td><td>diffssd_rows:29, lj_rows:43, libri_rows:51, main:58</td></tr>
+<tr><td>scripts/manifest_asvspoof19.py</td><td>ASVspoof2019 LA train/dev/eval manifests</td><td>PROTO files:18-22, main:25</td></tr>
+<tr><td>scripts/pull_mlaad.py</td><td>generator-sampled English MLAAD subset via the HF Hub API</td><td>main:41</td></tr>
+<tr><td>scripts/hash_audio.py</td><td>file-bytes + decoded-PCM hash index for leakage detection</td><td>hash_one:31, main:40</td></tr>
+<tr><td>scripts/bench_latency.py</td><td>one SSL front-end forward pass per 4 s window against a 750 ms p95 gate</td><td>GATE_P95_MS:23, main:33</td></tr>
+<tr><td>tests/test_docs_consistency.py</td><td>tripwire suite pinning living docs to code (A1-A8)</td><td>RUBRICS:22, LIVING:23, BASE_SHA:24, BANNER_PREFIX:25, MAX_CUT_LINES:27, A1:72, A2:83, A3 constants:107, A3 no conflict:116, A4:124, A5:133, A7:156, A8:178</td></tr>
+<tr><td>splits/nsa_folds.csv</td><td>20,000 rows; holdout 3858, inner folds 0-4 sum to 16,142; 10,000 bonafide / 10,000 spoof</td><td>columns path,label,generator,speaker,source,group,fold</td></tr>
+<tr><td>splits/nsa_test_durations.csv</td><td>1,671 rows, columns filename, duration_s</td><td>basis for the short-clip claim in the M3 spec</td></tr>
+</tbody>
+</table></div>
+<p>Where to add</p>
+<ul>
+<li>M3 extensions land in src/hearsay/spectra.py spectra_logits (lines 54-59): spec D4 asks for a pad_mode parameter; spec D2/D3 requires the input to go through hearsay.embed.prepare_segment before windowing, which the current file does not call.</li>
+<li>hearsay.metrics.by_group (spec D9) is to be copied verbatim from scripts/train_handcrafted.py into src/hearsay/metrics.py after report() (past line 106); not present yet.</li>
+<li>write_submission score_max (src/hearsay/submission.py:80) is the only knob if the score ceiling ever changes from [0, 1].</li>
+<li>Any new .claude/skills/<em>/SKILL.md or codex-</em>.md rubric is pulled into every living-doc check automatically (tests/test_docs_consistency.py:22-23); it must state the pinned constants correctly and avoid banned words.</li>
+</ul>
+<p>Invariants you must keep</p>
+<ul>
+<li>WIN = 64,600 samples, HOP = WIN // 2 (src/hearsay/spectra.py:26-27); synth_logit = logit_spoof - logit_bonafide and must increase with synthetic likelihood (line 62-63).</li>
+<li>Direction gate: auc &lt; 0.5 or median_synth_spoof &lt;= median_synth_bonafide is a hard failure (scripts/spectra_direction.py:88). Its Platt fit is diagnostic, marked provisional, and must never be fit on the NSA validation split or In-the-Wild (docstring lines 11-12).</li>
+<li>Submission format: TSV, header <code>filename&lt;TAB&gt;cm-score</code>, score in [0, 1], 0.0 = bona fide, 1.0 = synthetic (src/hearsay/submission.py:3-5). write_submission never overwrites (line 86) and re-reads the file to assert header, order and values (lines 107-109). LOG_COLUMNS order is fixed: timestamp, rung, validation_score, validation_score_clean_only, csv_path, notes (lines 29-31).</li>
+<li>score_files records <code>fallback</code> plus a flag ('decode_error', 'score_error:&lt;Type&gt;', 'nonfinite_score') for every failing file, guaranteeing one row per input (src/hearsay/submission.py:44).</li>
+<li>min_dcf at pi_synth = 0.3 is the sponsor-judged number (src/hearsay/metrics.py:19); reports lead with it, not EER. C_FA = 4.0, C_MISS = 1.0, PI_SYNTH = 0.3 (lines 29-31) are pinned by tests/test_docs_consistency.py:107, which also requires CLAUDE.md and docs/plan.md to contain the literal strings 'C_FA = 4' and 'π_synth = 0.3'.</li>
+<li>Living docs (CLAUDE.md, README.md, docs/plan.md, every .claude/skills/<em>/SKILL.md, the two codex-</em>.md rubrics) may not spell out the comma-separated-values word (the TSV-format rule) outside the allowlist (tests/test_docs_consistency.py:124), may not state a conflicting prior (line 116), and may not contain dropped-scope vocabulary except on lines marked '(cut)', capped at MAX_CUT_LINES = 6 (lines 27, 72).</li>
+<li>docs/scoping.md and docs/master-doc.md must equal their content at git sha e1a1e88 plus exactly one banner line; the first handoff must be byte-identical (tests/test_docs_consistency.py:156).</li>
+</ul>
+<p>Gotchas</p>
+<ul>
+<li>scripts/score_spectra.py and tests/test_spectra.py do not exist; git log on src/hearsay/spectra.py shows one real commit (0e2df3d, M0). The M3 spec describes planned work that has not landed.</li>
+<li>The m3val map left it unverified whether hearsay.audio.windows() repeat-pads short clips; the deep map confirms it tiles them (src/hearsay/audio.py:82-83).</li>
+<li>sponsor_min_dcf (src/hearsay/metrics.py:78) uses the sponsor's own constants and polarity (higher score = bona fide); it exists to catch a polarity mismatch with the sponsor's script, not as the primary metric.</li>
+<li>score_files swallows all scorer exceptions (src/hearsay/submission.py:60); check ScoredFiles.flags / n_flagged after scoring.</li>
+<li>bench_latency times only the backbone forward pass; pooling and head are excluded (docstring line 5).</li>
+<li>splits/nsa_folds_plus_asv19.csv (27,648 rows, 15,128 bonafide / 12,520 spoof) also exists; do not conflate it with the 20,000-row base file.</li>
+<li>MLAAD is gated with a non-commercial notice (scripts/pull_mlaad.py:3).</li>
+</ul>
+<h2 id="documentation-docs-claudemd-readmemd">Documentation (docs/, CLAUDE.md, README.md)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Path</th><th>Status</th><th>Purpose</th>
+</tr></thead>
+<tbody>
+<tr><td>README.md</td><td>living</td><td>public intro, setup, Docker target, layout; points to docs/STATUS.md and CLAUDE.md; to be rewritten before submission (README.md:17)</td></tr>
+<tr><td>CLAUDE.md</td><td>living</td><td>project constitution: detector contract, model ladder, conventions, sources-of-truth precedence, frozen pre-event work log (100-111), AI-use disclosure kept current (113-155), skills table; team table (17-22)</td></tr>
+<tr><td>docs/STATUS.md</td><td>living snapshot</td><td>what is done / in flight / planned, data locations, findings log, how to help; stamped Sat Sep 26 ~04:40 (STATUS.md:1)</td></tr>
+<tr><td>docs/architecture.md</td><td>living</td><td>Mermaid diagrams, components tagged built / in-flight / planned; plan wins on scope, submissions/log.csv and meta.json win on numbers (architecture.md:1)</td></tr>
+<tr><td>docs/plan.md</td><td>living</td><td>software-only working plan: scoring, deliverables, score direction, ladder gates, timeline; the scope source of truth</td></tr>
+<tr><td>docs/nsa-challenge.md, .pdf</td><td>spec</td><td>sponsor brief text (pdftotext) and the original PDF; rules/scoring authority</td></tr>
+<tr><td>docs/scoping.md, docs/master-doc.md</td><td>historical, frozen</td><td>pre-rescope memos, pinned by tests/test_docs_consistency.py</td></tr>
+<tr><td>docs/handoffs/2026-09-26_feature-engineering-map.md</td><td>living for the lane</td><td>file:line "where do you plug in" map for hc_v4 families, ranked feature ideas, gate procedure</td></tr>
+<tr><td>docs/handoffs/2026-09-26_handcrafted-v4-brief.md</td><td>brief</td><td>math, metric and gate criteria for handcrafted v4</td></tr>
+<tr><td>docs/handoffs/2026-09-25_first-two-hours-handoff.md, 2026-09-26_cpu-detectors-handoff.md, _m3-spectra-aasist-handoff.md, _m5-finetune-handoff.md</td><td>historical</td><td>lane spin-up runbooks</td></tr>
+<tr><td>docs/reports/2026-09-26_cpu-detectors.md</td><td>report</td><td>D-track results: shortcuts found and fixed, container-is-the-label, 7.2 kHz band-wall finding</td></tr>
+<tr><td>docs/reports/2026-09-26_handcrafted-v4.md</td><td>report, untracked</td><td>v4 per-family gate results; stops before training-variant results</td></tr>
+<tr><td>docs/reports/2026-09-26_m1b-asv19-bonafide.md</td><td>report</td><td>M1b: better holdout, worse In-the-Wild false alarms</td></tr>
+<tr><td>docs/reports/2026-09-26_m5-xlsr-finetune.md</td><td>live skeleton</td><td>most cells TBD, filled as M5 pilot runs land</td></tr>
+<tr><td>docs/reports/2026-09-26_m3-spectra-aasist-plan.md, docs/specs/2026-09-26_m3-spectra-aasist.md</td><td>untracked</td><td>M3 reviewed plan and run spec</td></tr>
+<tr><td>docs/reports/2026-09-26_m5-xlsr-finetune-plan.md, -plan-review.md, docs/specs/2026-09-26_m5-xlsr-finetune.md</td><td>frozen</td><td>M5 plan, Codex review, run spec (D1-D8)</td></tr>
+<tr><td>docs/reports/2026-09-25_*.md</td><td>frozen</td><td>M1 public-probe shakedown, rescope plan and review, sponsor questions</td></tr>
+<tr><td>docs/reports/cloud-expense-ledger.md</td><td>living ledger</td><td>one row per cloud rental / destroy / credit event, appended by scripts/cloud/*.sh</td></tr>
+<tr><td>docs/consults/2026-09-26_*.md</td><td>consult records</td><td>fusion-strategy and M5 data-mix prompts and responses (summary and verbatim)</td></tr>
+<tr><td>docs/specs/2026-09-25_software-only-rescope.md, -audit.md</td><td>frozen</td><td>rescope run spec and audit</td></tr>
+</tbody>
+</table></div>
+<p>Where to add</p>
+<ul>
+<li>A new lane's "where do I plug in" map: docs/handoffs/ (pattern: docs/handoffs/2026-09-26_feature-engineering-map.md). Results: docs/reports/. Run specs: docs/specs/. External consults: docs/consults/.</li>
+<li>Any completed AI-assisted work: CLAUDE.md:113-155 AI-use disclosure, which the rules require to be kept current through the weekend.</li>
+<li>Team ownership: CLAUDE.md:17-22.</li>
+<li>Constraints: CLAUDE.md, README.md, docs/plan.md and every SKILL.md are scanned by tests/test_docs_consistency.py (no spelled-out comma-separated-values word, no conflicting prior, no dropped-scope vocabulary, exact 'C_FA = 4' and 'π_synth = 0.3' strings).</li>
+</ul>
+<p>Invariants you must keep</p>
+<ul>
+<li>Sources of truth: docs/plan.md for scope, submissions/log.csv and models/*/meta.json for numbers (architecture.md:1), docs/nsa-challenge.md for rules.</li>
+<li>docs/scoping.md, docs/master-doc.md and docs/handoffs/2026-09-25_first-two-hours-handoff.md are frozen at git sha e1a1e88 (tests/test_docs_consistency.py:24, 156).</li>
+</ul>
+<p>Gotchas</p>
+<ul>
+<li>docs/STATUS.md and docs/architecture.md are snapshots, not auto-updated; commits ea65f73, 982aa11 and 8445095 (04:25-04:34) land at or after their timestamp.</li>
+<li>docs/reports/2026-09-26_m5-xlsr-finetune.md is intentionally a skeleton.</li>
+</ul>
+<h2 id="how-to-recipes">How-to recipes</h2>
+<h3 id="a-add-a-feature-family-to-the-handcrafted-detector">(a) Add a feature family to the handcrafted detector</h3>
+<ol>
+<li>Write <code>myfam(ctx) -&gt; dict[str, float]</code> in src/hearsay/hc_v4.py reading x/Z/S/freqs/voiced/rms_db/f0 from ctx; prefix every key with the family name; obey the naming and content rules above.</li>
+<li>Register it in FAMILIES (src/hearsay/hc_v4.py:300-303).</li>
+<li>Add its key set to EXPECTED in tests/test_hc_v4.py:33-44 and run <code>uv run pytest tests/test_hc_v4.py -q</code> (key names, finiteness, offset invariance, disjointness from v3).</li>
+<li>Add <code>'myfam': ('myfam_',)</code> to FAMILY_PREFIXES (scripts/train_handcrafted.py:51).</li>
+<li>Add plain-English LABELS entries in src/hearsay/detectors/handcrafted.py (LABELS ends line 92); run <code>uv run pytest tests/test_handcrafted_detector.py -q</code>.</li>
+<li>Extract: <code>uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/&lt;m&gt;.csv --name &lt;name&gt; --families lfcc,phase,cqcc,modulation,breath,jitter,myfam --workers 6 [--crop test --seed 0]</code> (writes outputs/handcrafted/&lt;name&gt;.csv + .meta.json).</li>
+<li>Train and gate: <code>uv run python scripts/train_handcrafted.py --train &lt;name&gt; --folds splits/nsa_folds.csv --test &lt;test_name&gt; --out-name handcrafted_v4 [--drop-columns 'contrast0_mean,mfcc2_std*']</code>; selection by inner CV only, holdout read once.</li>
+<li>Stress: <code>uv run python scripts/eval_bundle.py --bundle models/hc_lgbm_&lt;stamp&gt; --features outputs/handcrafted/&lt;file&gt;.csv --oof outputs/detector_scores/&lt;out-name&gt;.csv</code>.</li>
+<li>Record the gate result in docs/reports/2026-09-26_handcrafted-v4.md.</li>
+</ol>
+<h3 id="b-add-a-new-contract-detector-and-export-it-for-fusion">(b) Add a new contract detector and export it for fusion</h3>
+<ol>
+<li>Rule-based: copy src/hearsay/detectors/enf.py's shape (docstring with rationale and calibration, <code>applies()</code> True, <code>run()</code> memoizing <code>analyze()</code> via ctx.memo, named score constants, register guard at module bottom). Learned: subclass FeatureModelDetector as src/hearsay/detectors/compression.py does (feature_fn, LABELS, name/prefix/kind_label/memo_key), and train the bundle with scripts/train_handcrafted.py so it lands in models/&lt;prefix&gt;<em>&lt;kind&gt;</em>&lt;stamp&gt;/.</li>
+<li>Import it in src/hearsay/detectors/engineered.py:16 and add it to LEARNED or RULE_BASED (lines 18-19).</li>
+<li>Write a hermetic test in the pattern of tests/test_handcrafted_detector.py (toy bundles, ClipContext.from_array, contract B1-B9) and add it to tests/test_engineered_registry.py's expected set.</li>
+<li>Run <code>uv run pytest tests/test_detector_contract.py tests/test_engineered_registry.py tests/&lt;new test&gt; -q</code>.</li>
+<li>Export fold-validated scores: <code>uv run python scripts/score_detector.py --detector &lt;name&gt; --folds splits/nsa_folds.csv --test-manifest outputs/manifests/nsa_test.csv --workers 6</code> (inner_oof / holdout / test splits under outputs/detector_scores/).</li>
+</ol>
+<h3 id="c-run-the-fold-validated-gate-for-any-detector">(c) Run the fold-validated gate for any detector</h3>
+<ol>
+<li>Fold file: splits/nsa_folds.csv (or splits/nsa_folds_plus_asv19.csv when the row set includes ASV19); never build fresh folds. Extend with training-only rows via <code>scripts/extend_folds.py --base splits/nsa_folds.csv --extra &lt;rows&gt; --out &lt;new file&gt;</code>.</li>
+<li>Rule-based or any registered detector: <code>uv run python scripts/score_detector.py --detector &lt;name&gt; --folds splits/nsa_folds.csv --test-manifest outputs/manifests/nsa_test.csv --workers 6</code>.</li>
+<li>Handcrafted / compression bundles: <code>scripts/train_handcrafted.py --train &lt;name&gt; --folds splits/nsa_folds.csv --test &lt;test_name&gt; --out-name &lt;out&gt;</code>; compression features first via <code>uv run python scripts/extract_compression.py --manifest outputs/manifests/nsa_train_sample.csv --name nsa_train_sample --crop test --seed 0 --launder-frac 0.5 --workers 6</code>.</li>
+<li>M1 probe: <code>scripts/train_probe.py --folds splits/nsa_folds.csv --train &lt;embedding sets&gt; [--stress &lt;itw set&gt;]</code> (layer picked by argmin CV (min_dcf, eer), holdout scored once, <code>assert auc &gt; 0.5</code>).</li>
+<li>M5: scripts/m5_assemble.py checks 16142 / 3858 / 1671 row counts and compares against the newest NSA-only M1 bar.</li>
+<li>Read minDCF at pi_synth = 0.3 first (hearsay.metrics.report), then EER; stress sets are read at the inner-OOF threshold (scripts/eval_bundle.py, scripts/train_probe.py --stress).</li>
+</ol>
+<h3 id="d-produce-a-tsv-and-log-it">(d) Produce a TSV and log it</h3>
+<ol>
+<li>Rollback baseline: <code>scripts/make_constant_csv.py --test-dir &lt;dir&gt; --manifest &lt;m&gt; --pi-synth 0.3 --out &lt;path&gt; --notes &lt;text&gt;</code>; it runs preflight, score_files with a constant, write_submission and append_log with validation_score 1.0 (scripts/make_constant_csv.py:33-62).</li>
+<li>M1 probe: <code>scripts/make_probe_csv.py --probe models/m1_&lt;...&gt; --test-dir &lt;dir&gt; --manifest &lt;m&gt; --pi-synth 0.3 [--cost-shift] --val-mindcf &lt;x&gt; --val-eer &lt;y&gt; --notes &lt;text&gt;</code>; preflight (submission.py:148) scores silence and a chord twice and asserts reproducibility before any real file.</li>
+<li>write_submission (src/hearsay/submission.py:73) refuses to overwrite; pick a new path per attempt. It validates equal lengths, unique ids, finite scores in [0, 1] and re-reads the file.</li>
+<li>append_log (src/hearsay/submission.py:113) appends one row to submissions/log.csv with the fixed LOG_COLUMNS; csv_path is stored repo-relative.</li>
+<li>Check ScoredFiles.flags / n_flagged and the sidecar's flag column before trusting the TSV.</li>
+</ol>
+<h2 id="tests-what-pins-what">Tests: what pins what</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Test</th><th>Pins</th>
+</tr></thead>
+<tbody>
+<tr><td>tests/test_hc_v4.py</td><td>per-family expected key sets (EXPECTED, lines 33-44), finite floats, no collision with the 75 v3 names, offset invariance (rel_tol 0.25 / abs_tol 0.05), families=() gives len(V3) columns, unknown family raises KeyError, directional checks (phase coherence, lfcc1 tilt, modulation fractions sum to 1, jitter small on a steady tone)</td></tr>
+<tr><td>tests/test_handcrafted_detector.py</td><td>HandcraftedDetector against contract B1-B9 with toy logreg/lgbm bundles: result shape, score in [0, 1], features = bundle features + hc_logit, direction follows the model, evidence has an SD figure and a LABELS phrase, deterministic and memoized, missing bundle -&gt; error result, latest_model_dir picks newest stamp, REGISTRY registration, families recomputed at inference (line 141)</td></tr>
+<tr><td>tests/test_detector_contract.py</td><td>DetectorResult validation and safe_run never-raises / skip / error conversion (base.py:163-192)</td></tr>
+<tr><td>tests/test_trees.py</td><td>Trees matches LightGBM bit-for-bit (line 22), contrib sums to raw (line 32), categorical splits rejected (line 61), no lightgbm import anywhere in src/ or tests/ (line 69)</td></tr>
+<tr><td>tests/test_enf_detector.py, test_splice_detector.py, test_container_detector.py, test_compression_detector.py</td><td>each detector's scoring/evidence on synthetic inputs via ClipContext.from_array; fixed score sets; tag rule matching; compression wiring to a saved bundle</td></tr>
+<tr><td>tests/test_engineered_registry.py</td><td>LEARNED/RULE_BASED/NAMES partition; importing engineered registers exactly five detectors</td></tr>
+<tr><td>tests/test_audio_and_submission.py</td><td>embed_clip == bulk path within 1e-3 (line 179, needs weights); prepare_segment never tiles, deterministic, 8 s cap (line 270); band_limit reproduces the 7.25 kHz wall (line 294); trim_silence level-independent and safe (line 256); normalize_windows removes level and offset (line 222); test_duration_sampler in [3.0, 14.0] s with median in (3.2, 3.7) (line 284, skipped without splits/nsa_test_durations.csv). No separate test_embed.py or test_probe.py exists.</td></tr>
+<tr><td>tests/test_m5_model.py</td><td>M5Net forward on a fixed tiny model; save_m5/load_m5 hash round-trip</td></tr>
+<tr><td>tests/test_m5_bundle.py</td><td>write_clip peak clamp, pcm_sha256 length, prepare_clip peak scaling</td></tr>
+<tr><td>tests/test_m5_manifest.py, test_m5_crops.py, test_m5_codecs.py, test_m5_scores.py</td><td>manifest fold/exclusion rules; crop/collate/LengthMixer; codec round-trip; assemble report shape incl. score_duration_spearman_bonafide (test_m5_scores.py:106). Not read in the finder pass.</td></tr>
+<tr><td>tests/test_docs_consistency.py</td><td>C_FA = 4, C_MISS = 1, PI_SYNTH = 0.3 in code and as literal strings in CLAUDE.md and docs/plan.md; no spelled-out comma-separated-values word, no conflicting prior, no dropped-scope words in living docs; historical docs frozen at e1a1e88 plus one banner</td></tr>
+<tr><td>tests/test_spectra.py</td><td>does not exist; the M3 spec lists ~40 planned tests</td></tr>
+<tr><td>whole suite</td><td><code>uv run pytest -q</code> passes 301/301; with <code>-m "not needs_data and not needs_weights and not slow"</code> 294 pass, 7 deselected</td></tr>
+</tbody>
+</table></div>
+<h2 id="known-gaps-and-stale-docs">Known gaps and stale docs</h2>
+<ul>
+<li>docs/reports/2026-09-26_handcrafted-v4.md ends at line 34 with the placeholder "<em>(filled in below from the full 20,000-clip run; four variants, all selected by inner CV only, holdout read once each.)</em>" and nothing follows; the training-variant section is not written.</li>
+<li>No v4-trained bundle exists under models/: only hc_lgbm_20260926-0232 and three hc_logreg_* dirs, all with train='nsa_train_sample_v3'; outputs/detector_scores/ has handcrafted.csv, <em>v1, _v2, _v3 but no handcrafted_v4.csv. outputs/handcrafted/ does contain nsa_test_v4.csv, nsa_train_sample_v4.csv and the hc_gate</em>*.csv per-family gate files with sidecars.</li>
+<li>No speaker-embedding-drift detector exists anywhere in src/hearsay/detectors/: no stub, TODO or partial implementation.</li>
+<li>No Dockerfile exists yet for the M5/Docker deployment path; the inferred image file list is src/hearsay/m5_model.py, m5_data.py, audio.py, handcrafted.py, embed.py, metrics.py, scripts/m5_score.py, a saved model dir (backbone/, head.safetensors, m5_config.json, hashes.json) and pyproject.toml / uv.lock.</li>
+<li>The CPU-parity check in docs/specs/2026-09-26_m5-xlsr-finetune.md:106 (Spearman &gt; 0.99, max |logit diff| &lt; 0.05 on 50 clips) was not found implemented in scripts/m5_train.py, scripts/m5_score.py or any tests/test_m5*.py.</li>
+<li>scripts/m5_assemble.py describes a 3-condition gate (lines 212-214) but exposes holdout_passed, the pooled-OOF comparison and itw['passed'] as separate fields, not one combined boolean.</li>
+<li>scripts/score_spectra.py does not exist; src/hearsay/spectra.py lacks the M3 extensions (pad_mode, prepare_segment integration, direction check, crop plan, export helpers); hearsay.metrics.by_group is absent; the M3 spec's Results, Codex plan review and Audits sections are placeholders.</li>
+<li>docs/STATUS.md:44 claims "297 passing, 301 collected"; <code>uv run pytest -q</code> reports 301 passed, 301 collected.</li>
+<li>docs/STATUS.md:41 and docs/architecture.md (both stamped Sat Sep 26 ~04:40) describe M5 as in flight with no pilot; commits ea65f73, 982aa11 and 8445095 show the pipeline built, a pilot launched, an MLAAD probe A (cap 12%), an In-the-Wild P_FA gate in the assembler, and the gate bar changed to NSA-only M1 by content with M1b beside it.</li>
+<li>CLAUDE.md:117-126 AI-use disclosure lists work only through the D-track CPU chat; the M1 TSV submission and M1b addition (dba960c, 582ecee), the 7.2 kHz band-match fix (133e536) and consult findings (0ad7a30), the M3 plan/spec/handoff, the M5 pipeline and pilot (ea65f73, 982aa11, 8445095), the v4 scaffolding (4b644c9 through 096754d), the architecture diagrams (9288d73) and docs/consults/ have no entry.</li>
+<li>CLAUDE.md:17-22 team table rows for Teammate A/B/C are still "<em>fill in</em>".</li>
+<li>docs/handoffs/2026-09-26_feature-engineering-map.md:3 says a repo-wide code map is being generated at docs/code-map.md; this file fulfils that pointer.</li>
+<li>src/hearsay/metrics.py:13-15 flags an unresolved sponsor-formula ambiguity (P_FA weighting by P(attack)).</li>
+<li>m5_data.group_key (src/hearsay/m5_data.py:63) vs scripts/make_folds.py:group_key identity was not diffed.</li>
+</ul>
+<h2 id="reading-order">Reading order</h2>
+<p>Feature-engineering teammate</p>
+<ol>
+<li>docs/STATUS.md</li>
+<li>docs/handoffs/2026-09-26_feature-engineering-map.md, then docs/handoffs/2026-09-26_handcrafted-v4-brief.md (section 3 "Where to plug in" is the recipe)</li>
+<li>src/hearsay/handcrafted.py (features:72, ctx:136, preprocessing 43-68)</li>
+<li>src/hearsay/hc_v4.py (FAMILIES:300 and the six family functions)</li>
+<li>tests/test_hc_v4.py (the contract every family must satisfy)</li>
+<li>scripts/extract_handcrafted.py (--families -&gt; .csv + .meta.json)</li>
+<li>scripts/train_handcrafted.py (META_COLS/META_SUFFIXES, FAMILY_PREFIXES, --drop-columns, bundle contents)</li>
+<li>src/hearsay/detectors/_learned.py (run:88, _evidence:102) and src/hearsay/detectors/handcrafted.py (LABELS:21)</li>
+<li>tests/test_handcrafted_detector.py (hermetic contract-test pattern)</li>
+<li>docs/reports/2026-09-26_cpu-detectors.md, then docs/reports/2026-09-26_handcrafted-v4.md</li>
+<li>scripts/eval_bundle.py once a family is real</li>
+</ol>
+<p>Docker teammate</p>
+<ol>
+<li>README.md for the target CLI contract (<code>docker run --network none -v &lt;test_dir&gt;:/data:ro -v &lt;out_dir&gt;:/out hearsay</code>)</li>
+<li>CLAUDE.md Conventions (offline-only, 16 kHz mono, no hosted API)</li>
+<li>docs/plan.md Docker section; docs/STATUS.md:43 currently lists Docker as not started and unowned, verify before starting</li>
+<li>docs/architecture.md for loader -&gt; orchestrator -&gt; detectors -&gt; fusion -&gt; TSV writer</li>
+<li>src/hearsay/detectors/base.py (Detector:149, safe_run:163, Registry:195) and src/hearsay/submission.py (score_files:44, write_submission:73, append_log:113)</li>
+<li>src/hearsay/audio.py (load_audio:22) and src/hearsay/m5_data.py (deploy_transform:258, DEPLOY_MAX_S:44), scripts/m5_score.py (score_paths:30) for the CPU inference path</li>
+<li>src/hearsay/trees.py (why lightgbm is never imported at inference)</li>
+<li>docs/STATUS.md Data table for what is mounted read-only, baked in (weights) or excluded (train-only data)</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/code-map.md</code> <span class="hash">ca82daff6622</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

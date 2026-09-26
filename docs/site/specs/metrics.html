@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The metric module · HEARSAY</title>
+<meta name="description" content="The normalized detection cost used for every selection and every reported number, plus an exact re-implementation of the sponsor&#x27;s shipped scoring code, so each">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html" aria-current="page">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>The metric module</h1>
+<p class="lead">The normalized detection cost used for every selection and every reported number, plus an exact re-implementation of the sponsor's shipped scoring code, so each result can be read both ways.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Parameters and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>Everything on this site is measured with one function that mirrors the sponsor's rule: a false alarm costs <span class="num" data-src="CLAUDE.md#conventions">4×</span><a class="src" href="../library/claude-md.html#conventions" title="Source: CLAUDE.md, section conventions"><span class="sr">source: CLAUDE.md, section conventions</span></a> a miss and about <span class="num" data-src="CLAUDE.md#conventions">70%</span><a class="src" href="../library/claude-md.html#conventions" title="Source: CLAUDE.md, section conventions"><span class="sr">source: CLAUDE.md, section conventions</span></a> of files are real, scaled so that <span class="num" data-src="src/hearsay/metrics.py#L7">1.0</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L7" title="Source: src/hearsay/metrics.py line 7 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py line 7 (GitHub; assumes main is public)</span></a> is the best constant answer. The sponsor's actual script reads scores the other way round and moves the heavy weight to the missed fake, so a second function reproduces that script exactly. The long explanation is on <a href="../metric.html">the metric page</a>.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: labels (1 = synthetic) and scores. Out: normalized minDCF at the best threshold, the cost at a given threshold, EER, the Bayes threshold on a log-likelihood ratio, and the sponsor-code reading with or without a flip.</p>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py" title="src/hearsay/metrics.py (GitHub; assumes main is public)">src/hearsay/metrics.py</a>.</p>
+<h2 id="params">Parameters and where each is set</h2>
+<ul>
+<li>Constants: <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L29" title="src/hearsay/metrics.py line 29 (GitHub; assumes main is public)">C_FA = 4, C_MISS = 1, PI_SYNTH = 0.3</a>. The normalizer is the best constant decision, <code>min(C_FA·(1−π), C_MISS·π)</code> (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L41" title="src/hearsay/metrics.py line 41 (GitHub; assumes main is public)">metrics.py, lines 41–42</a>), which makes the normalized cost <span class="num" data-src="src/hearsay/metrics.py#L10">9.33</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L10" title="Source: src/hearsay/metrics.py line 10 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py line 10 (GitHub; assumes main is public)</span></a>·P_FA + P_miss.</li>
+<li><code>min_cost</code> sweeps every threshold from the ROC curve and caps the result at the constant decision, so it is never above 1 (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L54" title="src/hearsay/metrics.py line 54 (GitHub; assumes main is public)">metrics.py, lines 54–59</a>). Only the ranking of scores can change it.</li>
+<li><code>bayes_llr_threshold</code> = ln(C_FA/C_MISS) − logit(π): the log-likelihood ratio above which calling a file synthetic pays (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L62" title="src/hearsay/metrics.py line 62 (GitHub; assumes main is public)">metrics.py, lines 62–64</a>); <code>decision_logit</code> shifts a calibrated LLR so that a fixed <span class="num" data-src="src/hearsay/metrics.py#L69">50%</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L69" title="Source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)</span></a> cut makes that decision, which is a posterior above <span class="num" data-src="src/hearsay/metrics.py#L69">0.8</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L69" title="Source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)</span></a> at the four-to-one cost.</li>
+<li><code>sponsor_min_dcf</code>: the sponsor's constants (bona fide prior <span class="num" data-src="docs/reports/2026-09-26_fusion-sweep-predeclared.md#readouts-for-every-candidate">0.5</span><a class="src" href="../library/reports-2026-09-26-fusion-sweep-predeclared.html#readouts-for-every-candidate" title="Source: docs/reports/2026-09-26_fusion-sweep-predeclared.md, section readouts-for-every-candidate"><span class="sr">source: docs/reports/2026-09-26_fusion-sweep-predeclared.md, section readouts-for-every-candidate</span></a>, the 4× on an accepted spoof) with a higher score read as bona fide, and a <code>flip</code> switch (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L78" title="src/hearsay/metrics.py line 78 (GitHub; assumes main is public)">metrics.py, lines 78–96</a>). The sweeps call this reading the "miss-averse" cost.</li>
+<li><code>report</code> returns EER, minDCF, the actual cost at the Bayes threshold, the same at an even prior, and both sponsor-code readings; <code>by_group</code> gives per-generator and per-source readouts.</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built in the first hours; the sponsor-code twin was verified against the shipped script within 1e-9 for both polarities (a data-gated test).</p>
+<h2 id="numbers">Numbers</h2>
+<p>Every table on this site.</p>
+<h2 id="limits">Known limits</h2>
+<p>The docstring records an open question about whether the kickoff slide's formula weights the false-alarm term by the attack prior; the brief's wording is what the constants implement, and the sponsor's script is reproduced separately.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_audio_and_submission.py</code>: constant decisions normalize to one, a perfect scorer gives zero and the Bayes threshold at an even prior is ln 4, the sponsor-code twin matches the shipped script. <code>tests/test_docs_consistency.py</code> pins the constants stated in the documents to the module.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/claude-md.html#conventions" title="CLAUDE.md, section conventions">CLAUDE.md, "NSA metric and format"</a>; <a class="srclink" href="../library/plan.html#scoring-and-deliverables" title="docs/plan.md, section scoring-and-deliverables">the plan, "Scoring and deliverables"</a>; <a class="srclink" href="../library/architecture.html#1-what-shapes-the-design" title="docs/architecture.md, section 1-what-shapes-the-design">Architecture §1</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="submission-writer.html">← The submission writer and the experiment log</a><a class="next" rel="next" href="folds.html">The fold file →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/specs/metrics.frag</code> <span class="hash">e878402e59ed</span>, <code>src/hearsay/metrics.py</code> <span class="hash">cb9b3e220c1c</span>, <code>CLAUDE.md</code> <span class="hash">e6756765556f</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

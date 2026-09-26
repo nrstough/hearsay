@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff — first-two-hours (2026-09-25, 8:01 pm) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-25_first-two-hours-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-25_first-two-hours-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next-planmd-runbook-clock-starts-when-the-nsa-data-is-in-hand">What to do next (plan.md runbook, clock starts when the NSA data is in hand)</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#hearsay-status">HEARSAY status</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff--first-two-hours-2026-09-25-801-pm">Handoff — first-two-hours (2026-09-25, 8:01 pm)</h1>
+<p><strong>Purpose of this chat:</strong> hacking has started (8:00 pm Fri Sep 25). Birth the repo, then run the model owner's first-two-hours runbook from <code>docs/plan.md</code>: read the NSA rules, inventory the drop, build grouped splits, ship the <strong>constant-prior CSV</strong>, verify Spectra-AASIST score direction, and start the latency microbenchmark plus frozen-embedding extraction. No custom architecture work in this window.</p>
+<h2 id="context">Context</h2>
+<p>HEARSAY is an audio deepfake detector for the HackGT 13 NSA challenge (clip in → 0–100% synthetic likelihood → CSV on a hidden test set), plus a live pan-tilt listening-head demo. I own the detector, validation split, CSV, and streaming scorer. Pre-event setup is done: uv env, skills, CLAUDE.md, Codex review scripts, weights and two datasets downloaded. <strong>No application code exists yet</strong>; <code>src/hearsay/</code> is empty.</p>
+<p><code>docs/plan.md</code> is the working plan and <strong>supersedes the model ladder in CLAUDE.md</strong> where they differ (CLAUDE.md: "the docs win on plan and scope"). Plan changes: fine-tune M5 comes right after the first learned CSV; M4 is logistic fusion + Platt scaling, not gradient boosting; M2 is one 30-minute gate; M6 is cut unless labels are explicit; 2 mics; no laser. The core front end is <code>facebook/wav2vec2-xls-r-300m</code>.</p>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>~/Projects/hearsay</code>, <strong>not a git repo yet</strong>. <code>scripts/first-commit.sh</code> has not run. It is past 8:00 pm, so it will now run.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay
+bash scripts/first-commit.sh      # FIRST: git init, private GitHub repo nrstough/hearsay, first commit, push
+                                  # prompts about docs/master-doc.md (missing): answer y, or add it first
+uv sync                           # env already built; Python 3.12 in .venv
+uv run python -c "import torch; print(torch.backends.mps.is_available())"   # expect True</code></pre>
+<ul>
+<li>Run everything with <code>uv run …</code> from the repo root.</li>
+<li>Load audio with <code>soundfile</code> / <code>librosa</code> / ffmpeg. <code>torchaudio.load()</code> fails here (needs torchcodec, not installed); <code>torchaudio.functional.resample</code> works.</li>
+<li>ffmpeg 7.1.1 has encoders for Opus, AMR-NB, AAC, MP3, and μ-law (the codec round-trip set).</li>
+<li>Hugging Face: <strong>not logged in</strong>. Run <code>hf auth login</code> (user types the token) before requesting MLAAD access.</li>
+<li>After the first push, the user adds collaborators: GitHub → repo Settings → Collaborators, or <code>gh api -X PUT repos/nrstough/hearsay/collaborators/&lt;user&gt; -f permission=push</code>.</li>
+</ul>
+<h2 id="what-to-do-next-planmd-runbook-clock-starts-when-the-nsa-data-is-in-hand">What to do next (plan.md runbook, clock starts when the NSA data is in hand)</h2>
+<ol>
+<li><strong>Birth the repo</strong> (<code>scripts/first-commit.sh</code>, above).</li>
+<li><strong>0:00–0:20: rules.</strong> Read the metric, label semantics, outside-data policy, and submission schema. Send the sponsor three written questions: outside data allowed? which metric? are manipulation types labeled? Also ask whether pretrained anti-spoof checkpoints count as outside data, and whether pre-event weight downloads are OK.</li>
+<li><strong>0:20–0:40: inventory the NSA drop</strong> into <code>data/nsa/</code> (gitignored). Report N, formats, sample-rate and duration histograms <strong>by class</strong>, class balance, and decode failures on a stratified sample. Use <code>/validate-training-data</code>.</li>
+<li><strong>0:40–1:00: split and rollback CSV.</strong>
+<ul>
+<li>Build a generator- and speaker-disjoint split (or the best available grouping key, stated explicitly).</li>
+<li>Write the <strong>constant-prior CSV</strong> through the real test loader: one path to 16 kHz mono float32, every file yields one finite score in exact row order.</li>
+<li>Save it as a new file under <code>submissions/</code> and append a row to <code>submissions/log.csv</code>.</li>
+<li>Hash-dedupe the NSA train/test against In-the-Wild and ASVspoof.</li>
+</ul></li>
+<li><strong>1:00–1:30: Spectra-AASIST on a labeled sample.</strong> Verify score direction, then fit a provisional Platt map. Model card: logits <code>(batch, 2)</code>, <strong>index 0 = spoof, index 1 = bonafide</strong>, default threshold −1.140625 on the bonafide logit. The exported value must <em>increase</em> with synthetic likelihood; assert that with known examples before any CSV ships.</li>
+<li><strong>1:30–2:00: latency and extraction.</strong> Run the 100-window XLS-R latency microbenchmark on MPS (4 s windows; gate is 750 ms at the 95th percentile). Start frozen XLS-R embedding extraction for M1 and the bake-off.</li>
+<li><strong>Hard gate:</strong> no learned CSV by Friday midnight → stop the bake-off and ship calibrated Spectra-AASIST.</li>
+<li><strong>Parallel non-model tasks (plan.md, "Before 8 pm" leftovers):</strong>
+<ul>
+<li>Request MLAAD access.</li>
+<li>Set up a vast.ai datacenter-verified H100 with ≥100 GB disk. <strong>Ask the user before renting</strong>; spend cap ~$75.</li>
+<li>Pull a ReplayDF subset (not downloaded; CC-BY-NC-SA-4.0, Git LFS).</li>
+<li>Pick the demo phones.</li>
+<li>Replay capture with the EE ~23:15–00:15: 480-clip matrix. Split by source utterance and speaker <strong>before</strong> replaying, and hold out one phone-position cell.</li>
+</ul></li>
+</ol>
+<p>Any rung expected to take &gt;1 h goes through <code>/plan-review</code>. Time-box every rung; when the box runs out, stop and report.</p>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li><strong>Tests:</strong> none exist. <code>uv run pytest</code> collects 0 tests (exit 5); report that as "no tests", not a pass. Markers are ready: <code>needs_data</code>, <code>needs_weights</code>, <code>slow</code>.</li>
+<li><strong>Before every CSV</strong> (plan.md): run one music file and one silence file through the loader; check schema, row order, finite range, and reproducibility.</li>
+<li><strong>UPDATE 8:30 pm: ASVspoof <code>LA.zip</code> download is COMPLETE and md5-verified</strong> (<code>30c98f11d8b2bc21f2c257bfd78bb5c5</code>). The unzip was stopped partway (laptop closed), so <code>data/asvspoof2019/LA/</code> is <strong>incomplete</strong>. Finish it with <code>cd ~/Projects/hearsay/data/asvspoof2019 &amp;&amp; unzip -oq LA.zip</code> (overwrites the partial files), then check the flac count and <code>LA/ASVspoof2019_LA_cm_protocols/</code>. The resume instructions below are only needed if <code>LA.zip</code> is ever re-downloaded.</li>
+<li><strong>In flight (historical): ASVspoof 2019 LA download</strong> (7.64 GB, ~50% at 8:01 pm, ETA ~8:20 pm). It is <code>aria2c</code> running as a background job of the <em>previous</em> chat and may die with it. Check with <code>ls -l data/asvspoof2019/</code>: done when <code>LA.zip.aria2</code> is gone. If it's interrupted, resume with the same command (the <code>.aria2</code> file makes it pick up where it stopped; the md5 is verified automatically at the end):
+<pre><code class="language-bash">cd ~/Projects/hearsay/data/asvspoof2019 &amp;&amp; aria2c -x16 -s16 -k20M --file-allocation=none --continue=true --max-tries=20 --retry-wait=5 --console-log-level=warn --checksum=md5=30c98f11d8b2bc21f2c257bfd78bb5c5 -o LA.zip "https://datashare.ed.ac.uk/server/api/core/bitstreams/a9f87c35-f055-4015-80e2-2fdff0d46269/content"</code></pre>
+<p>Then <code>unzip -q LA.zip</code> in that directory. Source: Edinburgh DataShare, handle 10283/3336, ODC-BY. It's slow per connection, so keep the parallel connections.</p></li>
+<li><strong>At-risk: <code>weights/</code></strong> (4.0 GB: XLS-R 300M, WavLM-large, WavLM-base, Spectra-AASIST). Only on the Mac and gitignored. Re-downloadable from Hugging Face, all verified to load. <strong>NOT archived.</strong></li>
+<li><strong>At-risk: <code>data/in_the_wild/</code></strong> (16 GB incl. 8.2 GB zip). SHA-256 verified; 31,779 wavs (19,963 bona-fide / 11,816 spoof); labels in <code>release_in_the_wild/meta.csv</code>. <strong>Held-out stress test only, never train on it.</strong> NOT archived.</li>
+<li><strong>At-risk: submission CSVs.</strong> <code>submissions/*.csv</code> is <strong>gitignored</strong>; only <code>log.csv</code> is tracked. Archive every submitted CSV to the external drive: <code>/Volumes/Crucial P3 NVME Gen 3 2TB</code> (104 GB free, Thunderbolt NVMe ~2.7 GB/s). NOT archived yet (none exist).</li>
+<li><strong>At-risk: the NSA dataset</strong> once it arrives. It exists nowhere else; copy it to the external drive as soon as it lands.</li>
+</ul>
+<h2 id="hearsay-status">HEARSAY status</h2>
+<p>Rung: pre-M0 · Latest valid CSV: none · Val (held-out generators): clean — / replay —
+Time left to freeze: ~34 h to Sunday ~06:00–08:00 freeze (hacking ends 8 am Sun) · Contract changes pending: none</p>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li><strong>Mac:</strong> 65 GB free; M3 Pro, 18 GB unified memory, MPS works. M3 Pro timings in the plan are analytic (133 GFLOPs per 4 s XLS-R window), not measured; the microbenchmark replaces them.</li>
+<li><strong>Replay evidence:</strong> EER 4.7% → 18.2% under physical replay; failures are asymmetric (fakes pass as real). Keep a clean-only validation score beside any replay-augmented one; the NSA test set is probably clean.</li>
+<li><strong>Class imbalance:</strong> anti-spoof sets run ~90% spoof. Use a weighted sampler at ~50% bona fide per batch; never quote accuracy; never assume the test prior matches train.</li>
+<li><strong>Metric unknown:</strong> keep raw logits, calibrated probabilities, and hard decisions separately. Submit calibrated probabilities, with a rank-preserving raw-score CSV ready.</li>
+<li><strong>Shortcuts to check in hour one:</strong> clip duration correlating with label, and silence duration. VAD-gate the live scorer. Never denoise or loudness-normalize test audio.</li>
+<li><strong>License conflicts to settle before Devpost</strong> (both recorded in the CLAUDE.md AI use disclosure):
+<ul>
+<li>Spectra-AASIST: repo header Apache-2.0 vs card text MIT.</li>
+<li>In-the-Wild: Hugging Face CC-BY-SA-4.0 vs site Apache-2.0.</li>
+<li>WavLM: no license on its Hugging Face card (released via unilm, MIT).</li>
+</ul></li>
+<li><strong>Other:</strong> <code>docs/master-doc.md</code> is still missing. The external drive also holds unrelated personal data; only write into a new <code>hearsay/</code> folder there.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<p>Read first: <code>CLAUDE.md</code> → <code>docs/plan.md</code> (working plan, first-two-hours table, hard gates, cut order) → <code>docs/scoping.md</code> (the VeriLM scoping memo; evidence, ~283 KB, search it rather than reading linearly). Skills: <code>/plan-review</code>, <code>/validate-training-data</code>, <code>/diagnose</code>, <code>/handoff</code>. Log every CSV in <code>submissions/log.csv</code>.</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-25_first-two-hours-handoff.md</code> <span class="hash">2977cc8607bc</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

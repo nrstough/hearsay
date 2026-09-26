@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Docker image · HEARSAY</title>
+<meta name="description" content="An offline, CPU-only image whose entrypoint is the runner, with every model and weight inside, a hash manifest checked at start, and a refusal to run if the net">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html" aria-current="page">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>The Docker image</h1>
+<p class="lead">An offline, CPU-only image whose entrypoint is the runner, with every model and weight inside, a hash manifest checked at start, and a refusal to run if the network is on. Not a graded deliverable since Saturday noon; kept as evidence that the pipeline runs from a clean build.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Parameters and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>The brief originally asked for a container that scores the test set without configuration. NSA said on Saturday that the TSV and the README are the submission, so the image became a reproducibility check rather than a deliverable. It still proves the claim that nothing on the scoring path needs a network: the build bakes the offline flags in, the entrypoint verifies every shipped file against a manifest, and the smoke test confirms that an online container is refused.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: a mounted directory of audio, the template TSV, and the team name in an environment variable. Out: the same outputs as the runner, in a mounted output directory.</p>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/Dockerfile" title="Dockerfile (GitHub; assumes main is public)">Dockerfile</a>; <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/build.sh" title="docker/build.sh (GitHub; assumes main is public)">docker/build.sh</a> (stages the model bundles, builds for linux/amd64, tags by timestamp); <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/entrypoint.sh" title="docker/entrypoint.sh (GitHub; assumes main is public)">docker/entrypoint.sh</a> (threads, template discovery, manifest check, the runner); <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/assets.py" title="docker/assets.py (GitHub; assumes main is public)">docker/assets.py</a> (the manifest); <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/smoke.sh" title="docker/smoke.sh (GitHub; assumes main is public)">docker/smoke.sh</a>; <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/parity.py" title="docker/parity.py (GitHub; assumes main is public)">docker/parity.py</a>.</p>
+<h2 id="params">Parameters and where each is set</h2>
+<ul>
+<li>Base image <code>python:<span class="num" data-src="Dockerfile#L7">3.12</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/Dockerfile#L7" title="Source: Dockerfile line 7 (GitHub; assumes main is public)"><span class="sr">source: Dockerfile line 7 (GitHub; assumes main is public)</span></a>-slim-bookworm</code> pinned by digest; FFmpeg from apt; CPU-only torch <span class="num" data-src="Dockerfile#L29">2.14.0</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/Dockerfile#L29" title="Source: Dockerfile line 29 (GitHub; assumes main is public)"><span class="sr">source: Dockerfile line 29 (GitHub; assumes main is public)</span></a> from the PyTorch CPU index; locked dependencies exported without torch, torchaudio or LightGBM (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/Dockerfile#L7" title="Dockerfile line 7 (GitHub; assumes main is public)">Dockerfile, lines 7–30</a>).</li>
+<li>Offline flags baked in as environment: Hugging Face and transformers offline, telemetry off (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/Dockerfile#L9" title="Dockerfile line 9 (GitHub; assumes main is public)">Dockerfile, lines 9–12</a>).</li>
+<li>Copied in: the XLS-R, Spectra-AASIST and ECAPA weights, the staged model bundles, the source and scripts; a manifest of every shipped file's size and hash is frozen at build time and verified at every start, exit code 3 on a mismatch (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/entrypoint.sh#L36" title="docker/entrypoint.sh line 36 (GitHub; assumes main is public)">entrypoint.sh, lines 36–39</a>).</li>
+<li>Threads: the container's CPU quota, capped at six (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/entrypoint.sh#L12" title="docker/entrypoint.sh line 12 (GitHub; assumes main is public)">entrypoint.sh, lines 12–25</a>); a lone TSV in the data mount becomes the template; the runner is started with <code>--require-offline</code>.</li>
+<li>The build stages the probe, the handcrafted and compression bundles and every fusion constants file, refuses to run with less than eight gigabytes free, and records a build-info line with the git commit (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/docker/build.sh#L21" title="docker/build.sh line 21 (GitHub; assumes main is public)">build.sh, lines 21–69</a>).</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>The recorded image is <code>hearsay:20260926-0916</code>, built from source <code>37c26b8</code>, running the <strong>previous</strong> rule: it does not contain the M5 checkpoint. The build script does not stage M5, so a rebuild as-is would refuse to start under the runner's current default; staging M5 adds about <span class="num" data-src="docs/specs/2026-09-26_k-docker-image.md">627 MB</span><a class="src" href="../library/specs-2026-09-26-k-docker-image.html" title="Source: docs/specs/2026-09-26_k-docker-image.md"><span class="sr">source: docs/specs/2026-09-26_k-docker-image.md</span></a>. Both facts are on the routed list.</p>
+<h2 id="numbers">Numbers</h2>
+<p><span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">50</span><a class="src" href="../library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a> test files scored inside the image against the previous rule's TSV: Spearman <span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">1.0</span><a class="src" href="../library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a>, max abs diff <span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">2.02e-4</span><a class="src" href="../library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a>; decoded audio identical to the Mac on 50 of 50 files; about <span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">4 s</span><a class="src" href="../library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a> per file under emulation; <span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">3.3 GiB</span><a class="src" href="../library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a> resident.</p>
+<h2 id="limits">Known limits</h2>
+<p>Built on Apple Silicon under emulation, so it is slow there. The entrypoint's comment still names an old default rule. The image is not the shipped rule; the runner on the Mac is.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_docker_image.py</code> (no Docker needed): base image and FFmpeg layer, offline environment baked in, CPU torch and no LightGBM in the locked dependencies, the context never copies private trees or the frontend, copy destinations match the loaders, the entrypoint's contract matches the runner including the six-thread cap, symlinked bundles resolve, no LightGBM on the image path, the manifest freezes, verifies and detects tampering, the PCM hash detects a changed sample, the smoke script runs offline and checks order, the build script targets amd64 and records provenance.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/specs-2026-09-26-k-docker-image.html" title="docs/specs/2026-09-26_k-docker-image.md">The run spec</a>; <a class="srclink" href="../library/reports-2026-09-26-k-docker-image-plan.html" title="docs/reports/2026-09-26_k-docker-image-plan.md">the plan</a>; <a class="srclink" href="../library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">README, "Reproduce in Docker"</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="channel-robustness.html">← The channel-robustness probes</a><a class="next" rel="next" href="frontend-contract.html">The frontend contract →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/specs/docker-image.frag</code> <span class="hash">5216ab2246dc</span>, <code>Dockerfile</code> <span class="hash">162c288a9ace</span>, <code>docker/build.sh</code> <span class="hash">6d331bfcab9b</span>, <code>docker/entrypoint.sh</code> <span class="hash">90d2d7e9da59</span>, <code>docs/specs/2026-09-26_k-docker-image.md</code> <span class="hash">5b0d684e1eb1</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

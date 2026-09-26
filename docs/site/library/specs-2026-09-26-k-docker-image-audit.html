@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 k docker image (audit) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_k-docker-image-audit.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/specs/2026-09-26_k-docker-image-audit.md</code>; the markdown file is the record.</p>
+
+<h3 id="scorecard">Scorecard</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td>Acceptable</td><td>Matches amended K scope; T8 remains open under the documented contingency.</td></tr>
+<tr><td>Scope discipline</td><td>Excellent</td><td>K implementation commits respect ownership and prohibited-file boundaries; no training added.</td></tr>
+<tr><td>Test coverage</td><td>Acceptable</td><td>Saved parity and smoke artifacts support results; full-run completion remains outstanding.</td></tr>
+<tr><td>Review compliance</td><td>Acceptable</td><td>Previous findings addressed; complete revised smoke-script rerun remains deferred.</td></tr>
+<tr><td>Freeze integrity</td><td>—</td><td>Skipped: no P1/P2/P3 freeze hashes recorded.</td></tr>
+<tr><td>Regression check</td><td>Acceptable</td><td>Ruff passes. Independently verified 50 valid, template-ordered scores and 50/50 matching PCM hashes. Full TSV logging has a named blocker.</td></tr>
+<tr><td>Documentation</td><td>Acceptable</td><td>Required documentation and disclosure present; minor comment drift remains.</td></tr>
+<tr><td><strong>Overall</strong></td><td><strong>Acceptable</strong></td><td></td></tr>
+</tbody>
+</table></div>
+<h3 id="commentary">Commentary</h3>
+<ol>
+<li><p><strong>Plan adherence / Test coverage / Regression check — downgrade to Acceptable.</strong> T8 is unfinished: the cache contained 369 result rows at inspection, with no full TSV. The spec records exit 137, the resumed run, and deferred host-side logging. Complete the result addendum and submission log action, or record the specified hard-stop measurements.</p></li>
+<li><p><strong>Test coverage / Review compliance — limited to Acceptable.</strong> The corrected negative offline check has saved refusal evidence using real input. The complete revised smoke script has not yet been rerun. Saved positive smoke outputs are identical; independently recalculated image parity gives matching ranks and maximum difference <strong>0.000142672</strong>, within tolerance.</p></li>
+<li><p><strong>Test coverage / Regression check — verification limitation.</strong> Pytest could not start because the sandbox has no writable temporary directory; Docker access was denied. The reported 419-test pass was not independently reproduced. Repository-wide Ruff passes now.</p></li>
+<li><p><strong>Documentation — cosmetic downgrade to Acceptable.</strong> <a href="https://github.com/nrstough/hearsay/blob/main/docker/smoke.sh#L3" title="on GitHub">docker/smoke.sh</a> still says repeat outputs “must be byte-identical,” while its assertion and amended spec allow differences below <code>1e-6</code>. Align the comment with the implemented tolerance.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/specs/2026-09-26_k-docker-image-audit.md</code> <span class="hash">3ebdad34e790</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

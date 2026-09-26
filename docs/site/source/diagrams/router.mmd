@@ -1,0 +1,28 @@
+%% The router: which measured fact decides what each result is allowed to do.
+%% cites: README.md#orchestration-what-routing-changes, README.md#the-eight-forensic-techniques
+flowchart TB
+  H["header facts<br/>from the container detector"] --> H1{"PCM WAV written<br/>by FFmpeg?"}
+  H1 -->|"yes (every test file)"| H2["compression forensics run<br/>for evidence, not score"]
+  H1 -->|"no: lossy header"| H3["compression forensics apply<br/>(still evidence, never fused)"]
+  H2 ~~~ B
+  B["effective bandwidth<br/>from the compression detector"] --> B1{"above the 7.25 kHz<br/>band match?"}
+  B1 -->|"yes"| B2["logged: the file lacks<br/>the test set's low-pass"]
+  B1 -->|"no"| B3["logged: at or below<br/>the band match"]
+  B3 ~~~ GT
+  GT["speech gate<br/>five cues, thresholds beyond<br/>the test set's extremes"] --> G1{"speech present?"}
+  G1 -->|"yes"| G2["fusion runs"]
+  G1 -->|"no"| G3["skip fusion →<br/>pinned block, real end"]
+  G2 ~~~ SM
+  SM["Spectra margin<br/>+ fused rank"] --> S1{"margin below −3<br/>and rank above 0.5?"}
+  S1 -->|"yes"| S2["rank halved:<br/>a likely false alarm"]
+  S1 -->|"no"| S3["unchanged:<br/>Spectra never promotes"]
+  S3 ~~~ EV
+  EV["hum · seams · drift"] --> E1["written to the routing log<br/>and the evidence list only"]
+  E1 ~~~ MI
+  MI["a fused detector errored?"] --> M1["its column imputed at the<br/>training mean; the log names it"]
+  classDef q fill:#e9eff6,stroke:#005493,color:#101a2b
+  classDef act fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef ev fill:#ffffff,stroke:#c37530,color:#101a2b,stroke-dasharray:4
+  class H1,B1,G1,S1 q
+  class G2,S2,G3 act
+  class H2,H3,B2,B3,S3,E1,M1 ev

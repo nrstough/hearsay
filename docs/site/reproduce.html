@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reproduce it · HEARSAY</title>
+<meta name="description" content="How to set up and run HEARSAY: the runner command that reproduces the submitted TSV, the Docker evidence image, and where every artifact lives.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="story" data-search-index="search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The story</a>
+<ul><li><a href="index.html">Home</a></li><li><a href="how-it-decides.html">How it decides</a></li><li><a href="metric.html">The metric and the default answer</a></li><li><a href="what-worked.html">What worked and what did not</a></li><li><a href="detectors.html">The ten detectors</a></li><li><a href="validation.html">Validation</a></li><li><a href="reproduce.html" aria-current="page">Reproduce it</a></li><li><a href="credits.html">Credits and AI use</a></li><li><a href="glossary.html">Glossary</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>Reproduce it</h1>
+<p class="lead">The commands below are the README's, verbatim. Data, weights, model directories and submission TSVs are not in the repository; the layout they are expected in is stated, and the parity checks say how closely a live run reproduces the submitted file.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#setup">Setup</a></li><li><a href="#score">Score a directory</a></li><li><a href="#docker">Reproduce in Docker (offline, CPU; not a graded deliverable)</a></li><li><a href="#artifacts">Where each artifact lives</a></li><li><a href="#layout">Repository layout</a></li></ul></nav>
+<h2 id="setup">Setup</h2>
+<p>Requires uv and FFmpeg. <a class="srclink" href="library/readme.html#setup" title="README.md, section setup">Source: the README's setup section.</a></p>
+<pre><code class="language-bash">uv sync
+cp .env.example .env
+uv run pytest -q
+uv run ruff check .</code></pre>
+<p>Data, weights, model directories and submission TSVs are gitignored; only the experiment log is tracked. Expected layout: the NSA test set at <code>data/nsa/HackGTHearsayTesting/</code>, the template at <code>data/nsa/HearsayScoreKey4TeamX.tsv</code>, pretrained weights under <code>weights/</code>, trained bundles under <code>models/</code>.</p>
+<h2 id="score">Score a directory</h2>
+<pre><code class="language-bash">uv run python scripts/run_pipeline.py --in data/nsa/HackGTHearsayTesting --out outputs/runner/final --template data/nsa/HearsayScoreKey4TeamX.tsv --team CrossExam --fusion models/fusion_v2/constants.json</code></pre>
+<p><code>--fusion models/fusion_v2/constants.json</code> selects the shipped rule. It writes <code>CrossExam_predictions.tsv</code>, one explanation JSON per file under <code>results/</code>, a resumable <code>results.jsonl</code>, <code>timings.csv</code> and <code>run_meta.json</code>. Rerun the same command to resume after a crash. <code>--flip</code> also writes the pre-flipped twin; <code>--rule</code>, <code>--policy</code> and <code>--flip</code> re-fuse the cached logits without reloading a model. Speed with M5 loaded: <span class="num" data-src="README.md#score-a-directory-on-the-mac">1.34 s</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a> per file on the full test set (<span class="num" data-src="README.md#score-a-directory-on-the-mac">38 minutes</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a> wall on a Mac shared with other jobs); peak memory <span class="num" data-src="README.md#score-a-directory-on-the-mac">4.0 GB</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a>. <a class="srclink" href="library/readme.html#score-a-directory-on-the-mac" title="README.md, section score-a-directory-on-the-mac">Source: the README.</a></p>
+<h3 id="parity">Parity</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Exported logits → shipped constants → policy, vs the submitted TSV, all <span class="num" data-src="README.md#score-a-directory-on-the-mac">1,671</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a> rows</td><td>max abs diff <span class="num" data-src="README.md#score-a-directory-on-the-mac">6.7e-16</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a></td></tr>
+<tr><td>Same, <code>--flip</code>, vs the flipped twin</td><td>max abs diff <span class="num" data-src="README.md#score-a-directory-on-the-mac">7.2e-16</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a></td></tr>
+<tr><td>Live from audio, all files, vs the submitted TSV</td><td>Spearman <span class="num" data-src="README.md#score-a-directory-on-the-mac">1.000000</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a>, max <span class="num" data-src="README.md#score-a-directory-on-the-mac">9.3e-4</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a>, mean <span class="num" data-src="README.md#score-a-directory-on-the-mac">1.8e-5</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a>; 0 verdict flips, 0 scorer errors</td></tr>
+<tr><td>M5 logit, live CPU on WAV vs the A100 export on FLAC</td><td>max <span class="num" data-src="README.md#score-a-directory-on-the-mac">0.035</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a>, median <span class="num" data-src="README.md#score-a-directory-on-the-mac">7.0e-4</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a></td></tr>
+<tr><td>Handcrafted logit, live vs export</td><td>max <span class="num" data-src="README.md#score-a-directory-on-the-mac">4.4e-16</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a> (numpy trees, identical)</td></tr>
+<tr><td>M1b logit, live CPU vs the MPS-extracted export</td><td>max <span class="num" data-src="README.md#score-a-directory-on-the-mac">5.5e-4</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a></td></tr>
+<tr><td>Spectra-AASIST logit, live CPU vs MPS export</td><td>max <span class="num" data-src="README.md#score-a-directory-on-the-mac">1.1e-4</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a></td></tr>
+<tr><td>Previous rule: exported logits → previous constants vs the 08:13 TSV, all rows</td><td>max abs diff <span class="num" data-src="README.md#score-a-directory-on-the-mac">1.1e-16</span><a class="src" href="library/readme.html#score-a-directory-on-the-mac" title="Source: README.md, section score-a-directory-on-the-mac"><span class="sr">source: README.md, section score-a-directory-on-the-mac</span></a></td></tr>
+</tbody></table></div>
+<h2 id="docker">Reproduce in Docker (offline, CPU; not a graded deliverable)</h2>
+<p>NSA said on Saturday that the image is not required; the deliverable is the TSV and the README. The image is kept as evidence that the pipeline runs offline from a clean build. <strong>The recorded image runs the previous rule, not the shipped one:</strong> it does not contain the M5 checkpoint. <a class="srclink" href="library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">Source: the README.</a></p>
+<pre><code class="language-bash">bash docker/build.sh
+docker run --network none -v &lt;test_dir&gt;:/data:ro -v &lt;out_dir&gt;:/out -v &lt;path&gt;/HearsayScoreKey4TeamX.tsv:/tmpl/key.tsv:ro -e HEARSAY_TEMPLATE=/tmpl/key.tsv -e HEARSAY_TEAM=CrossExam hearsay:20260926-0916</code></pre>
+<p>The image contains every engineered detector, the M1b probe, Spectra-AASIST, the ECAPA speaker model, the handcrafted bundle and the fusion constants, with a sha manifest of the shipped files checked at start. It refuses to start unless it is offline, and nothing is downloaded at run time. Always pass <code>HEARSAY_TEAM</code>: the runner's default team name is not ours. Recorded image <code>hearsay:20260926-0916</code>: <span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">50</span><a class="src" href="library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a> test files scored inside the image against the previous rule's TSV, Spearman <span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">1.0</span><a class="src" href="library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a>, max abs diff <span class="num" data-src="README.md#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">2.02e-4</span><a class="src" href="library/readme.html#reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable" title="Source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable"><span class="sr">source: README.md, section reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable</span></a>; decoded audio identical to the Mac on 50 of 50 files; the smoke test passed, including the refusal to run online.</p>
+<h2 id="artifacts">Where each artifact lives</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Artifact</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Experiment log (every TSV with its holdout score)</td><td><code>submissions/log.csv</code></td></tr>
+<tr><td>Shipped fusion constants</td><td><code>models/fusion_v2/constants.json</code>; previous rule <code>models/fusion_v1/constants.json</code></td></tr>
+<tr><td>Per-detector score exports</td><td><code>outputs/detector_scores/&lt;name&gt;.csv</code> (regenerable; commands in each report)</td></tr>
+<tr><td>Model bundles and their readouts</td><td><code>models/&lt;rung&gt;_&lt;stamp&gt;/meta.json</code></td></tr>
+<tr><td>Submitted TSV</td><td><code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (sent as <code>CrossExam_predictions.tsv</code>)</td></tr>
+<tr><td>Fold file</td><td><code>splits/nsa_folds.csv</code> (+ <code>nsa_folds_plus_asv19.csv</code> for M1b)</td></tr>
+<tr><td>Experiment write-ups</td><td><a href="library/index.html#reports">docs/reports/</a></td></tr>
+<tr><td>Outside reviews we asked for, and their answers</td><td><a href="library/index.html#consults">docs/consults/</a></td></tr>
+<tr><td>Run specs and audits</td><td><a href="library/index.html#specs">docs/specs/</a></td></tr>
+</tbody></table></div>
+<h2 id="layout">Repository layout</h2>
+<pre><code>src/hearsay/            application code; detectors/ holds the contract and every detector
+tests/                  pytest suite (hermetic; data- and weight-dependent tests are marked)
+scripts/                extraction, training, fusion, runner, cloud and ops scripts
+docker/                 build, entrypoint, smoke, parity and asset-manifest scripts
+docs/                   plan, architecture, code map, reports/, specs/, consults/, handoffs/, and this site
+submissions/            log.csv (tracked) and submission TSVs (ignored)
+data/ weights/ models/  local only
+.claude/                Claude Code skills and review scripts shared by the team</code></pre>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="validation.html">← Validation</a><a class="next" rel="next" href="credits.html">Credits and AI use →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/pages/reproduce.frag</code> <span class="hash">ecd1296cb220</span>, <code>README.md</code> <span class="hash">3fe4ed9967b7</span>. The markdown is the record. <a href="about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

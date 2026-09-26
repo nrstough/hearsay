@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: M3, Spectra-AASIST as the second deep detector (Sat Sep 26, 2026, ~03:35) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_m3-spectra-aasist-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_m3-spectra-aasist-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important-tests--at-risk-artifacts">IMPORTANT: tests &amp; at-risk artifacts</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-m3-spectra-aasist-as-the-second-deep-detector-sat-sep-26-2026-0335">Handoff: M3, Spectra-AASIST as the second deep detector (Sat Sep 26, 2026, ~03:35)</h1>
+<p><strong>Purpose of this chat:</strong> run the off-the-shelf Spectra-AASIST detector over the NSA fold file and test set, and export its scores in the fusion format so M4 (fusion) gets a second deep score stream that is decorrelated from M1. Time box: <strong>45 min of build plus the scoring run</strong>; <code>docs/plan.md</code> says "drop on friction". No training, no fine-tuning: this is a scoring rung.</p>
+<p><strong>Deliver:</strong></p>
+<ul>
+<li><code>outputs/detector_scores/spectra_aasist.csv</code> with columns <code>path, fold, split, score, logit</code>, <code>split</code> ∈ {<code>inner_oof</code>, <code>holdout</code>, <code>test</code>}, one row per fold-file row (20,000) plus one per test file (1,671), same shape as <code>outputs/detector_scores/handcrafted_v1.csv</code>.</li>
+<li><code>models/m3_spectra_&lt;stamp&gt;/meta.json</code> via <code>hearsay.metrics.report</code> on the outer holdout: overall, per generator, per bona fide source, <code>sponsor_code_asis</code> and <code>sponsor_code_flipped</code>, plus the direction check.</li>
+<li>A short note in <code>docs/reports/2026-09-26_m3-spectra.md</code> (numbers, timing, what it's blind to), and an M3 line in <code>docs/STATUS.md</code>.</li>
+<li><strong>Do not write TSVs or touch <code>submissions/</code>.</strong> The main chat turns detector scores into submissions.</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>HEARSAY is the HackGT 13 NSA HEARSAY entry (software only). Read <code>CLAUDE.md</code>, <code>docs/plan.md</code>, <code>docs/STATUS.md</code> first. Scoring is 60% normalized minDCF with C_FA = 4, π_synth = 0.3 (false alarms on real speech cost 9.33× a miss); output 1.0 = synthetic, never flip.</p>
+<p><strong>Four chats run in parallel. Stay in your lane.</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Chat</th><th>Owns</th>
+</tr></thead>
+<tbody>
+<tr><td>Main</td><td>local MPS GPU, M1, fusion (M4), orchestrator, <strong>all TSVs and <code>submissions/</code></strong>, <code>src/hearsay/embed.py</code>, the M1 scripts</td></tr>
+<tr><td>CPU detectors</td><td>engineered detectors, CPU only (<code>docs/handoffs/2026-09-26_cpu-detectors-handoff.md</code>)</td></tr>
+<tr><td>M5</td><td>XLS-R fine-tune on vast.ai only (<code>docs/handoffs/2026-09-26_m5-finetune-handoff.md</code>)</td></tr>
+<tr><td><strong>This one (M3)</strong></td><td>Spectra-AASIST scoring. New files only: <code>scripts/score_spectra.py</code>, <code>tests/test_spectra.py</code>, the report. <code>src/hearsay/spectra.py</code> is yours to extend (nobody else edits it).</td></tr>
+</tbody>
+</table></div>
+<p><strong>Device decision (make it first, with Nathan):</strong> Spectra-AASIST wraps a full XLS-R 300M, so it costs about what M1's extraction cost: ~0.2 s per 4 s window on MPS, roughly 3–5× that on CPU. 21,671 clips at up to 16 windows each is <strong>~1–2 h on MPS, 4–8 h on CPU</strong>. The main chat is using the MPS GPU (an In-the-Wild extraction was running at 03:30: <code>pgrep -fl extract_embeddings</code>). Options:</p>
+<ol>
+<li><strong>Coordinate MPS with the main chat</strong>: run when their extraction finishes, or run at lower priority (<code>nice</code>) in segment mode with <code>max_windows=4</code>.</li>
+<li><strong>CPU with <code>max_windows=2</code></strong> on the 6 spare cores (<code>nice -n 10</code>), which fits the 45-min box only for a subset; use <code>--limit</code> for a pilot, then let it run in the background.
+Ask before taking the GPU. Never run on vast.ai (that's the M5 chat's budget).</li>
+</ol>
+<p><strong>What already exists:</strong></p>
+<ul>
+<li><code>src/hearsay/spectra.py</code>: <code>load_spectra(device)</code>, <code>spectra_logits(model, x, max_windows=16)</code> (repeat-pads short clips into 64,600-sample windows with 50% hop, pre-emphasis, mean of window logits), <code>synth_logit(logits) = logit_spoof − logit_bonafide</code> (increases with synthetic likelihood). Weights in <code>weights/Spectra-AASIST/</code> (<code>model.py</code> + <code>model.safetensors</code>, 1.26 GB; <code>load_spectra</code> patches the hub id to the local XLS-R copy).</li>
+<li><code>scripts/spectra_direction.py</code>: asserts direction (AUC &gt; 0.5 and spoof median above bona fide median) on a labeled manifest and fits an optional class-balanced Platt map. Already run on 494 ASVspoof 2019 eval clips: <code>outputs/spectra/asv19eval500_scores.csv</code> (raw logits per file; spoof synth_logit ≈ +11, bona fide ≈ −7 on the first rows). Result on that ASVspoof sample: AUC 1.0, EER 0.0, spoof median synth_logit +9.7 vs bona fide −7.6, <strong>0.169 s per clip on MPS</strong>; provisional Platt map (a = 4.42, b = 10.51) in <code>outputs/calibration/spectra_platt_asv19eval500.json</code>. That is public data with a known silence shortcut; expect worse on NSA.</li>
+<li><code>scripts/score_detector.py</code> shows the fusion-format export for non-learned detectors (<code>split=inner_oof</code> for inner rows, <code>holdout</code>, <code>test</code>; NaN score for failed rows; <code>logit = log(s/(1−s))</code> on a clipped score). Mirror its export block. <code>scripts/train_handcrafted.py:75-88</code> has <code>by_group()</code> for the per-generator / per-source readouts; copy it.</li>
+<li>Fold file: <code>splits/nsa_folds.csv</code> (path, label, generator, speaker, source, group, fold; holdout = playht + wavegrad2 + 26 bona fide groups; inner folds "0"–"4"). <strong>Never regenerate it.</strong> Test manifest: <code>outputs/manifests/nsa_test.csv</code> (<code>filename, path</code>, relative paths; row order is the submission order).</li>
+</ul>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>main</code> in <code>~/Projects/hearsay</code> (shared worktree). Uncommitted at handoff: the M5 chat's untracked spec/plan/consult files under <code>docs/</code> (not yours; never stage them). Stage only your own files with <code>git add &lt;paths&gt;</code>; never <code>-A</code>. Don't push without asking Nathan.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync
+uv run pytest -q          # 215 passed at 3c170d5
+uv run ruff check .       # clean
+uv run python -c "from hearsay.spectra import load_spectra; m = load_spectra('cpu'); print(type(m).__name__)"</code></pre>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li><strong>Device decision</strong> with Nathan (above). Check <code>pgrep -fl extract_embeddings</code> and the main chat before touching MPS.</li>
+<li><strong>Input path parity.</strong> Spectra was trained on ~4 s crops. Decide and record whether to score (a) <code>spectra_logits</code> on the raw <code>load_audio</code> clip (current code: repeat-pads short clips, which is the tiling shortcut M1 v2 removed), or (b) the silence-trimmed clip via <code>hearsay.embed.prepare_segment(x)</code> (trim, cap 8 s) and then windows without repeat-padding for clips ≥ 64,600 samples, zero-padding shorter ones. Recommendation: (b), with the same treatment for train and test rows, so silence and tiling can't become shortcuts. Whatever you pick, the <strong>same function scores every row</strong> (inner, holdout, test).</li>
+<li><strong>Direction check on NSA first</strong>: run <code>scripts/spectra_direction.py</code> on ~300 inner-fold rows (150 per class, sampled from <code>splits/nsa_folds.csv</code> where fold != holdout) before any export. If AUC &lt; 0.5 it exits non-zero; do not "fix" by flipping without telling Nathan.</li>
+<li><strong>Write <code>scripts/score_spectra.py</code></strong>: loads the fold file + test manifest, scores every row with the chosen path, exports <code>outputs/detector_scores/spectra_aasist.csv</code> (score = sigmoid(synth_logit) or a Platt map fit <strong>only on inner-fold rows</strong>, never holdout; logit = synth_logit), writes <code>models/m3_spectra_&lt;stamp&gt;/meta.json</code> with <code>hearsay.metrics.report</code> on the holdout, <code>by_group</code> breakdowns, timing, device, <code>max_windows</code>, and the input-path choice. Support <code>--limit N</code> for a pilot and <code>--device</code>.</li>
+<li><strong>Pilot</strong> with <code>--limit 200</code>, check timing, extrapolate, then run the full set in the background (<code>nohup … &amp;</code> or the terminal), logging to <code>outputs/spectra/score_spectra.log</code>.</li>
+<li><strong>Tests</strong> (<code>tests/test_spectra.py</code>, hermetic, no weights): direction contract (<code>synth_logit</code> increases with spoof logit), export schema and counts (20,000 + 1,671, unique paths, <code>split</code> values), NaN on decode error, no repeat-padding if you chose (b). Mark anything that needs weights <code>@pytest.mark.needs_weights @pytest.mark.slow</code> and skip when <code>weights/Spectra-AASIST</code> is missing (pattern in <code>tests/test_audio_and_submission.py:177-194</code>).</li>
+<li><strong>Report + STATUS line</strong>, disclosure line in <code>CLAUDE.md</code> (Spectra-AASIST "how used": M3 score stream; license still unclear, say so). Tell the main chat the file name so fusion picks it up.</li>
+</ol>
+<h2 id="important-tests--at-risk-artifacts">IMPORTANT: tests &amp; at-risk artifacts</h2>
+<ul>
+<li>Test: <code>uv run pytest -q</code> → <strong>215 passed</strong> at <code>3c170d5</code>; <code>uv run ruff check .</code> → clean. Add your tests; the docs-consistency test bans the bare word "CSV" in <code>CLAUDE.md</code>/<code>docs/plan.md</code> (write <code>.csv</code>) and any π other than 0.3.</li>
+<li>At risk (gitignored, NOT archived): <code>outputs/detector_scores/*.csv</code>, <code>outputs/spectra/</code>, <code>models/</code>. <code>weights/Spectra-AASIST</code> (1.26 GB) and <code>weights/wav2vec2-xls-r-300m</code> are local only.</li>
+<li>In flight (main chat, MPS): <code>extract_embeddings.py --manifest outputs/manifests/itw_stress.csv</code> at 03:30. Check <code>pgrep -fl "extract_embeddings|train_probe"</code>.</li>
+<li>The raw audio lives on the external drive (<code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/</code>, symlinked from <code>data/</code>); it must be mounted. ASVspoof/In-the-Wild/MLAAD were copied there at 03:12 and may be symlinked by the time you start.</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>M1 v2 (frozen XLS-R probe, layer 7) is the bar for deep detectors: outer-holdout minDCF <strong>0.1458</strong>, EER 2.5% (<code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0302/meta.json</code>); wavegrad2 0.21, LibriSpeech real 0.16. M3 does not need to beat it; its value is a second, differently trained deep score for the stacker. Report where it disagrees with M1 (per generator, per source).</li>
+<li>Handcrafted detector v3: holdout minDCF 0.25, blind to grad_tts, pro_diff and ElevenLabs. Compression forensics: near chance on decoded inputs.</li>
+<li>Known traps from the CPU chat's report (<code>docs/reports/2026-09-26_cpu-detectors.md</code>): the test set is band-limited differently from the training corpora, so anything keyed on the 7–8 kHz band false-alarms on real test audio. Check <code>frac_above_half</code> on the test set in <code>meta.json</code>: with a 70% real test set, a value far above 0.3 means false alarms.</li>
+<li>Sponsor scoring code treats higher = bona fide; <code>hearsay.metrics.report</code> gives both readings. Submit 1.0 = synthetic regardless.</li>
+<li>Spectra's output convention: index 0 = spoof, index 1 = bonafide (model card); <code>synth_logit</code> already handles it. The direction script is the guard.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<p><code>CLAUDE.md</code> → <code>docs/plan.md</code> (ladder row M3, cut order) → <code>docs/STATUS.md</code> → <code>src/hearsay/spectra.py</code> → <code>scripts/spectra_direction.py</code> → <code>scripts/score_detector.py</code> (export format) → <code>scripts/train_handcrafted.py:75-88</code> (<code>by_group</code>) → <code>src/hearsay/metrics.py</code> → <code>docs/reports/2026-09-26_cpu-detectors.md</code> (band-limit trap).</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-26_m3-spectra-aasist-handoff.md</code> <span class="hash">d77296462aeb</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

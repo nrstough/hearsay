@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature engineering: where you can add (map for the spectral/prosody teammate) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_feature-engineering-map.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_feature-engineering-map.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#1-the-lane-in-one-picture">1. The lane in one picture</a></li><li><a href="#2-the-one-function-you-write">2. The one function you write</a></li><li><a href="#3-rules-the-pipeline-enforces-and-the-ones-it-cant">3. Rules the pipeline enforces (and the ones it can't)</a></li><li><a href="#4-checklist-for-a-complete-family">4. Checklist for a complete family</a></li><li><a href="#5-where-the-open-slots-are">5. Where the open slots are</a></li><li><a href="#6-the-gate-as-it-was-actually-run">6. The gate, as it was actually run</a></li><li><a href="#7-from-a-kept-family-to-a-fusion-column">7. From a kept family to a fusion column</a></li><li><a href="#8-do-not-touch-and-when">8. Do not touch, and when</a></li><li><a href="#9-reading-order">9. Reading order</a></li></ul></details>
+<h1 id="feature-engineering-where-you-can-add-map-for-the-spectralprosody-teammate">Feature engineering: where you can add (map for the spectral/prosody teammate)</h1>
+<p>Sat Sep 26, 2026, ~05:00. This is the "where do I plug in" companion to the brief (<a href="handoffs-2026-09-26-handcrafted-v4-brief.html">2026-09-26_handcrafted-v4-brief.md</a>, which has the math, the metric and the gate). Read this one first, then the brief, then the code in the order at the bottom. Everything here was checked against the repo at commit <code>4b644c9</code> and the working tree after it. A repo-wide code map is being generated at <code>docs/code-map.md</code>.</p>
+<h2 id="1-the-lane-in-one-picture">1. The lane in one picture</h2>
+<pre><code>audio file
+  │ load_audio                       src/hearsay/audio.py          16 kHz mono float32
+  │ band_limit → trim → crop → RMS   src/hearsay/handcrafted.py    _crop(), lines 55-69
+  ▼
+features(x, families=(...))          src/hearsay/handcrafted.py    lines 72-141
+  ├─ 75 v3 features                  (spectral 64, prosody 11)     built in
+  └─ ctx dict → hc_v4.FAMILIES       src/hearsay/hc_v4.py          ← YOU ADD HERE (line 300)
+  ▼
+outputs/handcrafted/&lt;name&gt;.csv       scripts/extract_handcrafted.py  --families lfcc,phase,...
+  ▼
+train_handcrafted.py                 scripts/train_handcrafted.py    logistic vs LightGBM, inner folds
+  ├─ models/hc_&lt;kind&gt;_&lt;stamp&gt;/       bundle: trees + feature stats + families
+  ├─ outputs/detector_scores/&lt;out-name&gt;.csv     fusion input (path, fold, split, score, logit)
+  └─ meta.json                       per-generator, per-real-source, holdout, test share &gt; 0.5
+  ▼
+detectors/handcrafted.py             HandcraftedDetector: recomputes your families at inference,
+                                     writes the evidence sentence from LABELS</code></pre>
+<p>Five files. You will touch two of them for a new family (<code>hc_v4.py</code>, <code>detectors/handcrafted.py</code>), one line in a third (<code>train_handcrafted.py</code>), and add a test.</p>
+<h2 id="2-the-one-function-you-write">2. The one function you write</h2>
+<p>A family is a function of a context dict returning a flat <code>{name: float}</code>. Register it in <code>FAMILIES</code> at <a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/hc_v4.py" title="on GitHub">hc_v4.py:300</a>. <code>features()</code> builds the context once and calls each requested family (<a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/handcrafted.py" title="on GitHub">handcrafted.py:133-139</a>).</p>
+<p>What the context gives you, all computed on the prepared clip (band-limited to 7.25 kHz, silence-trimmed, cropped to a test-set length for training rows, RMS-normalized to 0.1):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Key</th><th>Shape</th><th>What it is</th>
+</tr></thead>
+<tbody>
+<tr><td><code>x</code></td><td><code>(n_samples,)</code> float32</td><td>the waveform, 16 kHz</td></tr>
+<tr><td><code>Z</code></td><td><code>(257, T)</code> complex</td><td>STFT, n_fft 512, hop 160 (32 ms frames every 10 ms)</td></tr>
+<tr><td><code>S</code></td><td><code>(257, T)</code> float</td><td>power spectrogram, <code>abs(Z)**2</code></td></tr>
+<tr><td><code>freqs</code></td><td><code>(257,)</code></td><td>bin center frequencies in Hz, 0 to 8000 in 31.25 Hz steps</td></tr>
+<tr><td><code>voiced</code></td><td><code>(T,)</code> bool</td><td>frames with energy above −30 dB relative and YIN pitch in 65–390 Hz</td></tr>
+<tr><td><code>rms_db</code></td><td><code>(T,)</code> float</td><td>frame loudness in dB relative to the loudest frame (frame 400, hop 160)</td></tr>
+<tr><td><code>f0</code></td><td><code>(T,)</code> float</td><td>YIN pitch track, 60–400 Hz, frame 1024, hop 160</td></tr>
+</tbody>
+</table></div>
+<p>Minimal template, matching the existing families:</p>
+<pre><code class="language-python"># src/hearsay/hc_v4.py
+def harmonic_noise(ctx: dict) -&gt; dict[str, float]:
+    S, freqs, voiced = ctx["S"], ctx["freqs"], np.asarray(ctx["voiced"], dtype=bool)
+    band = freqs &lt;= FMAX                      # never above 7 kHz
+    ...                                       # compute per-frame values on voiced frames
+    return _stats(values, "hnr_band1", pct=True)   # -&gt; hnr_band1_mean/_std/_p10/_p90
+
+FAMILIES["hnr"] = harmonic_noise              # or add it to the dict literal at line 300</code></pre>
+<p><code>_stats(v, prefix, pct)</code> at <a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/hc_v4.py" title="on GitHub">hc_v4.py:29</a> gives mean, std and optional p10/p90. Use it; it also handles empty inputs.</p>
+<h2 id="3-rules-the-pipeline-enforces-and-the-ones-it-cant">3. Rules the pipeline enforces (and the ones it can't)</h2>
+<p>Enforced by code or tests:</p>
+<ul>
+<li><strong>Finite floats only.</strong> <code>features()</code> maps non-finite values to 0.0 at the end, but don't rely on it; return real numbers.</li>
+<li><strong>Column names.</strong> Not in <code>{path, label, generator, speaker, utt, source, filename, group, fold}</code> and not ending in <code>_flag</code>, <code>_launder</code> or <code>_crop_s</code>; the trainer treats those as metadata and drops them (<a href="https://github.com/nrstough/hearsay/blob/main/scripts/train_handcrafted.py" title="on GitHub">train_handcrafted.py:46-56</a>). Names must be disjoint from the 75 v3 names (test at <a href="https://github.com/nrstough/hearsay/blob/main/tests/test_hc_v4.py" title="on GitHub">tests/test_hc_v4.py:48</a>).</li>
+<li><strong>Offset invariance.</strong> A shifted copy of the same clip must give the same values within tolerance (<a href="https://github.com/nrstough/hearsay/blob/main/tests/test_hc_v4.py" title="on GitHub">tests/test_hc_v4.py:59</a>). Training crops start at random offsets, test clips are whole utterances; a feature that depends on where the clip starts is a train-vs-test shortcut.</li>
+<li><strong>Family prefix map.</strong> The trainer keeps <code>FAMILY_PREFIXES</code>, a family → column-prefix table (<a href="https://github.com/nrstough/hearsay/blob/main/scripts/train_handcrafted.py" title="on GitHub">train_handcrafted.py:51-52</a>), so a bundle only asks for the families its columns need. It falls back to the family name as the prefix (line 144), so a family whose columns start with its own name (<code>hnr</code> → <code>hnr_*</code>) needs no entry. Add one only if your column prefixes differ from the family name, as <code>phase</code> (<code>gd_</code>, <code>pc_</code>) and <code>jitter</code> (<code>jit_</code>, <code>shim_</code>) do.</li>
+</ul>
+<p>Not enforceable by code, so they are on you:</p>
+<ul>
+<li><strong>Nothing above 7 kHz.</strong> The test set is low-passed at 7.2 kHz and every clip you see is filtered to match. Bins above <code>FMAX</code> (7,000 Hz) are filter shape, identical for both classes. <code>cqcc</code> and <code>lfcc</code> stop at 7 kHz for this reason.</li>
+<li><strong>No level, no duration, no counts.</strong> Level is normalized away; clip length is matched by construction. Use means, stds, percentiles, fractions and rates per second.</li>
+<li><strong>No onset or offset features.</strong> See offset invariance.</li>
+<li><strong>Voiced-only where it matters.</strong> Pitch-period and phase features are meaningless on unvoiced frames; use the <code>voiced</code> mask (with the fallback pattern in <code>_band_and_voiced</code>, <a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/hc_v4.py" title="on GitHub">hc_v4.py:80</a>).</li>
+<li><strong>Cost.</strong> Measured from the extraction sidecars, in worker-seconds per clip: the 75 v3 features cost 0.14 s, and all six v4 families together add about 0.06 s (0.20 s for all 234 columns). Keep a new family under about 0.05 s per clip. Use at most 4 CPU workers until 05:15, 6 after.</li>
+</ul>
+<h2 id="4-checklist-for-a-complete-family">4. Checklist for a complete family</h2>
+<ol>
+<li>Function + <code>FAMILIES</code> entry in <a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/hc_v4.py" title="on GitHub">src/hearsay/hc_v4.py</a> (line 300).</li>
+<li>A <code>FAMILY_PREFIXES</code> entry (<a href="https://github.com/nrstough/hearsay/blob/main/scripts/train_handcrafted.py" title="on GitHub">scripts/train_handcrafted.py:51-52</a>) only if your column names do not start with the family name.</li>
+<li>Plain-English <code>LABELS</code> for each column in <a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/handcrafted.py" title="on GitHub">src/hearsay/detectors/handcrafted.py</a> (the v4 block starts at line 55). This text becomes the evidence sentence judges read, e.g. "harmonic-to-noise ratio, 1–2 kHz 2.3 SD below real speech (toward synthetic)". Unlabeled columns fall back to their raw name.</li>
+<li>Tests in <a href="https://github.com/nrstough/hearsay/blob/main/tests/test_hc_v4.py" title="on GitHub">tests/test_hc_v4.py</a>. The finite/disjoint test (line 48) and the offset-invariance test (line 59) already run over every entry in <code>FAMILIES</code>, but the first one asserts your exact column-name set against the <code>EXPECTED</code> dict near the top of the file, so add your family's names there. Then one behavioral test, like <code>test_phase_family_separates_coherent_from_incoherent_phase</code> at line 67: a synthetic input where you know which way the feature should move.</li>
+<li><code>uv run pytest -q tests/test_hc_v4.py tests/test_handcrafted_detector.py</code> green, <code>uv run ruff check .</code> clean.</li>
+<li>Gate it (section 6). Keep or kill.</li>
+<li>If kept: full extraction, training variant, In-the-Wild readout (section 7).</li>
+</ol>
+<h2 id="5-where-the-open-slots-are">5. Where the open slots are</h2>
+<p>What exists and how it did at the gate (details in <a href="reports-2026-09-26-handcrafted-v4.html">docs/reports/2026-09-26_handcrafted-v4.md</a>):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Family</th><th>Columns</th><th>Best blind-generator AUC</th><th>State</th>
+</tr></thead>
+<tbody>
+<tr><td><code>cqcc</code></td><td>72</td><td>pro_diff 0.94, elevenlabs 0.82, grad_tts 0.72</td><td>strong; 15 columns are corpus cues</td></tr>
+<tr><td><code>lfcc</code></td><td>60</td><td>pro_diff 0.13 (<code>lfcc17_std</code>, which reads 0.75 on elevenlabs); elevenlabs 0.85 (<code>lfcc0_dstd</code>)</td><td>strong; 32 columns are corpus cues</td></tr>
+<tr><td><code>phase</code> (<code>gd_</code>, <code>pc_</code>)</td><td>12</td><td>grad_tts 0.80 on a corpus-neutral cue; pro_diff 0.21</td><td>keep; the only family that sees grad_tts cleanly</td></tr>
+<tr><td><code>jitter</code> (<code>jit_</code>, <code>shim_</code>)</td><td>5</td><td>grad_tts 0.63, pro_diff 0.34</td><td>marginal</td></tr>
+<tr><td><code>modulation</code> (<code>mod_</code>)</td><td>6</td><td>elevenlabs 0.66</td><td>marginal, as expected on 3.4 s clips</td></tr>
+<tr><td><code>breath</code></td><td>4</td><td>pro_diff 0.28 on one column</td><td>marginal</td></tr>
+</tbody>
+</table></div>
+<p>Ranked places to add, given that:</p>
+<ol>
+<li><strong>Harmonic fine structure, untried.</strong> Per-band harmonic-to-noise ratio (say 0–1, 1–2, 2–4, 4–7 kHz) and the inter-harmonic noise floor relative to the harmonic peaks, on voiced frames. The v3 result that "synthetic speech is noisier between harmonics" came from whole-band flatness; nobody has asked which band. Use <code>S</code>, <code>freqs</code>, <code>f0</code> and <code>voiced</code>. Prefix <code>hnr_</code>.</li>
+<li><strong>Vocoder excitation, untried.</strong> LPC residual statistics per voiced frame (order 16 on the 7 kHz signal): residual kurtosis, peak-to-RMS, and the regularity of residual peaks at the pitch period. Neural vocoders produce an excitation that is too regular or too Gaussian. Uses <code>x</code>, <code>f0</code>, <code>voiced</code>. Prefix <code>lpc_</code>.</li>
+<li><strong>Extend <code>phase</code>, which works.</strong> <code>pc_</code> measures coherence at every peak pooled together. Split it by harmonic order (first three harmonics vs the rest) and by band; diffusion vocoders may fail at high harmonics only. Same function shape as <code>peak_coherence</code> (<a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/hc_v4.py" title="on GitHub">hc_v4.py:118</a>). Prefix <code>pc_</code>, new suffixes.</li>
+<li><strong>Formant transitions, untried.</strong> Formant bandwidths and the smoothness of F1/F2 trajectories across voiced runs (LPC roots per frame, then track). TTS coarticulation is often too smooth or too abrupt. Riskier: formant tracking on 3 s clips is noisy. Prefix <code>fmt_</code>.</li>
+<li><strong>Fix rather than add: <code>breath</code>.</strong> It currently measures the spectral shape of mid-level unvoiced frames. A real breath is broadband and 100–400 ms long; add duration and count-per-second of such events. Cheap.</li>
+<li><strong>Corpus-cue cleanup, not a feature.</strong> 83 of the 234 columns separate LJ from LibriSpeech real speech (<code>outputs/handcrafted/hc_gate_all_columns.csv</code>), and 34 v3 columns make LibriSpeech real look synthetic, which is the expensive error. Any family you add must pass the LJ-vs-LibriSpeech check at ≤ 0.15 deviation, and the trainer's <code>--drop-columns</code> (<a href="https://github.com/nrstough/hearsay/blob/main/scripts/train_handcrafted.py" title="on GitHub">train_handcrafted.py:118</a>, exact names or <code>prefix*</code> globs) lets you train without the offenders.</li>
+</ol>
+<p>Not in this lane: the speaker-embedding drift detector. It is a new contract detector, not a feature family (<code>src/hearsay/detectors/speaker_drift.py</code>, template <code>enf.py</code>, export with <code>scripts/score_detector.py</code>); section 8.7 of the brief has the recipe.</p>
+<h2 id="6-the-gate-as-it-was-actually-run">6. The gate, as it was actually run</h2>
+<p>Sample: <code>outputs/manifests/hc_gate_sample.csv</code>, 200 inner-fold clips per generator and per real source, 2,000 clips, never the holdout. Extraction on that sample with one family takes about 90 s on 4 workers.</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/hc_gate_sample.csv \
+    --name hc_gate_&lt;family&gt; --crop test --seed 0 --workers 4 --families &lt;family&gt;</code></pre>
+<p>Then the per-column table (the brief, section 7, has the script): AUC of each blind generator vs all real, AUC of each real source vs all synthetic, LJ-vs-LibriSpeech corpus check. Keep rule per column: |AUC − 0.5| ≥ 0.15 on grad_tts, pro_diff or elevenlabs; corpus deviation ≤ 0.15; the two real sources within 0.10 of each other. A family survives if any column does. Existing tables to compare against: <code>outputs/handcrafted/hc_gate_all_columns.csv</code>.</p>
+<p>Codec check for anything that passes on elevenlabs: launder 100 real clips through MP3 128 kbps with <code>hearsay.compression.launder</code>, recompute, and require the feature to move by less than 0.5 clean standard deviations.</p>
+<h2 id="7-from-a-kept-family-to-a-fusion-column">7. From a kept family to a fusion column</h2>
+<pre><code class="language-bash"># full extraction (full manifest, seed 0: crops match M1 row for row)
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_test.csv \
+    --name nsa_test_v5 --workers 6 --families lfcc,phase,cqcc,&lt;yours&gt;
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_train_sample.csv \
+    --name nsa_train_sample_v5 --crop test --seed 0 --workers 6 --families lfcc,phase,cqcc,&lt;yours&gt;
+# train; never overwrite handcrafted.csv (fusion reads it) or handcrafted_v4.csv (the current candidate)
+uv run python scripts/train_handcrafted.py --train nsa_train_sample_v5 --folds splits/nsa_folds.csv \
+    --test nsa_test_v5 --out-name handcrafted_v5 [--drop-columns "contrast0_mean,mfcc2_std,..."]
+# real-world false alarms, eval only
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/itw_stress.csv \
+    --name itw_stress_v5 --crop test --seed 200 --workers 6 --families lfcc,phase,cqcc,&lt;yours&gt;
+uv run python scripts/eval_bundle.py --bundle models/hc_lgbm_&lt;stamp&gt; \
+    --features outputs/handcrafted/itw_stress_v5.csv --oof outputs/detector_scores/handcrafted_v5.csv --name itw_stress</code></pre>
+<p>How to read the trainer's <code>meta.json</code> (in <code>models/hc_&lt;kind&gt;_&lt;stamp&gt;/</code>):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Key</th><th>What to look at</th>
+</tr></thead>
+<tbody>
+<tr><td><code>cv.lgbm.min_dcf</code>, <code>cv.logreg.min_dcf</code></td><td>inner out-of-fold minDCF; the selection number. v3 lgbm: 0.614</td></tr>
+<tr><td><code>cv_by_generator</code></td><td>the blind three: v3 has grad_tts 1.00, pro_diff 1.00, elevenlabs 0.80</td></tr>
+<tr><td><code>cv_by_bonafide_source.librispeech</code></td><td>false alarms on unfamiliar real voices; v3: 0.77. Must not get worse</td></tr>
+<tr><td><code>val_min_dcf</code>, <code>val_by_generator</code>, <code>val_by_bonafide_source</code></td><td>the holdout, read once; gaps under 0.15 are noise</td></tr>
+<tr><td><code>test.frac_above_half</code></td><td>share of test files called synthetic; prior is 0.30, v3 is 0.42</td></tr>
+<tr><td><code>feature_auc_top15</code></td><td>which of your columns the model leans on</td></tr>
+</tbody>
+</table></div>
+<p>And <code>eval_&lt;name&gt;.json</code> from <code>eval_bundle.py</code>: minDCF, EER and P_FA on the 2,000 In-the-Wild real clips at the inner-fold threshold. The deep models sit at 1.2% (M1) and 5.7% (M1b) there; that number is now a gate for every column entering fusion.</p>
+<h2 id="8-do-not-touch-and-when">8. Do not touch, and when</h2>
+<p>Owned by other lanes: <code>src/hearsay/embed.py</code>, <code>probe.py</code>, <code>submission.py</code>, <code>m5_*.py</code>, <code>spectra.py</code>; <code>scripts/extract_embeddings.py</code>, <code>train_probe.py</code>, <code>make_probe_csv.py</code>, <code>m5_*.py</code>, <code>score_spectra.py</code>; <code>submissions/</code>; <code>splits/nsa_folds.csv</code>; <code>outputs/detector_scores/handcrafted.csv</code> and <code>handcrafted_v4.csv</code>. Never <code>import lightgbm</code> outside the trainer. Stage only your own files with <code>git add &lt;paths&gt;</code>; never <code>-A</code>; don't push.</p>
+<p>Deadlines: detector scores due <strong>Sat 19:00</strong>; fusion freezes <strong>Sat 22:00</strong>. A family that isn't in a scored <code>handcrafted_v*.csv</code> by 19:00 doesn't ship.</p>
+<h2 id="9-reading-order">9. Reading order</h2>
+<ol>
+<li>This file, then the brief (<a href="handoffs-2026-09-26-handcrafted-v4-brief.html">2026-09-26_handcrafted-v4-brief.md</a>).</li>
+<li><a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/hc_v4.py" title="on GitHub">src/hearsay/hc_v4.py</a>: six worked examples of exactly what you'll write. <code>peak_coherence</code> (line 118) is the best-commented.</li>
+<li><a href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/handcrafted.py" title="on GitHub">src/hearsay/handcrafted.py</a> lines 56–141: what the context holds and how it's built.</li>
+<li><a href="https://github.com/nrstough/hearsay/blob/main/tests/test_hc_v4.py" title="on GitHub">tests/test_hc_v4.py</a>: the test pattern.</li>
+<li><a href="reports-2026-09-26-handcrafted-v4.html">docs/reports/2026-09-26_handcrafted-v4.md</a>: the gate tables and the corpus-cue lists.</li>
+<li><a href="https://github.com/nrstough/hearsay/blob/main/scripts/train_handcrafted.py" title="on GitHub">scripts/train_handcrafted.py</a> and <a href="https://github.com/nrstough/hearsay/blob/main/scripts/eval_bundle.py" title="on GitHub">scripts/eval_bundle.py</a> only when you get to section 7.</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-26_feature-engineering-map.md</code> <span class="hash">cc51e59b6b26</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

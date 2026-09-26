@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: K, the Docker image (Sat Sep 26, 2026, ~05:45) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_docker-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_docker-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#interface-from-readmemd">Interface (from README.md)</a></li><li><a href="#what-already-exists">What already exists</a></li><li><a href="#design-from-docsplanmd-docker">Design (from docs/plan.md, "Docker")</a></li><li><a href="#checks-before-calling-it-done">Checks before calling it done</a></li><li><a href="#do-not-touch">Do not touch</a></li><li><a href="#environment">Environment</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-k-the-docker-image-sat-sep-26-2026-0545">Handoff: K, the Docker image (Sat Sep 26, 2026, ~05:45)</h1>
+<p><strong>Purpose of this chat:</strong> build the offline CPU inference image that NSA will run, and prove it produces the same TSV the logged submissions do. This is a required deliverable with <strong>no owner and no file yet</strong>. Gates from <code>docs/plan.md</code>: <strong>first amd64 image with the M1 payload by Sat 14:00</strong>; rebuild with fusion Sun 00:00 with a 3-file smoke test under <code>--network none</code> and a CPU-vs-Mac parity check on 50 files; final TSV Sun 05:00; DM before 08:00 Sunday. Time box: about 3 hours for the first image.</p>
+<p>Read <code>CLAUDE.md</code>, <code>docs/STATUS.md</code>, <code>docs/architecture.md</code> (sections 2, 4 and 10.7) and <code>docs/code-map.md</code> first. This file tells you what to build and what already exists.</p>
+<h2 id="interface-from-readmemd">Interface (from <code>README.md</code>)</h2>
+<pre><code class="language-bash">docker run --network none -v &lt;test_dir&gt;:/data:ro -v &lt;out_dir&gt;:/out hearsay</code></pre>
+<p>In: a directory of audio files (NSA's test set is 1,671 WAVs, 16 kHz mono PCM, 3.0–13.6 s). Out: <code>/out/&lt;teamName&gt;_predictions.tsv</code>, header <code>filename&lt;TAB&gt;cm-score</code>, one row per file, probabilities with <strong>1.0 = synthetic</strong>, all rows in the template's order. Row order comes from NSA's template <code>HearsayScoreKey4TeamX.tsv</code> (copied at <code>data/nsa/HearsayScoreKey4TeamX.tsv</code>), so accept an optional mounted template and fall back to sorted filenames. The team name is still an open question (STATUS.md); make it an environment variable with a placeholder default.</p>
+<h2 id="what-already-exists">What already exists</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Piece</th><th>Where</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>The one audio path</td><td><code>hearsay.audio.load_audio</code></td><td>FFmpeg subprocess, so the image needs the <code>ffmpeg</code> apt package</td></tr>
+<tr><td>M1/M1b scorer, audio to TSV</td><td><code>scripts/make_probe_csv.py --probe &lt;dir&gt; --test-dir &lt;dir&gt; [--manifest &lt;tsv&gt; --id-col filename]</code></td><td>loads XLS-R via <code>hearsay.embed.load_backbone</code> (device defaults to CPU when MPS is absent), runs <code>prepare_segment</code> (band-limit, trim, 8 s cap) and the probe; validates and logs the TSV; runs a silence-and-chord preflight first</td></tr>
+<tr><td>Best probe today</td><td><code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0521/probe.joblib</code> (M1b v3: holdout minDCF 0.072, In-the-Wild 0.342) and <code>…-0518</code> (M1 v3)</td><td><code>meta.json</code> beside each; the main chat decides which ships</td></tr>
+<tr><td>M3 scorer</td><td><code>scripts/score_spectra.py --pad-mode zero --device cpu</code></td><td>Spectra-AASIST; <code>hearsay.spectra.load_spectra</code> patches the checkpoint's hub id to the local <code>weights/wav2vec2-xls-r-300m</code>; about 0.1 s per clip on MPS, expect 3–5× that on CPU</td></tr>
+<tr><td>Handcrafted detector</td><td><code>hearsay.detectors.handcrafted</code> with the newest <code>models/hc_lgbm_&lt;stamp&gt;/model.joblib</code></td><td>numpy tree evaluator; never imports lightgbm; recomputes v4 families at inference</td></tr>
+<tr><td>Other engineered detectors</td><td><code>import hearsay.detectors.engineered</code>; <code>scripts/score_detector.py</code></td><td>rule-based; evidence and routing only</td></tr>
+<tr><td>Non-speech gate + default-answer policy</td><td><code>hearsay.detectors.speech_gate</code> (<code>apply_default_answer</code>)</td><td>rule-based; gated files rank below all speech files; the runner must apply it after fusion</td></tr>
+<tr><td>Speaker drift</td><td><code>hearsay.detectors.speaker_drift</code></td><td>needs the <code>speechbrain</code> dependency (now in <code>pyproject.toml</code>/<code>uv.lock</code>) and <code>weights/spkrec-ecapa-voxceleb</code> (89 MB) copied into the image; evidence only, never fused</td></tr>
+<tr><td>M5 scorer</td><td><code>scripts/m5_score.py --model &lt;dir&gt; --files … --out &lt;csv&gt;</code></td><td>CPU path with a sha check; only if M5 clears its gate at 12:00; its checkpoint (truncated backbone + head, safetensors, about 850 MB) will be on the HF Hub or a GitHub release, never in git</td></tr>
+<tr><td>Fusion v0</td><td><code>scripts/fuse.py --detectors m1b_v3 handcrafted_v4 spectra_aasist …</code></td><td>fuses <strong>exported score files</strong> under <code>outputs/detector_scores/</code>; it does not run detectors on audio</td></tr>
+<tr><td>Submission writer</td><td><code>hearsay.submission.write_submission</code>, <code>append_log</code>, <code>preflight</code>, <code>list_test_files</code></td><td>refuses to overwrite; validates header, uniqueness, range, order</td></tr>
+<tr><td>Weights</td><td><code>weights/wav2vec2-xls-r-300m</code> (1.2 GB), <code>weights/Spectra-AASIST</code> (1.3 GB); exclude <code>weights/wavlm-*</code> (1.5 GB, unused)</td><td>all local; the image must never download</td></tr>
+</tbody>
+</table></div>
+<p><strong>The missing piece is an end-to-end runner:</strong> audio directory → each shipped detector → fusion rule → TSV, inside the container. Today only M1 goes from audio to TSV in one script. Coordinate the runner's contract with the main chat (it owns fusion and the TSV): the cleanest shape is <code>scripts/run_pipeline.py</code> that (1) lists files, (2) runs each shipped scorer to a per-detector score file in the same <code>path, score, logit</code> shape the exports use, (3) applies the fusion rule the main chat names, (4) calls <code>write_submission</code>. Until fusion is frozen (Sat 22:00), the M1b probe alone is the payload and step 3 is identity.</p>
+<h2 id="design-from-docsplanmd-docker">Design (from <code>docs/plan.md</code>, "Docker")</h2>
+<ul>
+<li><strong>Base:</strong> <code>python:3.12-slim-bookworm</code> plus <code>apt-get install ffmpeg</code>. Python is pinned to 3.12 in <code>.python-version</code>.</li>
+<li><strong>Dependencies:</strong> the project is uv-managed (<code>pyproject.toml</code>, <code>uv.lock</code>). The lockfile resolves torch 2.14.0 and torchaudio 2.11.0; install the <strong>CPU</strong> wheels from the PyTorch CPU index and skip the lockfile's CUDA wheels (<code>uv sync --no-install-package torch --no-install-package torchaudio</code>, then install the CPU pair explicitly), or build a requirements list from the lock. transformers is 5.17.0. Keep the editable install of <code>src/hearsay</code>.</li>
+<li><strong>Offline:</strong> <code>ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1</code>. <code>hearsay.spectra</code> already sets the first. Test every run with <code>--network none</code>.</li>
+<li><strong>Weights in the image:</strong> copy <code>weights/wav2vec2-xls-r-300m</code>, <code>weights/Spectra-AASIST</code>, <code>weights/spkrec-ecapa-voxceleb</code>, the shipped <code>models/m1_*/probe.joblib</code> and <code>models/hc_lgbm_*/model.joblib</code>. <code>.dockerignore</code> must exclude <code>weights/wavlm-*</code>, <code>.venv</code>, <code>data/</code>, <code>outputs/</code>, <code>submissions/</code>, <code>.cache</code>, <code>.git</code>. Expect a 4–5 GB image.</li>
+<li><strong>Runtime:</strong> one heavy model loaded at a time (XLS-R, then Spectra, then the CPU detectors), a resumable per-file cache (one JSON line per scored file, so a crash resumes), a new output file per run, never an overwrite. Thread count from <code>OMP_NUM_THREADS</code>/<code>torch.set_num_threads</code>, default to all cores.</li>
+<li><strong>Platform:</strong> this Mac is arm64; NSA's box is almost certainly amd64. Build with <code>docker buildx build --platform linux/amd64</code> (emulated, slow: budget an hour for the first build) or build natively on a Linux box. Verify with <code>docker run --platform linux/amd64 hearsay python -c "import platform; print(platform.machine())"</code>.</li>
+</ul>
+<h2 id="checks-before-calling-it-done">Checks before calling it done</h2>
+<ol>
+<li><strong>Smoke:</strong> 3 test files in, a valid 3-row TSV out, with <code>--network none</code>, on amd64.</li>
+<li><strong>Parity:</strong> score the same 50 test files in the image and on the Mac (the logged TSV <code>submissions/20260926-0522_M1_*.tsv</code> has M1b v3's scores; <code>scripts/tsv_from_embeddings.py</code> regenerates from embeddings without a GPU). Require Spearman &gt; 0.99 and max absolute score difference &lt; 0.05. Differences come from CPU fp32 vs MPS and from the FFmpeg version; both are expected to be tiny.</li>
+<li><strong>Preflight:</strong> silence and a synthetic chord through the image scorer, finite and reproducible (<code>hearsay.submission.preflight</code> does this; <code>make_probe_csv.py</code> calls it).</li>
+<li><strong>Order:</strong> the TSV row order equals the template's order when a template is mounted.</li>
+<li><strong>Timing:</strong> log wall time for the full 1,671 files on CPU; M1 alone should be well under an hour, Spectra adds roughly 10–15 minutes.</li>
+<li><strong>Full suite still green:</strong> <code>uv run pytest -q</code> (301 passing at 05:38), <code>uv run ruff check .</code>.</li>
+</ol>
+<h2 id="do-not-touch">Do not touch</h2>
+<p><code>src/hearsay/embed.py</code>, <code>probe.py</code>, <code>submission.py</code>, <code>spectra.py</code>, <code>m5_*.py</code>; <code>scripts/make_probe_csv.py</code>, <code>train_probe.py</code>, <code>extract_embeddings.py</code>, <code>fuse.py</code>, <code>score_spectra.py</code>, <code>m5_*.py</code>; <code>submissions/</code>; <code>splits/</code>; the detector modules. Your files: <code>Dockerfile</code>, <code>.dockerignore</code>, <code>docker/</code> (entrypoint, README section), <code>scripts/run_pipeline.py</code> if the main chat agrees to that name, <code>tests/test_docker_*.py</code> (hermetic; anything needing the image or weights is marked <code>slow</code> and <code>needs_weights</code>). Stage only your own files with <code>git add &lt;paths&gt;</code>; never <code>-A</code>; don't push without asking Nathan. Never <code>import lightgbm</code> anywhere on the inference path.</p>
+<h2 id="environment">Environment</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync
+uv run pytest -q          # 301 passed at 05:38
+docker --version          # Docker Desktop must be running; buildx for amd64
+ls weights/ models/       # weights present; models/ has the probe and hc bundles</code></pre>
+<p><code>models/</code> and <code>outputs/</code> are gitignored and not archived; the probe and hc bundles regenerate in about 25 minutes from the commands in <code>docs/reports/2026-09-26_cpu-detectors.md</code> and <code>scripts/train_probe.py</code>. Weights exist only on this Mac and its external drive.</p>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>The test set is band-limited at 7.2 kHz and <code>prepare_segment</code> reproduces that on every clip, so the image must use the repo's own loader and preparation, never a re-implementation.</li>
+<li>The sponsor's scoring code treats a higher score as bona fide, the opposite of the instructions. We submit 1.0 = synthetic and never flip; the draft review at 14:00 settles it. The image's output must keep that convention.</li>
+<li>M1 reads only layer 7 of the 24-layer backbone; dropping layers 8–24 at load time is a safe 70% compute saving with bit-identical output, if wall time matters. Not needed for correctness.</li>
+<li>M5, if it ships, needs its checkpoint fetched at build time from the Hub or a release (not at run time) and the same sha check <code>m5_score.py</code> performs.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<p><code>CLAUDE.md</code> → <code>docs/plan.md</code> (Docker, Timeline, Cut order) → <code>docs/architecture.md</code> §2, §4, §10.7 → <code>docs/code-map.md</code> ("M1 deep path", "M3 … submission machinery", recipe d) → <code>scripts/make_probe_csv.py</code> → <code>src/hearsay/submission.py</code> → <code>scripts/score_spectra.py</code> → <code>scripts/fuse.py</code> docstring.</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-26_docker-handoff.md</code> <span class="hash">0eb870e521c6</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

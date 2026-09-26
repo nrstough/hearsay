@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: channel robustness on the frozen path (Sat Sep 26, 2026, ~08:30) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_channel-robustness-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_channel-robustness-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#why">Why</a></li><li><a href="#the-four-actions-in-order">The four actions, in order</a></li><li><a href="#deliverables">Deliverables</a></li><li><a href="#rules">Rules</a></li></ul></details>
+<h1 id="handoff-channel-robustness-on-the-frozen-path-sat-sep-26-2026-0830">Handoff: channel robustness on the frozen path (Sat Sep 26, 2026, ~08:30)</h1>
+<p><strong>Paste this into an idle chat (the M5 chat is the best fit: GPU-literate, owns the codec-augmentation code, has the In-the-Wild gate machinery) and start it with <code>/plan-review</code>.</strong></p>
+<p><strong>Purpose of this chat:</strong> run the four measurement-and-refit actions the fusion consult ranked "DO" for the frozen deep path, and deliver either a better M1b column for the <strong>final</strong> TSV or a documented negative result. Nothing here touches the 14:00 draft: the draft ships the rule frozen at 08:13. Time box: about 4 hours of work, hard stop <strong>16:00</strong>, so that any new column can go through the same pre-declared sweep (<code>scripts/fuse_sweep.py</code>) and parity before the fusion freeze at 22:00.</p>
+<p>Read first: <code>CLAUDE.md</code>, <code>docs/STATUS.md</code>, <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code> (items 3, 4, 6, 8 and 9 of "What to do"), <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>, <code>docs/reports/2026-09-26_m1b-asv19-bonafide.md</code>, <code>docs/architecture.md</code> sections 4 and 8.</p>
+<h2 id="why">Why</h2>
+<p>Both deep models sit at 0.26–0.34 minDCF on In-the-Wild against 0.014–0.07 on the NSA holdout. The memo's diagnosis: the training real speech is all clean read speech, and the test set's uniform 7.2 kHz wall looks like a codec round-trip, whose artifacts on real test speech can masquerade as vocoder artifacts. The memo also corrected our own premise: once band-matched, adding VCTK real speakers helped on both axes (ITW 0.380 → 0.342, holdout 0.159 → 0.072), so real-speech diversity is a live lever.</p>
+<h2 id="the-four-actions-in-order">The four actions, in order</h2>
+<p><strong>A. Estimate λ, the test set's wild-domain weight (30 min, CPU, no labels).</strong> Label-free channel statistics per clip: 95% spectral roll-off, long-term spectral tilt, noise-floor level and its stationarity over time, a reverberation proxy (e.g. energy-decay slope after offsets). Most exist already as detector features: <code>bw_hz</code>, the four band levels and floor depths from <code>hearsay.compression.features</code>, <code>flatness</code>, <code>energy_db_std</code> and <code>pause_frac</code> from <code>hearsay.handcrafted.features</code>. Train a small logistic classifier to separate holdout-real (<code>splits/nsa_folds.csv</code>, fold <code>holdout</code>, label bonafide) from In-the-Wild real (<code>outputs/manifests/itw_bonafide.csv</code> or the real rows of <code>itw_stress.csv</code>), then average its predicted P(wild) over the 1,671 test files. Report λ̂ with a bootstrap interval. The memo's crossover is 0.32 and its prior is "low" (one curated re-encode, not field audio). This number decides how much In-the-Wild should weigh in every later selection; write it into the report first.</p>
+<p><strong>B. Diagnose the 7.2 kHz edge as a codec (45 min, CPU).</strong> Take 50 LJ clips; run <code>hearsay.compression.launder(x, codec, kbps, sr_enc)</code> over a grid (mp3 at 32/48/64/96 kbps, aac at 32/48/64, at 16 and 44.1 kHz), then band-match with <code>hearsay.handcrafted.band_limit</code>; compare each variant's roll-off slope across 6.5–8 kHz, high-band spectral flatness and the compression detector's hole statistics (<code>deep_hole_frac</code>, <code>local_hole_frac</code>, <code>floor_p2_db</code>) against the same statistics on the test files (<code>outputs/inventory/nsa_test_highband.csv</code> has per-file band levels already). Pick the closest match; if nothing is closer than the plain Kaiser low-pass, stop here and record the negative.</p>
+<p><strong>C. Symmetric codec round-trip refit of M1b (1.5 h, GPU then CPU).</strong> Only if B found a match. Apply the matched round-trip to <strong>every</strong> training clip of <strong>both</strong> classes (never one class: that recreates the 7.2 kHz shortcut in reverse), decode back to 16 kHz, then extract with the shared crops: <code>uv run python scripts/extract_embeddings.py --manifest &lt;laundered manifest&gt; --name nsa_train_sample_v4c --segment --crop test --seed 0</code> and the same for <code>asv19_addon</code> (seed 100). Do not touch <code>embed.py</code>, the extraction script, <code>train_probe.py</code> or the fold files; write a new manifest whose paths point at the laundered copies (put them under <code>outputs/laundered/</code>, not <code>data/</code>). Refit with <code>uv run python scripts/train_probe.py --train nsa_train_sample_v4c,asv19_addon_v4c --folds splits/nsa_folds_plus_asv19.csv --stress itw_stress_v3</code>. Compare with M1b v3 (<code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0521/meta.json</code>: holdout 0.072, ITW 0.342, ITW P_FA 0.8%) on inner OOF, holdout, per-real-source, ITW under both cost weightings. Clean-only readouts beside the augmented ones (CLAUDE.md rule). Export scores in the fusion format as <code>outputs/detector_scores/m1b_v4c.csv</code> if it wins on ITW without losing the holdout beyond noise (0.15); otherwise record the numbers and stop.</p>
+<p><strong>D. One wild, non-read bona fide corpus (30-minute download rule).</strong> If a public corpus of a few thousand real, non-read, channel-diverse clips downloads within 30 minutes (VoxCeleb1 test needs a request form, so probably not; SpoofCeleb's bona fide is enhanced and the authors warn about it; say what you tried), band-match it, group by speaker, add it to the <strong>inner folds only</strong> via <code>scripts/extend_folds.py</code> (a new fold file name; never edit <code>splits/nsa_folds.csv</code>), extract, refit as in C, compare. One corpus, not three. If nothing downloads in 30 minutes, abandon and say so.</p>
+<p><strong>E. M3 leakage probes (1 h, CPU, can run in parallel with C).</strong> Three, from the memo. (1) Perturbation sensitivity: 500 inner clips, four label-preserving perturbations (MP3 round-trip via <code>launder</code>, +20 dB SNR white noise, ±2% time-stretch, a one-sample circular shift); score with M3 (<code>scripts/score_spectra.py</code> functions, zero-pad, CPU) and with M1b; report ΔAUC per perturbation for each; a memorising model degrades far more. (2) Spearman of M1b vs M3 ranks on the holdout versus on the test set (both exports exist under <code>outputs/detector_scores/</code>); a large drop means holdout agreement is memorisation. (3) M3 on MLAAD spoof (<code>outputs/manifests/mlaad_en.csv</code>, on disk): miss rate at M3's inner threshold; near-perfect on the classic sets but mediocre here is consistent with memorisation. Ten minutes on the model card for a training-data list, then stop. The result gates whether M3's FA-suppression role in the shipped rule is kept for the final.</p>
+<h2 id="deliverables">Deliverables</h2>
+<ul>
+<li><code>docs/reports/2026-09-26_channel-robustness.md</code>: λ̂ with interval; the codec-match table; the refit comparison table (or the negative); the corpus attempt; the three M3 probe results and a one-line verdict on M3's role.</li>
+<li>Any winning column exported in the fusion format and announced to the main chat, which reruns <code>scripts/fuse_sweep.py</code> under its pre-declared rule.</li>
+<li>A STATUS line and a disclosure bullet in <code>CLAUDE.md</code>.</li>
+</ul>
+<h2 id="rules">Rules</h2>
+<p>Never train or select on the holdout, In-the-Wild or the test set. No pseudo-labels. Augment both classes or neither. Stage only your own files (<code>git add &lt;paths&gt;</code>, never <code>-A</code>); do not push. Files you may create: <code>scripts/channel_*.py</code>, <code>scripts/m3_probes.py</code>, the report, new manifests under <code>outputs/manifests/</code>, laundered audio under <code>outputs/laundered/</code>. Do not edit <code>src/hearsay/embed.py</code>, <code>probe.py</code>, <code>spectra.py</code>, the fold files, <code>scripts/extract_embeddings.py</code>, <code>train_probe.py</code>, <code>fuse.py</code>, <code>fuse_sweep.py</code>. The local GPU is free (M3 and the M1 re-extractions are done); the runner agent and the Docker chat use CPU only. Report to the oversight chat at each milestone; Nathan ratifies anything that changes the shipped column.</p>
+</article>
+
+<footer class="page-footer">
+<p>Generated from <code>docs/handoffs/2026-09-26_channel-robustness-handoff.md</code> <span class="hash">62a54eb8be5f</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

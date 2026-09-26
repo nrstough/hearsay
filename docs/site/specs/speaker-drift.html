@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speaker drift · HEARSAY</title>
+<meta name="description" content="Speaker embeddings on one-second windows, compared pairwise, to ask whether the voice stays the same within a clip. It works as a detector of edits and second v">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300254b'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffb800' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<script>try{var t=localStorage.getItem("hearsay-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<button type="button" class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme">Dark</button>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<label class="menu-toggle" for="nav-check">Menu</label>
+</div>
+</header>
+<input type="checkbox" id="nav-check" class="nav-check" aria-label="Show the site navigation">
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section" class="current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html" aria-current="page">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<h1>Speaker drift</h1>
+<p class="lead">Speaker embeddings on one-second windows, compared pairwise, to ask whether the voice stays the same within a clip. It works as a detector of edits and second voices, and it points the wrong way as a detector of fakes: cloned voices are the most self-consistent voices in the data.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Parameters and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>The rubric's speaker-embedding consistency technique. A pretrained speaker-recognition network (<span class="term" tabindex="0" data-term="ECAPA" aria-describedby="tip-1">ECAPA<span class="tip-body" role="tooltip" id="tip-1">A pretrained speaker-recognition network that turns a second of speech into a vector describing the voice. Comparing vectors from successive windows shows whether the voice stays the same within a clip.</span></span>) turns each second of speech into a vector describing the voice; if two windows of the same clip disagree, the voice changed. The surprise in the data: real people vary from second to second and clones do not, so the mean similarity separates classes <em>toward fake</em>. Fused, it would push the hard real recordings toward synthetic, which is the expensive error, so it stays evidence.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: the clip, trimmed and capped. Out: the number of windows, the minimum, mean and standard deviation of the pairwise cosine similarities, the adjacent-window minimum, a drift flag, and a sentence: <code>voice drifts across the clip: minimum window-to-window speaker similarity −0.10 (mean 0.37) over 14 windows; consistent with a second voice or an unstable cloned identity</code>, or <code>one consistent voice: …</code>.</p>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py" title="src/hearsay/detectors/speaker_drift.py (GitHub; assumes main is public)">detectors/speaker_drift.py</a>; the weights are the SpeechBrain ECAPA model loaded from a local directory with the hub path overridden, so it runs offline.</p>
+<h2 id="params">Parameters and where each is set</h2>
+<ul>
+<li>Windows of <span class="num" data-src="src/hearsay/detectors/speaker_drift.py#L34">1.0</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py#L34" title="Source: src/hearsay/detectors/speaker_drift.py line 34 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/speaker_drift.py line 34 (GitHub; assumes main is public)</span></a> s every <span class="num" data-src="src/hearsay/detectors/speaker_drift.py#L34">0.5</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py#L34" title="Source: src/hearsay/detectors/speaker_drift.py line 34 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/speaker_drift.py line 34 (GitHub; assumes main is public)</span></a> s over at most <span class="num" data-src="src/hearsay/detectors/speaker_drift.py#L34">8.0</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py#L34" title="Source: src/hearsay/detectors/speaker_drift.py line 34 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/speaker_drift.py line 34 (GitHub; assumes main is public)</span></a> s, the last window flush with the end; unit-norm embeddings; fewer than two windows means no drift (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py#L75" title="src/hearsay/detectors/speaker_drift.py line 75 (GitHub; assumes main is public)">speaker_drift.py, lines 75–101</a>).</li>
+<li>Drift when the minimum pairwise cosine is below <span class="num" data-src="src/hearsay/detectors/speaker_drift.py#L35">0.05</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py#L35" title="Source: src/hearsay/detectors/speaker_drift.py line 35 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/speaker_drift.py line 35 (GitHub; assumes main is public)</span></a>; scores drift <span class="num" data-src="src/hearsay/detectors/speaker_drift.py#L36">0.6</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py#L36" title="Source: src/hearsay/detectors/speaker_drift.py line 36 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/speaker_drift.py line 36 (GitHub; assumes main is public)</span></a>, none <span class="num" data-src="src/hearsay/detectors/speaker_drift.py#L36">0.5</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/speaker_drift.py#L36" title="Source: src/hearsay/detectors/speaker_drift.py line 36 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/speaker_drift.py line 36 (GitHub; assumes main is public)</span></a>.</li>
+<li>Calibrated on synthetic two-speaker splices: <span class="num" data-src="docs/reports/2026-09-26_gate-and-drift.md">94%</span><a class="src" href="../library/reports-2026-09-26-gate-and-drift.html" title="Source: docs/reports/2026-09-26_gate-and-drift.md"><span class="sr">source: docs/reports/2026-09-26_gate-and-drift.md</span></a> of splices flagged against <span class="num" data-src="docs/reports/2026-09-26_gate-and-drift.md">6.2%</span><a class="src" href="../library/reports-2026-09-26-gate-and-drift.html" title="Source: docs/reports/2026-09-26_gate-and-drift.md"><span class="sr">source: docs/reports/2026-09-26_gate-and-drift.md</span></a> of single voices.</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built about 06:10 on Saturday; evidence only, by the finding below.</p>
+<h2 id="numbers">Numbers</h2>
+<p>Mean window-to-window similarity separates classes toward fake at AUC <span class="num" data-src="README.md#what-did-not-work">0.73</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a>. Drift flags <span class="num" data-src="README.md#what-did-not-work">16%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> of test files, mostly the hard real recordings; in the ablation <span class="num" data-src="README.md#orchestration-what-routing-changes">180</span><a class="src" href="../library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> holdout rows and <span class="num" data-src="README.md#orchestration-what-routing-changes">269</span><a class="src" href="../library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> test files, without moving a score.</p>
+<h2 id="limits">Known limits</h2>
+<p>After trimming, a mostly silent clip yields too few windows to say anything (worked example 7). The module's docstring quotes older flag rates than the report.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_speaker_drift.py</code>: windows cover the clip flush with the end, one voice is consistent and two voices drift (with a stub encoder), a single window is neutral, registration, offline loading with an empty cache and a real two-speaker splice (both weights-gated).</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/reports-2026-09-26-gate-and-drift.html" title="docs/reports/2026-09-26_gate-and-drift.md">The gate and drift report</a>; <a class="srclink" href="../library/readme.html#what-did-not-work" title="README.md, section what-did-not-work">README, "Speaker drift points the wrong way"</a>; <a class="srclink" href="../library/reports-2026-09-26-worked-examples.html#4-hgt1046947wav-the-deep-detectors-disagree-drift-flagged-p--0003-z-mean-0686" title="docs/reports/2026-09-26_worked-examples.md, section 4-hgt1046947wav-the-deep-detectors-disagree-drift-flagged-p--0003-z-mean-0686">worked example 4</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="splice.html">← Splice and discontinuity detection</a><a class="next" rel="next" href="fusion-rule.html">The fusion rule →</a></nav>
+<footer class="page-footer">
+<p>Generated from <code>docs/site/source/specs/speaker-drift.frag</code> <span class="hash">7f105f01c95e</span>, <code>src/hearsay/detectors/speaker_drift.py</code> <span class="hash">b42a5f1118c4</span>, <code>docs/reports/2026-09-26_gate-and-drift.md</code> <span class="hash">259ba5584b04</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>
