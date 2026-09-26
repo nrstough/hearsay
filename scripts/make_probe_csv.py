@@ -10,7 +10,7 @@ prior-neutral LLR and per-file flags.
 
 Usage:
   uv run python scripts/make_probe_csv.py --probe models/m1_... --test-dir data/nsa/test \
-      --pi-synth 0.5 --val-mindcf 0.21 --val-eer 0.034 --notes "val = NSA grouped split"
+      --pi-synth 0.3 --val-mindcf 0.21 --val-eer 0.034 --notes "val = NSA grouped split"
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def main() -> None:
     ap.add_argument("--test-dir", type=Path, required=True)
     ap.add_argument("--manifest", type=Path)
     ap.add_argument("--id-col", default="filename")
-    ap.add_argument("--pi-synth", type=float, default=0.5, help="test prior (slides: ~50/50)")
+    ap.add_argument("--pi-synth", type=float, default=0.3, help="NSA test prior (70/30 real/synth)")
     ap.add_argument("--cost-shift", action="store_true", help="subtract ln(C_FA/C_MISS)")
     ap.add_argument("--val-mindcf", default="", help="val normalized minDCF -> validation_score")
     ap.add_argument("--val-eer", default="", help="val EER, logged in notes")

@@ -32,11 +32,31 @@
 - Optional one-time feedback on a test-data submission.
 - Final submission is due **no later than 8 AM** (Sunday).
 
+**Generators named on the "Text to Speech: inexpensive and ubiquitous" slide** (likely what the NSA fakes come from):
+- ElevenLabs: instant voice cloning from 10 s to 1 min of audio; professional voice cloning from 30+ min.
+- Amazon Polly, Grok TTS, Google Gemini.
+- Open-weight models on Hugging Face, e.g. Qwen-3 (Qwen3-TTS).
+
+Black-box detectors are discouraged, not forbidden (said aloud, per Nathan).
+
 **What they're looking for**
 - Unique perspectives: synthetic-speech consistency, breathing, pauses, emotion, prosody; read transcript vs. real-time speech; correlation, stacking, signal processing, artifacts, metadata, statistics.
 - Test yourself: generate your own synthetic speech.
 - Tell us what didn't work, and what did work and how it can be explained.
 - Minimize black-box detectors.
+
+## What the presenter said aloud (Nathan's notes, Fri Sep 25)
+
+- Class balance is **70% real / 30% synthetic**. The slide photo reads "~50% real, ~50% synthetic". We go with 70/30 (π_synth = 0.3) and will check it against the NSA train labels.
+- Clips are 3 s or longer, with a likely upper bound around 30 s. The slide says "more than 2 seconds".
+- Labels are discrete, pass or fail: every clip is fully synthetic or fully real, with nothing in between. Added noise does not change the label.
+- One-time early submission to check whether we're on track against the test data.
+- Diversity means "not just SSL": fine-tuning, depth, multiple layers, engineered features.
+- Ranking preference, using the bullseye slide: accurate and precise > accurate but not precise > neither. The worst case is **high precision, low accuracy**, i.e. consistently and confidently wrong. For us: submit calibrated probabilities, not saturated 0/1 scores, and never be confidently wrong on a whole subpopulation (e.g. silence or a noise type).
+- Black-box detectors are discouraged, not forbidden.
+- Outside data was neither allowed nor forbidden, so we use it and disclose it. ElevenLabs was mentioned as a way to generate our own test fakes.
+
+With π_synth = 0.3 and C_FA = 4, normalized DCF = (4·0.7·P_FA + 0.3·P_miss) / 0.3 = **9.33·P_FA + P_miss**. False alarms dominate. The best constant is "always real" (normalized 1.0).
 
 ## What this changes (implemented)
 
@@ -70,7 +90,7 @@ Post these in writing (NSA x HexLabs Discord) and record the answers below.
 |---|--------|---------------|
 | metric | MinDCF, false alarm ×4, label 1 = synthetic, not log-loss | kickoff slides, Fri Sep 25; confirmed by Nathan |
 | format | TSV `filename<TAB>cm-score`, probability, no LLR | kickoff slides |
-| balance | ~50/50 (slide) vs 70/30 (unsourced note), open | |
+| balance | 70/30 real/synthetic said aloud; slide reads ~50/50; verify on NSA train labels | presenter, per Nathan |
 | 1 | | |
 | 2 | | |
 | 3 | | |

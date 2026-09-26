@@ -6,8 +6,9 @@ Miss = synthetic not identified; label 1 = synthetic.
     normalized by the best constant decision, min(C_FA * pi_real, C_MISS * pi_synth),
     so 1.0 = no better than a constant answer, 0.0 = perfect.
 
-The slide's formula weights the FA term by P(attack) as transcribed; at the stated ~50/50
-balance both readings give the same number. Ask the sponsor which prior they plug in.
+pi_synth = 0.3 (70/30, said aloud at kickoff; the slide read ~50/50): normalized DCF =
+9.33 * P_FA + P_miss. The slide's formula weights the FA term by P(attack) as transcribed, which
+would change the weights; ask the sponsor which form and prior they plug in.
 
 min_dcf sweeps the threshold: this is the judged number and depends only on ranking.
 act_dcf uses the Bayes threshold on calibrated LLRs (calibration check only).
@@ -23,6 +24,7 @@ from sklearn.metrics import roc_curve
 
 C_FA = 4.0
 C_MISS = 1.0
+PI_SYNTH = 0.3  # 70/30 real/synthetic, said aloud at kickoff; slide read ~50/50
 
 
 def eer(y: np.ndarray, s: np.ndarray) -> float:
@@ -36,7 +38,7 @@ def _default_cost(pi_synth: float, c_fa: float, c_miss: float) -> float:
     return min(c_fa * (1 - pi_synth), c_miss * pi_synth)
 
 
-def cost_at(y, s, thr, pi_synth=0.5, c_fa=C_FA, c_miss=C_MISS) -> float:
+def cost_at(y, s, thr, pi_synth=PI_SYNTH, c_fa=C_FA, c_miss=C_MISS) -> float:
     """Normalized cost when s >= thr is called synthetic (y: 1 = synthetic)."""
     y, s = np.asarray(y), np.asarray(s)
     p_fa = float(np.mean(s[y == 0] >= thr))
@@ -45,7 +47,7 @@ def cost_at(y, s, thr, pi_synth=0.5, c_fa=C_FA, c_miss=C_MISS) -> float:
     return c / _default_cost(pi_synth, c_fa, c_miss)
 
 
-def min_cost(y, s, pi_synth=0.5, c_fa=C_FA, c_miss=C_MISS) -> float:
+def min_cost(y, s, pi_synth=PI_SYNTH, c_fa=C_FA, c_miss=C_MISS) -> float:
     """Normalized cost at the best threshold (oracle sweep)."""
     fpr, tpr, _ = roc_curve(y, s)
     c = c_fa * fpr * (1 - pi_synth) + c_miss * (1 - tpr) * pi_synth
@@ -53,12 +55,12 @@ def min_cost(y, s, pi_synth=0.5, c_fa=C_FA, c_miss=C_MISS) -> float:
                  _default_cost(pi_synth, c_fa, c_miss))  # fmt: skip
 
 
-def bayes_llr_threshold(pi_synth=0.5, c_fa=C_FA, c_miss=C_MISS) -> float:
+def bayes_llr_threshold(pi_synth=PI_SYNTH, c_fa=C_FA, c_miss=C_MISS) -> float:
     """Call synthetic iff LLR > ln(c_fa/c_miss) - logit(pi_synth)."""
     return math.log(c_fa / c_miss) - math.log(pi_synth / (1 - pi_synth))
 
 
-def decision_logit(llr, pi_synth=0.5, c_fa=C_FA, c_miss=C_MISS):
+def decision_logit(llr, pi_synth=PI_SYNTH, c_fa=C_FA, c_miss=C_MISS):
     """Shift a prior-neutral LLR so a fixed 50% cut-off makes the Bayes decision:
     logit(q) = LLR + logit(pi_synth) - ln(c_fa/c_miss). q > 0.5 <=> posterior P > 0.8 (at 4:1).
     Monotone, so ranking metrics are unchanged."""
@@ -69,7 +71,7 @@ def sigmoid(z):
     return 1 / (1 + np.exp(-np.asarray(z, dtype=np.float64)))
 
 
-def report(y, llr, pi_synth=0.5) -> dict:
+def report(y, llr, pi_synth=PI_SYNTH) -> dict:
     """EER + normalized min/actual cost for prior-neutral LLR-like scores."""
     y, llr = np.asarray(y), np.asarray(llr)
     return {

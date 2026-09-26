@@ -7,7 +7,7 @@
 
 Usage:
   uv run python scripts/train_probe.py --train asv19_train_probe --val asv19_eval_probe \
-      [--pi-synth 0.5]
+      [--pi-synth 0.3]
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def main() -> None:
     ap.add_argument("--train", required=True)
     ap.add_argument("--val", required=True)
     ap.add_argument("--c", type=float, default=1.0)
-    ap.add_argument("--pi-synth", type=float, default=0.5, help="prior used in the cost metric")
+    ap.add_argument("--pi-synth", type=float, default=0.3, help="NSA prior (70/30 real/synth)")
     args = ap.parse_args()
 
     t0 = time.time()
