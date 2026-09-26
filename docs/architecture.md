@@ -83,7 +83,7 @@ Today's logged TSV bypasses the orchestrator and fusion: `scripts/make_probe_csv
 
 ## 5. The detector contract
 
-`ClipContext` → `DetectorResult(name, score ∈ [0, 1], evidence: str, features: {str: float}, status ∈ {ok, skipped, error})`. Detectors load heavy models lazily inside `run`, share expensive intermediates through `ctx.memo`, and never read filenames or filesystem timestamps. Fusion input per detector: `logit(clip(score, 1e-4, 1 − 1e-4))` when `ok`, else imputed with the fold-local train mean plus a `<name>.missing` indicator. The registry iterates in sorted name order so fusion columns are stable.
+`ClipContext` → `DetectorResult(name, score ∈ [0, 1], evidence: str, features: {str: float}, status ∈ {ok, skipped, error})`. Detectors load heavy models lazily inside `run`, share expensive intermediates through `ctx.memo`, and never read filenames or filesystem timestamps. Fusion input per detector: the exported `logit` column from `outputs/detector_scores/<name>.csv`, standardized on inner rows, when `ok`. That column holds the raw decision value (e.g. Spectra-AASIST's synth_logit, whose margins run ±10–17), so nothing saturates. For live `DetectorResult`s without an export it falls back to `logit(clip(score, 1e-4, 1 − 1e-4))`. When a detector isn't `ok`, the value is imputed with the fold-local train mean plus a `<name>.missing` indicator. The registry iterates in sorted name order so fusion columns are stable.
 
 ## 6. Deep detectors
 
