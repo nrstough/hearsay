@@ -125,6 +125,7 @@
 <ul>
 <li>Create: this spec; <code>docs/reports/2026-09-26_docs-site-plan.md</code>; <code>docs/reports/2026-09-26_docs-site.md</code> (what was built, verification results, critique verdicts, the pending Codex pass, the routed discrepancies).</li>
 <li><strong>Routed to the oversight chat, not edited by this lane</strong> (listed so the audit does not read them as unfulfilled): <code>CLAUDE.md</code> AI-use disclosure (one line for the site and generator); <code>README.md</code> "Where to look next" (a link to <code>docs/site/index.html</code>); <code>docs/architecture.md</code> §9 and <code>docs/img/architecture-flow.svg</code> (still show the previous fusion rule); the ratification time stated as 12:03 (README), ~12:05 (STATUS) and 12:20 (sweep report, decoding table).</li>
+<li><strong>Full drift list, routed at execution (B20; the plan's "Ground truth" has the line references):</strong> <code>docs/architecture.md</code> §7 states the first gated-file formula where the code uses <code>BLOCK_TOP</code> 0.001, <code>FAILURE_TOP</code> 1e-4 and <code>JITTER_WEIGHT</code> 0.01, and the document and <code>docs/STATUS.md</code> are both dated ~04:40; M1b's In-the-Wild figure is 0.342 in the README's detector table and 0.343 in its results table, and the test share above 0.5 is 27.4% in the README's numbers table and 27.5% in the orchestration ablation (a different readout); the speech gate's docstring says "a tenth" where <code>MIN_VOICED_FRAC</code> is 0.05; stale comments name the previous default rule at <code>src/hearsay/pipeline.py:71</code>, <code>docker/build.sh:5</code> and <code>docker/entrypoint.sh:6,42</code>; <code>docker/build.sh</code> does not stage the M5 checkpoint the runner's current default needs; <code>scripts/orchestration_ablation.py:82</code> defaults to the previous constants file; the runner's team default is <code>HEARSAY</code>, not <code>CrossExam</code>; <code>spectra_aasist</code> is tagged "fused" in the runner's role map where it only suppresses; the frontend contract's verdict rule and its line reference into the gate module are stale; <code>docs/code-map.md</code>'s line numbers for <code>embed.py</code> are stale and it says <code>tests/test_spectra.py</code> does not exist; <code>tests/test_engineered_registry.py</code> is titled "all five" and asserts seven names; a comment in <code>src/hearsay/compression.py:38</code> says 3–8 kHz where the code uses 3–7 kHz; five links in <code>docs/specs/*-audit.md</code> use absolute Mac paths (the site rewrites them). The site states the code's values and marks each document's stale one where a page touches it.</li>
 <li>No feature spec (the project has none). No change to <code>docs/STATUS.md</code>.</li>
 </ul>
 <h2 id="claude-plan-critique-phase-3c-1940-utc-findings-and-dispositions">Claude plan critique (Phase 3c, ~19:40 UTC): findings and dispositions</h2>
@@ -144,13 +145,29 @@
 <li><strong>D14 amended (B20).</strong> Adds <code>docs/site/source/verify-pages.js</code> (the browser check) and, proposed to Nathan, <code>docs/.nojekyll</code>. Pushing this session's branch is authorized; the lane never merges. The full doc-versus-code drift list (plan, "Ground truth") is added to the routed section at execution.</li>
 </ol>
 <h2 id="results">Results</h2>
-<p><em>To be filled at execution.</em></p>
+<p>Executed Sat Sep 26, 2026, in the cloud container (no data, weights, models or outputs; <code>ffmpeg</code> absent). Main commit <code>b8ce0db</code> (201 files); the report is <code>docs/reports/2026-09-26_docs-site.md</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Criterion</th><th>Result</th>
+</tr></thead>
+<tbody>
+<tr><td>1. Build, <code>--check</code>, <code>--check-citations</code></td><td><code>uv run python scripts/build_site.py --strict</code>: 121 pages (9 story, 27 spec incl. the index, 84 library incl. the index, 1 About), 0 warnings. <code>--check</code> against the committed output: OK. <code>--check-citations</code>: OK, 857 citations of 128 distinct sections in 50 files, 0 uncited numbers on story, spec and diagram sources.</td></tr>
+<tr><td>2. Site tests</td><td><code>uv run pytest -q tests/test_build_site.py</code>: 77 passed, 2 skipped (the staleness checks, run only under <code>HEARSAY_SITE_CHECK=1</code>; with it: 79 passed). Every row of the failure-mode table has a test; the counterfactual rows (a wrong or uncited number, a missing source or section, a stale generated file, a missing diagram, an unknown term, a term inside a link) are asserted to fail.</td></tr>
+<tr><td>3. Link check</td><td>The amended regex (B4) over <code>docs/site/**/*.html</code> excluding <code>source/</code>: <code>links OK</code>.</td></tr>
+<tr><td>4. Regression, lint, docs consistency</td><td>Baseline before the change, <code>uv run pytest -q --continue-on-collection-errors</code>: 439 passed, 60 failed, 21 skipped, 3 errors (the three modules that import <code>ffmpeg</code>-backed loaders; the 60 failures need data, weights or <code>ffmpeg</code>). After: 516 passed, 60 failed, 23 skipped, 3 errors; the failure set is identical to the baseline's (diffed by node id). <code>uv run ruff check .</code>: the 3 pre-existing findings, none in this lane's files. <code>tests/test_docs_consistency.py</code>: 49 passed, 3 skipped, unchanged.</td></tr>
+<tr><td>5. Browser pass</td><td><code>node docs/site/source/verify-pages.js</code>: 121 pages × (390 px, 1280 px) × (light, dark) from <code>file://</code>, 484 screenshots, 0 pages with <code>scrollWidth &gt; innerWidth</code>, 0 page errors, one h1 on every page.</td></tr>
+<tr><td>6. Content</td><td>The eight story pages and the Glossary; all 26 spec pages of the P1 list plus the spec index; all 84 markdown documents in the library (this spec, the plan and the report included) (the corpus assertion is ≥ 80); the About page. Every Home-page number from the handoff is present and cited (pinned by name in <code>tests/test_build_site.py</code>): shipped rule 0.135 / 0.0065 / 0.228 / 0.239, previous rule 0.140 / 0.014 / 0.260 / 0.267, M1b v3 0.301 / 0.072 / 0.343 (and 0.342 where the README's detector table is the source), Spectra In-the-Wild 0.065 with the "possibly in-sample" caveat, test share 27.4% (README, Numbers) and 27.5% (orchestration ablation), 1,671 files, 0 of 1,671 gated, router on vs off 0.0065 vs 0.0200 and 0.229 vs 0.274. NSA's draft minDCF is shown as a pending tile.</td></tr>
+<tr><td>7. Self-containment</td><td>No external <code>&lt;script src&gt;</code> or <code>&lt;link href&gt;</code>, no <code>fetch(</code>, no Mermaid CDN tag, no absolute <code>/</code> path, no <code>http</code> URL in <code>site.css</code>, no font files; SVGs pass the hygiene row. All tested.</td></tr>
+<tr><td>8. This spec</td><td>Records the plan-critique dispositions (above), the Claude audit scorecard (below) and the pending Codex pass.</td></tr>
+</tbody>
+</table></div>
+<p>Nothing from the cut order was cut (the explorer sliders and the inverted-index search were built). Deviations from the plan are listed in the report.</p>
 <h2 id="audits">Audits</h2>
 <p><em>Claude critique against <code>.claude/codex-audit-prompt.md</code>: to be filled. Codex audit: pending on the Mac.</em></p>
 </article>
 
 <footer class="page-footer">
-<p>Generated from <code>docs/specs/2026-09-26_docs-site.md</code> <span class="hash">90ad4b9f31ec</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+<p>Generated from <code>docs/specs/2026-09-26_docs-site.md</code> <span class="hash">e8e0461bbb59</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
 </footer>
 </main>
 </div>
