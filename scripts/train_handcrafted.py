@@ -47,10 +47,18 @@ META_COLS = {"path", "label", "generator", "speaker", "utt", "source", "filename
              "fold"}  # fmt: skip
 META_SUFFIXES = ("_flag", "_launder", "_crop_s")
 N_JOBS = 6  # leave cores for the GPU chat's decoding
+# v4 family -> column prefixes, so a bundle only asks for the families its columns need
+FAMILY_PREFIXES = {"lfcc": ("lfcc",), "phase": ("gd_", "pc_"), "cqcc": ("cqcc",),
+                   "modulation": ("mod_",), "breath": ("breath_",), "jitter": ("jit_", "shim_")}  # fmt: skip
 
 
 def is_meta(col: str) -> bool:
     return col in META_COLS or col.endswith(META_SUFFIXES)
+
+
+def dropped(col: str, patterns: list[str]) -> bool:
+    """`--drop-columns` entries are exact names or `prefix*` globs."""
+    return any((pat.endswith("*") and col.startswith(pat[:-1])) or col == pat for pat in patterns)
 
 
 def models() -> dict:
@@ -107,7 +115,10 @@ def main() -> None:
     ap.add_argument("--out-name", default="handcrafted",
                     help="outputs/detector_scores/<out-name>.csv")
     ap.add_argument("--pi-synth", type=float, default=PI_SYNTH)
+    ap.add_argument("--drop-columns", default="",
+                    help="comma-separated feature names or prefix* globs to leave out (v4 gate)")
     args = ap.parse_args()
+    drop = [c for c in args.drop_columns.split(",") if c]
 
     t0 = time.time()
     fdir = args.features_dir.resolve()
@@ -118,7 +129,8 @@ def main() -> None:
     assert d_all.fold.notna().all(), "rows missing from the fold file"
     d_all[flag_col] = d_all[flag_col].fillna("")
     d = d_all[d_all[flag_col] == ""].reset_index(drop=True)
-    feat_cols = [c for c in d.columns if not is_meta(c)]
+    feat_cols = [c for c in d.columns if not is_meta(c) and not dropped(c, drop)]
+    n_dropped = sum(1 for c in d.columns if not is_meta(c)) - len(feat_cols)
     X = d[feat_cols].to_numpy(np.float32)
     y = (d.label == "spoof").to_numpy(int)
     tr, va = (d.fold != "holdout").to_numpy(), (d.fold == "holdout").to_numpy()
@@ -128,10 +140,13 @@ def main() -> None:
     crop_mode = side_meta.get("crop_mode", "first4s")
     band_match = bool(side_meta.get("band_match", False))
     families = [str(n) for n in side_meta.get("families", [])]
+    families = [fam for fam in families
+                if any(c.startswith(FAMILY_PREFIXES.get(fam, (fam,))) for c in feat_cols)]  # fmt: skip
     n_laundered = int((d_all.get("cmp_launder", pd.Series(dtype=str)).fillna("") != "").sum())
     print(f"{args.train}: {len(d)} rows ({(d_all[flag_col] != '').sum()} feature failures "
           f"dropped), {len(feat_cols)} features, crop_mode={crop_mode}, band_match={band_match}, "
-          f"families={families}, laundered={n_laundered}, inner {tr.sum()} / holdout {va.sum()}")
+          f"families={families}, dropped={n_dropped} columns, laundered={n_laundered}, "
+          f"inner {tr.sum()} / holdout {va.sum()}")
 
     auc = {c: round(float(roc_auc_score(y[tr], d.loc[tr, c])), 4) for c in feat_cols}
     top = sorted(auc.items(), key=lambda kv: -abs(kv[1] - 0.5))[:15]
@@ -219,7 +234,7 @@ def main() -> None:
     fdir_txt = str(fdir.relative_to(REPO)) if fdir.is_relative_to(REPO) else str(fdir)
     meta = {"rung": args.rung, "train": args.train, "features_dir": fdir_txt,
             "crop_mode": crop_mode, "band_match": band_match, "families": families,
-            "n_laundered": n_laundered,
+            "dropped_columns": drop, "n_laundered": n_laundered,
             "folds": str(args.folds), "model": best, "cv": cv,
             "cv_by_generator": cv_gen, "cv_by_bonafide_source": cv_src,
             "n_features": len(feat_cols), "n_inner": int(tr.sum()), "n_holdout": int(va.sum()),
