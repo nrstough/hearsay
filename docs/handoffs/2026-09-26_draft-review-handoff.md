@@ -8,7 +8,7 @@ Read first: `docs/reports/2026-09-26_draft-review-branches.md` (the decoding tab
 
 - **What NSA grades (60% of the score):** minDCF on 1,671 unlabeled test WAVs, false alarms costing 4× a miss, about 70% real. Only the ranking of our scores matters; any monotone rescaling changes nothing.
 - **What we know about our error:** holdout 0.014 (two unseen generators + 26 unseen real speakers), In-the-Wild 0.260 (3,000 real-world clips, never trained on), inner 0.140. The test number is unknown; NSA provided no labels. The draft review is the only labeled measurement we will ever get on the test set: one file, one time, one number back.
-- **The draft is the shipped rule, not an experiment.** `e_on_a`, frozen by Nathan at 09:25: rank blend 0.8·M1b v3 + 0.2·handcrafted v5, Spectra-AASIST used only to suppress false alarms, Platt at the 0.3 prior into [0.001, 1], non-speech and decode failures pinned below 0.001. The runner reproduces it to 4e-16, the Docker image `hearsay:20260926-0916` to 2e-4 (Spearman 1.0 on 50 files).
+- **The draft is the shipped rule, not an experiment.** Since ~12:05 that rule is **A3 w0.2 + E** (ratified by Nathan once NSA said the image is not required): rank blend 0.6·M1b v3 + 0.2·handcrafted v5 + 0.2·M5, Spectra-AASIST used only to suppress false alarms, Platt at the 0.3 prior into [0.001, 1], non-speech and decode failures pinned below 0.001. Constants `models/fusion_v2/constants.json`; the runner reproduces the file live from audio at Spearman 1.0 / max 9.3e-4 on all 1,671 rows. The previous rule `e_on_a` (fusion_v1) is the fallback; the evidence image `hearsay:20260926-0916` reproduces that one.
 - **Score direction:** we submit 1.0 = synthetic, as the brief says. NSA's scoring code is ASVspoof5 code that treats a higher score as bona fide. The draft's returned number tells us which one they actually use; the decoding table below turns that number into an action. The pinned block stays at the bottom in both polarities, by design (consult item 5): that is where the 4× error is avoided under either reading.
 - **The M5 candidate (A3 w0.2 + E)** beat the frozen rule on every readout but is shelved until the draft number is back; artifacts under `submissions/20260926-0914_*CANDIDATE*`, `outputs/fusion/fusion_v2_candidate/` and the runner's `models/fusion_v2/constants.json`. The runner can already execute it (8316e50, opt-in via `--fusion`; default and the draft file unchanged, reproduced to 1.1e-16), so reopening it is Nathan's call and, now that the Docker image is not required (NSA, Sat ~12:00), costs nothing but a file copy and a README line. Nathan is deciding at ~12:15 whether the draft itself goes out as A3.
 
@@ -16,13 +16,13 @@ Read first: `docs/reports/2026-09-26_draft-review-branches.md` (the decoding tab
 
 | | |
 |---|---|
-| Logged file | `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv` |
-| sha256 (first 16) | `096f3f0c9e3cfa9a5` |
-| Copy in Downloads | `~/Downloads/HEARSAY_predictions.tsv`, verified byte-identical at 09:52 |
+| Logged file | `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv` (A3 w0.2 + E; supersedes the 08:13 `e_on_a` file, which stays logged as the fallback) |
+| sha256 (first 16) | `fb7830762691d04d` |
+| Copy in Downloads | `~/Downloads/CrossExam_predictions.tsv`, verified byte-identical at 12:03 (the earlier `e_on_a` copy is beside it as `CrossExam_predictions_e_on_a_superseded.tsv`; do not send that one) |
 | Rows | 1,671 + header, in the template's order (`data/nsa/HearsayScoreKey4TeamX.tsv`) |
 | Header | `filename<TAB>cm-score` |
-| Range | min 0.0012, max 0.9997, no NaN, 0 files gated |
-| Share ≥ 0.5 | 27.4% (458 files); a smoke alarm, not a selection signal |
+| Range | min 0.0014, max 0.9996, no NaN, 0 files gated |
+| Share ≥ 0.5 | 27.3%; a smoke alarm, not a selection signal |
 
 **Team name: Cross Exam.** The file goes out as **`CrossExam_predictions.tsv`** (the brief's pattern is `teamName_predictions.tsv`). Made at 11:20: `~/Downloads/CrossExam_predictions.tsv`, byte-identical to the logged 08:13 file (sha256 `096f3f0c9e3cfa9a…`), checker output `OK rows 1671 min 0.0012 max 0.9997 share>=0.5 0.274`. The runner and the image take the name as `--team CrossExam` / `HEARSAY_TEAM=CrossExam` (their default is `HEARSAY`, which is wrong for the deliverable).
 
@@ -40,10 +40,10 @@ Copy the file for the band, rename it to `<TeamName>_predictions.tsv`, run the c
 
 | NSA's minDCF | Meaning | Final TSV | Then |
 |---|---|---|---|
-| **0.00–0.20** | our direction; test behaves like our holdout | the 08:13 file, unchanged | remaining hours to README and diversity; A3 may be revisited if it is before ~14:00 and Nathan wants it |
-| **0.20–0.45** | our direction; test is wild-like | the 08:13 file, unchanged (it already has the best In-the-Wild brief-cost score of the ratified rules) | the channel-robustness report (16:00) becomes the lever; A3 worth a second look |
-| **0.45–0.90** | ambiguous; do not flip | `submissions/20260926-0928_BRANCH_C_M1b_alone_our_direction.tsv` (sha `4ae685ff9824543d1`) | no image work (Docker not required); note the rule in the README |
-| **0.95–1.00** | NSA's code reads our scores inverted | `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_FLIPPED_only_if_NSA_scores_inverted.tsv` (sha `84468a0925fa8d8ad`) | raise it with NSA at the booth or on Discord (the brief says 1.0 = synthetic); the runner's `--flip` already produces this file, so the image needs no change |
+| **0.00–0.20** | our direction; test behaves like our holdout | the A3 file, unchanged | remaining hours to README and diversity |
+| **0.20–0.45** | our direction; test is wild-like | the A3 file, unchanged (it has the best In-the-Wild score under both costs of every rule we have) | the channel-robustness report (16:00) becomes the lever |
+| **0.45–0.90** | ambiguous; do not flip | `submissions/20260926-0928_BRANCH_C_M1b_alone_our_direction.tsv` (sha `4ae685ff9824543d1`) | ask NSA the direction question directly before doing anything else; note the rule in the README |
+| **0.95–1.00** | NSA's code reads our scores inverted | `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_FLIPPED_only_if_NSA_scores_inverted.tsv` | raise it with NSA at the booth or on Discord (their own document says 1.0 = synthetic); the runner's `--flip` produces this file |
 
 If only EER comes back: 2–5% → first row; 95–98% → last row. If a number lands on a boundary or NSA sends something else (a rank, a plot, "looks fine"), do not guess: post it to Nathan and the M4 lane verbatim and ask NSA for minDCF and EER.
 
