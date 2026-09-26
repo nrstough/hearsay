@@ -133,7 +133,7 @@ def m3_verdict(m3_dauc: float, m1_dauc: float, mlaad_damped: float,
     (d) under some perturbation the step raises the fused holdout minDCF by > 0.01.
     Any NaN input makes the verdict "inconclusive", never "kept"."""
     vals = (m3_dauc, m1_dauc, mlaad_damped, e_hurts_perturbed)
-    if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in vals):
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in vals):
         return "inconclusive", ["a probe did not produce a number"]
     why = []
     if abs(m3_dauc) > 2 * abs(m1_dauc) and abs(m3_dauc) > 0.02:
@@ -312,7 +312,15 @@ def perturb_readout(d: pd.DataFrame) -> dict:
     piv = {c: d.pivot_table(index="path", columns="kind", values=c, aggfunc="first")
            for c in (*MODELS, "fused_base", "fused", "e_applied")}  # fmt: skip
     lab = d.groupby("path").label.first()
-    paths = [p for p in piv["m1b_v3"].index if all(piv["m1b_v3"].loc[p].notna())]
+    # A clip counts only if every detector, both fused scores and the step flag exist under
+    # every perturbation: a missing M3 (or any) score must shrink n_paired, never vanish.
+    need = (*MODELS, "fused_base", "fused", "e_applied")
+    idx = piv["m1b_v3"].index
+    for c in need:
+        idx = idx.intersection(piv[c].index)
+    paths = [p for p in idx
+             if all(set(PERTURBATIONS) <= set(piv[c].columns) and piv[c].loc[p, list(PERTURBATIONS)].notna().all()
+                    for c in need)]  # fmt: skip
     y = (lab.loc[paths] == "spoof").to_numpy(int)
     res: dict = {"n_paired": len(paths), "n_real": int((y == 0).sum()), "n_spoof": int((y == 1).sum())}
     for c in (*MODELS, "fused_base", "fused"):

@@ -450,3 +450,36 @@ def test_verdict_from_checks_which_perturbations_and_rejects_booleans():
              "e_step_effect_min_dcf": {f"x{i}": 0.0 for i in range(5)}}  # fmt: skip
     assert m3p.verdict_from(wrong, m)["verdict"] == "inconclusive"
     assert m3p.verdict_from(_p([0.0, 0.0, True, 0.0, 0.0]), m)["verdict"] == "inconclusive"
+
+
+def _cohort(n_real=4, n_spoof=4):
+    import pandas as pd
+
+    rows = []
+    for i in range(n_real + n_spoof):
+        lab = "bonafide" if i < n_real else "spoof"
+        for k in m3p.PERTURBATIONS:
+            v = float(i >= n_real) + 0.01 * i
+            rows.append({"key": f"p{i}|{k}|0", "path": f"p{i}", "kind": k, "label": lab,
+                         **{c: v for c in (*m3p.MODELS, "fused_base", "fused")}, "e_applied": 0.0})
+    return pd.DataFrame(rows)
+
+
+def test_a_missing_score_from_any_model_shrinks_the_cohort_and_the_verdict_goes_inconclusive(monkeypatch):
+    monkeypatch.setattr(m3p, "THRESHOLDS_FROM_EXPORTS", False)
+    d = _cohort()
+    assert m3p.perturb_readout(d)["n_paired"] == 8
+    d.loc[(d.path == "p5") & (d.kind == "noise20"), "spectra_aasist"] = float("nan")
+    r = m3p.perturb_readout(d)
+    assert r["n_paired"] == 7
+    assert m3p.verdict_from(r, {"e_applied_share": 0.0, "n": 572}, n_perturb=8)["verdict"] == "inconclusive"
+    d2 = _cohort()
+    d2 = d2[~((d2.path == "p2") & (d2.kind == "shift1"))]  # a perturbation row missing entirely
+    assert m3p.perturb_readout(d2)["n_paired"] == 7
+
+
+@pytest.mark.parametrize("i", range(4))
+def test_m3_verdict_rejects_a_boolean_in_every_scalar_input(i):
+    vals = [0.001, 0.004, 0.01, 0.0]
+    vals[i] = False
+    assert m3p.m3_verdict(*vals)[0] == "inconclusive"

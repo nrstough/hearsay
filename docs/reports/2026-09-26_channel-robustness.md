@@ -37,7 +37,7 @@ Run spec: `docs/specs/2026-09-26_channel-robustness.md`. Plan: `docs/reports/202
 | **Duration-matched** (reference clips cropped to test lengths) | **0.36** (AUC 0.81) |
 | LJ removed from the clean side | 0.54 |
 | λ̂ on the 1,170 files the shipped rule calls real | 0.58 |
-| Mean posterior P(wild) (descriptive; biased toward 0.5) | 0.56 |
+| Mean posterior P(wild) (descriptive; biased toward 0.5) | 0.56 (95% CI 0.55–0.58, test files resampled) |
 | Without all floor and hole features | 0.80, but the classifier is weak (per-fold AUC 0.32–0.74) |
 | Without the top feature (`local_hole_runs`) | refused: pooled TPR − FPR is 0.13, but per-fold AUC stays 0.63–0.89. The refusal comes from the LJ fold (see below), not a collapse |
 | Test files outside both domains (Mahalanobis p99) | 1.0% (1% expected) |
@@ -64,7 +64,7 @@ The pre-declared identifiability rule passes, but only just: VCTK sits at 24.7% 
 - **Beyond the clean end:** loudness spread (−3.5), deep-hole fraction (−0.74), floor p10 (−0.70), floor p2 (−0.51), decay slope (−0.45), deep-hole flicker and persistence (−0.2), low-band floor (−0.14).
 - So the test set is not a blend of the two reference domains on every axis. It is its own recording population, and that is why λ̂ carries a wide interval.
 
-**What went wrong first, and why it matters for the README.** The first full run reported λ̂ = 0.947 with AUC 0.99 and read "wild" as "codec-processed", because one MP3 round-trip moved our clean clips to 91% "wild". That run was driven by `clip_floor_db`, a 1st percentile over the whole spectrogram, which lands in the 7–8 kHz stopband. Action B measured the test files at −118 dB as delivered and −157 dB after the pipeline's second low-pass. So the feature measured the double filtering (and In-the-Wild's own band limits), not the recording channel. Dropping it under the rule already declared for >7 kHz columns gave the numbers above, and the codec reading disappeared (MP3 control 91% → 9%). The 0.947 figure came from the run at ~12:36 and its JSON was overwritten by the corrected run; the retained `outputs/channel/lambda_run.log` holds an earlier, pre-review run of the same feature set (AUC 0.999, λ̂ 0.945). This is the same class of shortcut as the 7.2 kHz wall in `architecture.md` §11: a band no training clip has, read through a feature that did not look like a band feature.
+**What went wrong first, and why it matters for the README.** The first full run reported λ̂ = 0.947 with AUC 0.99 and read "wild" as "codec-processed", because one MP3 round-trip moved our clean clips to 91% "wild". That run was driven by `clip_floor_db`, a 1st percentile over the whole spectrogram, which lands in the 7–8 kHz stopband. Action B measured the test files at −118 dB as delivered and −157 dB after the pipeline's second low-pass. So the feature measured the double filtering (and In-the-Wild's own band limits), not the recording channel. Dropping it under the rule already declared for >7 kHz columns gave the numbers above, and the codec reading disappeared (MP3 control 91% → 9%). The 0.947 figure came from the run at ~12:36 and its JSON was overwritten by the corrected run; the retained `outputs/channel/lambda_run.log` holds an earlier, pre-review run of the same feature set (AUC 0.999, λ̂ 0.945). It is now an entry in the shortcut ledger (`architecture.md` §11, "Double low-pass stopband"), left open: whether the detectors respond to it is unmeasured. It is the same class of shortcut as the 7.2 kHz wall: a band no training clip has, read through a feature that did not look like a band feature.
 
 **Limits.**
 - In-the-Wild stands in for "wild"; telephony and physical replay are not represented.
@@ -101,7 +101,7 @@ The pre-declared identifiability rule passes, but only just: VCTK sits at 24.7% 
 The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any perturbation. Under noise it fires on nothing, because noise pushes M3 out of its "strongly bona fide" region (logit < −3).
 
 **Two stability readings, and they disagree.**
-- **Margin:** M3's AUC and minDCF barely move (mean |ΔAUC| 0.0008). But its clean AUC is 1.000, so its ΔAUC has almost no room to fall, and trigger (a) can barely fire for M3.
+- **Margin:** M3's AUC and minDCF barely move (mean |ΔAUC| 0.0008). AUC counts only whether each spoof clip outscores each real clip. A perturbation can reorder clips within each class, or shift every score, and leave that separation intact. So a stable AUC says the classes stay apart, not that individual scores stay put.
 - **Rank order:** Spearman between each detector's clean and perturbed scores. M3 has the lowest rank stability of the three deep models under every perturbation:
 
   | Perturbation | M3 | M1b | M5 |

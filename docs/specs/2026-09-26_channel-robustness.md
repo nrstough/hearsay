@@ -65,7 +65,7 @@ Scripts read real data and weights and are exercised by running them; their pure
 
 - Create: this spec; `docs/reports/2026-09-26_channel-robustness-plan.md`; `docs/reports/2026-09-26_channel-robustness.md`.
 - Update: `docs/STATUS.md` (one row), `CLAUDE.md` (one disclosure bullet).
-- Conditional (confirm at execution): `docs/architecture.md` §11 shortcut ledger, only if A or B finds a new train-vs-test fingerprint.
+- Conditional (confirm at execution): `docs/architecture.md` §11 shortcut ledger, only if A or B finds a new train-vs-test fingerprint. **Confirmed:** A found one (the double low-pass stopband); the entry was added after the Codex audit (below).
 
 ## Codex plan review (before commit a0018a8): findings and dispositions
 
@@ -145,3 +145,14 @@ Acceptance criteria:
 5. `verdict_from` checked how many step effects there were, not their names, and accepted booleans. Both are now checked, with a test.
 6. The report called M3 "near-perfect" under noise. It now says best of the four, with P_miss 0.32.
 7. Two stale claims sit in another lane's `docs/reports/2026-09-26_fusion-sweep-predeclared.md` (lines 53 and 141), and README.md:225 repeats the "fires only on real clips" claim. Those are other lanes' files, relayed through oversight.
+
+**Codex audit, round 1 (13:55, on 68cc08e): Overall Fail** (`docs/specs/2026-09-26_channel-robustness-audit.md`). Plan adherence, Test coverage, Review compliance and Documentation were Fail; Scope discipline Excellent; Freeze and Regression Acceptable. Codex confirmed the saved cohorts have no missing scores, so the recorded verdict stands. Findings and fixes:
+1. **Completeness checked M1b only.** `perturb_readout` now counts a clip only if every detector, both fused scores and the step flag exist under all five perturbations. Tested through readout → verdict: one missing M3 score shrinks `n_paired`, and the verdict goes "inconclusive".
+2. **Booleans were accepted in the scalar verdict inputs.** `m3_verdict` now rejects them, tested per input.
+3. **Missing deliverables:**
+   - The report now carries the mean-posterior interval (0.55–0.58, AC1).
+   - The conditional shortcut-ledger entry is written (`architecture.md` §11, "Double low-pass stopband"). It is marked **open**: whether the detectors respond to the stopband depth is unmeasured.
+4. **Reversed AUC reasoning.** The report now says a stable AUC means the classes stay apart, not that scores stay put. The claim about trigger (a) is removed.
+5. **The final full suite predated the fixes.** It is re-run at the audit-fix commit, recorded below.
+
+Full suite at the audit-fix commit: **572 passed** (`uv run pytest -q`, 199 s). Ruff is clean on this change's files; the 3 findings in `src/hearsay/analyzer.py` belong to another lane (19925a3).
