@@ -183,7 +183,16 @@ git diff --stat -- src/hearsay/embed.py scripts/extract_embeddings.py scripts/tr
 
 ## Results
 
-_Filled in at execution._
+### Execution notes (dated; deviations from the plan)
+
+- **03:40** ASV19 rows come from the main chat's `splits/nsa_folds_plus_asv19.csv` (commit c7a3275: 5,128 bona fide + 2,520 A01–A06 anchor, speaker-grouped into inner folds) instead of a second selection here; they keep their fold (never trained on by that fold's model) and are `extra_asv19`, never exported. The bundle applies the ≥ 2.0 s cut and the 0.5× duration matching on top (2,496 bona fide + 1,092 spoof kept).
+- **03:58** Bundle `m5_bundle/v1`: 44,850 training rows (3,724 short extras dropped, 0 decode errors, 0 cross-scope PCM collisions, 0 core clips identical to a test clip), 1,671 test rows, 5.3 GB; trivial-feature AUCs per scope all ≤ 0.64 (`diagnostics.json`). Extra DiffSSD spoof capped at 1,000 per generator.
+- **04:00** Main chat commit 133e536 made `prepare_segment` band-limit at 7.25 kHz by default. Adopted: `hearsay.handcrafted.band_limit` runs once per clip, after augmentation, on every clip the model sees; the bundle stays raw (trimmed only). Fusion exports use the 8 s default cap (`DEPLOY_MAX_S`); 14 s whole clips are `diag_*_14s.csv` only. The 7 kHz augmentation op was dropped (3.4 and 4 kHz telephony only).
+- **04:05** Gate extended (main chat + oversight): beat M1 on the outer holdout **and** the pooled 5-fold OOF **and** In-the-Wild bona fide P_FA at the OOF minDCF threshold ≤ M1's (read from M1's `meta.json` stress block). The bar is the NSA-only M1 selected by its `train` field, not by timestamp; M1b is reported beside it.
+- **04:30** MLAAD probe A (`outputs/m5_probe_a.json`): MLAAD-vs-DiffSSD spoof AUC 0.90 on augmented handcrafted features; LibriSpeech 66% and VCTK 90% land on the MLAAD side → MLAAD capped at **12%** of the spoof side (config), pending the ITW read-out.
+- **04:29–04:51** Pilot #1 (A100, instance 52716242, $0.61/h): setup 9 min, codec pass 16,015 variants in 273 s (no AMR-NB encoder on the image; MP3/Opus/AAC/μ-law), then FAIL: the trainer's tree check ran stale code (code.tgz built before the `codecs`-dir exclusion patch). Reaper destroyed the box within 60 s. Fix: `scripts/cloud/push_code.sh` rebuilds code.tgz + TREE_SHA + meta and pushes them in one step. Also found and fixed: the box's rclone config needed `no_check_bucket = true` (R2 writes were 403 while reads worked); the reaper exited before any job existed and used bash-4 arrays on macOS bash 3.2.
+- **04:54** Pilot #2 launched (instance 52718897) with the codec variants pulled from R2.
+
 
 ## Appendix: P2 failure-mode tables (frozen 03:05; ids referenced by the plan and tests)
 
