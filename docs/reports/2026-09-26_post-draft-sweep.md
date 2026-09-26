@@ -10,7 +10,7 @@
 | Script | `scripts/fuse_sweep_v3.py` at `43916ee`, run once at 19:08, a minute after `wavlm_l.csv` landed |
 | Locked report | `outputs/fusion/sweep_v3_report.json`, sha256 `c2b6bc22d69f67acb037cb1f5e1c11e0762f2b66d34ce1a8a60139c376ed69ad`; also archived as `sweep_v3_report_20260926-190836.json`. `--write` requires this hash. |
 | WavLM export | `outputs/detector_scores/wavlm_l.csv` (sha256 `cef08ea6…`; 16,142 / 3,858 / 1,671 / 3,000 rows) |
-| WavLM probe | `models/m1_wavlm-large_L9_20260926-1906` (heads chat; report `docs/reports/2026-09-26_post-draft-heads.md`) |
+| WavLM probe | `models/m1_wavlm-large_L9_20260926-1906` (heads chat, commit `e611d1b`; report `docs/reports/2026-09-26_post-draft-heads.md`; its 57-of-158 count is at the ITW argmin, while this report's 41 of 122 is at the inner-OOF threshold) |
 | Self-check | CURRENT reproduces the shipped numbers on every field; Spearman against the shipped file is 1.0000000 over all 1,671 rows (the pinned block is empty) |
 
 ## The locked table
