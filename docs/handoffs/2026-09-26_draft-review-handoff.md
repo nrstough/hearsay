@@ -24,7 +24,7 @@ Read first: `docs/reports/2026-09-26_draft-review-branches.md` (the decoding tab
 | Range | min 0.0012, max 0.9997, no NaN, 0 files gated |
 | Share ≥ 0.5 | 27.4% (458 files); a smoke alarm, not a selection signal |
 
-Before sending, rename the copy to **`<TeamName>_predictions.tsv`** (the brief's example is `teamName_predictions.tsv`; the kickoff notes say `TeamName_predictions.tsv`; either case is fine, the name must be ours). The team name was still to be confirmed at 09:00; if in doubt, use the name registered with HexLabs.
+**Team name: Cross Exam.** The file goes out as **`CrossExam_predictions.tsv`** (the brief's pattern is `teamName_predictions.tsv`). Made at 11:20: `~/Downloads/CrossExam_predictions.tsv`, byte-identical to the logged 08:13 file (sha256 `096f3f0c9e3cfa9a…`), checker output `OK rows 1671 min 0.0012 max 0.9997 share>=0.5 0.274`. The runner and the image take the name as `--team CrossExam` / `HEARSAY_TEAM=CrossExam` (their default is `HEARSAY`, which is wrong for the deliverable).
 
 **How to send:** as a DM in the NSA × HexLabs Discord channel (kickoff notes, `docs/reports/2026-09-25_sponsor-questions.md`). Say it is the optional draft for review. **Ask for P_FA, P_miss and EER alongside minDCF**; minDCF alone does not say which way the errors lean, and EER alone decodes the direction (2–5% ours, 95–98% theirs).
 
