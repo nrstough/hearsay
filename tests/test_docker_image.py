@@ -248,6 +248,14 @@ def test_p2_pcm_hash_detects_a_changed_sample(tmp_path):
     assert bad == [f"two.wav: pcm differs ({SR} vs {SR} samples)"]
     assert parity.main(["pcm-diff", str(tmp_path / "a.json"), str(tmp_path / "b.json")]) == 1
     assert parity.main(["pcm-diff", str(tmp_path / "a.json"), str(tmp_path / "a.json")]) == 0
+    # two failed decodes (empty hash, zero samples) must never count as a match
+    (a / "junk.wav").write_bytes(b"not audio" * 8)
+    (b / "junk.wav").write_bytes(b"not audio" * 8)
+    (tmp_path / "t2.tsv").write_text("filename\tcm-score\njunk.wav\t0.5\none.wav\t0.5\n")
+    parity.pcm_hash(a, tmp_path / "t2.tsv", None, tmp_path / "a2.json")
+    parity.pcm_hash(b, tmp_path / "t2.tsv", None, tmp_path / "b2.json")
+    bad = parity.pcm_diff(tmp_path / "a2.json", tmp_path / "b2.json")
+    assert bad == ["junk.wav: decode failed (both); a failed decode never counts as a match"]
 
 
 def test_p3_smoke_script_runs_offline_and_checks_order():
@@ -255,6 +263,10 @@ def test_p3_smoke_script_runs_offline_and_checks_order():
     assert "--entrypoint python" in SMOKE and "assets.py verify" in SMOKE and "--full" in SMOKE
     assert "-e TRANSFORMERS_OFFLINE=0" in SMOKE and "refused without the offline variables" in SMOKE, \
         "the negative offline check (D2) is part of the smoke test"
+    neg = SMOKE.index("-e TRANSFORMERS_OFFLINE=0")
+    assert SMOKE.index("c_tone.flac") < neg < SMOKE.index("for i in 1 2"), \
+        "the negative check runs on the real input, before the positive runs"
+    assert "-e HEARSAY_TEAM=smoke" in SMOKE[neg - 200:neg + 200] and 'ls "$ROOT/outneg"/*.tsv' in SMOKE
     assert "c_tone.flac b_noise.mp3 a_sine.wav" in SMOKE, "reversed template order is asserted"
     assert "max |diff|" in SMOKE and "1e-6" in SMOKE, "repeat runs are compared with a tolerance"
     assert "outputs/docker/smoke" in SMOKE and "/tmp" not in SMOKE.replace("/tmpl/", ""), \
