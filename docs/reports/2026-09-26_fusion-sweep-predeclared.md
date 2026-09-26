@@ -79,3 +79,29 @@ M5 = `outputs/detector_scores/m5_xlsr_ft.csv`. It is the frozen-backbone, head-o
 If several candidates qualify, the one with the best In-the-Wild brief-cost wins. If none qualifies, the rule stays frozen and the negative result is recorded here. Any change needs Nathan's ratification before it ships.
 
 **Expectation, stated in advance:** F may buy a little on In-the-Wild false alarms. A3 will probably lose on the holdout's short clips and LibriSpeech real.
+
+### Addendum results (appended after the runs, ~09:15; the rule was not changed)
+
+**Deviation from the addendum, disclosed.** The addendum said M5's In-the-Wild spoofs would be scored "using the same seed-200 crops". `scripts/m5_score.py` has no crop option, so the first run scored all 3,000 M5 In-the-Wild clips whole, capped at 8 s, while the other detectors saw seed-200 test-length crops. The run was then repeated **crop-fair**: the identical `prepare_segment(x, crop_s, 200 + row)` crops were written to WAV and scored with `m5_score.py`. Both runs are reported. **The crop-fair run is the decision input.**
+
+**`t_F`** = −3.90 (1% of inner spoof rows fall below it; it covers 41.8% of inner real rows).
+
+| Candidate | Inner (brief) | Holdout (brief) | Holdout (averse) | Holdout [#FA, #miss] | ITW brief (whole-clip M5 → crop-fair) | ITW averse (whole-clip → crop-fair) | ITW P_FA / P_miss at inner threshold (crop-fair) |
+|---|---|---|---|---|---|---|---|
+| CURRENT: E on A α 0.2 | 0.140 | 0.014 | 0.009 | [1, 18] | 0.260 → 0.260 | 0.267 → 0.267 | 1.4% / 14.8% |
+| F: M5 suppression | 0.136 | 0.014 | 0.009 | [1, 18] | 0.258 → 0.258 | 0.267 → 0.268 | 1.4% / 14.4% |
+| A3 w 0.1 | 0.222 | 0.022 | 0.027 | [1, 33] | 0.282 → 0.290 | 0.264 → 0.265 | 0.4% / 33.3% |
+| A3 w 0.1 + E | 0.136 | 0.0095 | 0.009 | [0, 19] | 0.241 → 0.244 | 0.251 → 0.252 | 1.45% / 13.0% |
+| A3 w 0.2 | 0.213 | 0.020 | 0.025 | [1, 30] | 0.266 → 0.274 | 0.246 → 0.251 | 0.3% / 32.4% |
+| **A3 w 0.2 + E** | **0.135** | **0.0065** | 0.009 | [0, 13] | 0.215 → **0.228** | 0.234 → **0.239** | 1.3% / 12.2% |
+
+**Decision under the pre-declared rule:** A3 w 0.1 + E and A3 w 0.2 + E both qualify; the winner is **A3 w 0.2 + E**. The weights are 0.6 M1b v3 + 0.2 handcrafted v5 + 0.2 M5 in rank space, followed by the M3 false-alarm suppression step. F does not qualify: its ITW gain of 0.003 is under the 0.01 bar.
+
+**The advance expectation was wrong.** A3 was expected to lose on the holdout's short clips and LibriSpeech real, but with the M3 step it improved both (LibriSpeech 0.0186 → 0.0065).
+
+**Effect on the test set** (current rule vs candidate): Spearman 0.974, and only **3 of 1,671 files** cross 0.5.
+
+**Status: candidate, pending Nathan's ratification. Not shipped.**
+- TSVs, both polarities, are logged: `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_*.tsv`.
+- Runner constants: `models/fusion_v2_candidate/constants.json`.
+- Shipping it would require the pipeline and Docker to add the M5 scorer: a 657 MB checkpoint from the HF Hub, about 0.2 s per clip on CPU.
