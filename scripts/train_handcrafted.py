@@ -45,7 +45,7 @@ from hearsay.trees import Trees
 REPO = Path(__file__).resolve().parents[1]
 META_COLS = {"path", "label", "generator", "speaker", "utt", "source", "filename", "group",
              "fold"}  # fmt: skip
-META_SUFFIXES = ("_flag", "_launder", "_crop_s")
+META_SUFFIXES = ("_flag", "_launder", "_crop_s", "_augment")
 N_JOBS = 6  # leave cores for the GPU chat's decoding
 # v4 family -> column prefixes, so a bundle only asks for the families its columns need
 FAMILY_PREFIXES = {"lfcc": ("lfcc",), "phase": ("gd_", "pc_"), "cqcc": ("cqcc",),

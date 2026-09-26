@@ -140,11 +140,72 @@ def features(
     return {k: (v if np.isfinite(v) else 0.0) for k, v in f.items()}
 
 
+# --- training-side augmentation (v5) ---------------------------------------------------------
+#
+# The NSA test set is darker below 7 kHz than any training corpus (codec-like; the compression
+# lens reads 72% of it as laundered), and the spectral-envelope means (cepstral means, centroid,
+# roll-offs) shift toward "fake" on it. Augmenting a random subset of TRAINING clips with a codec
+# round-trip and/or a random spectral tilt + low-pass makes envelope means untrustworthy as class
+# cues, so the model leans on dynamics. Test clips are never augmented. Draws are per row from
+# default_rng(seed + row), recorded in the extraction sidecar/columns.
+
+TILT_DB_PER_KHZ = (-4.0, 4.0)
+TILT_LOWPASS_HZ = (4500.0, 7000.0)
+
+
+def tilt_lowpass(x: np.ndarray, db_per_khz: float, lowpass_hz: float) -> np.ndarray:
+    """Apply a linear spectral tilt (dB per kHz, referenced at 1 kHz) and a Kaiser low-pass."""
+    import scipy.signal as sg
+
+    n = x.size
+    X = np.fft.rfft(x)
+    f = np.fft.rfftfreq(n, 1 / SR)
+    gain = 10 ** ((db_per_khz * (f - 1000.0) / 1000.0) / 20.0)
+    y = np.fft.irfft(X * gain, n=n)
+    taps, beta = sg.kaiserord(45.0, 600.0 / (SR / 2))
+    h = sg.firwin(taps | 1, lowpass_hz, window=("kaiser", beta), fs=SR)
+    return sg.fftconvolve(y, h, mode="same").astype(np.float32)
+
+
+def draw_augment(rng: np.random.Generator, launder_frac: float, tilt_frac: float) -> str:
+    """"" (clean), "launder:<spec>", "tilt:<db>:<hz>" or both joined by "+"."""
+    from hearsay.compression import draw_laundering
+
+    parts = []
+    spec = draw_laundering(rng, launder_frac)
+    if spec:
+        parts.append(f"launder:{spec}")
+    if rng.random() < tilt_frac:
+        db = float(rng.uniform(*TILT_DB_PER_KHZ))
+        hz = float(rng.uniform(*TILT_LOWPASS_HZ))
+        parts.append(f"tilt:{db:.2f}:{hz:.0f}")
+    return "+".join(parts)
+
+
+def apply_augment(x: np.ndarray, spec: str) -> np.ndarray:
+    from hearsay.compression import launder, parse_laundering
+
+    for part in [p for p in spec.split("+") if p]:
+        kind, _, rest = part.partition(":")
+        if kind == "launder":
+            x = launder(x, *parse_laundering(rest))
+        elif kind == "tilt":
+            db, hz = rest.split(":")
+            x = tilt_lowpass(x, float(db), float(hz))
+        else:
+            raise ValueError(f"unknown augmentation {part!r}")
+    return x
+
+
 def features_for_path(
     path: str, crop_s: float | None = None, seed: int | None = None,
     crop_mode: str = "segment", band_match: bool = True, families: tuple[str, ...] = (),
+    augment: str = "",
 ) -> dict[str, float] | None:  # fmt: skip
     try:
-        return features(load_audio(path), crop_s, seed, crop_mode, band_match, families)
+        x = load_audio(path)
+        if augment:
+            x = apply_augment(x, augment)  # training only; before band match, trim and crop
+        return features(x, crop_s, seed, crop_mode, band_match, families)
     except Exception:  # noqa: BLE001 - one bad file becomes a missing row, reported by caller
         return None

@@ -26,9 +26,10 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
-from hearsay.handcrafted import CROP_MODES, features_for_path
+from hearsay.handcrafted import CROP_MODES, draw_augment, features_for_path
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -47,6 +48,10 @@ def main() -> None:
                     help="apply hearsay.handcrafted.band_limit (NSA test-set roll-off; v3)")
     ap.add_argument("--families", default="",
                     help="comma-separated hearsay.hc_v4 families to append (v4), e.g. lfcc,phase")
+    ap.add_argument("--launder-frac", type=float, default=0.0,
+                    help="training only: share of rows re-encoded through MP3/AAC first (v5)")
+    ap.add_argument("--tilt-frac", type=float, default=0.0,
+                    help="training only: share of rows given a random spectral tilt + low-pass (v5)")
     args = ap.parse_args()
     families = tuple(n for n in args.families.split(",") if n)
 
@@ -62,21 +67,25 @@ def main() -> None:
     modes = [args.crop_mode] * len(m)
     bands = [args.band_match] * len(m)
     fams = [families] * len(m)
-
+    augs = [draw_augment(np.random.default_rng(args.seed + r), args.launder_frac, args.tilt_frac)
+            if (args.launder_frac or args.tilt_frac) else "" for r in range(len(m))]  # fmt: skip
     t0 = time.time()
     with ProcessPoolExecutor(args.workers) as ex:
-        rows = list(ex.map(features_for_path, m.path, crop_s, seeds, modes, bands, fams,
+        rows = list(ex.map(features_for_path, m.path, crop_s, seeds, modes, bands, fams, augs,
                            chunksize=32))  # fmt: skip
     feats = pd.DataFrame([r or {} for r in rows])
     out = pd.concat([m.reset_index(drop=True), feats], axis=1)
     out.insert(len(m.columns), "hc_crop_s", [float("nan") if c is None else c for c in crop_s])
+    out.insert(len(m.columns) + 1, "hc_augment", augs)
     out["hc_flag"] = ["" if r else "feature_error" for r in rows]
     dest = REPO / "outputs" / "handcrafted" / f"{args.name}.csv"
     dest.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(dest, index=False)
     meta = {"manifest": str(args.manifest), "crop_mode": args.crop_mode, "crop": args.crop,
             "band_match": args.band_match, "families": list(families), "seed": args.seed,
-            "workers": args.workers, "rows": len(out),
+            "launder_frac": args.launder_frac, "tilt_frac": args.tilt_frac,
+            "n_augmented": int(sum(1 for a in augs if a)), "workers": args.workers,
+            "rows": len(out),
             "n_features": int(feats.shape[1]), "failures": int((out.hc_flag != "").sum()),
             "seconds": round(time.time() - t0)}  # fmt: skip
     dest.with_suffix(".meta.json").write_text(json.dumps(meta, indent=2))
