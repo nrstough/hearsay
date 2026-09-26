@@ -90,7 +90,7 @@ Every learned detector exports one file, `outputs/detector_scores/<name>.csv`, w
 |---|---|---|---|
 | **M1 / M1b** | Frozen XLS-R 300M; layer-7 hidden state averaged over time, then a class-balanced logistic regression and a Platt map. M1b adds 40 VCTK real speakers from ASVspoof 2019 and a 2.5k spoof anchor to the training folds only. | Primary fused score (60% of the rank blend) | Layer 7 won inner cross-validation (0.257; layers 6 and 8 close; layers 20+ at 0.40–0.43, `models/m1_…_0518/meta.json`). Mid-depth SSL layers carry the acoustic detail that separates vocoders; the top layers are tuned for phonetic content. |
 | **M3, Spectra-AASIST** | `lab260/Spectra-AASIST` run off the shelf with no training, through the same band-matched input path and crops. Short clips are zero-padded to one 4.04 s window. | False-alarm suppressor only | It is the strongest detector on every set we hold, but its training data is undisclosed, so none of our validation rows can be shown to be out-of-sample for it. It is allowed to lower a score and never to raise one. |
-| **M5, trained head on XLS-R** | 12 kept XLS-R layers, learned layer weights, attentive statistics pooling, linear head; trained on rented A100s with class-blind augmentation (noise, telephony band-limits, reverb, codecs, RawBoost). | Fused (20% of the rank blend), since the 12:20 switch | It did not clear its gate as a replacement for M1 (holdout 0.363 vs 0.159), but it is wrong on different files. As a third rank input it passed the second pre-declared sweep (below). The runner loads it only when the constants file gives it a weight, and refuses a checkpoint whose hashes don't match the file. |
+| **M5, trained head on XLS-R** | 12 kept XLS-R layers, learned layer weights, attentive statistics pooling, linear head; trained on rented A100s with class-blind augmentation (noise, telephony band-limits, reverb, codecs, RawBoost). | Fused (20% of the rank blend), since the 12:03 switch | It did not clear its gate as a replacement for M1 (holdout 0.363 vs 0.159), but it is wrong on different files. As a third rank input it passed the second pre-declared sweep (below). The runner loads it only when the constants file gives it a weight, and refuses a checkpoint whose hashes don't match the file. |
 
 ### The eight forensic techniques
 
@@ -137,7 +137,7 @@ Orchestration here is a set of fixed rules over measured file properties, not a 
 
 ### The fusion rule
 
-The shipped rule is whatever `final` names in `models/fusion_v2/constants.json`; the record of how it was chosen is `docs/reports/2026-09-26_fusion-sweep-predeclared.md` (the main sweep and its M5 addendum). Today that is `A3_w0.2_E`, ratified by Nathan at 12:20 on Saturday. The rule before it, `E_on_A_alpha0.2` in `models/fusion_v1/constants.json`, is the fallback. It got there in two pre-declared steps.
+The shipped rule is whatever `final` names in `models/fusion_v2/constants.json`; the record of how it was chosen is `docs/reports/2026-09-26_fusion-sweep-predeclared.md` (the main sweep and its M5 addendum). Today that is `A3_w0.2_E`, ratified by Nathan at 12:03 on Saturday (the `submissions/log.csv` row written when he gave the go). The rule before it, `E_on_A_alpha0.2` in `models/fusion_v1/constants.json`, is the fallback. It got there in two pre-declared steps.
 
 **Step 1, frozen at 08:13.** We wrote the candidates and the selection rule down before running anything (`docs/reports/2026-09-26_fusion-sweep-predeclared.md`), then applied the rule once:
 
@@ -147,13 +147,13 @@ The shipped rule is whatever `final` names in `models/fusion_v2/constants.json`;
 
 **Why not equal weights.** Our first fusion (05:32) averaged the two detectors equally, as `zmean` (mean of standardized logits) and `rankmean` (mean of ranks). On the holdout it looked like the best thing we had: 0.018 and 0.015, against 0.072 for M1b alone. On In-the-Wild it doubled the misses, from 28% for M1b alone to 58–60%, and pushed the share of test files called synthetic up to 32–40% (`docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md`). The holdout gain (about 0.05) was below the holdout's resolution floor. The In-the-Wild loss was large and consistent. The handcrafted column is excellent on generators it has seen and blind to the web-sourced fakes (97% missed on its own), so giving it half the vote traded real-world detection for a holdout number. We dropped equal weights and let the sweep choose α.
 
-**Step 2, the M5 addendum, shipped at 12:20.** At 08:35 we wrote down two M5 candidates and a stricter replacement rule before running them: replace the frozen rule only if In-the-Wild improves by ≥ 0.01 under the brief's cost, gets no more than 0.01 worse under the sponsor code's, the holdout gets no more than 0.05 worse, and inner no more than 0.03 worse. The candidates were M5 as a second false-alarm suppressor (F) and M5 as a third rank input (A3).
+**Step 2, the M5 addendum, shipped at 12:03.** At 08:35 we wrote down two M5 candidates and a stricter replacement rule before running them: replace the frozen rule only if In-the-Wild improves by ≥ 0.01 under the brief's cost, gets no more than 0.01 worse under the sponsor code's, the holdout gets no more than 0.05 worse, and inner no more than 0.03 worse. The candidates were M5 as a second false-alarm suppressor (F) and M5 as a third rank input (A3).
 - F missed the bar: its In-the-Wild gain was 0.003.
 - A3 at weight 0.2, plus the same Spectra step, qualified: `0.6·rank(M1b) + 0.2·rank(handcrafted) + 0.2·rank(M5)`. Inner 0.135 vs 0.140, holdout 0.0065 vs 0.014, In-the-Wild 0.228 / 0.239 (brief / sponsor-code cost) vs 0.260 / 0.267.
 - We had predicted A3 would lose on short clips and LibriSpeech real speech. With the Spectra step it improved both.
 - On the test set the switch changes little: Spearman 0.974 against the previous rule's scores, and 3 of 1,671 files cross 0.5.
 
-Nathan first held it (09:25) because the previous rule was the file planned for the draft review. The runner side was built behind a flag (`8316e50`), and at 12:20 he ratified the switch. The submitted file is `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv`, sent as `CrossExam_predictions.tsv`.
+Nathan first held it (09:25) because the previous rule was the file planned for the draft review. The runner side was built behind a flag (`8316e50`), and at 12:03 he ratified the switch. The submitted file is `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv`, sent as `CrossExam_predictions.tsv`.
 
 **Score direction.** The instructions say 1.0 = synthetic. NSA's scoring code (ASVspoof5's) treats a higher score as bona fide. We follow the instructions and never flip. Every model logs its minDCF under the sponsor's code both ways, and a pre-flipped twin of the draft TSV exists in case NSA's feedback shows they grade inverted.
 
@@ -236,7 +236,7 @@ Normalized minDCF, `π_synth = 0.3`, `C_FA = 4`, unless marked. **Inner** = pool
 | M1 v3 (band-matched) | 0.257 | 0.159 | 2.9% | 0.380 | 0.7% | 28.9% | `models/m1_…_0518/meta.json`, `submissions/log.csv` |
 | **M1b v3** (+40 VCTK speakers) | 0.301* | 0.072 | 1.4% | 0.342 (averse 0.296) | 0.8% | 26.8% | `models/m1_…_0521/meta.json`, `submissions/log.csv`; *inner and averse from the fusion sweep report |
 | **M3 Spectra-AASIST** (off the shelf) | 0.0045† | 0.012 | 0.16% | 0.065† | 0.0% | 29.3% | `models/m3_spectra_20260926-0522/meta.json` |
-| **M5 frozen-backbone head** (fused at 20% since 12:20) | 0.302 | 0.363 | 6.0% | — | 0.45% | 25.8% | `models/m5_xlsr_ft_20260926-0741/meta.json` |
+| **M5 frozen-backbone head** (fused at 20% since 12:03) | 0.302 | 0.363 | 6.0% | — | 0.45% | 25.8% | `models/m5_xlsr_ft_20260926-0741/meta.json` |
 | Handcrafted v3 (75 features) | 0.614 | 0.254 | 4.3% | 1.00 | 0.55% | 42% | `docs/reports/2026-09-26_cpu-detectors.md`, `…_handcrafted-v4.md` |
 | Handcrafted v4a (234 features) | 0.434 | 0.170 | 3.6% | 1.00 | 0.65% | 41% | `docs/reports/2026-09-26_handcrafted-v4.md` |
 | **Handcrafted v5b** (v4a + augmented twins) | 0.469 | 0.137 | 3.1% | — | 0.40% | 45.1% | `models/hc_selected/meta.json`; ITW FA from `docs/reports/2026-09-26_handcrafted-v4.md` |
@@ -259,7 +259,7 @@ Normalized minDCF, `π_synth = 0.3`, `C_FA = 4`, unless marked. **Inner** = pool
 | Sweep A, α = 0.3 | 0.230 | 0.021 | 0.322 | 0.280 | 0.25% / 39.5% | — | `299cab3` | same |
 | Sweep D, non-negative stacker | 0.230 | 0.025 | 0.324 | 0.280 | 0.4% / 36.9% | — | `299cab3` | same |
 | Previous rule, the fallback: E on α 0.2 | 0.140 | 0.014 | 0.260 | 0.267 | 1.4% / 14.8% | 27.4% | `299cab3` | same; test share from `docs/reports/2026-09-26_sponsor-questions.md` |
-| **Shipped since 12:20: A3 w 0.2 + E** (adds M5 at 0.2) | 0.135 | 0.0065 | **0.228** | **0.239** | 1.3% / 12.2% | 27.4% | `e6341bb` | same report, M5 addendum; `submissions/log.csv`; test share from `docs/reports/2026-09-26_runner-docker.md` (live full-set run) |
+| **Shipped since 12:03: A3 w 0.2 + E** (adds M5 at 0.2) | 0.135 | 0.0065 | **0.228** | **0.239** | 1.3% / 12.2% | 27.4% | `e6341bb` | same report, M5 addendum; `submissions/log.csv`; test share from `docs/reports/2026-09-26_runner-docker.md` (live full-set run) |
 
 **Run (git)** is the commit that holds the code that produced the row: `59951c1` is the first `scripts/fuse.py` (05:32); `299cab3` is `scripts/fuse_sweep.py` committed with its results, run against the selection rule committed beforehand in `bf1dc55`; `e6341bb` is the M5 addendum's sweep (`scripts/fuse_sweep_m5.py`), run against the rule committed in `a4379bb`. The candidate's In-the-Wild figures use crop-fair M5 scores. ‡ The 06:02 TSVs were made with `fuse.py` as of `59951c1`, before `22992c4` (06:25) added the persisted constants.
 
