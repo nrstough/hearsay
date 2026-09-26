@@ -81,6 +81,8 @@ M5 wins the hardest fold (ElevenLabs) and ties three, but loses fold 1 (diffgan_
 | test-length crops, 3.0–13.6 s drawn from the test distribution (diagnostic) | 0.516 | 8.9% |
 | augmented slice, one op per clip (diagnostic) | 0.465 | 8.3% |
 | per op: gain + clip / band-limit / RawBoost-conv / reverb / noise | 0.30 / 0.37 / 0.42 / 0.48 / 0.57 | |
+| **transcoded** (one codec per clip, all 3,858; `outputs/m5_runs/codec_readout.json`) | **0.328** vs 0.363 clean on the same rows | 6.3% |
+| per codec, transcoded vs clean on its rows: μ-law 8 kHz / Opus 20 kbps / MP3 48 kbps / AAC 40 kbps | 0.22 vs 0.29 / 0.27 vs 0.32 / 0.36 vs 0.41 / 0.37 vs 0.37 | |
 | per generator: playht / wavegrad2 (each vs all bona fide) | 0.051 / 0.578 | 1.1% / 7.9% |
 | per bona fide source: LJ Speech / LibriSpeech (each vs all spoof) | 0.167 / 0.425 | 3.8% / 8.8% |
 | per length bucket: ≤ 4 s / 4–6 s / > 6 s | 0.595 / 0.342 / 0.286 | 9.0 / 6.2 / 5.7% |
@@ -89,7 +91,7 @@ M5 wins the hardest fold (ElevenLabs) and ties three, but loses fold 1 (diffgan_
 
 - **Where M5 loses to M1:** wavegrad2 (0.58 vs M1's 0.21 per-generator) and LibriSpeech real speech (0.43 vs 0.16). playht is easy for both.
 - **Short clips are the weak spot:** ≤ 4 s clips score 0.60 vs 0.29 above 6 s; the test set's median is 3.4 s. The frozen head was trained on test-length crops, but the attentive pooling has less to work with on short inputs.
-- **Additive noise is the hardest laundering** (0.57 on the noise slice); gain/clipping and band-limiting barely move the score.
+- **Additive noise is the hardest laundering** (0.57 on the noise slice); gain/clipping and band-limiting barely move the score, and **transcoding does not hurt** (0.33 vs 0.36 clean): the codec variants were in training, and MP3/Opus/AAC/μ-law strip the same high band the test set lacks. AMR-NB was not available on the box's ffmpeg, so narrowband telephony is represented by μ-law at 8 kHz only.
 - Score–duration coupling on bona fide: Spearman(score, log duration) = −0.12 (mild; longer real clips look slightly more real).
 - Test set: mean score 0.29, 25.8% above 0.5 (M1 v3: 28.9%), consistent with the ~30% synthetic prior; the same direction as M1 (`sponsor_code_asis` = 1.0 for every detector because the sponsor's code treats high as bona fide).
 
