@@ -120,6 +120,7 @@ Keep this current through the weekend; copy into Devpost. The rules require cred
   - data pulls
   - the software-only rescope: plan, detector contract, doc-consistency tests
   - reading the NSA brief, instructions and scoring code
+  - the D-track engineered detectors (Sat Sep 26, CPU-only chat): handcrafted spectral + prosody, compression forensics, container/metadata, ENF and splice detectors, their fold-validated training and fusion score exports (`outputs/detector_scores/*.csv`), the container and high-band inventories, and the test-set band-match finding (`docs/reports/2026-09-26_cpu-detectors.md`)
 
   _Add specifics as they happen._
 - `/plan-review` workflow (a Claude Code skill): used to plan and review rungs taking over an hour. Its plan review and post-commit audit call OpenAI Codex (Codex CLI, via `.claude/review-*.sh`) when the CLI is installed. Used for the software-only rescope (Sep 25–26): Codex plan review, Claude critique and exploration agents.
@@ -137,13 +138,14 @@ Downloaded before the event to `data/`; fill in "how used" as each is actually u
 - In-the-Wild (Müller et al. 2022; `mueller91/In-The-Wild` on Hugging Face), license listed as CC-BY-SA-4.0 on Hugging Face and Apache-2.0 on deepfake-total.com: held-out stress test only, never trained on.
 - MLAAD (`mueller91/MLAAD` on Hugging Face, gated, non-commercial notice): 6,390 English synthetic clips pulled during the event (30 per model across 143 models, plus 300 per model for the ElevenLabs, Gemini and Qwen3 families named on the kickoff slide). Planned training data.
 - NSA HEARSAY data (provided by the sponsor during the event): 1,671-file test set, a resampled LJ Speech subset (real), DiffSSD (synthetic, Purdue), and the ASVspoof5 evaluation code for MinDCF.
+- LibriSpeech dev-clean/dev-other/test-clean/test-other (openslr.org/12, CC BY 4.0): 5,323 multi-speaker bona fide clips; 4,000 of them in the NSA training sample.
 
 **Planned, not yet downloaded or used** (move each item up to the list above once it is actually used):
 - ECAPA-TDNN speaker embeddings (SpeechBrain), for the speaker-drift detector.
-- LibriSpeech / VCTK as multi-speaker bona fide data.
+- VCTK as a second multi-speaker bona fide source (LibriSpeech dev+test is in use; see above).
 - Full LJ Speech (keithito.com).
 - ReplayDF (optional).
-- ExifTool, for metadata forensics.
+- ExifTool, for metadata forensics. _Not used: ffprobe (FFmpeg) covered the embedded fields, and the test set carries none beyond one encoder tag._
 
 **Frameworks and libraries**
 - PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, pydub, ffmpeg-python, FFmpeg.

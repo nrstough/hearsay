@@ -35,7 +35,8 @@ The design:
 | Metric | Done: `hearsay.metrics`, plus an exact re-implementation of NSA's own scoring code (`sponsor_min_dcf`). |
 | Validation split | Done: `splits/nsa_folds.csv`. Whole generators and speakers are held out; the outer holdout is the `playht` and `wavegrad2` generators plus 26 real-speech groups. |
 | Deep detector (XLS-R probe, M1) | **Running now.** Length-matched embeddings, then training. First learned TSV expected tonight. |
-| Handcrafted spectral and prosody features (75, interpretable) | Features are extracted for all 21,671 clips; training next. |
+| Handcrafted spectral and prosody detector (75 interpretable features) | Done: `hearsay.detectors.handcrafted`. Holdout minDCF 0.25, EER 4.3% (v3: test-length crops + band match, LightGBM). Blind to grad_tts, pro_diff and ElevenLabs. Export `outputs/detector_scores/handcrafted.csv`. |
+| Compression, container, ENF, splice detectors | Done against the contract (`hearsay.detectors.{compression,container,enf,splice}`; `import hearsay.detectors.engineered` registers all five). Container is rule-based (constant on this test set, by design); ENF and splice are mild rule-based scores plus evidence. Exports in `outputs/detector_scores/`. Report: `docs/reports/2026-09-26_cpu-detectors.md`. |
 | Spectra-AASIST (second deep detector), fine-tuning, fusion, orchestrator, Docker | Not started. See the ladder in `docs/plan.md`. |
 | Tests | 152 passing (`uv run pytest -q`), ruff clean. |
 
@@ -62,6 +63,8 @@ Data is gitignored. Put it under `data/` with the same paths as above (`data/nsa
   - **Leading silence.** LibriSpeech real clips start with about 0.37 s of silence; test clips have about 0.06 s. Fixed with the same silence trim on train and test.
   - **Clip length and tiling.** Training clips are 5–9 s and test clips about 3.4 s. The old 4 s window repeat-padded short test clips, which put a splice seam only in test data. Fixed by embedding each clip at its real length, and training on crops drawn from the test length distribution.
 - **Container format is a trap.** Some training fakes are MP3 or 22 kHz, while every test file is 16 kHz WAV. Any metadata or compression detector must be trained on clips converted to 16 kHz WAV first, or it will learn "MP3 = fake".
+- **The container *is* the label on the training data** (measured): LibriSpeech = FLAC, LJ = 22 kHz WAV, DiffSSD = WAV or MP3, and PlayHT's MP3s carry the same FFmpeg encoder tag (`Lavf58.29.100`) as all 1,671 test files. So the container detector is never learned; it returns routing facts and a constant score here.
+- **The test set is low-passed at about 7.2 kHz** and no training corpus is (not even the sponsor's resampled LJ clips). Everything above 7 kHz was a train-vs-test fingerprint; the handcrafted detector called 90% of the test set synthetic until `hearsay.handcrafted.band_limit` (a 71-tap Kaiser low-pass matching the roll-off) was applied to every clip, train and test. Now 42% of test files score above 0.5. **The deep detector needs the same band match** (one call in `prepare_segment`); details and numbers in `docs/reports/2026-09-26_cpu-detectors.md`.
 - **Leakage check is clean.** No test file is an exact copy of anything in LJ Speech, the NSA LJ subset, or In-the-Wild.
 - **Public-data sanity check** (not an NSA number): frozen XLS-R plus logistic regression gets minDCF 0.023 on ASVspoof 2019's unseen attacks. The same model scored pure silence as 99% synthetic, which is why the silence handling above matters.
 
