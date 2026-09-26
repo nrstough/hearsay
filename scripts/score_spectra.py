@@ -200,6 +200,8 @@ def build_rows(args, root: Path) -> tuple[pd.DataFrame, str]:
                           t[["path", "fold", "split", "label", "generator", "source"]]],
                          ignore_index=True)  # fmt: skip
     rows = rows.reset_index(drop=True)
+    if len(rows) == 0:
+        _die("no rows to score (check --limit / --test-limit / the manifest)")
     rows["resolved"] = [resolve_path(p, root) for p in rows.path]
     crops = [plan.get(p) if s != "test" else None for p, s in zip(rows.path, rows.split, strict=True)]
     rows["crop_s"] = [np.nan if c is None else c[0] for c in crops]

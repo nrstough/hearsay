@@ -447,6 +447,7 @@ def test_c10_pilot_writes_only_under_pilot_dir(repo):
     assert _run(_load_script(), root, "--limit", "4", "--test-limit", "0", "--name", "q") == 0
     qdir = max((root / "outputs" / "spectra" / "pilot").iterdir())
     assert set(pd.read_csv(qdir / "scores_zero.csv").split) == {"inner_oof"}  # --test-limit 0 means none
+    assert _run(_load_script(), root, "--limit", "0", "--test-limit", "0", "--name", "z") == 2  # no rows
 
 
 def test_c11_manifest_mode(repo):
@@ -625,8 +626,15 @@ def test_d11_failures_in_every_split_keep_every_readout(tmp_path, monkeypatch):
     sm = json.loads((tmp_path / "outputs" / "spectra" / "st" / "meta.json").read_text())
     assert sm["stress"]["n_dropped"] == 2 and sm["stress"]["status"] == "ok"
     raw = tmp_path / "outputs" / "spectra" / "spectra_aasist_raw.csv"
+    pilot_meta = tmp_path / "pm.json"
+    pilot_meta.write_text(json.dumps({"pilot": {"zero": {}}, "selection": {"pick": "zero"}}))
+    out = tmp_path / "ro.json"
     assert _run(mod, tmp_path, "--readout", f"inner={raw}",
-                f"stress=itw={tmp_path / 'outputs' / 'spectra' / 'st' / 'scores.csv'}", "--final") == 0  # fmt: skip
+                f"stress=itw={tmp_path / 'outputs' / 'spectra' / 'st' / 'scores.csv'}",
+                f"pilot={pilot_meta}", "--final", "--out", str(out)) == 0  # fmt: skip
+    ro = json.loads(out.read_text())
+    assert ro["stress"]["itw"]["provisional"] is False and ro["stress"]["itw"]["n_dropped"] == 2
+    assert ro["pilot"]["selection"]["pick"] == "zero" and ro["caveats"]["in_the_wild_possibly_optimistic"]
 
 
 def test_c14b_failure_late_in_the_run_publishes_nothing(repo):
