@@ -15,11 +15,16 @@ a file that does not decode, still gets a row (the default answer, `undetermined
 before scoring; an empty listing fails with no TSV. Without a template: sorted audio files.
 
 Scoring: --detectors m1b alone means M1 only, P = sigmoid(LLR + logit(0.3)) exactly as
-scripts/make_probe_csv.py; otherwise every fused detector runs and --rule is read from the
-constants file, never refit: e_on_a (default; models/fusion_v1/constants.json from
-scripts/fuse_sweep.py: 0.8 rank(M1b) + 0.2 rank(handcrafted), M3 as false-alarm suppression only)
-or zmean | stack_nonlj (models/fusion_v0/constants.json from scripts/fuse.py, via --fusion). A rule
-the file does not define is refused. The policy then maps determinate scores to [0.001, 1] and
+scripts/make_probe_csv.py; otherwise the fused detectors the constants file names run and --rule
+is read from that file, never refit: e_on_a (default; models/fusion_v1/constants.json from
+scripts/fuse_sweep.py: 0.8 rank(M1b) + 0.2 rank(handcrafted), M3 as false-alarm suppression only;
+or, via --fusion models/fusion_v2/constants.json from scripts/fuse_sweep_m5.py, the same rule
+with weights 0.6 M1b / 0.2 handcrafted / 0.2 M5, which also loads the M5 checkpoint from --m5 and
+refuses one whose hashes the file did not record) or zmean | stack_nonlj
+(models/fusion_v0/constants.json from scripts/fuse.py, via --fusion). A rule the file does not
+define is refused. A fused scorer that fails on a clip is imputed at its inner-fold centre and
+counted; the run exits 4 (after writing the TSV) when a weighted scorer failed on any file of a
+--compare-tsv run or on more than 1% of files otherwise. The policy then maps determinate scores to [0.001, 1] and
 pins gated files below 0.001 (hearsay.detectors.speech_gate.apply_default_answer, applied exactly
 once); --flip emits the pre-flipped variant (1 - p mapped the same way). A rerun with the same
 --out resumes from results.jsonl; another --rule, --policy or --flip re-fuses the cached logits
@@ -42,6 +47,7 @@ import math
 import os
 import sys
 import time
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 
@@ -53,12 +59,15 @@ from hearsay.detectors.base import ClipContext
 from hearsay.detectors.speech_gate import BLOCK_TOP
 from hearsay.metrics import PI_SYNTH
 from hearsay.pipeline import (
+    DEEP,
     DEFAULT_CONSTANTS_PATH,
     DEFAULT_RULE,
     DETECTOR_ORDER,
+    FUSED_FROM_DETECTOR,
     HC_DIR,
     M1_EMBED_FP16,
     M1_MODES,
+    M5_DIR,
     PROBE_DIR,
     REPO,
     RULES,
@@ -66,10 +75,12 @@ from hearsay.pipeline import (
     FusionConstants,
     Models,
     analyze_clip,
+    check_m5_identity,
     final_score,
     fuse_items,
     fusion_block,
     git_sha,
+    m5_identity_from_dir,
     refuse,
     verdict_for,
 )
@@ -95,7 +106,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                     help=f"comma list of {sorted(SCORER_FLAGS)}; m1b alone = M1 only, no fusion ($HEARSAY_DETECTORS)")  # fmt: skip
     ap.add_argument("--fusion", "--constants", dest="fusion", type=Path, default=_env_path("HEARSAY_FUSION"),
                     help="fusion constants file ($HEARSAY_FUSION; default <app-root>/models/fusion_v1/"
-                         "constants.json when more than m1b is requested; models/fusion_v0/constants.json "
+                         "constants.json when more than m1b is requested; models/fusion_v2/constants.json adds "
+                         "M5 as a weighted scorer; models/fusion_v0/constants.json "
                          "holds zmean and stack_nonlj)")  # fmt: skip
     ap.add_argument("--rule", default=os.environ.get("HEARSAY_RULE", DEFAULT_RULE), choices=RULES,
                     help=f"fusion rule; must be one the constants file defines (default {DEFAULT_RULE})")  # fmt: skip
@@ -116,11 +128,14 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--require-offline", action="store_true",
                     help="refuse to run unless HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1 (the image sets them)")  # fmt: skip
     ap.add_argument("--app-root", type=Path, default=REPO,
-                    help="base directory holding models/ (probe, hc_selected, fusion_v0) inside the image")  # fmt: skip
+                    help="base directory holding models/ (probe, hc_selected, fusion_*, m5_shipped) inside the image")  # fmt: skip
     ap.add_argument("--pi-synth", type=float, default=PI_SYNTH, help="prior shift for the M1-only posterior")
     ap.add_argument("--threads", type=int, help="torch threads (default: $OMP_NUM_THREADS, else min(cores, 6))")
     ap.add_argument("--probe", type=Path, help="probe dir (default <app-root>/models/m1_shipped or the pinned 0521 probe)")
     ap.add_argument("--hc", type=Path, help="handcrafted bundle dir (default <app-root>/models/hc_selected)")
+    ap.add_argument("--m5", type=Path, default=_env_path("HEARSAY_M5"),
+                    help="M5 checkpoint dir ($HEARSAY_M5; default <app-root>/models/m5_shipped or the pinned "
+                         "0741 checkpoint); loaded only when the fusion file weights m5_xlsr_ft")  # fmt: skip
     ap.add_argument("--preflight", action=argparse.BooleanOptionalAction, default=True,
                     help="score silence and a chord twice first; finite and reproducible")  # fmt: skip
     ap.add_argument("--no-tsv", action="store_true", help="skip the TSV (JSON and cache only)")
@@ -139,10 +154,18 @@ def resolve_scorers(detectors: str, fusion: Path | None, app_root: Path) -> tupl
         return scorers, None  # M1 only
     if fusion is None:
         fusion = app_root / DEFAULT_CONSTANTS_PATH.relative_to(REPO)
-    if scorers != DETECTOR_ORDER:
-        print(f"note: fusion needs every fused detector ({', '.join(DETECTOR_ORDER)}), "
-              f"not only --detectors {detectors!r}; running all of them", flush=True)  # fmt: skip
-    return DETECTOR_ORDER, fusion
+    return DETECTOR_ORDER, fusion  # the maximal set; main narrows it to the file's detectors (scorers_for)
+
+
+def requested_scorers(detectors: str) -> set[str]:
+    """The fused columns --detectors actually named (for the note when the file needs more)."""
+    return {SCORER_FLAGS[f.strip()] for f in detectors.split(",") if f.strip() in SCORER_FLAGS}
+
+
+def scorers_for(consts: FusionConstants | None) -> tuple[str, ...]:
+    """The fused columns a run computes: the constants file's own detectors (fusion_v1 three,
+    fusion_v2 four, so M5 loads and runs only for a file that weights it), M1 alone otherwise."""
+    return consts.detectors if consts is not None else ("m1b_v3",)
 
 
 def default_probe(app_root: Path) -> Path:
@@ -151,6 +174,14 @@ def default_probe(app_root: Path) -> Path:
         return shipped
     pinned = app_root / "models" / PROBE_DIR.name
     return pinned if (pinned / "probe.joblib").exists() or app_root != REPO else PROBE_DIR
+
+
+def default_m5(app_root: Path) -> Path:
+    shipped = app_root / "models" / "m5_shipped"  # docker/build.sh's staging name for the M5 checkpoint
+    if (shipped / "hashes.json").exists():
+        return shipped
+    pinned = app_root / M5_DIR.relative_to(REPO)
+    return pinned if (pinned / "hashes.json").exists() or app_root != REPO else M5_DIR
 
 
 def read_template_ids(template: Path) -> list[str]:
@@ -213,12 +244,14 @@ def _sha256(path: Path | None) -> str | None:
 
 
 def cache_identity(probe_dir: Path, hc_dir: Path, fusion: Path | None, scorers, m1_mode: str,
-                   truncate: bool) -> dict:  # fmt: skip
+                   truncate: bool, m5: str | None = None) -> dict:  # fmt: skip
     """What a cached row's logits depend on. A resume requires an exact match (rule and policy
-    are not in it: those are re-fused from the cached logits)."""
+    are not in it: those are re-fused from the cached logits). `m5` is the checkpoint's head sha
+    prefix when M5 is among the scorers, else None (a header written before the key existed
+    compares equal to None)."""
     return {"_header": "hearsay.run_pipeline results.jsonl", "git_sha": git_sha(),
             "probe": probe_dir.resolve().name, "hc": hc_dir.resolve().name if hc_dir.exists() else hc_dir.name,
-            "constants_sha": _sha256(fusion), "scorers": list(scorers), "m1_mode": m1_mode,
+            "m5": m5, "constants_sha": _sha256(fusion), "scorers": list(scorers), "m1_mode": m1_mode,
             "m1_fp16": M1_EMBED_FP16, "truncate": truncate}  # fmt: skip
 
 
@@ -298,6 +331,15 @@ def preflight(models: Models, consts: FusionConstants | None, rule: str, tmp: Pa
         pa, pb = a["probability_synthetic"], b["probability_synthetic"]
         if not preflight_consistent(pa, pb):
             raise RuntimeError(f"preflight {name}: not finite or not reproducible: {pa} vs {pb}")
+        fa, fb = a["fusion"]["p_fused"], b["fusion"]["p_fused"]
+        if not preflight_consistent(fa, fb):  # the gate hides the scorers from pa; check before it
+            raise RuntimeError(f"preflight {name}: fused probability not finite or not reproducible: {fa} vs {fb}")
+        entry_of = {col: det for col, (det, _key) in FUSED_FROM_DETECTOR.items()}
+        for doc in (a, b):
+            status = {d["name"]: d["status"] for d in doc["detectors"]}
+            bad = [n for n in kw.get("scorers") or () if status.get(entry_of.get(n, n)) != "ok"]
+            if bad:  # a scorer that errors is imputed silently per file; the preflight is where it is loud
+                raise RuntimeError(f"preflight {name}: scorer(s) not ok: {', '.join(bad)}")
         if a["is_speech"]:
             raise RuntimeError(f"preflight {name}: the speech gate let a non-speech clip through")
         if apply_gate and not pa < BLOCK_TOP:
@@ -309,6 +351,27 @@ def preflight(models: Models, consts: FusionConstants | None, rule: str, tmp: Pa
           f"(before the gate: {out['silence.wav']['p_fused']:.3f}, {out['music.wav']['p_fused']:.3f})",
           flush=True)  # fmt: skip
     return out
+
+
+def scorer_error_counts(docs: Mapping[str, dict], scorers: Sequence[str]) -> dict[str, int]:
+    """Errored entries per fused column over every row (cached or fresh); the handcrafted column's
+    entry is named `handcrafted`, mapped back through FUSED_FROM_DETECTOR."""
+    entry_of = {col: det for col, (det, _key) in FUSED_FROM_DETECTOR.items()}
+    counts = {n: 0 for n in scorers}
+    for doc in docs.values():
+        status = {d["name"]: d["status"] for d in doc.get("detectors", [])}
+        for n in scorers:
+            if status.get(entry_of.get(n, n)) == "error":
+                counts[n] += 1
+    return counts
+
+
+def scorer_error_exit(counts: Mapping[str, int], scorers: Sequence[str], n_rows: int, strict: bool) -> int:
+    """4 when a weighted scorer errored on any row (strict: a --compare-tsv run) or on more than 1%
+    of rows; else 0. spectra_aasist only suppresses and is excluded. The TSV is written either
+    way; the exit code says whether to trust it."""
+    limit = 0 if strict else 0.01 * n_rows
+    return 4 if any(counts.get(n, 0) > limit for n in scorers if n != "spectra_aasist") else 0
 
 
 def compare_tsv(ids: list[str], scores: list[float], ref: Path) -> dict:
@@ -385,21 +448,40 @@ def main(argv=None) -> int:
     hc_dir = args.hc or (args.app_root / "models" / "hc_selected" if args.app_root != REPO else HC_DIR)
     threads = args.threads or (int(os.environ["OMP_NUM_THREADS"]) if os.environ.get("OMP_NUM_THREADS") else None)
 
+    consts = None
+    if fusion is not None:
+        if not fusion.exists():
+            sys.exit(f"fusion constants {fusion} not found (run scripts/fuse.py, or --detectors m1b)")
+        try:
+            consts = FusionConstants.load(fusion)
+        except (ValueError, KeyError) as e:
+            sys.exit(f"fusion constants {fusion}: {e}")
+        if args.rule not in consts.rules():
+            sys.exit(f"rule {args.rule!r} is not defined by {fusion} (it has {consts.rules()}); "
+                     f"pass --rule from that list or another --fusion file")  # fmt: skip
+    scorers = scorers_for(consts)  # the file's detectors, not the maximal set resolve_scorers returned
+    missing = set(scorers) - requested_scorers(args.detectors)
+    if consts is not None and missing:
+        print(f"note: {fusion.name} needs {', '.join(sorted(missing))} beyond --detectors {args.detectors!r}; "
+              "running them too", flush=True)  # fmt: skip
+    m5_dir = args.m5 or default_m5(args.app_root)
+    m5_hashes = None
+    if "m5_xlsr_ft" in scorers:
+        try:  # the cheap gate: hashes.json against the constants, before the cache and the 657 MB load
+            m5_hashes = m5_identity_from_dir(m5_dir)
+            check_m5_identity(m5_hashes, consts)
+        except RuntimeError as e:
+            sys.exit(f"error: {e}")
+
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
     (out / "results").mkdir(exist_ok=True)
     cache_path = out / "results.jsonl"
     cache = open_cache(cache_path, cache_identity(probe_dir, hc_dir, fusion, scorers, args.m1_mode,
-                                                 not args.no_truncate), args.fresh)  # fmt: skip
+                                                 not args.no_truncate,
+                                                 m5=(m5_hashes or {}).get("head_sha256", "")[:12] or None),
+                       args.fresh)  # fmt: skip
     todo = [(i, p) for i, p in items if i not in cache]
-    consts = None
-    if fusion is not None:
-        if not fusion.exists():
-            sys.exit(f"fusion constants {fusion} not found (run scripts/fuse.py, or --detectors m1b)")
-        consts = FusionConstants.load(fusion)
-        if args.rule not in consts.rules():
-            sys.exit(f"rule {args.rule!r} is not defined by {fusion} (it has {consts.rules()}); "
-                     f"pass --rule from that list or another --fusion file")  # fmt: skip
     rule = args.rule if consts is not None else "m1b_only"
     apply_gate = args.policy == "speech_gate"
     kw = {"scorers": scorers, "pi_synth": args.pi_synth, "flip": args.flip}
@@ -407,7 +489,7 @@ def main(argv=None) -> int:
           f"rule {rule}; policy {args.policy}; polarity {'flipped' if args.flip else 'our_direction'}; order from "
           f"{'template ' + str(args.template) if args.template else 'sorted filenames'}", flush=True)  # fmt: skip
 
-    version = {"git_sha": git_sha(), "fusion": fusion.name if fusion else "none", "rule": rule,
+    version = {"git_sha": git_sha(), "fusion": "/".join(fusion.parts[-2:]) if fusion else "none", "rule": rule,
                "policy": args.policy, "polarity": "flipped" if args.flip else "our_direction",
                "scorers": list(scorers), "m1_mode": args.m1_mode,
                "fusion_final": getattr(consts, "final", None)}  # fmt: skip
@@ -423,24 +505,36 @@ def main(argv=None) -> int:
         t0 = time.time()
         models = Models(device=args.device, probe_dir=probe_dir, hc_dir=hc_dir, threads=threads,
                         m1_mode=args.m1_mode, load_spectra="spectra_aasist" in scorers,
-                        truncate=not args.no_truncate)  # fmt: skip
+                        truncate=not args.no_truncate, m5_dir=m5_dir, load_m5="m5_xlsr_ft" in scorers)  # fmt: skip
         version["models"] = models.version()
+        try:
+            check_m5_identity(models.m5_hashes, consts)  # the belt: the loaded checkpoint, not just its file
+        except RuntimeError as e:
+            sys.exit(f"error: {e}")
         meta["model_load_seconds"] = round(time.time() - t0, 2)
         meta["threads"] = models.threads
         print(f"models loaded in {meta['model_load_seconds']}s ({models.load_seconds}), "
-              f"{models.threads} threads; probe {probe_dir}, hc {hc_dir}", flush=True)  # fmt: skip
+              f"{models.threads} threads; probe {probe_dir}, hc {hc_dir}"
+              + (f", m5 {m5_dir}" if models.with_m5 else ""), flush=True)  # fmt: skip
         if args.preflight:
             meta["preflight"] = preflight(models, consts, rule, out / "preflight", apply_gate, **kw)
 
     timings_path = out / "timings.csv"
+    timings_header = ["filename", "seconds", "engineered_s", *(f"{n}_s" for n in DEEP),
+                      "probability_synthetic", "is_speech", "flag"]  # fmt: skip
+    if timings_path.exists():  # an older column layout is moved aside, never appended to
+        first = timings_path.read_text().splitlines()[:1]
+        if first != [",".join(timings_header)]:
+            aside = timings_path.with_name(f"{timings_path.name}.stale-{_stamp()}")
+            timings_path.rename(aside)
+            print(f"timings {timings_path} has another column layout; moved to {aside.name}", flush=True)
     new_timings = not timings_path.exists()
     docs: dict[str, dict] = {}
     t_score, secs = time.time(), []
     with cache_path.open("a") as cache_f, timings_path.open("a", newline="") as tf:
         tw = csv.writer(tf)
         if new_timings:
-            tw.writerow(["filename", "seconds", "engineered_s", "m1b_v3_s", "spectra_aasist_s",
-                         "probability_synthetic", "is_speech", "flag"])  # fmt: skip
+            tw.writerow(timings_header)
         for k, (fid, path) in enumerate(items, start=1):
             if fid in cache:
                 doc = cache[fid]
@@ -470,8 +564,8 @@ def main(argv=None) -> int:
             cache_f.flush()
             (out / "results" / f"{Path(fid).name}.json").write_text(json.dumps(doc, indent=1))
             by = {d["name"]: d["seconds"] for d in doc["detectors"]}
-            eng = sum(v for n, v in by.items() if n not in ("m1b_v3", "spectra_aasist"))
-            tw.writerow([fid, round(dt, 3), round(eng, 3), by.get("m1b_v3", ""), by.get("spectra_aasist", ""),
+            eng = sum(v for n, v in by.items() if n not in DEEP)
+            tw.writerow([fid, round(dt, 3), round(eng, 3), *(by.get(n, "") for n in DEEP),
                          doc["probability_synthetic"], doc["is_speech"], doc.get("flag", "")])  # fmt: skip
             tf.flush()
             docs[fid] = doc
@@ -491,6 +585,7 @@ def main(argv=None) -> int:
     flags = [docs[i].get("flag", "") for i in ids]
     meta["n_gated"] = int(sum(not docs[i]["is_speech"] for i in ids))
     meta["flags"] = {f: flags.count(f) for f in sorted(set(flags)) if f}
+    meta["n_scorer_errors"] = scorer_error_counts(docs, scorers)  # over every row, cached ones too
     meta["share_gt_0.5"] = round(float(np.mean(np.array(scores) > 0.5)), 4)
     meta["version"] = version
 
@@ -510,9 +605,14 @@ def main(argv=None) -> int:
     meta["wall_seconds"] = round(time.time() - t_run, 1)
     (out / "run_meta.json").write_text(json.dumps(meta, indent=2))
     print(f"done: {len(ids)} files, {meta['n_gated']} gated, flags {meta['flags']}, "
-          f"share>0.5 {meta['share_gt_0.5']}, wall {meta['wall_seconds']}s "
-          f"({meta.get('per_file_seconds', {}).get('mean', 'cached')} s/file)", flush=True)  # fmt: skip
-    return 0
+          f"scorer errors {meta['n_scorer_errors']}, share>0.5 {meta['share_gt_0.5']}, "
+          f"wall {meta['wall_seconds']}s ({meta.get('per_file_seconds', {}).get('mean', 'cached')} s/file)",
+          flush=True)  # fmt: skip
+    code = scorer_error_exit(meta["n_scorer_errors"], scorers, len(ids), bool(args.compare_tsv))
+    if code:
+        print(f"error: a weighted scorer failed on too many files ({meta['n_scorer_errors']}); the TSV was "
+              f"written but is not to be trusted (exit {code})", file=sys.stderr, flush=True)  # fmt: skip
+    return code
 
 
 if __name__ == "__main__":

@@ -1,4 +1,54 @@
-# Runner, API and Docker status (Sat Sep 26, 2026, runner lane; written 07:35, v2 at 08:35)
+# Runner, API and Docker status (Sat Sep 26, 2026, runner lane; written 07:35, v2 at 08:35, v3 at 10:55)
+
+## v3 (10:55): M5 as a fourth scorer; `fusion_v2` executable; the default unchanged
+
+Run spec `docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md` (M4 fusion chat; Nathan ~10:20: "build now,
+switch later"). The pre-declared M5 sweep's winner `A3_w0.2_E` (addendum in
+`docs/reports/2026-09-26_fusion-sweep-predeclared.md`) is now something the runner can execute, without
+changing what ships:
+
+- `models/fusion_v2/constants.json` (`scripts/fuse_sweep_m5.py --write`): the same rule family `e_on_a`
+  with a `weights` dict (m1b_v3 0.6, handcrafted_v5 0.2, m5_xlsr_ft 0.2) over each column's inner-OOF
+  rank reference, the same M3 suppression step, the Platt map, a `how` line, and the M5 checkpoint's
+  hashes. `FusionConstants` reads both layouts (`alpha_handcrafted` → weights (1 − α, α)); the blend is
+  accumulated in weights order, which is bit-identical to the old `(1 − a)·r1 + a·rh` for a v1 file
+  (pinned by a test with exact `==`, and by the 0813 parity rows below, still 4.4e-16).
+- `Models` loads the M5 checkpoint (`--m5`, `$HEARSAY_M5`; default `models/m5_shipped` under the app
+  root, else the pinned `models/m5_xlsr_ft_20260926-0741/model`) **only when the fusion file weights
+  it**: a run's scorers are the file's own detectors (v1 three, v2 four), never the flag list.
+  `m5_logit` is `scripts/m5_score.py`'s sequence on one clip (`deploy_transform`: trim → band-limit →
+  cap 8 s → normalize; then `collate`, which normalizes again as the export did; `score_batch`, fp32,
+  batch 1, no truncation). `check_m5_identity` refuses, before anything is scored, a rule that weights
+  M5 when M5 is not loaded or when the loaded checkpoint's hashes differ from the file's (checked once
+  from `hashes.json` before the 657 MB load, once from the loaded net).
+- Loudness: the preflight now requires every scorer in use to be `ok` on the silence and chord clips and
+  compares the pre-gate fused probability between passes; `run_meta.json` carries `n_scorer_errors` per
+  fused column over every row (cached rows too); a weighted scorer that failed on any file of a
+  `--compare-tsv` run, or on more than 1% of files otherwise, makes the run exit 4 after the TSV is
+  written. `version.fusion` records `fusion_v1/constants.json` (the bare file name was the same for
+  both layouts); the cache identity gains the M5 head-sha prefix; `timings.csv` has one column per deep
+  scorer and moves an older layout aside on resume.
+- **Unchanged:** `DEFAULT_CONSTANTS_PATH` = `models/fusion_v1/constants.json`; the 08:13 draft-review
+  payload; the Docker image (nothing to stage until the switch; a rebuild on this commit would list
+  `fusion_v2` in BUILD_INFO and the file would be inert without the checkpoint).
+
+| Comparison (v3) | Spearman | max abs diff | mean abs diff | notes |
+|---|---|---|---|---|
+| exported logits -> `fusion_v2` -> policy vs `20260926-0914_..._CANDIDATE_our_direction.tsv` (1,671 rows) | | 6.7e-16 | 7.3e-17 | the one ulp of `0.8 − 0.2` in the sweep script vs the file's rounded 0.6 |
+| same, `--flip`, vs `..._CANDIDATE_FLIPPED_...tsv` | | 7.2e-16 | 8.4e-17 | |
+| `fusion_v2` file vs the 09:14 candidate file | | 0.0 | | weights, all three references and Platt a, b identical |
+| live from audio, 50 template files, `--fusion models/fusion_v2/constants.json`, vs the candidate TSV | 1.000000 | 2.6e-4 | 1.2e-5 | 0 rows over 0.01; 0 E-rule flips; 0 verdict flips; `n_scorer_errors` all 0 |
+| M5 live logit vs the export, those 50 files | | 6.8e-3 | median 6.9e-4 | the recorded CPU-on-WAV vs A100-on-FLAC gap (`parity_f6.json`: 0.0118); gate 0.02 |
+| M5 batch 1 (runner) vs batch 8 (`m5_score.py`), same 50 clips | | 5.7e-6 | median 1.4e-6 | padding is inert on the real model |
+| live from audio, 50 files, the default `fusion_v1` after this change, vs the 0813 TSV | 1.000000 | 2.7e-5 | 6.5e-7 | unchanged from v2; three scorers, M5 neither loaded nor run |
+| live from audio, all 1,671 files, `fusion_v2`, our direction and `--flip` | _(v2_full: filled below)_ | | | |
+
+Timing and memory (Mac, 6 threads, `/usr/bin/time -l`, the 50-file v2 run): model load 8.8 s (M1 0.64,
+Spectra 3.74, M5 0.89 with the hash check), 1.10 s per file against 0.78 under v1 (M5 adds about
+0.3 s per clip here; `speaker_drift` halves torch's thread count after ECAPA loads, so the deep passes
+run at 3 threads), maximum resident set 4.0 GB (3.3 GiB before M5). Preflight: silence 0.0009, chord
+0.0010 (pre-gate 0.898 / 0.939), both gated.
+
 
 ## v2 (08:35): the shipped fusion rule changed to `e_on_a`; parity re-established
 
@@ -100,7 +150,8 @@ Commits: `1394ca0` runner, `b97bbb0` preflight tolerance, `6c2d1ca` API. Suite a
   compression `bw_hz` against the 7.25 kHz band match, enf `enf_present` / `enf_stable`, splice
   `n_seams`, speaker_drift `drift` / `cos_min`, speech_gate `is_speech` / `voiced_frac`, the fusion
   rule and any imputation; **version**: git sha (`HEARSAY_GIT_SHA` in the image), probe dir,
-  resolved hc bundle, Spectra id, constants file, rule, policy, truncation depth.
+  resolved hc bundle, Spectra id, the M5 checkpoint name and hash prefixes (v3), constants file as
+  `<dir>/constants.json`, rule, policy, truncation depth.
 
 **`scripts/run_pipeline.py`** — the Docker entrypoint's runner, also the Mac-side parity tool.
 
@@ -109,9 +160,11 @@ uv run python scripts/run_pipeline.py --in <audio dir> --out <dir> [--template <
     [--limit N] [--device cpu] [--rule zmean|stack_nonlj] [--policy speech_gate|none]
     [--detectors m1b|m1b,spectra,handcrafted] [--fusion|--constants <constants.json>]
     [--m1-mode segment|windows|auto] [--no-truncate] [--fresh] [--threads N]
-    [--require-offline] [--app-root DIR] [--probe DIR] [--hc DIR] [--no-preflight] [--no-tsv]
+    [--require-offline] [--app-root DIR] [--probe DIR] [--hc DIR] [--m5 DIR] [--no-preflight] [--no-tsv]
     [--compare-tsv <logged.tsv>]
-env: HEARSAY_TEAM HEARSAY_TEMPLATE HEARSAY_RULE HEARSAY_POLICY HEARSAY_FUSION HEARSAY_DETECTORS OMP_NUM_THREADS
+env: HEARSAY_TEAM HEARSAY_TEMPLATE HEARSAY_RULE HEARSAY_POLICY HEARSAY_FUSION HEARSAY_DETECTORS HEARSAY_M5 OMP_NUM_THREADS
+(v3: `--fusion models/fusion_v2/constants.json` runs four fused scorers, M5 from `--m5`; the fused
+columns a run computes are the constants file's own, whatever `--detectors` says beyond `m1b` alone)
 ```
 
 - Rows: the template's order (`filename` column, tab-only parse, duplicates fail before scoring);
@@ -124,7 +177,7 @@ env: HEARSAY_TEAM HEARSAY_TEMPLATE HEARSAY_RULE HEARSAY_POLICY HEARSAY_FUSION HE
   git sha, probe, hc bundle, constants sha, scorers, m1 mode, fp16, truncation, and a resume
   requires an exact match, else the old cache is moved to `results.jsonl.stale-<stamp>`;
   `--fresh` forces that), `<team>_predictions.sidecar.csv` (per file: p, flag, is_speech, the
-  three logits, fused), `timings.csv` (per file and per stage), `run_meta.json`, `preflight/`.
+  fused columns' logits, fused), `timings.csv` (per file and per stage), `run_meta.json`, `preflight/`.
 - A rerun with another `--rule` or `--policy` re-fuses the cached logits without loading a model
   (0.1 s for 50 files) and rewrites the per-file JSON.
 - Preflight before the first file: silence and a chord through the whole pipeline twice; both
@@ -237,6 +290,6 @@ with `HEARSAY_TEAM` / `HEARSAY_TEMPLATE`; every flag and variable it relies on i
   fixed preflight and the 1,671-file in-image wall time are the K chat's checks with its rebuild.
 - The full-set run above was done on the Mac (22 min), not in the image.
 - The API is not in the image and has no auth or rate limiting (demo only).
-- The runner scores files one at a time (decode + engineered detectors + two deep models on
-  one thread pool); a decode/engineered prefetch thread would overlap the ~0.3 s of CPU
+- The runner scores files one at a time (decode + engineered detectors + the deep models the
+  constants file names, two under v1 and three under v2, on one thread pool); a decode/engineered prefetch thread would overlap the ~0.3 s of CPU
   detectors with the deep models and buy ~30%.

@@ -2,11 +2,18 @@
 docs/reports/2026-09-26_fusion-sweep-predeclared.md). Reuses fuse_sweep's loaders and
 readouts; never rewrites the frozen fusion_v1 constants.
 
-Usage: uv run python scripts/fuse_sweep_m5.py
+Always writes outputs/fusion/sweep_m5_report.json and, when a candidate qualifies,
+outputs/fusion/sweep_m5_final_test.csv. Nothing under models/ is written unless --write is
+given: then the winner's constants go to models/fusion_v2/constants.json (the runner's file:
+`weights` over the three ranked columns, their inner-OOF rank references, the M3 step, the
+Platt map, `how`, and the M5 checkpoint's hashes so the runner can refuse another checkpoint).
+
+Usage: uv run python scripts/fuse_sweep_m5.py [--write]
 """
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import json
 from pathlib import Path
@@ -21,6 +28,10 @@ spec.loader.exec_module(fs)
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--write", action="store_true",
+                    help="write models/fusion_v2/constants.json (the runner's file); without it nothing under models/ is written")  # fmt: skip
+    args = ap.parse_args()
     S = fs.S
     m1 = fs.load("m1b_v3")
     hc = fs.load("handcrafted_v5", str(S / "_itw_handcrafted_v5.csv"))
@@ -108,22 +119,31 @@ def main() -> None:
         p = sigmoid(pl.decision_function(sc["test"][:, None]) + math.log(fs.PI / (1 - fs.PI)))
         pd.DataFrame({"path": idx["test"], "p": 0.001 + 0.999 * p, "p_flipped": 0.001 + 0.999 * (1 - p),
                       "fused": sc["test"]}).to_csv(REPO / "outputs/fusion/sweep_m5_final_test.csv", index=False)
-        w = float(winner.split("_w")[1][:3])
-        cdir = REPO / "models" / "fusion_v2_candidate"
-        cdir.mkdir(parents=True, exist_ok=True)
-        (cdir / "constants.json").write_text(json.dumps({
-            "status": "CANDIDATE pending Nathan's ratification (not shipped)", "final": winner,
-            "pi_synth": fs.PI,
-            "rank_ref_inner_oof_sorted": {n: np.sort(d.loc[idx["inner_oof"], "logit"].to_numpy()).tolist()
-                                          for n, d in (("m1b_v3", m1), ("handcrafted_v5", hc), ("m5_xlsr_ft", m5))},
-            "weights": {"m1b_v3": round(0.8 - w, 2), "handcrafted_v5": 0.2, "m5_xlsr_ft": w},
-            "e_rule": {"applied": winner.endswith("_E"), "m3_logit_below": -3.0, "base_rank_above": 0.5,
-                       "multiply_by": 0.5},
-            "platt": {"a": float(pl.coef_[0, 0]), "b": float(pl.intercept_[0]),
-                      "prior_shift": math.log(fs.PI / (1 - fs.PI))},
-            "determinate_map": "0.001 + 0.999 * sigmoid(a*fused + b + prior_shift), applied once",
-        }))
-        print("wrote outputs/fusion/sweep_m5_final_test.csv and models/fusion_v2_candidate/constants.json")
+        print("wrote outputs/fusion/sweep_m5_final_test.csv")
+        if args.write:
+            from hearsay.pipeline import M5_DIR
+
+            w = float(winner.split("_w")[1][:3])
+            hashes = json.loads((M5_DIR / "hashes.json").read_text())
+            cdir = REPO / "models" / "fusion_v2"
+            cdir.mkdir(parents=True, exist_ok=True)
+            (cdir / "constants.json").write_text(json.dumps({
+                "final": winner, "pi_synth": fs.PI,
+                "rank_ref_inner_oof_sorted": {n: np.sort(d.loc[idx["inner_oof"], "logit"].to_numpy()).tolist()
+                                              for n, d in (("m1b_v3", m1), ("handcrafted_v5", hc), ("m5_xlsr_ft", m5))},
+                "weights": {"m1b_v3": round(0.8 - w, 2), "handcrafted_v5": 0.2, "m5_xlsr_ft": w},
+                "e_rule": {"applied": winner.endswith("_E"), "m3_logit_below": -3.0, "base_rank_above": 0.5,
+                           "multiply_by": 0.5},
+                "platt": {"a": float(pl.coef_[0, 0]), "b": float(pl.intercept_[0]),
+                          "prior_shift": math.log(fs.PI / (1 - fs.PI))},
+                "determinate_map": "0.001 + 0.999 * sigmoid(a*fused + b + prior_shift), applied once",
+                "how": "rank_d = searchsorted(rank_ref[d], logit_d)/len; base = sum(weights[d] * rank_d) over "
+                       "m1b_v3, handcrafted_v5, m5_xlsr_ft, accumulated in that order; "
+                       "if m3_logit < -3 and base > 0.5: base *= 0.5; p = determinate_map(base)",
+                "m5_checkpoint": {"dir": str(M5_DIR.relative_to(REPO)),
+                                  **{k: hashes[k] for k in ("backbone_sha256", "head_sha256", "config_hash")}},
+            }))
+            print(f"wrote {cdir / 'constants.json'}")
     (REPO / "outputs" / "fusion" / "sweep_m5_report.json").write_text(json.dumps(
         {"t_F": t_f, "t_F_inner_real_coverage": real_cov, "candidates": rep, "qualifying": sorted(ok),
          "winner": winner}, indent=2))

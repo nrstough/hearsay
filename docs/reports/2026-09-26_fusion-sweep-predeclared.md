@@ -103,11 +103,16 @@ If several candidates qualify, the one with the best In-the-Wild brief-cost wins
 
 **Status: candidate, pending Nathan's ratification. Not shipped.**
 - TSVs, both polarities, are logged: `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_*.tsv`.
-- Runner constants: `models/fusion_v2_candidate/constants.json`.
-- Shipping it would require the pipeline and Docker to add the M5 scorer: a 657 MB checkpoint from the HF Hub, about 0.2 s per clip on CPU.
+- Runner constants: `models/fusion_v2_candidate/constants.json` (moved at 10:45 to `outputs/fusion/fusion_v2_candidate/constants.json`, the record; the runner's file is `models/fusion_v2/constants.json`, see the 10:45 note below).
+- Shipping it would require the pipeline and Docker to add the M5 scorer: a 657 MB checkpoint from the HF Hub, about 0.2 s per clip on CPU. _(10:45: the pipeline half is done, see below; the image half waits for the switch.)_
 
 **Nathan's decision (09:25): positive result, not shipped pending draft review.**
 - E on A α 0.2 stays frozen, and it is the file sent for the draft review.
 - A3 w 0.2 + E is revisited only if NSA's draft-review number decodes to our direction and there is time left before 22:00.
-- The candidate artifacts stay where they are. No pipeline changes.
+- The candidate artifacts stay where they are. No pipeline changes. _(Superseded at ~10:20 by the note below: Nathan approved building the runner side now, gated, so the switch is one line if the number comes back in our direction.)_
 - Reaction branches are in `docs/reports/2026-09-26_draft-review-branches.md`.
+
+**Runner side built, not switched (M4 fusion chat, 10:45; run spec `docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md`).** Nathan (~10:20, "build now, switch later"): make the revisit a one-line switch without changing anything that ships. Done:
+- `scripts/fuse_sweep_m5.py --write` (the flag now exists; without it nothing under `models/` is written) wrote `models/fusion_v2/constants.json`: weights 0.6 / 0.2 / 0.2, the three inner-OOF rank references, the same M3 step, the Platt map, a `how` line, and the M5 checkpoint's hashes (`m5_xlsr_ft_20260926-0741/model`). Against the 09:14 candidate file: weights and references identical, Platt a and b identical to the last digit (delta 0.0). The candidate constants moved to `outputs/fusion/fusion_v2_candidate/` so `docker/build.sh` stops staging them.
+- The runner and the API execute it with `--fusion models/fusion_v2/constants.json` (M5 loads and runs only under a file that weights it; a checkpoint whose hashes differ from the file's is refused before anything is scored). Exports through the new file reproduce both 09:14 candidate TSVs on all 1,671 rows to 7e-16; live from audio on 50 template files: Spearman 1.0, max abs diff 2.6e-4 (the known CPU-vs-A100 M5 gap), 0 scorer errors. Full-set numbers in `docs/reports/2026-09-26_runner-docker.md` (v3).
+- **Unchanged:** the default rule (`models/fusion_v1/constants.json`, `e_on_a`), every TSV under `submissions/` except one new PARITY-labelled runner artifact, the draft-review payload, the Docker image. The switch (default → v2, the shipped TSV pair, the image with `models/m5_shipped`, README) is a separate commit on Nathan's word after NSA's number.

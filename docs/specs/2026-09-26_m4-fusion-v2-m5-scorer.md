@@ -1,0 +1,172 @@
+# Run spec: M4 fusion v2, M5 as a live scorer in the runner (Sat Sep 26, 2026, ~09:50)
+
+Status: P1 and P2 frozen (deep mode). Plan: `docs/reports/2026-09-26_m4-fusion-v2-m5-scorer-plan.md`.
+- **Worktree:** branch `main`, `~/Projects/hearsay`, shared with the main, Docker, CPU, README, channel-robustness and oversight chats. Stage only this lane's files by path; never `git add -A`; never push without Nathan. Other lanes' uncommitted edits in the tree (at `28d26fe`: `scripts/cloud/*`, `tests/test_cloud_scripts.py`, the two `m5-xlsr-finetune` spec files; the Docker lane's smoke and test edits landed in `28d26fe`) are not touched and not staged.
+- **Handoff:** `docs/handoffs/2026-09-26_m4-fusion-handoff.md`.
+- **Rung:** M4 (fusion). Baseline: full suite 452 passed at HEAD `7c17836` (09:45); `tests/test_pipeline.py` + `test_api.py` + `test_docs_consistency.py` 99 passed.
+- **Time box (reset 10:15 after the critique agent's arithmetic):** runner path first. Runner-subset suite green by 14:00; the 50-file live parity (A4) by 14:30; API and docs after; commit by 15:00; the full-set run finishes in the background. If the runner subset is not green by 14:00 or A4 is not met by 14:30, stop, report, leave the branch uncommitted.
+- **Hard stop (Nathan, 09:30):** if the runner is not reproducing the M5 candidate TSV by 16:00, stop; the fallback is shipping the candidate TSV with the image left on `e_on_a` (option 2), which needs nothing from this change.
+- **Decision this change serves (Nathan, this chat, ~09:35: "build now, switch later").** The pre-declared M5 sweep found that A3 w0.2 + E qualifies (addendum in `docs/reports/2026-09-26_fusion-sweep-predeclared.md`; crop-fair ITW brief 0.228 vs 0.260, averse 0.239 vs 0.267, holdout 0.0065 vs 0.014, inner 0.135 vs 0.140). Nathan's 09:25 decision, recorded by the oversight chat, keeps `e_on_a` frozen and the 08:13 file as the draft-review payload, and revisits A3 only after NSA's number decodes to our direction with time left. This change makes that revisit a one-line switch by building everything except the switch itself. Nothing shipped changes here.
+
+## Problem
+
+`scripts/fuse_sweep_m5.py` (committed at 09:14, `e6341bb`) produced a qualifying three-way rule, `A3_w0.2_E`: score = 0.6·rank(M1b v3) + 0.2·rank(handcrafted v5) + 0.2·rank(M5) in each detector's inner-OOF rank space, then the same M3 false-alarm suppression as `e_on_a`, then the Platt map at π_synth = 0.3, then the determinate map into [0.001, 1]. Its candidate artifacts exist (`models/fusion_v2_candidate/constants.json`, `submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_*.tsv`), but the runner cannot execute it:
+- `hearsay.pipeline.FusionConstants._from_v1` reads `alpha_handcrafted` and exactly two rank references (`RANKED = ("m1b_v3", "handcrafted_v5")`); the candidate file carries a `weights` dict and three references, so `FusionConstants.load` raises.
+- M5 is not a pipeline scorer. `DETECTOR_ORDER` has three columns; `Models` loads the XLS-R probe and Spectra only; `analyze_clip` runs two deep scorers.
+- The Docker image (`hearsay:20260926-0753`, rebuilding on runner v2 `9614c18`) ships neither the M5 checkpoint nor a runner that can use it.
+
+If the draft-review number comes back in our direction, the pipeline change (1–2 h) is the long pole before the image rebuild (Docker chat's estimate: 45 min to 1 h). Doing it now, gated, removes the long pole.
+
+## Solution
+
+### D1. Scope: build the capability, do not switch
+This change adds `models/fusion_v2/constants.json`, a loader that understands both file layouts, an M5 scorer in `Models`, the runner and API wiring, and tests. `DEFAULT_CONSTANTS_PATH` stays `models/fusion_v1/constants.json`; the shipped TSV, the draft-review payload and the image's rule are unchanged. The switch is a later, separate commit gated on Nathan's word (D8). The only file this change adds under `submissions/` is the runner's full-set parity TSV with its log row, named PARITY (CLAUDE.md's every-experiment rule); it is not a submission and nothing existing is touched.
+
+### D2. Constants file v2 (written by `scripts/fuse_sweep_m5.py --write`)
+Layout = the candidate file's layout plus two fields: `weights` ({"m1b_v3": 0.6, "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.2}), `rank_ref_inner_oof_sorted` for each weighted detector (16,142 inner-OOF logits each, sorted), `e_rule`, `platt` {a, b, prior_shift = log(0.3/0.7)}, `pi_synth` 0.3, `final` "A3_w0.2_E", `determinate_map`, **`how`** (the rule in one line, as `fusion_v1` has), and **`m5_checkpoint`** = {"dir": "models/m5_xlsr_ft_20260926-0741/model" (informational, repo-relative), "backbone_sha256", "head_sha256", "config_hash"} copied from that checkpoint's `hashes.json` (the export `outputs/detector_scores/m5_xlsr_ft.csv` was assembled from that model: `models/m5_xlsr_ft_20260926-0741/meta.json` `scores`). The script gains a `--write` flag mirroring `fuse_sweep.py`; without it the script writes only `outputs/fusion/sweep_m5_report.json` and `sweep_m5_final_test.csv` (today it also rewrites the candidate constants on every run, which stops). The Platt fit is the same deterministic `LogisticRegression(class_weight="balanced")` on inner OOF as the candidate's, so `platt` must match the candidate file to 1e-9 (A2). The `--write` gate is added before the script is run again, so the 09:14 candidate file is never rewritten by a refit; once `fusion_v2` is written and matched against that original, `models/fusion_v2_candidate/` (the original) is moved to `outputs/fusion/fusion_v2_candidate/` (a gitignored record) so `docker/build.sh`, which stages every `models/fusion_*/constants.json`, does not ship a stale candidate file.
+
+### D3. Loader: one rank rule, N weighted detectors, both layouts
+`FusionConstants._from_v1` accepts either `alpha_handcrafted` (→ weights {m1b_v3: 1 − α, handcrafted_v5: α}; `alpha` stays populated for these files) or `weights` (every value > 0, sum within 1e-9 of 1, keys a subset of the fused columns other than `spectra_aasist`, each with a non-empty sorted rank reference; a zero weight is refused rather than silently loading and running a 657 MB model for a term that contributes nothing); a file with neither or both is refused with a message naming the field. The instance gets `ranked` (the weighted detectors in `DETECTOR_ORDER` order) and `detectors` = `ranked` + `("spectra_aasist",)` in that order, so a v1 file still reports three detectors and a v2 file four. A file whose weights include `m5_xlsr_ft` must carry `m5_checkpoint` or it is refused (D6). The rule name stays `e_on_a` (the family: weighted rank blend with M3 suppression); `weights("e_on_a")` returns the weights plus `spectra_aasist: 0.0`; `fuse` computes base = Σ_d w_d·rank_d over `ranked`, imputes a missing weighted detector at rank 0.5 and names it, then applies E with the same strict inequalities as the sweep scripts (`m3 < −3`, `base > 0.5`); `fusion_line` prints one term per weighted detector. Existing v1 arithmetic, imputation and E-rule behaviour are unchanged, pinned by the existing tests.
+
+### D4. Fused columns and scorer selection
+`DETECTOR_ORDER = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist")` is the canonical order of every fused column; `DEEP` gains `m5_xlsr_ft`; `ROLE["m5_xlsr_ft"] = "fused"`; `SCORER_FLAGS["m5"] = "m5_xlsr_ft"`. The scorers a run computes are the constants file's `detectors`, not `DETECTOR_ORDER`: the runner's `resolve_scorers` keeps returning the maximal set and the fusion path (its tests pin that), and `main` takes the real list from `scorers_for(consts)` after loading the file; the API's `settings()` reads the file's detectors when the file exists (memoized on path and mtime) and falls back to the env-derived list only when it does not. Under `fusion_v1` M5 is neither loaded nor run, under `fusion_v2` all four run. The runner's "running all of them" note moves out of `resolve_scorers` and prints only when `--detectors` omitted a column the loaded file needs. `--detectors m1b` alone (M1 only, no fusion) is unchanged.
+
+### D5. The M5 scorer
+`M5_DIR = REPO / "models" / "m5_xlsr_ft_20260926-0741" / "model"`. `Models(..., load_m5: bool = False, m5_dir=M5_DIR)`; `load_deep` loads it with `hearsay.m5_model.load_m5` (hash-verified, eval mode) after Spectra and records its load time; `m5_logit(x)` is exactly `scripts/m5_score.py`'s sequence on one clip: `xs, mask = hearsay.m5_data.collate([hearsay.m5_data.deploy_transform(x)])` (trim_silence → band-limit → cap 8 s → normalize, the order the export used) then `score_batch(net, xs, mask)[0]`; it raises when M5 was not loaded, as `spectra_logit` does. No float16 rounding (the M5 export is fp32), no layer truncation (the checkpoint is saved truncated to 12 layers), the shared `set_cpu_threads` cap. `x` is `ctx.audio`, the single ffmpeg decode every detector shares. `Models.version()` gains `m5` (the checkpoint's directory name: the parent when the dir is called `model`, so `m5_xlsr_ft_20260926-0741`, else its own name such as `m5_shipped`) plus `m5_backbone_sha` and `m5_head_sha` (12 hex chars each); `_deep_entry` gets an M5 evidence sentence.
+
+### D6. Checkpoint identity gate
+When the constants carry `m5_checkpoint` and M5 is loaded, the runner and the API compare the loaded checkpoint's `hashes.json` values to the constants' before any file is scored and refuse on mismatch (a rank reference built from one model and a runner scoring with another would be silently wrong). `hearsay.pipeline.check_m5_identity(models, consts)` is the one function; the runner calls it after loading models, the API inside `get_models`. Both also run a cheap pre-load gate (`m5_dir/hashes.json` against `consts.m5_checkpoint`) right after the constants load, before the cache is opened and before the 11 s checkpoint load. The runner turns either refusal into `sys.exit("error: …")` (its convention); the API into an HTTP 500 with the message, cached in `_state` so the 657 MB reload is not repeated per request. **Loudness after load:** a weighted scorer that errors on a clip is imputed at rank 0.5 by design (one bad file must not lose the row), so the runner (a) makes the preflight require an `ok` entry for every scorer in use on both the silence and the chord clips and compares the pre-gate `p_fused` between the two passes as well as the final score, and (b) tallies `status == "error"` per fused scorer over the run into `run_meta.json` (`n_scorer_errors`), prints it in the `done:` line, and exits non-zero after the TSV is written when a weighted scorer errored on any file in a `--compare-tsv` run or on more than 1% of files otherwise. A valid TSV always exists; the exit code says whether to trust it.
+
+### D7. Runner and API wiring
+`scripts/run_pipeline.py`: `--m5 DIR` (default `default_m5(app_root)`: `models/m5_shipped` when it exists under the app root, the Docker staging name, else `M5_DIR`); `cache_identity` gains `m5` (its resolved directory name) beside `probe`, `hc`, `constants_sha` and `scorers`, so a v1 cache is never reused for a v2 run; `resolve_scorers` returns the constants file's detectors (D4); `Models` gets `load_m5` from the scorers; `check_m5_identity` after load; `run_meta.json` and every response's `version.fusion` record `<parent dir>/<file>` (e.g. `fusion_v1/constants.json`) instead of the bare file name, which was the same for both layouts. `src/hearsay/api.py`: `settings()` derives scorers from the constants file, `get_models` passes `load_m5` and runs the identity check. `refuse` on a cached v1 response under a v2 rule raises `KeyError` (missing `m5_xlsr_ft` logit; "rescore instead"), the existing contract. `timings.csv` gets one column per deep scorer (constant set, `DEEP` order); on resume, a `timings.csv` whose header differs from the current one is moved aside like a stale cache, never appended to.
+
+### D8. The switch (not in this change; recorded so the audit can tell them apart)
+On Nathan's "switch": (1) `DEFAULT_CONSTANTS_PATH = CONSTANTS_V2_PATH` (one line) and the docstrings that name the default; (2) `scripts/fuse_sweep_m5.py --write --tsv` writes the shipped TSV pair under a new timestamp with log rows (values must equal the 09:14 candidate pair exactly: same exports, same fit) and the notes carry the min score; (3) the Docker chat's `tests/test_docker_image.py` B6 pin moves to `fusion_v2`, `build.sh` stages `models/m5_shipped`, the image is rebuilt, smoked and parity-checked against the new TSV; (4) README runner section, `docs/reports/2026-09-26_draft-review-branches.md` row 0.20–0.45, STATUS, architecture and the CLAUDE.md disclosure ("M5 ... used live in the runner") follow, by their owners. Until then `fusion_v2` is exercised only with `--fusion models/fusion_v2/constants.json`.
+
+### D9. Docs and messages
+Edited by this lane: this run spec; `docs/reports/2026-09-26_fusion-sweep-predeclared.md` (one dated line under the addendum: the v2 file exists, the runner can execute it with `--fusion`, default unchanged pending the switch); `docs/reports/2026-09-26_runner-docker.md` (a v3 section: M5 live parity and timing). Messaged, not edited (owners named in `docs/handoffs/2026-09-26_oversight-handoff.md`): the Docker chat (staging `models/m5_shipped` from `M5_DIR`, the 657 MB layer, the B6 pin, memory), the README chat (runner section, the "Pending: a second pre-declared sweep" placeholder), the oversight chat (STATUS, architecture §9, code map, CLAUDE.md disclosure, the frontend contract's additive fields for Hrushi: a fourth `fusion.weights` key, a fourth fused detector entry, `version.models.m5`).
+
+### D10. Order of operations
+1. `fuse_sweep_m5.py`: `--write`, `how`, `m5_checkpoint`; run it read-only first and confirm the crop-fair table reproduces; then `--write`; compare `fusion_v2` to the candidate; move the candidate dir.
+2. Loader (D3) with its tests; existing v1 tests must not change.
+3. M5 scorer (D5, D6) with its tests (fake net + the TINY random-init config from `tests/test_m5_model.py`).
+4. Runner and API (D4, D7) with their tests.
+5. `uv run pytest -q` and `uv run ruff check .`.
+6. Live: 50 template files with `--fusion models/fusion_v2/constants.json --compare-tsv <candidate>`; then all 1,671 in the background; record parity, preflight and per-clip time.
+7. Docs (D9), commit, Claude critique loop, Codex audit, messages to the lanes.
+
+## What will change
+
+Create: `models/fusion_v2/constants.json` (gitignored; written by the script), this run spec, the plan file and its Codex review.
+Modify: `scripts/fuse_sweep_m5.py`, `src/hearsay/pipeline.py`, `scripts/run_pipeline.py`, `src/hearsay/api.py`, `tests/test_pipeline.py`, `tests/test_api.py`, `docs/reports/2026-09-26_fusion-sweep-predeclared.md`, `docs/reports/2026-09-26_runner-docker.md`, `submissions/log.csv` (no: nothing is logged by this change; listed to say so).
+Move (gitignored): `models/fusion_v2_candidate/` → `outputs/fusion/fusion_v2_candidate/`.
+Never: `models/fusion_v1/constants.json`, `scripts/fuse_sweep.py`, `submissions/*.tsv`, `docker/*`, `Dockerfile`, `tests/test_docker_image.py`, `src/hearsay/m5_*.py`, `scripts/m5_*.py`, `README.md`, `docs/STATUS.md`, `docs/architecture.md`, `CLAUDE.md`, `DEFAULT_CONSTANTS_PATH`'s value.
+
+## Tests (P2, frozen)
+
+_Amended before the plan (09:58, from the risk agent's perturbation analysis): A4 tightened from max 0.01 / Spearman 0.999 to max 0.005 / mean 5e-4 / Spearman 0.9999 with zero verdict or E-rule flips, plus a direct M5-logit gate; T24 added for the sub-400-sample crash path. Nothing was loosened._
+
+New in `tests/test_pipeline.py` (hermetic unless marked):
+- T1 `test_v2_constants_load_weights_refs_and_checkpoint`: toy v2 dict → `ranked` order, four detectors, weights, `m5_checkpoint` stored, `how` stored.
+- T2 `test_v2_constants_reject_bad_files`: weights not summing to 1; a negative weight; a zero weight; a NaN weight; an unknown key; a NaN in a reference; a 2-D reference; a weighted detector with no reference; an unsorted reference; neither `alpha_handcrafted` nor `weights`; both; an M5 weight without `m5_checkpoint`. Each refused with the field named.
+- T3 `test_v1_file_and_its_v2_twin_fuse_identically`: `TOY_V1` vs the same numbers as `weights {0.8, 0.2}`: identical `FusionOutput` on the three existing logit sets, and `detail["base"] == (1 - 0.2) * 0.6 + 0.2 * 0.8` with exact `==` (the old expression, so a later regression to `sum()` or `np.dot` fails here, not only in the data-gated parity test).
+- T4 `test_e_on_a_three_way_is_fuse_sweep_m5_arithmetic`: hand-computed base, E applied and not, `p`; M5 missing → rank 0.5 and named; M3 missing → no suppression and named.
+- T5 `test_e_rule_boundaries_are_strict`: with four-point references `[-2, -1, 1, 2]` for all three detectors and logits 0.0, every rank is 0.5 and the accumulated base is exactly 0.5 with margin −7: not suppressed; M5 logit 1.5 (rank 0.75, base 0.55): suppressed. With `TOY_V2` (base 0.64) margin exactly −3.0: not suppressed; −3.0000001: suppressed.
+- T6 `test_fusion_line_lists_every_weighted_term`: the routing-log string names three terms with their weights.
+- T7 `test_version_fusion_names_the_directory`: `version.fusion` is `fusion_v1/constants.json` for a file under `models/fusion_v1`; the existing v1 assertions updated where they pinned the bare name.
+- T8 `test_m5_logit_is_the_m5_score_sequence_on_shared_audio`: a fake net records its input; it equals `collate([deploy_transform(ctx.audio)])`; the logit returned is the net's.
+- T9 `test_m5_not_loaded_raises`: `Models(load_deep=False)`. `m5_logit` raises like `spectra_logit`.
+- T10 `test_m5_tiny_net_scores_short_silent_and_long_clips`: `build_model(tiny=True)` on a 0.3 s clip, 4 s of zeros and a 10 s clip: finite logits.
+- T11 `test_m5_backbone_layer_count_is_untouched_by_models`: the tiny net's layer count before and after `Models` holds it.
+- T12 `test_m5_identity_gate`: matching hashes pass; a changed `head_sha256` in the constants is refused; the counterfactual (constants without `m5_checkpoint` on a v1 file) is a no-op.
+- T13 `test_runner_resolve_scorers_from_the_constants_file`: a v1 toy file → three scorers; a v2 toy file → four; `m1b` alone → None.
+- T14 `test_runner_cache_identity_includes_m5_and_refuses_a_v1_cache_under_v2`.
+- T15 `test_refuse_v1_cache_under_v2_raises_key_error`.
+- T16 `test_missing_doc_and_decode_failure_under_v2_sit_below_the_block`: all four inputs imputed.
+- T17 `test_flip_under_v2_reverses_determinate_rows_and_keeps_the_block`.
+- T18 `test_analyze_v2_response_shape`: `REQUIRED` keys unchanged; an `m5_xlsr_ft` entry with role `fused`, score in [0, 1], non-empty evidence; `fusion.weights` has four keys; `version.models.m5` present.
+- T19 `test_default_constants_path_is_still_v1`.
+- T20 `test_v2_platt_and_refs_match_the_candidate` (`needs_data`): `models/fusion_v2/constants.json` vs the moved candidate: weights equal, references equal, Platt within 1e-9.
+- T21 `test_v2_parity_exports_to_candidate_tsv` (`slow`, `needs_data`): exports → `fusion_v2` → policy vs `submissions/20260926-0914_..._our_direction.tsv` and `..._FLIPPED_...tsv`, all 1,671 rows, max abs diff ≤ 1e-9 (the v1 twin of this test reads 4.4e-16).
+- T24 `test_m5_failure_on_one_clip_is_imputed_not_fatal`: a net that raises (the real model raises inside conv1d below 400 samples) gives an `m5_xlsr_ft` entry with status `error`, the row is fused with M5 imputed at rank 0.5 and named, and `analyze_clip` returns normally.
+New in `tests/test_api.py`:
+- T22 `test_api_loads_m5_only_when_the_constants_need_it`: `HEARSAY_FUSION` pointing at a v2 toy file written at `tmp_path/fusion_v2/constants.json` → four scorers and `load_m5=True`; pointing at a v1 toy file at `tmp_path/fusion_v1/constants.json` → three and `False`.
+- T23 `test_health_reports_the_file_s_scorers`: `/health` before any model loads lists three scorers under the v1 toy file and four under the v2 toy file, and `fusion` reads `fusion_v1/constants.json` and `fusion_v2/constants.json` respectively; the existing health test's assertion on the default file becomes conditional on that gitignored file's presence (three when present, the env-derived list when absent).
+- T26 `test_runner_scorer_error_tally_and_exit_code`: the pure helpers on synthetic docs: a fresh failure, a cached failure (a row that never went through the scoring loop), a `handcrafted` error counted under `handcrafted_v5`, the 1% boundary, strict mode with `--compare-tsv`, and spectra excluded.
+- T25 `test_preflight_refuses_a_scorer_that_errors`: `rp.preflight` with a fake whose `m5_logit` raises, under the v2 toy constants, raises naming `m5_xlsr_ft`; with the same fake under v1 it passes (M5 is not in use). Counterfactual for D6's loudness clause.
+Existing, run unchanged: `tests/test_docker_image.py` (the Docker lane's static checks against the runner, working-tree version), `tests/test_docs_consistency.py`, the whole suite.
+
+Commands:
+```
+uv run pytest -q tests/test_pipeline.py tests/test_api.py tests/test_docker_image.py tests/test_docs_consistency.py
+uv run pytest -q -m "slow or needs_data" tests/test_pipeline.py -k "v2"
+uv run pytest -q && uv run ruff check .
+uv run python scripts/fuse_sweep_m5.py                       # read-only: the crop-fair table must reproduce
+uv run python scripts/fuse_sweep_m5.py --write               # writes models/fusion_v2/constants.json
+uv run python scripts/run_pipeline.py --data data/nsa/HackGTHearsayTesting --out outputs/runner/v2_50 --template data/nsa/HearsayScoreKey4TeamX.tsv --fusion models/fusion_v2/constants.json --limit 50 --compare-tsv submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv
+uv run python scripts/run_pipeline.py --data data/nsa/HackGTHearsayTesting --out outputs/runner/v2_full --template data/nsa/HearsayScoreKey4TeamX.tsv --fusion models/fusion_v2/constants.json --flip --compare-tsv submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv
+```
+
+## Acceptance criteria
+
+- A1 T1–T19, T22–T26 pass; every existing test still passes; `ruff` clean. Full suite: no fewer than 452 passed plus the new tests.
+- A2 `models/fusion_v2/constants.json` matches the candidate file: weights equal, three references equal element-wise, Platt a and b within 1e-9 (T20; the fit is the same deterministic solver on the same rows, so equality is expected and any last-digit drift is recorded); `how` and `m5_checkpoint` present; `pi_synth` = 0.3.
+- A3 Exports → `fusion_v2` → policy reproduce both 09:14 candidate TSVs on all 1,671 rows to ≤ 1e-9 (T21; with the candidate's own Platt the risk agent measured 6.7e-16, so anything above 1e-12 means the refit drifted and is recorded).
+- A4 Live, 50 template files, gate on, `--fusion models/fusion_v2/constants.json`, against the candidate TSV: Spearman ≥ 0.9999, max abs diff ≤ 0.005, mean abs diff ≤ 5e-4, 0 rows over 0.01, 0 verdict (0.5) crossings and 0 E-rule flips vs the export path; preflight (silence, chord) finite, reproducible within 1e-6, both gated; 0 decode errors. M5 live logit vs the export column on those files: max |Δ| ≤ 0.02 (the recorded CPU-vs-A100 gap is 0.0118; the earlier band-limit-before-trim bug showed as 0.279, which the probability gate alone would not catch). Also measured and recorded, not gated: the real model's batch-1 (pipeline) vs batch-8 (`m5_score.py`) logit delta on the same 50 files.
+- A5 Live, all 1,671 files, our direction and then `--flip` on the same cache against the FLIPPED candidate: the same marks on all rows; the per-clip M5 time and the total wall time recorded (expectation about 0.2 s per clip added on the Mac at 6 threads, possibly more under the ECAPA thread halving); the our-direction TSV copied under `submissions/` as a PARITY file with a log row (validation score 0.0065 = the candidate's holdout, clean-only the same, notes carrying the parity numbers). If A5 fails there is no copy and no row and the failure is the named blocker.
+- A6 Under `fusion_v1` (the default) the runner neither loads nor runs M5, and its 50-file parity against the 08:13 TSV is unchanged (Spearman 1.0, max ≤ 3e-5).
+- A7 The identity gate refuses a mismatched checkpoint before scoring (T12), and a v1 cache is not reused under v2 (T14).
+- A8 `DEFAULT_CONSTANTS_PATH` still points at `fusion_v1` (T19); no existing file under `submissions/` is modified and the draft-review payload is untouched (sha256 `096f3f0c…` per `docs/reports/2026-09-26_draft-review-branches.md`); the one addition is the runner-made full-set parity TSV, copied under a new name marked PARITY with its log row (A5), never a promotion of the candidate.
+- A9 The sweep script no longer writes under `models/` without `--write`, and its read-only run prints the crop-fair table (inner 0.1351, holdout 0.0065, ITW brief 0.228, averse 0.2385 for A3 w0.2 + E).
+- A10 The frontend JSON is additive: `REQUIRED` keys unchanged (T18).
+- A11 A weighted scorer that fails is loud: the preflight refuses it (T25); a run in which M5 errored on any file with `--compare-tsv`, or on more than 1% of files otherwise, writes its TSV and exits non-zero with `n_scorer_errors` in `run_meta.json`; the 50-file and full runs of step 9 report `n_scorer_errors` = 0 for every scorer.
+
+## HEARSAY standing failure modes
+1. Laundering / telephony / replay: nothing new is modelled; M5's clean-vs-transcoded readout is on record (`models/m5_xlsr_ft_20260926-0741/codec_readout.json`, holdout 0.328 clean vs 0.363 transcoded) and the Docker smoke exercises MP3 and FLAC through the same decode. Physical replay is not covered.
+2. Generator / speaker overfitting: the rule was selected under a procedure written before the results, with In-the-Wild brief-cost minDCF as the objective and the outer holdout as a veto ("no worse than +0.05"), so the holdout did enter selection as a guard; the Platt map fits on inner OOF only. This change reproduces that frozen candidate and re-selects nothing; the pending independent evaluation is NSA's draft-review number on the test set (the decoding table). Any renewed selection would need an inner-only procedure with the outer holdout read once, afterwards.
+3. Class prior: `pi_synth` = 0.3 in the file and `prior_shift` = log(0.3/0.7), pinned (A2); the candidate also improves under the sponsor code's inverted cost (ITW averse 0.239 vs 0.267), so the decision does not flip between readings.
+4. Shortcuts: M5 sees the same capped, trimmed clip the export saw; no filename or timestamp reaches a scorer; the crop-fair rerun was the length-shortcut check (whole-clip 0.215 → crop-fair 0.228, both recorded).
+5. Loader format errors: M5 consumes `ctx.audio`, the shared 16 kHz mono ffmpeg decode (T8); the runner's preflight and the Docker smoke cover WAV, MP3 and FLAC.
+
+## Amendments before the plan was finalized (10:15, from the critique agent; recorded so the freeze is auditable)
+1. Time box reset (above): the original "2 h of build" could not hold with the step budget; the runner path now lands first and the API last, with two dated stops.
+2. D2: the `--write` gate is added before the sweep script is run again, so T20/A2 compare against the 09:14 original, not a refit of it.
+3. D3: a zero weight is refused (was "≥ 0").
+4. D4: `resolve_scorers` keeps its return value; `scorers_for(consts)` and a relocated "running all of them" note replace the earlier wording; the API reads the file's detectors when the file exists.
+5. D5: `version()` records both checkpoint hashes.
+6. D6: pre-load hash gate, `sys.exit` / HTTP 500 conventions, and the loudness clause (preflight `ok` requirement, `n_scorer_errors`, non-zero exit) with T25 and A11.
+7. D7: `timings.csv` header check on resume.
+8. T5 fixture made constructible (four-point references); T3 gains the exact old-expression check; T22/T23 paths fixed; the plan's extra real-weights slow test is dropped (not in this list).
+9. (10:25, from the Codex plan review) The scorer-error tally counts cached rows and normalizes the handcrafted name (T26); the full-set check runs each polarity against its own reference; the full-set parity TSV is logged (A5, A8, D1); the API derives scorers through `FusionConstants.load`; finite/1-D checks on weights and references (T2); the runner's note keys on the typed flags; the outer holdout's role in the pre-declared selection is recorded under standing failure mode 2; a single 15:45 deadline bounds the audit loop.
+
+## Doc impact
+Committed by this lane: this spec; the plan and its review; `docs/reports/2026-09-26_fusion-sweep-predeclared.md` (one line); `docs/reports/2026-09-26_runner-docker.md` (v3 section). Committed too (confirmed from the file-impact sweep): `docs/handoffs/2026-09-26_m4-fusion-handoff.md`, a dated note under "What to do next" step 3 that the runner part is done, so its lines 30, 35, 75 and 104 stop misleading the next reader. Messaged, not edited: README, STATUS, architecture, code map, CLAUDE.md disclosure, the Docker spec, the frontend contract (D9). Nothing in CLAUDE.md changes until the switch (no new model or dataset: M5 is already disclosed).
+
+## Asks to other lanes (messages, their files)
+- Docker chat: on the switch, stage `M5_DIR` as `docker/build/models/m5_shipped` (the runner's `default_m5`), the asset manifest covers it, memory 3.3 → ~4.2 GiB in the 5.8 GiB VM (their 09:20 estimate), and move the B6 default-constants pin to `fusion_v2`. Nothing before the switch.
+- README chat: on the switch, the runner section (default rule and file), the parity table (v2 numbers), the "Pending: a second pre-declared sweep" placeholder, the ablation table's rule line.
+- Oversight chat: STATUS fusion and runner rows, architecture §9 (M5 becomes a live scorer), code map (`pipeline.py` constants), CLAUDE.md disclosure wording, and the frontend contract note for Hrushi.
+
+## Results (execution 10:37 → , HEAD at start `1124d74`; other lanes committed in between, none touching the cited files)
+
+- **Step 0.** `main`, worktree confirmed; the draft-review payload's sha256 starts `096f3f0c` before and after. The Docker chat was told at 10:38 (message id d1d90683). The frozen sweep tripwire printed inner 0.1395 / holdout 0.014 / ITW brief 0.2603 for `E_on_A_alpha0.2` (no export drift).
+- **Step 1 (A9, A2).** With the `--write` gate in place, the read-only run printed the crop-fair table (A3_w0.2_E inner 0.1351 / holdout 0.0065 / ITW brief 0.228 / averse 0.2385, `t_F` −3.8985, winner A3_w0.2_E) and left `models/` untouched (`cmp` of the candidate file against the 10:37 copy: identical). `--write` produced `models/fusion_v2/constants.json` (964 KB): weights equal, the three 16,142-point references equal element-wise, Platt a = 17.692826639924263 and b = −8.151475321940495 identical to the candidate's (delta 0.0), `pi_synth` 0.3, `how` present, `m5_checkpoint` = the checkpoint's `hashes.json` values (`5f71940c…`, `c4aea87a…`, `23027e87…`). The candidate directory moved to `outputs/fusion/fusion_v2_candidate/` at 10:45 (both paths gitignored).
+- **Step 6 (stop 1, 10:50).** `tests/test_pipeline.py` + `test_docker_image.py` + `test_docs_consistency.py`: **147 passed** (pipeline 78: the 37 existing plus T1–T19, T24–T26, with T2 parametrized over 15 broken files). Data-gated (`-m "slow or needs_data"`): 8 passed, among them the v0 and v1 parity rows (still 4.4e-16) and T20/T21. `tests/test_api.py`: 10 passed (8 existing plus T22, T23). `ruff` clean on every file of this change; the repository-wide `ruff check .` fails only in `src/hearsay/analyzer.py` (the frontend lane's file, commit 19925a3, untouched here).
+- **A3.** Exports → `fusion_v2` → policy vs the 09:14 candidate TSVs, 1,671 rows: max |Δ| 6.7e-16 (our direction), 7.2e-16 (flipped); T21 pins ≤ 1e-9.
+- **A4 (stop 2, 10:52; `outputs/runner/v2_50`).** 50 template files, gate on, `--fusion models/fusion_v2/constants.json`, vs the candidate TSV: Spearman 1.000000, max abs diff 2.6e-4, mean 1.2e-5, 0 rows over 0.01; row by row against the export path: 0 E-rule flips, 0 verdict flips; `n_scorer_errors` all zero; preflight silence 0.0009 / chord 0.0010 (pre-gate 0.898 / 0.939), both gated, reproducible; M5 live vs export max |Δlogit| 6.8e-3, median 6.9e-4 (gate 0.02); M5 batch 1 vs batch 8 max 5.7e-6. Model load 8.8 s (M5 0.89 s), 1.10 s per file (0.78 under v1), maximum resident set 4.0 GB. Exit 0.
+- **A6 (`outputs/runner/v1_50_after`, 10:55).** The same 50 files under the default (`fusion_v1`, no `--fusion`) vs the 08:13 TSV: Spearman 1.000000, max abs diff 2.73e-5, mean 6.5e-7 (the v2 report's own numbers, unchanged); `version.scorers` = the three v1 columns, `version.fusion` = `fusion_v1/constants.json`, `models.m5` empty, no `m5` in `load_seconds`; `n_scorer_errors` all zero; exit 0. (3.4 s per file only because the full-set v2 run and the test suite were sharing the Mac.)
+- **A5.** _(v2_full: pending)_
+- **A1 (11:00).** Full suite `uv run pytest -q`: **504 passed**, 0 failed (baseline 452 at 09:45; the 52 added are T1–T26 with their parametrizations, plus other lanes' tests committed since). `ruff` clean on every file of this change (repo-wide lint red only in the frontend lane's `analyzer.py`, see Deviations).
+- **A8.** `DEFAULT_CONSTANTS_PATH` unchanged (T19); `git status` shows nothing under `submissions/` before the A5 PARITY copy.
+- **A10.** T18.
+
+## Deviations
+- `resolve_scorers` keeps returning the maximal set; `scorers_for(consts)` narrows it in `main` (spec amendment 4). The API's `settings()` reads the file's detectors through `FusionConstants.load` memoized on path and mtime, and labels the source (`scorers_from`).
+- The extra real-weights slow twin test was dropped (spec amendment 8); the M5 live-vs-export check is the 50-file join above, recorded here rather than as a test.
+- `ruff check .` is red at HEAD because of `src/hearsay/analyzer.py` (frontend lane); reported to the oversight chat, not fixed here.
+
+## Codex plan review
+_Filled after `.claude/review-plan.sh`._
+
+## Audits
+_Claude critique and Codex audit, filled post-commit._

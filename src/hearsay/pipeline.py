@@ -1,5 +1,5 @@
 """End-to-end inference for one clip: decode once, run every registered engineered detector
-and the two deep scorers, fuse with the persisted constants, apply the non-speech gate, and
+and the deep scorers, fuse with the persisted constants, apply the non-speech gate, and
 assemble the `AnalyzeResponse` the frontend contract describes
 (docs/handoffs/2026-09-26_frontend-contract.md). `scripts/run_pipeline.py` (the Docker
 entrypoint) and `hearsay.api` both call `analyze_clip`; nothing here refits anything.
@@ -14,6 +14,10 @@ Score paths, kept identical to the exports fusion was fit on (outputs/detector_s
   `hc_logit` feature is the export's logit (logit of the clipped P(synthetic)).
 - spectra_aasist: `hearsay.spectra.prepare_input` -> `score_clip` in zero-pad mode, 16 windows,
   no peak normalization (scripts/score_spectra.py defaults), synth_logit = spoof - bonafide.
+- m5_xlsr_ft (only when the constants file weights it, i.e. fusion_v2): `hearsay.m5_data.deploy_transform`
+  (trim_silence -> band-limit -> cap 8 s -> normalize, the order the export used) -> `collate`
+  (normalizes again, as the export did) -> `hearsay.m5_model.score_batch`, scripts/m5_score.py's
+  sequence on one clip; fp32, batch 1, no layer truncation (the checkpoint is saved at 12 layers).
 
 Fusion (`FusionConstants`), from a constants file, never refit:
 - models/fusion_v1/constants.json (scripts/fuse_sweep.py --write; the shipped rule, `e_on_a`,
@@ -21,6 +25,12 @@ Fusion (`FusionConstants`), from a constants file, never refit:
   and handcrafted_v5; base = (1 - alpha) * rank_m1b + alpha * rank_hc; M3 as false-alarm
   suppression only: if spectra_aasist logit < -3 and base > 0.5 then base *= 0.5 (M3 never
   promotes; nothing is fit on M3); p = sigmoid(a * base + b + prior_shift).
+- models/fusion_v2/constants.json (scripts/fuse_sweep_m5.py --write; `A3_w0.2_E`, the same rule
+  name `e_on_a` with a `weights` dict instead of alpha): base = sum over the weighted columns
+  (m1b_v3 0.6, handcrafted_v5 0.2, m5_xlsr_ft 0.2) of weight * rank, accumulated in that order,
+  then the same M3 step and Platt map. A v1 file is the same rule with weights (1 - alpha, alpha).
+  The file also records the M5 checkpoint's hashes; `check_m5_identity` refuses another one.
+  DEFAULT_CONSTANTS_PATH is still fusion_v1: fusion_v2 runs only when passed explicitly.
 - models/fusion_v0/constants.json (scripts/fuse.py; `zmean`, `stack_nonlj`): z_d = (logit_d -
   mean_d) / std_d; zmean = mean of z; stack_nonlj = weights . z + intercept; p = sigmoid(a *
   fused + b + prior_shift) with that rule's Platt map.
@@ -61,10 +71,15 @@ REPO = Path(__file__).resolve().parents[2]
 # fusion_v0 file, which docker/build.sh stages beside it and tests/test_docker_image.py pins.
 CONSTANTS_V0_PATH = REPO / "models" / "fusion_v0" / "constants.json"
 CONSTANTS_V1_PATH = REPO / "models" / "fusion_v1" / "constants.json"
+CONSTANTS_V2_PATH = REPO / "models" / "fusion_v2" / "constants.json"  # scripts/fuse_sweep_m5.py --write (A3_w0.2_E)
 CONSTANTS_PATH = CONSTANTS_V0_PATH
 DEFAULT_CONSTANTS_PATH = CONSTANTS_V1_PATH
 PROBE_DIR = REPO / "models" / "m1_wav2vec2-xls-r-300m_L7_20260926-0521"
 HC_DIR = REPO / "models" / "hc_selected"
+# The M5 checkpoint whose exported column (outputs/detector_scores/m5_xlsr_ft.csv, byte-identical to this
+# directory's scores.csv) built fusion_v2's rank reference; fusion_v2 records its hashes and the runner
+# refuses any other checkpoint (check_m5_identity).
+M5_DIR = REPO / "models" / "m5_xlsr_ft_20260926-0741" / "model"
 SPECTRA_ID = "lab260/Spectra-AASIST"
 
 RANK_RULE = "e_on_a"  # the fusion_v1 rule ("E on A alpha 0.2")
@@ -72,11 +87,12 @@ Z_RULES = ("zmean", "stack_nonlj")  # the fusion_v0 rules
 RULES = (RANK_RULE, *Z_RULES)
 DEFAULT_RULE = RANK_RULE
 M1_ONLY = "m1b_only"  # no constants: the probe's own LLR plus the prior shift, as make_probe_csv.py
-DETECTOR_ORDER = ("m1b_v3", "handcrafted_v5", "spectra_aasist")
-RANKED = ("m1b_v3", "handcrafted_v5")  # the two detectors e_on_a ranks; spectra_aasist only suppresses
-SCORER_FLAGS = {"m1b": "m1b_v3", "handcrafted": "handcrafted_v5", "spectra": "spectra_aasist"}
+DETECTOR_ORDER = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist")  # every fused column, canonical order
+# A constants file names the subset it uses (FusionConstants.detectors): fusion_v1 three, fusion_v2 four;
+# spectra_aasist only ever suppresses. The ranked (weighted) columns are FusionConstants.ranked.
+SCORER_FLAGS = {"m1b": "m1b_v3", "handcrafted": "handcrafted_v5", "m5": "m5_xlsr_ft", "spectra": "spectra_aasist"}
 M1_MODES = ("segment", "windows", "auto")
-DEEP = ("m1b_v3", "spectra_aasist")  # scored by `Models`, not by a registered detector
+DEEP = ("m1b_v3", "m5_xlsr_ft", "spectra_aasist")  # scored by `Models`, not by a registered detector
 FUSED_FROM_DETECTOR = {"handcrafted_v5": ("handcrafted", "hc_logit")}
 SPECTRA_PAD_MODE = "zero"
 SPECTRA_MAX_WINDOWS = 16
@@ -85,7 +101,7 @@ M1_EMBED_FP16 = True  # the extracted embeddings were saved as float16; match th
 MAX_THREADS = 6  # CPU-only lane: never more than six cores
 
 ROLE = {
-    "handcrafted": "fused", "m1b_v3": "fused", "spectra_aasist": "fused",
+    "handcrafted": "fused", "m1b_v3": "fused", "m5_xlsr_ft": "fused", "spectra_aasist": "fused",
     "container": "routing", "speech_gate": "gate",
     "compression": "evidence", "enf": "evidence", "splice": "evidence", "speaker_drift": "evidence",
 }  # fmt: skip
@@ -120,9 +136,12 @@ class FusionConstants:
     std: dict[str, float] = field(default_factory=dict)
     stack_weights: dict[str, float] | None = None
     stack_intercept: float | None = None
-    # fusion_v1 (rank rule)
+    # fusion_v1 / fusion_v2 (rank rule)
     rank_ref: dict[str, np.ndarray] | None = None
-    alpha: float | None = None
+    alpha: float | None = None  # set only for a v1 file (alpha_handcrafted); None for a weights file
+    ranked: tuple[str, ...] = ()  # the weighted columns, in DETECTOR_ORDER order
+    rank_weights: dict[str, float] | None = None  # column -> weight, summing to 1
+    m5_checkpoint: dict[str, str] | None = None  # {dir, backbone_sha256, head_sha256, config_hash}
     e_rule: dict[str, Any] | None = None
     final: str | None = None
     how: str | None = None
@@ -135,29 +154,55 @@ class FusionConstants:
 
     @classmethod
     def _from_v1(cls, c: Mapping[str, Any], source: str) -> FusionConstants:
+        """The rank rule in either layout: fusion_v1 (`alpha_handcrafted`, two ranked columns) or
+        fusion_v2 (`weights` over any of the fused columns other than spectra_aasist)."""
         refs = c["rank_ref_inner_oof_sorted"]
+        alpha, weights = c.get("alpha_handcrafted"), c.get("weights")
+        if (alpha is None) == (weights is None):
+            raise ValueError("constants: give exactly one of alpha_handcrafted (fusion_v1) or weights (fusion_v2)")
+        if weights is None:
+            if not 0.0 <= float(alpha) <= 1.0:
+                raise ValueError(f"constants: alpha_handcrafted must be in [0, 1], got {alpha!r}")
+            alpha = float(alpha)
+            weights = {"m1b_v3": 1.0 - alpha, "handcrafted_v5": alpha}  # 1 - 0.2 == 0.8 exactly
+        else:
+            if not isinstance(weights, Mapping) or not weights:
+                raise ValueError(f"constants: weights must be a non-empty mapping, got {weights!r}")
+            weights = {str(d): float(v) for d, v in weights.items()}
+            bad = [d for d in weights if d not in DETECTOR_ORDER or d == "spectra_aasist"]
+            if bad:
+                raise ValueError(f"constants: weights must name fused columns other than spectra_aasist, got {bad}")
+            if (not all(math.isfinite(v) and v > 0 for v in weights.values())
+                    or abs(sum(weights.values()) - 1.0) > 1e-9):
+                raise ValueError(f"constants: weights must be finite, > 0 and sum to 1, got {weights}")
+        ranked = tuple(d for d in DETECTOR_ORDER if d in weights)
         rank_ref = {}
-        for d in RANKED:
+        for d in ranked:
             if d not in refs:
                 raise ValueError(f"constants: no rank reference for {d!r}")
             ref = np.asarray(refs[d], dtype=np.float64)
-            if ref.size == 0 or not np.all(np.diff(ref) >= 0):
+            if ref.ndim != 1 or ref.size == 0 or not np.all(np.isfinite(ref)):
+                raise ValueError(f"constants: rank reference for {d!r} must be a non-empty 1-D array of finite values")
+            if not np.all(np.diff(ref) >= 0):
                 raise ValueError(f"constants: rank reference for {d!r} is empty or not sorted")
             rank_ref[d] = ref
-        alpha = c.get("alpha_handcrafted")
-        if alpha is None or not 0.0 <= float(alpha) <= 1.0:
-            raise ValueError(f"constants: alpha_handcrafted must be in [0, 1], got {alpha!r}")
+        ck = c.get("m5_checkpoint")
+        if "m5_xlsr_ft" in ranked and (not isinstance(ck, Mapping) or any(
+                k not in ck for k in ("dir", "backbone_sha256", "head_sha256", "config_hash"))):
+            raise ValueError("constants: a rule that weights m5_xlsr_ft must record m5_checkpoint "
+                             "{dir, backbone_sha256, head_sha256, config_hash}")
         pl = c["platt"]
         e = dict(c.get("e_rule") or {"applied": False})
         if e.get("applied"):
             for k in ("m3_logit_below", "base_rank_above", "multiply_by"):
                 if k not in e:
                     raise ValueError(f"constants: e_rule.{k} missing")
-        return cls(detectors=DETECTOR_ORDER,
+        return cls(detectors=(*ranked, "spectra_aasist"),
                    platt={RANK_RULE: {k: float(pl[k]) for k in ("a", "b", "prior_shift")}},
                    pi_synth=float(c.get("pi_synth", PI_SYNTH)), source=source, rank_ref=rank_ref,
-                   alpha=float(alpha), e_rule=e, final=str(c.get("final", RANK_RULE)),
-                   how=c.get("how"))  # fmt: skip
+                   alpha=alpha, ranked=ranked, rank_weights=weights,
+                   m5_checkpoint={k: str(v) for k, v in ck.items()} if ck else None,
+                   e_rule=e, final=str(c.get("final", RANK_RULE)), how=c.get("how"))  # fmt: skip
 
     @classmethod
     def _from_v0(cls, c: Mapping[str, Any], source: str) -> FusionConstants:
@@ -209,11 +254,11 @@ class FusionConstants:
             raise ValueError(f"rule {rule!r} is not defined by {self.source} (has {self.rules()})")
 
     def weights(self, rule: str) -> dict[str, float]:
-        """Per-detector weight: equal for zmean, the stacker's coefficients for stack_nonlj,
-        (1 - alpha, alpha, 0) for e_on_a (spectra only suppresses; it has no weight)."""
+        """Per-detector weight: equal for zmean, the stacker's coefficients for stack_nonlj, the
+        file's rank weights plus spectra 0 for e_on_a (spectra only suppresses; it has no weight)."""
         self.check_rule(rule)
         if rule == RANK_RULE:
-            return {"m1b_v3": 1.0 - self.alpha, "handcrafted_v5": self.alpha, "spectra_aasist": 0.0}
+            return {**self.rank_weights, "spectra_aasist": 0.0}
         if rule == "zmean":
             return {d: 1.0 / len(self.detectors) for d in self.detectors}
         return dict(self.stack_weights)
@@ -240,14 +285,15 @@ class FusionConstants:
         pl = self.platt[rule]
         if rule == RANK_RULE:
             terms, imputed, detail = {}, [], {"final": self.final}
-            for d in RANKED:
+            for d in self.ranked:
                 v = inputs[d]
                 if v is None or not math.isfinite(v):
                     terms[d], imputed = 0.5, [*imputed, d]  # the inner-fold median
                 else:
                     terms[d] = self.rank(d, v)
-            a = self.alpha
-            base = (1 - a) * terms["m1b_v3"] + a * terms["handcrafted_v5"]  # fuse_sweep's order of ops
+            base = 0.0
+            for d in self.ranked:  # weights order; bit-identical to (1 - a) * r1 + a * rh for a v1 file
+                base += self.rank_weights[d] * terms[d]
             detail["base"] = base
             m3 = inputs["spectra_aasist"]
             m3_ok = m3 is not None and math.isfinite(m3)
@@ -284,6 +330,31 @@ def m1_only(logit: float | None, pi_synth: float = PI_SYNTH) -> FusionOutput:
                         float(sigmoid(fused)), () if ok else ("m1b_v3",))  # fmt: skip
 
 
+def m5_identity_from_dir(m5_dir: str | Path) -> dict[str, str]:
+    """hashes.json of an M5 checkpoint directory: the cheap pre-load gate reads this, never the
+    657 MB weight file (load_m5 re-hashes the weights against the same file when it loads)."""
+    p = Path(m5_dir) / "hashes.json"
+    if not p.exists():
+        raise RuntimeError(f"M5 checkpoint {m5_dir} has no hashes.json")
+    return {k: str(v) for k, v in json.loads(p.read_text()).items()}
+
+
+def check_m5_identity(hashes: Mapping[str, str] | None, consts: FusionConstants | None) -> None:
+    """Refuse, before any file is scored, a rule that weights M5 when M5 is absent or is not the
+    checkpoint the rank reference was built from. `hashes` is the checkpoint's hashes.json
+    (pre-load, from m5_identity_from_dir) or Models.m5_hashes (post-load); None means not loaded.
+    A rule without an M5 weight is a no-op."""
+    if consts is None or "m5_xlsr_ft" not in consts.ranked:
+        return
+    if not hashes:
+        raise RuntimeError("the fusion rule weights m5_xlsr_ft but M5 is not loaded (load_m5=False)")
+    ck = consts.m5_checkpoint or {}
+    bad = [k for k in ("backbone_sha256", "head_sha256", "config_hash") if hashes.get(k) != ck.get(k)]
+    if bad:
+        raise RuntimeError(f"M5 checkpoint does not match the fusion constants on {', '.join(bad)} "
+                           f"(the constants were built from {ck.get('dir')})")
+
+
 # --- models held in memory -------------------------------------------------------------------
 
 
@@ -311,12 +382,14 @@ def truncate_backbone(model, layer: int) -> int:
 
 class Models:
     """The heavy models, loaded once: XLS-R backbone + probe, Spectra-AASIST, the handcrafted
-    bundle. CPU only (the GPU belongs to the training lane)."""
+    bundle, and (only when the fusion file weights it) the M5 checkpoint. CPU only (the GPU
+    belongs to the training lane)."""
 
     def __init__(self, device: str = "cpu", probe_dir: str | Path = PROBE_DIR,
                  hc_dir: str | Path = HC_DIR, threads: int | None = None,
                  load_deep: bool = True, m1_mode: str = "segment",
-                 load_spectra: bool = True, truncate: bool = True) -> None:  # fmt: skip
+                 load_spectra: bool = True, truncate: bool = True,
+                 m5_dir: str | Path = M5_DIR, load_m5: bool = False) -> None:  # fmt: skip
         if device != "cpu":
             raise ValueError("the inference pipeline is CPU-only; device must be 'cpu'")
         if m1_mode not in M1_MODES:
@@ -324,6 +397,9 @@ class Models:
         self.m1_mode = "segment" if m1_mode == "auto" else m1_mode
         self.device = device
         self.with_spectra = load_spectra
+        self.with_m5 = load_m5  # not `self.load_m5`: that name is the checkpoint loader's
+        self.m5_dir = Path(m5_dir)
+        self.m5_hashes: dict[str, str] | None = None
         self.truncate = truncate
         self.truncated_to_layer: int | None = None
         self.threads = set_cpu_threads(threads)
@@ -333,14 +409,20 @@ class Models:
         from hearsay.detectors.handcrafted import HandcraftedDetector
 
         self.handcrafted = HandcraftedDetector(model_dir=self.hc_dir)
-        self.probe = self.backbone = self.spectra = None
+        self.probe = self.backbone = self.spectra = self.m5 = None
         if load_deep:
             self.load_deep()
 
     def load_deep(self) -> None:
+        self.load_m1()
+        if self.with_spectra:
+            self.load_spectra_model()
+        if self.with_m5:
+            self.load_m5_model()
+
+    def load_m1(self) -> None:
         from hearsay.embed import load_backbone
         from hearsay.probe import Probe
-        from hearsay.spectra import load_spectra
 
         t = time.time()
         self.probe = Probe.load(self.probe_dir)
@@ -351,10 +433,24 @@ class Models:
         if bool(getattr(self.probe, "segment", False)) != (self.m1_mode == "segment"):
             print(f"note: probe.segment={getattr(self.probe, 'segment', None)} but m1_mode="
                   f"{self.m1_mode!r}; the flag is not trusted (see the module docstring)", flush=True)  # fmt: skip
-        if self.with_spectra:
-            t = time.time()
-            self.spectra = load_spectra(self.device)
-            self.load_seconds["spectra"] = round(time.time() - t, 2)
+
+    def load_spectra_model(self) -> None:
+        from hearsay.spectra import load_spectra
+
+        t = time.time()
+        self.spectra = load_spectra(self.device)
+        self.load_seconds["spectra"] = round(time.time() - t, 2)
+
+    def load_m5_model(self) -> None:
+        """The M5 checkpoint (hearsay.m5_model.load_m5: sha-verified, eval mode, layerdrop 0, no
+        spec-augment), saved already truncated to 12 layers; `truncate_backbone` never touches it."""
+        # lazy: hearsay.m5_model imports torch and transformers at module top
+        from hearsay.m5_model import load_m5 as _load_m5
+
+        t = time.time()
+        self.m5_hashes = m5_identity_from_dir(self.m5_dir)
+        self.m5 = _load_m5(self.m5_dir, self.device)
+        self.load_seconds["m5"] = round(time.time() - t, 2)
 
     # score paths (see the module docstring for why each looks the way it does)
 
@@ -377,6 +473,26 @@ class Models:
         out = score_clip(self.spectra, prepare_input(x), (SPECTRA_PAD_MODE,), SPECTRA_MAX_WINDOWS)
         return synth_logit(out[SPECTRA_PAD_MODE])
 
+    def m5_logit(self, x: np.ndarray) -> float:
+        """scripts/m5_score.py's sequence on one clip: deploy_transform (trim_silence -> band-limit ->
+        cap 8 s -> normalize) -> collate (normalizes again, as the export did) -> score_batch; fp32,
+        batch 1, no truncation, no fp16 rounding (the M5 export is fp32)."""
+        from hearsay.m5_data import collate, deploy_transform
+        from hearsay.m5_model import score_batch
+
+        if self.m5 is None:
+            raise RuntimeError("M5 was not loaded (load_m5=False)")
+        xs, mask = collate([deploy_transform(x)])
+        return float(score_batch(self.m5, xs, mask, self.device)[0])
+
+    def m5_name(self) -> str:
+        """The checkpoint's name for version blocks: the parent directory when the dir is the
+        conventional `model` (m5_xlsr_ft_<stamp>/model), else its own name (m5_shipped)."""
+        if not self.with_m5:
+            return ""
+        d = self.m5_dir.resolve()
+        return d.parent.name if d.name == "model" else d.name
+
     def engineered(self) -> list:
         """Every registered engineered detector, with handcrafted pinned to `hc_dir`."""
         import hearsay.detectors.engineered  # noqa: F401 - registers the D-track detectors
@@ -386,9 +502,12 @@ class Models:
 
     def version(self) -> dict[str, Any]:
         hc = self.hc_dir.resolve().name if self.hc_dir.exists() else self.hc_dir.name
+        h = self.m5_hashes or {}
         return {"m1": self.probe_dir.resolve().name, "m1_mode": self.m1_mode,
                 "m1_truncated_to_layer": self.truncated_to_layer, "handcrafted": hc,
-                "spectra": SPECTRA_ID}  # fmt: skip
+                "spectra": SPECTRA_ID, "m5": self.m5_name(),
+                "m5_backbone_sha": h.get("backbone_sha256", "")[:12],
+                "m5_head_sha": h.get("head_sha256", "")[:12]}  # fmt: skip
 
 
 # --- one clip --------------------------------------------------------------------------------
@@ -425,6 +544,9 @@ def _deep_entry(name: str, logit: float, seconds: float) -> dict[str, Any]:
     if name == "m1b_v3":
         why = (f"XLS-R layer-7 probe: calibrated log-likelihood ratio {logit:+.2f} "
                f"({'synthetic' if logit > 0 else 'real'}-like, P={p:.2f})")  # fmt: skip
+    elif name == "m5_xlsr_ft":
+        why = (f"XLS-R fine-tuned head (M5, 12 layers, attentive pooling): logit {logit:+.2f} "
+               f"({'synthetic' if logit > 0 else 'real'}-like, P={p:.2f})")  # fmt: skip
     else:
         why = (f"Spectra-AASIST: spoof-minus-bonafide margin {logit:+.2f} "
                f"({'synthetic' if logit > 0 else 'real'}-like, P={p:.2f})")  # fmt: skip
@@ -447,8 +569,8 @@ def fusion_line(fo: FusionOutput) -> str:
     elif fo.rule == RANK_RULE:
         w = fo.weights
         d = fo.detail
-        line = (f"fusion: {fo.rule} ({d.get('final')}): {w['m1b_v3']:.1f} x rank(m1b_v3) + "
-                f"{w['handcrafted_v5']:.1f} x rank(handcrafted_v5) = {d.get('base', fo.fused):.3f}")  # fmt: skip
+        terms = " + ".join(f"{w[k]:.1f} x rank({k})" for k in fo.terms)  # the ranked columns, in order
+        line = f"fusion: {fo.rule} ({d.get('final')}): {terms} = {d.get('base', fo.fused):.3f}"
         m3 = fo.inputs.get("spectra_aasist")
         e = d.get("e_rule") or {}
         if d.get("e_applied"):
@@ -546,23 +668,27 @@ def fusion_block(fo: FusionOutput) -> dict[str, Any]:
 def analyze_clip(ctx: ClipContext, models: Models, consts: FusionConstants | None,
                  rule: str = DEFAULT_RULE, detectors: Sequence | None = None,
                  version: Mapping[str, Any] | None = None, apply_gate: bool = True,
-                 scorers: Sequence[str] = DETECTOR_ORDER,
+                 scorers: Sequence[str] | None = None,
                  pi_synth: float = PI_SYNTH, flip: bool = False) -> dict[str, Any]:  # fmt: skip
     """One `AnalyzeResponse` for one clip. Never raises on a bad file: a decode failure gives an
     `undetermined` response with every detector in error and the default answer applied.
     `apply_gate=False` (the runner's `--policy none`) reports the gate but maps every file as
     determinate, for parity against TSVs that predate the gate. `scorers` names the fused
-    columns to compute (the runner's --detectors); `consts=None` means no fusion: the M1 probe's
-    posterior alone (`m1_only`). `flip` emits the pre-flipped score. The evidence detectors
-    always run."""
+    columns to compute; by default the constants file's own detectors (fusion_v1 three, fusion_v2
+    four, so M5 is requested only by a file that weights it); `consts=None` means no fusion: the
+    M1 probe's posterior alone (`m1_only`). `flip` emits the pre-flipped score. The evidence
+    detectors always run."""
     t_start = time.time()
     items: list[dict[str, Any]] = []
+    if scorers is None:
+        scorers = consts.detectors if consts is not None else ("m1b_v3",)
     scorers = tuple(scorers)
     hc_name = FUSED_FROM_DETECTOR["handcrafted_v5"][0]
     dets = [d for d in (list(detectors) if detectors is not None else models.engineered())
             if d.name != hc_name or "handcrafted_v5" in scorers]  # fmt: skip
-    deep = [(n, fn) for n, fn in (("m1b_v3", models.m1_logit), ("spectra_aasist", models.spectra_logit))
-            if n in scorers]  # fmt: skip
+    deep = [(n, getattr(models, attr)) for n, attr in (("m1b_v3", "m1_logit"), ("m5_xlsr_ft", "m5_logit"),
+                                                         ("spectra_aasist", "spectra_logit"))
+            if n in scorers]  # bound lazily: a Models without M5 is fine while no rule asks for it  # fmt: skip
     try:
         x = ctx.audio
         decoded = True
@@ -594,7 +720,7 @@ def analyze_clip(ctx: ClipContext, models: Models, consts: FusionConstants | Non
 
     ver = dict(version) if version is not None else {"git_sha": git_sha(), "models": models.version()}
     ver.setdefault("fusion", "none" if consts is None
-                   else (Path(consts.source).name if consts.source != "<dict>" else consts.source))  # fmt: skip
+                   else ("/".join(Path(consts.source).parts[-2:]) if consts.source != "<dict>" else consts.source))  # fmt: skip
     ver.setdefault("contract", CONTRACT_VERSION)
     ver.setdefault("rule", fo.rule)
     ver.setdefault("policy", "speech_gate" if apply_gate else "none")
