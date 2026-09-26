@@ -20,10 +20,12 @@ dependencies = [
     "ffmpeg-python",
 ]
 
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
 [tool.uv]
-# No application code exists yet (pre-event). Flip to `package = true` and add a
-# [build-system] once src/hearsay/ has an __init__.py.
-package = false
+package = true
 
 [dependency-groups]
 dev = [

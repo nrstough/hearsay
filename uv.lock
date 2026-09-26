@@ -462,7 +462,7 @@ wheels = [
 [[package]]
 name = "hearsay"
 version = "0.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "ffmpeg-python" },
     { name = "huggingface-hub" },
