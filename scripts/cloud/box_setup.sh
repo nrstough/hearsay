@@ -47,6 +47,7 @@ import json
 from huggingface_hub import snapshot_download
 # pinned revision (bundle_meta.json: xlsr_hf_revision), so every box gets the same weights
 rev = json.load(open("/root/m5/bundle/bundle_meta.json")).get("xlsr_hf_revision")
+assert rev, "bundle_meta.json has no xlsr_hf_revision: refuse to pull unpinned weights"
 p = snapshot_download("facebook/wav2vec2-xls-r-300m", revision=rev, local_dir="/root/m5/weights",
                       allow_patterns=["config.json", "preprocessor_config.json", "*.bin", "*.safetensors"])
 print("  from HF hub at revision", rev, ":", p)

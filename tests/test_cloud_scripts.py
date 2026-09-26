@@ -106,4 +106,7 @@ def test_box_scripts_source_the_guard(name):
 def test_g6_box_setup_pins_the_hf_revision_and_checks_the_config_sha():
     t = (CLOUD / "box_setup.sh").read_text()
     assert "revision=rev" in t and 'get("xlsr_hf_revision")' in t
+    assert 'assert rev, "bundle_meta.json has no xlsr_hf_revision' in t  # refuses unpinned
+    b = (REPO / "scripts" / "m5_build_bundle.py").read_text()
+    assert "xlsr_hf_revision=hf_rev" in b  # the key is produced by the bundle build itself
     assert "FATAL: XLS-R config sha" in t and "SHA256SUMS" in t

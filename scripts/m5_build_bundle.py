@@ -65,6 +65,13 @@ def _git_sha() -> str:
         return "unknown"
 
 
+def xlsr_hf_revision() -> str:
+    """The Hub commit the boxes must fetch (box_setup.sh refuses to run without it)."""
+    from huggingface_hub import HfApi
+
+    return HfApi().model_info("facebook/wav2vec2-xls-r-300m").sha
+
+
 def make_code_tgz(out: Path) -> None:
     members = ["src/hearsay", "scripts", "splits/nsa_test_durations.csv", "splits/nsa_folds.csv",
                "splits/nsa_folds_plus_asv19.csv", "pyproject.toml", "uv.lock"]  # fmt: skip
@@ -234,6 +241,7 @@ def main() -> None:
     print(json.dumps(diag["shortcut_aucs_by_scope_all_training_rows"], indent=1))
 
     make_code_tgz(out)
+    hf_rev = xlsr_hf_revision()
     (out / "config_sha.txt").write_text(
         __import__("hashlib").sha256((XLSR / "config.json").read_bytes()).hexdigest())
     sha = tree_sha(out)
@@ -242,6 +250,7 @@ def main() -> None:
                folds_sha256=__import__("hearsay.m5_data", fromlist=["x"]).sha256_file(FOLDS),
                folds_plus_sha256=__import__("hearsay.m5_data", fromlist=["x"]).sha256_file(FOLDS_PLUS),
                git_sha=_git_sha(), xlsr_config_sha=(out / "config_sha.txt").read_text(),
+               xlsr_hf_revision=hf_rev,
                built_at=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                size_bytes=int(sum(p.stat().st_size for p in out.rglob("*.flac"))))  # fmt: skip
     print(f"bundle {out}: {len(keep)} training rows, {len(tt)} test rows, tree {sha[:12]}, "

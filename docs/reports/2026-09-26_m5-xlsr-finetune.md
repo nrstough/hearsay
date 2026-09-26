@@ -99,7 +99,7 @@ M5 wins the hardest fold (ElevenLabs) and ties three, but loses fold 1 (diffgan_
 - Fine-tune: ~190 clips/s at 3.4 s crops; 2,500 steps ≈ 16–20 min with evals and checkpoint pushes. Frozen recipe: 2,500 steps ≈ 12 min; the full model 3,000 steps ≈ 13 min plus 7 min of holdout/test scoring.
 - 7 rentals (two hosts never booted, two chains failed on my own config-string bugs, see below); **total spend $5.09** (`docs/reports/cloud-expense-ledger.md`).
 - CPU inference (Docker path, `scripts/m5_score.py`): 0.19–0.25 s per clip on the M3 Pro; 1,671 test clips ≈ 6 min. Parity Mac-CPU-on-raw-WAV vs A100-on-bundled-FLAC over 50 test clips: Spearman 0.9999, median |Δlogit| 0.0007, max 0.012 (`outputs/m5_runs/parity_f6.json`). The first parity run showed a 0.28 outlier because the CPU scorer band-limited before trimming (M1's order) while the exports trimmed first; the scorer now uses the exported order (commit after the 07:50 critique).
-- Checkpoint: private HF Hub repo `nrs124554433/hearsay-m5-xlsr` (backbone 657 MB safetensors + head + `hashes.json`), re-downloaded and sha-verified.
+- Checkpoint: private HF Hub repo `nrs124554433/hearsay-m5-xlsr` (backbone 657 MB safetensors + head + `hashes.json`), re-downloaded and sha-verified. Provenance: the base weights were fetched from the Hub by the box with the config sha checked but no revision pin (the pin exists for future runs).
 
 ## What worked, what didn't
 
