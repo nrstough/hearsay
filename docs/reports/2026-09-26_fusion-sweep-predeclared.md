@@ -136,4 +136,6 @@ If several candidates qualify, the one with the best In-the-Wild brief-cost wins
 
 **Expectation, stated in advance.** A symmetric codec refit should help In-the-Wild false alarms (the wild-like regime λ̂ points at) and cost a little on the clean holdout; the clean-only floor above is what keeps that trade honest.
 
+**Outcome (13:05, oversight chat relaying the channel lane): not exercised.** The codec search found no match (the 7.2 kHz wall is best reproduced by our own Kaiser low-pass; the closest MP3/AAC variant was 3% closer where the rule needed 20%), so the refit did not run and no column arrived; this rule stands as pre-declared and unexercised. The λ̂ = 0.947 headline in "Why now" was withdrawn by its lane (its dominant feature read the stopband); the corrected estimate is expected near 0.5, still above the 0.32 crossover, so the expectation for NSA's number is unchanged in direction (between the holdout and In-the-Wild) and less certain in magnitude.
+
 _Self-check result (12:58):_ `--refit-m1b m1b_v3` on identical row sets (16,142 / 3,858 / 1,671 / 3,000): R1 equals CURRENT on every readout (inner 0.1351, holdout 0.0065 / 0.0087, ITW brief 0.228, averse 0.2385, P_FA/P_miss 1.3% / 12.2%), decision KEEP, nothing written under `models/`; `outputs/fusion/sweep_refit_report.json`.
