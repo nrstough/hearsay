@@ -99,7 +99,8 @@ def test_smoke_fold_model_end_to_end(bundle, tmp_path):
     assert np.isfinite(s.logit).all() and s.score.between(0, 1).all()
     meta = json.loads((tmp_path / "f0" / "run_meta.json").read_text())
     assert meta["steps"] == 3 and (tmp_path / "f0" / "model" / "hashes.json").exists()
-    events = [json.loads(line)["event"] for line in open(tmp_path / "f0" / "train_log.jsonl")]
+    lines = (tmp_path / "f0" / "train_log.jsonl").read_text().splitlines()
+    events = [json.loads(line)["event"] for line in lines]
     assert "shortcut_gate" in events and "aug_rates" in events and "export_oof" in events
 
 
@@ -124,7 +125,7 @@ def test_g4_resume_continues_from_checkpoint(bundle, tmp_path):
     assert (out / "ckpt" / "last.pt").exists()
     r = _run(bundle, out, "--resume", steps=4)
     assert r.returncode == 0, r.stderr[-2000:]
-    events = [json.loads(line) for line in open(out / "train_log.jsonl")]
+    events = [json.loads(line) for line in (out / "train_log.jsonl").read_text().splitlines()]
     resumed = [e for e in events if e["event"] == "resumed"]
     assert resumed and resumed[-1]["step"] == 2
     assert json.loads((out / "run_meta.json").read_text())["steps"] == 4
