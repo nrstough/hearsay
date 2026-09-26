@@ -60,19 +60,21 @@ def test_c5_normalization_over_valid_samples_only():
     assert abs(xs[0, : a.size].mean()) < 1e-4 and abs(xs[0, : a.size].std() - 1) < 1e-3
 
 
-def test_c6_bundle_path_matches_deploy_path_and_caps():
+def test_c6_bundle_path_equals_deploy_path_and_caps():
     """Bundle clips are trim_silence'd at build time and band-limited at train time; the raw
-    deploy path band-limits then trims (M1's prepare_segment). The two may differ by a trim
-    frame at the edges only."""
+    deploy path must be the same order (trim -> band-limit -> cap -> normalize), so the
+    Docker scorer reproduces the exported scores. Also pin the one-frame gap to M1's
+    prepare_segment order (band-limit -> trim)."""
     from hearsay.audio import trim_silence
+    from hearsay.embed import prepare_segment
     from hearsay.m5_data import bundle_transform
 
     x = np.concatenate([np.zeros(SR // 2, np.float32), _clip(6.0, 5), np.zeros(SR // 4, np.float32)])
     dep = deploy_transform(x)                      # raw path
     bun = bundle_transform(trim_silence(x))        # bundle path
-    assert abs(dep.size - bun.size) <= SR // 50    # at most one 20 ms trim frame
-    n = min(dep.size, bun.size) - SR // 50
-    assert np.abs(dep[:n] - bun[:n]).max() < 0.05  # same audio, same filter, same normalization
+    assert dep.size == bun.size and np.array_equal(dep, bun)
+    m1 = normalize_windows(prepare_segment(x)[None])[0]  # M1's order, for the record
+    assert abs(dep.size - m1.size) <= SR // 50
     long = _clip(16.0, 6)
     assert deploy_transform(long).size == 8 * SR   # fusion cap = prepare_segment's default
     assert deploy_transform(long, max_s=14.0).size == 14 * SR

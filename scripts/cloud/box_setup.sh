@@ -43,14 +43,18 @@ if rclone copy "${HEARSAY_R2_PREFIX}weights/wav2vec2-xls-r-300m" weights --trans
   echo "  from R2"
 else
   python - <<'EOF'
+import json
 from huggingface_hub import snapshot_download
-p = snapshot_download("facebook/wav2vec2-xls-r-300m", local_dir="/root/m5/weights",
+# pinned revision (bundle_meta.json: xlsr_hf_revision), so every box gets the same weights
+rev = json.load(open("/root/m5/bundle/bundle_meta.json")).get("xlsr_hf_revision")
+p = snapshot_download("facebook/wav2vec2-xls-r-300m", revision=rev, local_dir="/root/m5/weights",
                       allow_patterns=["config.json", "preprocessor_config.json", "*.bin", "*.safetensors"])
-print("  from HF hub:", p)
+print("  from HF hub at revision", rev, ":", p)
 EOF
 fi
 GOT=$(sha256sum weights/config.json | cut -d' ' -f1)
 [ "$GOT" = "$WANT" ] || { echo "FATAL: XLS-R config sha $GOT != bundled $WANT"; exit 1; }
+sha256sum weights/*.safetensors weights/*.bin 2>/dev/null | tee weights/SHA256SUMS  # recorded per box
 python - <<'EOF'
 from transformers import Wav2Vec2Model
 m = Wav2Vec2Model.from_pretrained('/root/m5/weights')

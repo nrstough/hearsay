@@ -195,3 +195,17 @@ def test_shortcut_aucs_handles_spoof_only_scope_and_folds_direction():
     assert a["pooled"]["peak"] < 0.65
     rows["duration"] = -rows["duration"]  # inverted cue is just as much a cue
     assert shortcut_aucs(rows)["extra_mlaad"]["duration"] > 0.95
+
+
+def test_extended_fold_file_agrees_with_the_shared_one():
+    from hearsay.m5_data import FOLDS_PLUS
+
+    if not (FOLDS.exists() and FOLDS_PLUS.exists()):
+        pytest.skip("fold files not present")
+    base = pd.read_csv(FOLDS).set_index("path")
+    plus = pd.read_csv(FOLDS_PLUS)
+    core = plus[plus.path.isin(base.index)].set_index("path")
+    assert len(core) == len(base) == 20000
+    assert (core.fold.astype(str) == base.fold.astype(str).reindex(core.index)).all()
+    extra = plus[~plus.path.isin(base.index)]
+    assert not extra.fold.astype(str).eq("holdout").any()  # extension never touches the holdout

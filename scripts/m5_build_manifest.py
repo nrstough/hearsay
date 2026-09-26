@@ -45,6 +45,12 @@ def main() -> None:
     if args.folds == FOLDS_PLUS:
         check_folds_file(FOLDS_PLUS, FOLDS_PLUS_SHA256)
     folds = pd.read_csv(args.folds)
+    if args.folds != FOLDS:  # the extended file must agree with the shared fold file on every core row
+        base = pd.read_csv(FOLDS).set_index("path")
+        core = folds[folds.path.isin(base.index)].set_index("path")
+        assert len(core) == len(base), (len(core), len(base))
+        bad = (core.fold.astype(str) != base.fold.astype(str).reindex(core.index)).sum()
+        assert bad == 0, f"{bad} core rows have a different fold in {args.folds}"
     full = pd.read_csv(args.full)
     mlaad = None
     if not args.no_mlaad:

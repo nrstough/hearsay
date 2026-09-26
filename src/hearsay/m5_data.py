@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from hearsay import SR
-from hearsay.embed import normalize_windows, prepare_segment, test_duration_sampler
+from hearsay.embed import normalize_windows, test_duration_sampler
 
 REPO = Path(__file__).resolve().parents[2]
 FOLDS = REPO / "splits" / "nsa_folds.csv"
@@ -256,9 +256,15 @@ def collate(clips: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
 
 
 def deploy_transform(x: np.ndarray, max_s: float = DEPLOY_MAX_S) -> np.ndarray:
-    """The deployment transform on RAW audio (Docker, m5_score.py): exactly M1's
-    prepare_segment (band-limit at the NSA 7.25 kHz wall -> trim -> cap) then normalize."""
-    return normalize_windows(prepare_segment(x, max_s=max_s)[None, :])[0]
+    """The deployment transform on RAW audio (Docker, m5_score.py): trim_silence -> band-limit
+    (the NSA 7.25 kHz wall) -> cap -> normalize. This is the ORDER THE MODEL WAS TRAINED AND
+    EXPORTED WITH (bundle clips are trimmed at build time and band-limited at train time), so
+    raw-file scores reproduce the exported holdout/test scores. M1's prepare_segment
+    band-limits before trimming; the difference is at most one 20 ms trim frame at the edges,
+    but for the stacker the exported path is the one that must be reproduced (critique 07:50)."""
+    from hearsay.audio import trim_silence
+
+    return bundle_transform(trim_silence(x), max_s)
 
 
 def band_match(x: np.ndarray) -> np.ndarray:
@@ -271,8 +277,7 @@ def band_match(x: np.ndarray) -> np.ndarray:
 
 def bundle_transform(x_flac: np.ndarray, max_s: float = DEPLOY_MAX_S) -> np.ndarray:
     """The deployment transform on a BUNDLE clip (already trim_silence'd at build time):
-    band-limit -> cap -> normalize. Differs from deploy_transform only in the order of trim
-    and band-limit, which moves the trim boundary by at most a frame (tested)."""
+    band-limit -> cap -> normalize. deploy_transform is exactly this after trim_silence."""
     return normalize_windows(band_match(x_flac)[: int(max_s * SR)][None, :])[0]
 
 

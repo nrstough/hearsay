@@ -299,7 +299,8 @@ def main() -> None:
         va = tr[tr.train_scope == "core"].sample(min(args.eval_n, len(tr)), random_state=0)
         va = va.reset_index(drop=True)
         va_note = "in-sample slice (direction only)"
-    va = va.iloc[: args.eval_n] if len(va) > args.eval_n else va
+    if len(va) > args.eval_n:  # a seeded random slice, not the first rows (class order!)
+        va = va.sample(args.eval_n, random_state=0).reset_index(drop=True)
     va_files = [str(args.bundle / "core" / f) for f in va.file]
     va_y = (va.label == "spoof").to_numpy(int)
     va_len = LengthMixer(1234, p_test=1.0)
@@ -343,6 +344,9 @@ def main() -> None:
             xs, mask = collate(clips)
             logits[ii] = score_batch(net, xs, mask, device).numpy()
         net.train()
+        if len(set(va_y)) < 2:  # a degenerate slice (tiny smoke bundles): no readout, no abort
+            jlog(event="eval", tag=tag, step=step, val=va_note, skipped="single class")
+            return {"auc": 1.0, "min_dcf": float("nan")}
         r = report(va_y, logits)
         from sklearn.metrics import roc_auc_score
 

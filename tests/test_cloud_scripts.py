@@ -101,3 +101,9 @@ def test_f8_m5_code_never_touches_other_lanes():
 @pytest.mark.parametrize("name", ["box_setup.sh", "box_chain.sh"])
 def test_box_scripts_source_the_guard(name):
     assert "r2_guard.sh" in (CLOUD / name).read_text()
+
+
+def test_g6_box_setup_pins_the_hf_revision_and_checks_the_config_sha():
+    t = (CLOUD / "box_setup.sh").read_text()
+    assert "revision=rev" in t and 'get("xlsr_hf_revision")' in t
+    assert "FATAL: XLS-R config sha" in t and "SHA256SUMS" in t
