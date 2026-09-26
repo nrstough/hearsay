@@ -67,9 +67,9 @@ Scripts read real data and weights and are exercised by running them; their pure
 - Update: `docs/STATUS.md` (one row), `CLAUDE.md` (one disclosure bullet).
 - Conditional (confirm at execution): `docs/architecture.md` §11 shortcut ledger, only if A or B finds a new train-vs-test fingerprint.
 
-## Codex plan review (12:45): findings and dispositions
+## Codex plan review (before commit a0018a8): findings and dispositions
 
-Review: `docs/reports/2026-09-26_channel-robustness-plan-review.md`. Every finding is adopted; the design above is amended as follows (these amendments override D2, D3, D6–D9 where they differ).
+Review: `docs/reports/2026-09-26_channel-robustness-plan-review.md`. Every finding is adopted; the design above is amended as follows (these amendments override D2, D3, D6–D9 where they differ). Several were only partly implemented at first; the post-commit Claude critique found the gaps and they were closed in the critique-fix commit (see "Post-commit review").
 
 1. **Mean posterior is not a mixture estimate.** λ̂ is the adjusted classify-and-count estimate; the mean posterior is descriptive only. Tests cover overlapping domains and endpoint mixtures (0, 0.3, 0.7, 1 at two separations), and pin the mean posterior's bias.
 2. **Synthetic files in the test set; no identifiability check.** Never-trained controls (VCTK clean read, DiffSSD spoof, inner real, inner real after one MP3 round-trip) are scored. A pre-declared rule (**D3b**) must pass before λ̂ is read against the crossover: AUC ≥ 0.8, VCTK and DiffSSD each read wild under 25%, LJ-excluded estimate within 0.15. Otherwise λ̂ is "unidentifiable". The likely-real subset is a sensitivity readout, not the estimate. Added after the first full run: refits without the dominant feature and without all floor/hole features, so a one-feature answer is visible.
@@ -85,24 +85,54 @@ Review: `docs/reports/2026-09-26_channel-robustness-plan-review.md`. Every findi
 
 **D9 revised (E verdict).** "At risk" if (a) M3's mean |ΔAUC| over the four perturbations exceeds twice M1b's and 0.02, or (c) the shipped rule damps more than 5% of unseen MLAAD spoof (`e_applied`), or (d) under any perturbation the step raises the fused holdout minDCF by more than 0.01. "Inconclusive" on any missing number; "kept" otherwise.
 
+## Deviations from the design, recorded
+
+- **D1 / A:** `clip_floor_db` added to the >7 kHz drop list after the first full run (it reads the stopband). Added sensitivities beyond D3: fold-ensemble and in-sample rate variants, per-fold AUCs, and a duration-matched run (reference clips cropped to test-length draws, seeded per clip), because D1's "no durations enter" was not strictly true for whole clips. The existing feature cache was written by `channel_stats` before the identity file existed; its identity (`channel_stats_v1`) was backfilled, with the code unchanged in between.
+- **D4 / B:** the grid also has MP3 at 24 kbps. B's distance includes `clip_floor_db`; a sensitivity without it is reported (Kaiser 0.660 vs best codec 0.647: no match either way).
+- **D8 / E:** MLAAD is 572 clips (4 per model × 143 models; stratified by model), not 600.
+
 ## Results (13:20)
 
 Report: `docs/reports/2026-09-26_channel-robustness.md`. Commits: a0018a8 (A), 32d6402 (B, λ̂ correction, E script), and the E commit.
 
 | # | Outcome |
 |---|---|
-| A | λ̂ = 0.51 (95% CI 0.12–0.64), identifiable, but only just (VCTK control 24.7% vs a 25% limit). The first run's 0.947 is withdrawn: `clip_floor_db` read the 7–8 kHz stopband and was added to the >7 kHz drop list (a deviation from D1's feature list, made under D1's own rule). |
+| A | λ̂ = 0.51 (95% CI 0.12–0.64), identifiable, but only just (VCTK control 24.7% vs a 25% limit); **indeterminate** against the 0.32 crossover; consistent variants 0.36 (duration-matched) to 0.57. The first run's 0.947 is withdrawn: `clip_floor_db` read the 7–8 kHz stopband and was added to the >7 kHz drop list (a deviation from D1's feature list, made under D1's own rule). |
 | B | No codec match (Kaiser 1.081, best codec 1.045: 3% where D5 needs 20% and both hole statistics). |
 | C | Not run: B negative. The laundering path was built and smoke-tested, then removed unused (`scripts/channel_launder.py` is not committed). |
 | D | Not attempted (time box, frozen P1). |
-| E | **Kept** under D9 revised: M3 mean \|ΔAUC\| 0.0008 vs M1b 0.0041; MLAAD damped 1.2%; the M3 step never raised fused minDCF (it lowered it by 0.008–0.020 in 4 of 5 conditions). Agreement gap 0.175 (descriptive). New: 20 dB noise drops handcrafted v5 to AUC 0.64 and the shipped rule to 0.269 holdout minDCF. |
+| E | **Kept** under D9 revised (`verdict_from`; both probes complete): M3 mean \|ΔAUC\| 0.0008 vs M1b 0.0041 (but M3's clean-vs-perturbed rank stability is the lowest of the deep models); MLAAD damped 1.2%; the M3 step never raised fused minDCF (it lowered it by 0.008–0.020 in 4 of 5 conditions). Agreement gap 0.175 (descriptive). New: 20 dB noise drops handcrafted v5 to AUC 0.64 and the shipped rule to 0.269 holdout minDCF. |
 
 Acceptance criteria:
 1. λ̂, both estimators and intervals, sent to oversight first (12:33), with the correction at 12:57. Grouped CV tested.
 2. B's grid table and D5 verdict are in the report.
 3. E's three probes, the D9 verdict and the model-card check are in the report.
 4. C and D dispositions are recorded.
-5. Tests: `tests/test_channel_robustness.py`, 42 passing. Full-suite and lint results are recorded at commit.
+5. Tests: `tests/test_channel_robustness.py`, 56 passing after the critique fixes. Full suite 552 passing at 73f6a5b; ruff is clean on this change's files (3 findings in `src/hearsay/analyzer.py`, another lane's commit 19925a3).
 6. Report, STATUS row and CLAUDE.md bullet are done.
 
 **No TSV and no `submissions/log.csv` row:** this rung is diagnostic only (plan-review disposition 9).
+
+## Post-commit review
+
+**Claude critique, round 1 (13:25, on 73f6a5b): Overall Needs work.** Plan adherence, Test coverage, Review compliance and Documentation were Needs work; Scope, Freeze and Regression were Acceptable. Every number in the report and STATUS matched the JSON outputs. Findings and fixes:
+
+1. **The verdict could say "kept" with a missing number** (`max()` skips NaN; no completeness check). Fixed with `verdict_from`, which gathers every input and the cohort counts and returns "inconclusive" on any gap. Tested with a NaN step effect, a missing perturbation, and short cohorts.
+2. **The one-class LJ fold** made the pooled AUC and FPR pessimistic, the "without the top feature" row was misread as a collapse, and q and the rates came from different models. The fix:
+   - per-fold AUCs reported
+   - fold-ensemble and in-sample rate variants added (0.48 and 0.57)
+   - the report's reading and limits rewritten
+3. **"Most perturbation-stable" contradicted the rank-stability numbers.** The report now gives both readings, qualifies M3's MLAAD exposure as unknown, and states that the verdict shows the step is safe, not that M3 generalises.
+4. **`lambda_hat_reading` ignored the interval.** It now comes from `crossover_reading` ("indeterminate" when the interval contains the crossover). Tested.
+5. **The STATUS per-feature claim was false.** The STATUS text and the report now list the features outside [0, 1].
+6. **Partial dispositions:**
+   - #6: fixed-inner-threshold P_FA and P_miss added per detector and perturbation.
+   - #7: AAC and 44.1 kHz alignment tests and a failed-round-trip test added.
+   - #10: identity required whenever a cache exists (`check_cache_identity`, shared by A and E); readouts use only the requested keys (`select_requested`); A's cache carries a feature version.
+   - #11: short cohorts give "inconclusive".
+7. **Test gaps closed:** `acc_ci` refusal, cache refusal, speaker grouping (`speaker_groups`), MP3 changing the signal, B's silence trim, key parsing and crops, strict JSON.
+8. **The report now carries the full 34-row grid** (AC2).
+9. **The D4 and D8 deviations are recorded above**, including B without `clip_floor_db`.
+10. **Provenance corrected:** the −157 dB source, the Codex-review timing, and the 0.947 run's artifact.
+11. **The duration confound is now measured:** a duration-matched sensitivity gives 0.36.
+12. **Wording and strict JSON:** fixed. The fusion lane's λ̂ line was relayed to oversight.

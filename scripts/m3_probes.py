@@ -24,6 +24,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import math
 import time
@@ -41,6 +42,7 @@ MODELS = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist")
 EXPORT = {"m1b_v3": "m1b_v3", "handcrafted_v5": "handcrafted_v5", "m5_xlsr_ft": "m5_xlsr_ft",
           "spectra_aasist": "spectra_aasist"}  # fmt: skip
 M3_SUPPRESS_BELOW = -3.0
+N_PERTURB, N_MLAAD = 500, 572  # the run spec's cohorts (MLAAD: 4 clips x 143 models)
 MAX_LAG = 4000  # samples searched when aligning a codec round-trip to its input
 
 
@@ -126,7 +128,8 @@ def m3_verdict(m3_dauc: float, m1_dauc: float, mlaad_damped: float,
                e_hurts_perturbed: float) -> tuple[str, list[str]]:  # fmt: skip
     """Pre-declared (run spec D9, revised): the M3 suppression step is "at risk" if
     (a) M3's mean |dAUC| over perturbations > 2x M1b's and > 0.02, or
-    (c) the shipped rule damps > 5% of unseen MLAAD spoof, or
+    (c) the shipped rule damps > 5% of MLAAD spoof (unseen by M1b and handcrafted; M3's training
+        data is undisclosed), or
     (d) under some perturbation the step raises the fused holdout minDCF by > 0.01.
     Any NaN input makes the verdict "inconclusive", never "kept"."""
     vals = (m3_dauc, m1_dauc, mlaad_damped, e_hurts_perturbed)
@@ -136,10 +139,33 @@ def m3_verdict(m3_dauc: float, m1_dauc: float, mlaad_damped: float,
     if abs(m3_dauc) > 2 * abs(m1_dauc) and abs(m3_dauc) > 0.02:
         why.append(f"(a) M3 mean |dAUC| {abs(m3_dauc):.3f} > 2x M1b's {abs(m1_dauc):.3f}")
     if mlaad_damped > 0.05:
-        why.append(f"(c) the shipped rule damps {mlaad_damped:.1%} of unseen MLAAD spoof")
+        why.append(f"(c) the shipped rule damps {mlaad_damped:.1%} of MLAAD spoof")
     if e_hurts_perturbed > 0.01:
         why.append(f"(d) the step raises fused minDCF by {e_hurts_perturbed:.3f} under a perturbation")
     return ("at risk" if why else "kept"), why
+
+
+def verdict_from(p: dict, m: dict, n_perturb: int = N_PERTURB, n_mlaad: int = N_MLAAD) -> dict:
+    """Gather every D9 input from the two probe readouts and apply m3_verdict. "inconclusive"
+    when a probe is short of its cohort or any input (including any per-perturbation step
+    effect) is missing or non-finite: Python's max() would otherwise skip a NaN silently."""
+    effects = list(p.get("e_step_effect_min_dcf", {}).values())
+    inputs = {"m3_mean_abs_d_auc": p.get("mean_abs_d_auc", {}).get("spectra_aasist"),
+              "m1b_mean_abs_d_auc": p.get("mean_abs_d_auc", {}).get("m1b_v3"),
+              "mlaad_damped_share": m.get("e_applied_share"),
+              "e_step_effects": effects, "n_perturb": p.get("n_paired"), "n_mlaad": m.get("n")}  # fmt: skip
+    short = []
+    if not (isinstance(p.get("n_paired"), int) and p["n_paired"] >= n_perturb):
+        short.append(f"perturbation probe has {p.get('n_paired')} of {n_perturb} clips")
+    if not (isinstance(m.get("n"), int) and m["n"] >= n_mlaad):
+        short.append(f"MLAAD probe has {m.get('n')} of {n_mlaad} clips")
+    fin = [isinstance(v, (int, float)) and math.isfinite(v) for v in effects]
+    if short or not effects or not all(fin) or len(effects) != len(PERTURBATIONS):
+        return {"verdict": "inconclusive", "reasons": short or ["a step-effect number is missing"], "inputs": inputs}
+    verdict, why = m3_verdict(inputs["m3_mean_abs_d_auc"], inputs["m1b_mean_abs_d_auc"],
+                              inputs["mlaad_damped_share"], max(effects))  # fmt: skip
+    inputs["max_e_step_min_dcf_increase"] = max(effects)
+    return {"verdict": verdict, "reasons": why, "inputs": inputs}
 
 
 def spearman_gap(a_h, b_h, a_t, b_t, n: int = 1000, seed: int = 0) -> dict:
@@ -173,6 +199,7 @@ def segment(path: str, seed: int) -> np.ndarray:
 
 
 TEST_DURS: np.ndarray = np.array([3.4])
+THRESHOLDS_FROM_EXPORTS = True  # tests switch this off (no exports in a hermetic run)
 
 
 def score_all(models, consts, x: np.ndarray) -> dict:
@@ -189,6 +216,23 @@ def score_all(models, consts, x: np.ndarray) -> dict:
     return out
 
 
+def _lambda_mod():
+    spec = importlib.util.spec_from_file_location("channel_lambda", REPO / "scripts" / "channel_lambda.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def requested_keys(rows: pd.DataFrame, kinds: tuple[str, ...]) -> set[str]:
+    return {f"{p}|{k}|{s}" for p, s in zip(rows.path, rows.seed) for k in kinds}
+
+
+def select_requested(cache: pd.DataFrame, rows: pd.DataFrame, kinds: tuple[str, ...]) -> pd.DataFrame:
+    """Only the cached rows this cohort asked for (a rerun with another --n reassigns seeds, and
+    stale rows must never be pivoted in), one per key."""
+    return cache[cache.key.isin(requested_keys(rows, kinds))].drop_duplicates("key", keep="last")
+
+
 def run_scoring(rows: pd.DataFrame, kinds: tuple[str, ...], name: str, threads: int) -> pd.DataFrame:
     """rows: path, label, seed. Resumable cache keyed path|kind|seed; refuses a cache written by
     different models or constants."""
@@ -202,9 +246,7 @@ def run_scoring(rows: pd.DataFrame, kinds: tuple[str, ...], name: str, threads: 
     consts = FusionConstants.load(CONSTANTS_V2_PATH)
     ident = {"models": models.version(), "constants": str(CONSTANTS_V2_PATH.relative_to(REPO)),
              "constants_final": consts.final, "kinds": list(kinds)}  # fmt: skip
-    if meta_p.exists() and json.loads(meta_p.read_text()) != ident and cache.exists():
-        raise SystemExit(f"{cache} was written by different models/constants; delete it to rerun")
-    meta_p.write_text(json.dumps(ident, indent=2))
+    _lambda_mod().check_cache_identity(meta_p, cache, ident)
     done = pd.read_csv(cache) if cache.exists() else pd.DataFrame(columns=["key"])
     have = set(done.key)
     new, t0 = [], time.time()
@@ -230,7 +272,7 @@ def run_scoring(rows: pd.DataFrame, kinds: tuple[str, ...], name: str, threads: 
             print(f"  {i + 1}/{len(rows)} clips, {time.time() - t0:.0f} s", flush=True)
     out = pd.concat([done, pd.DataFrame(new)], ignore_index=True)
     out.to_csv(cache, index=False)
-    return out
+    return select_requested(out, rows, kinds)
 
 
 def _test_durs() -> np.ndarray:
@@ -286,6 +328,11 @@ def perturb_readout(d: pd.DataFrame) -> dict:
                 res[c][k]["d_auc"] = round(delta_auc(y, m["none"].to_numpy(float), s), 4)
                 res[c][k]["spearman_vs_clean"] = round(float(pd.Series(s).corr(pd.Series(m["none"].to_numpy(float)),
                                                                                  method="spearman")), 4)  # fmt: skip
+    thr = {c: inner_threshold(c) for c in MODELS} if THRESHOLDS_FROM_EXPORTS else {}
+    res["at_inner_threshold"] = {
+        c: {k: {"p_fa": round(float((piv[c].loc[paths][k].to_numpy()[y == 0] >= t).mean()), 4),
+                "p_miss": round(float((piv[c].loc[paths][k].to_numpy()[y == 1] < t).mean()), 4)}
+            for k in PERTURBATIONS} for c, t in thr.items()}  # fmt: skip
     ea = piv["e_applied"].loc[paths]
     res["e_applied_share"] = {k: {"real": round(float(ea[k].to_numpy()[y == 0].mean()), 4),
                                   "spoof": round(float(ea[k].to_numpy()[y == 1].mean()), 4)} for k in PERTURBATIONS}  # fmt: skip
@@ -306,7 +353,7 @@ def mlaad_readout(d: pd.DataFrame, rows: pd.DataFrame) -> dict:
     for c in MODELS:
         thr = inner_threshold(c)
         res[c] = {"inner_threshold": round(thr, 4), "miss_rate": round(float((d[c] < thr).mean()), 4),
-                  "in_sample": c == "m5_xlsr_ft"}  # fmt: skip
+                  "mlaad_in_training": {"m5_xlsr_ft": "yes", "spectra_aasist": "unknown (undisclosed)"}.get(c, "no")}  # fmt: skip
     res["m3_below_suppress_share"] = round(float((d.spectra_aasist < M3_SUPPRESS_BELOW).mean()), 4)
     res["e_applied_share"] = round(float(d.e_applied.mean()), 4)
     worst = d.groupby("model_name").e_applied.mean().sort_values(ascending=False).head(8)
@@ -327,27 +374,28 @@ def main() -> None:
     ap.add_argument("probe", choices=["perturb", "mlaad", "agreement", "verdict"])
     ap.add_argument("--n", type=int)
     ap.add_argument("--threads", type=int, default=3)
+    ap.add_argument("--readout-only", action="store_true", help="recompute the readout from the cache")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
+
+    def scored(rows, kinds, name):
+        if a.readout_only:
+            return select_requested(pd.read_csv(OUT / f"m3_{name}.csv"), rows, kinds)
+        return run_scoring(rows, kinds, name, a.threads)
+
     if a.probe == "perturb":
-        rows = holdout_rows(a.n or 500)
-        res = perturb_readout(run_scoring(rows, PERTURBATIONS, "perturb", a.threads))
+        rows = holdout_rows(a.n or N_PERTURB)
+        res = perturb_readout(scored(rows, PERTURBATIONS, "perturb"))
     elif a.probe == "mlaad":
         rows = mlaad_rows(a.n or 600)
-        res = mlaad_readout(run_scoring(rows, ("none",), "mlaad", a.threads), rows)
+        res = mlaad_readout(scored(rows, ("none",), "mlaad"), rows)
     elif a.probe == "agreement":
         res = agreement()
     else:
-        p = json.loads((OUT / "m3_perturb.json").read_text())
-        m = json.loads((OUT / "m3_mlaad.json").read_text())
-        e_hurt = max(v for k, v in p["e_step_effect_min_dcf"].items())
-        verdict, why = m3_verdict(p["mean_abs_d_auc"]["spectra_aasist"], p["mean_abs_d_auc"]["m1b_v3"],
-                                  m["e_applied_share"], e_hurt)  # fmt: skip
-        res = {"verdict": verdict, "reasons": why, "inputs": {
-            "m3_mean_abs_d_auc": p["mean_abs_d_auc"]["spectra_aasist"],
-            "m1b_mean_abs_d_auc": p["mean_abs_d_auc"]["m1b_v3"],
-            "mlaad_damped_share": m["e_applied_share"], "max_e_step_min_dcf_increase": e_hurt}}
-    (OUT / f"m3_{a.probe}.json").write_text(json.dumps(res, indent=2))
+        res = verdict_from(json.loads((OUT / "m3_perturb.json").read_text()),
+                           json.loads((OUT / "m3_mlaad.json").read_text()))  # fmt: skip
+    res = _lambda_mod().json_safe(res)
+    (OUT / f"m3_{a.probe}.json").write_text(json.dumps(res, indent=2, allow_nan=False))
     print(json.dumps(res, indent=2))
 
 

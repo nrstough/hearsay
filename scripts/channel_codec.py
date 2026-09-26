@@ -135,9 +135,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--n", type=int, default=50, help="clips per real source")
+    ap.add_argument("--from-rows", action="store_true", help="rebuild the tables from codec_grid_rows.csv")
     a = ap.parse_args()
     t0 = time.time()
     OUT.mkdir(parents=True, exist_ok=True)
+    if a.from_rows:
+        d = pd.read_csv(OUT / "codec_grid_rows.csv")
+        return summarize(d[d.error.isna()] if "error" in d else d, variant_grid(), t0)
 
     f = pd.read_csv(REPO / "splits" / "nsa_folds.csv")
     inner = f[(f.fold != "holdout") & (f.label == "bonafide")]
@@ -159,22 +163,34 @@ def main() -> None:
     if "error" in d and d.error.notna().any():
         print(f"{int(d.error.notna().sum())} failed variant rows; e.g. {d[d.error.notna()].iloc[0].to_dict()}")
         d = d[d.error.isna()]
+    summarize(d, grid, t0)
+
+
+def grid_table(d: pd.DataFrame, grid: list[str], stats=STATS) -> pd.DataFrame:
     tst = d[d.set == "test"]
     table = []
     for v in grid:
         var = d[(d.set == "ref") & (d.variant == v)]
         if var.empty:
             continue
-        dist, excl = match_distance(var, tst)
+        dist, excl = match_distance(var, tst, stats)
         row = {"variant": v, "n": len(var), "distance": dist, "excluded": ";".join(excl)}
         for s in STATS:
             row[f"med_{s}"] = float(var[s].median())
         for s in HOLE_STATS:
             row[f"gap_{s}"] = abs(float(var[s].median()) - float(tst[s].median()))
         table.append(row)
-    table = pd.DataFrame(table).sort_values("distance")
+    return pd.DataFrame(table).sort_values("distance")
+
+
+def summarize(d: pd.DataFrame, grid: list[str], t0: float) -> None:
+    tst = d[d.set == "test"]
+    table = grid_table(d, grid)
     table.to_csv(OUT / "codec_grid.csv", index=False)
     res = codec_match(table)
+    # Sensitivity: without clip_floor_db, a whole-spectrogram percentile that reads the 7-8 kHz
+    # stopband (the column action A had to drop).
+    res["without_clip_floor_db"] = codec_match(grid_table(d, grid, tuple(x for x in STATS if x != "clip_floor_db")))
     res["test_medians"] = {s: round(float(tst[s].median()), 3) for s in STATS}
     res["top10"] = table.head(10)[["variant", "distance", *[f"med_{s}" for s in ("drop_7500_vs_6500",
                                    "rolloff_slope_db_per_khz", *HOLE_STATS, "clip_floor_db")]]].round(3).to_dict("records")  # fmt: skip

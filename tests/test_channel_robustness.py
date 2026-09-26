@@ -186,8 +186,10 @@ m3p = _load("m3_probes")
 def test_each_perturbation_changes_the_signal_and_none_does_not():
     x = _speechlike(2.0)
     assert np.array_equal(m3p.perturb(x, "none", 0), x)
-    for k in ("noise20", "speed", "shift1"):
-        assert not np.array_equal(m3p.perturb(x, k, 0), x), k
+    kinds = ("noise20", "speed", "shift1", "mp3") if HAVE_FFMPEG else ("noise20", "speed", "shift1")
+    for k in kinds:
+        y = m3p.perturb(x, k, 0)
+        assert y.shape != x.shape or not np.array_equal(y, x), k
 
 
 def test_noise_hits_twenty_db_snr():
@@ -316,8 +318,10 @@ def test_variant_grid_has_every_codec_alone_and_with_the_kaiser_pass():
     assert all(f"{c}+kaiser" in g for c in codecs)
 
 
-def test_perturb_readout_survives_a_one_class_slice():
+def test_perturb_readout_survives_a_one_class_slice(monkeypatch):
     import pandas as pd
+
+    monkeypatch.setattr(m3p, "THRESHOLDS_FROM_EXPORTS", False)
 
     rows = []
     for i in range(6):
@@ -326,3 +330,115 @@ def test_perturb_readout_survives_a_one_class_slice():
                          **{c: float(i) for c in (*m3p.MODELS, "fused_base", "fused")}, "e_applied": 0.0})
     r = m3p.perturb_readout(pd.DataFrame(rows))
     assert r["n_spoof"] == 0 and np.isnan(r["m1b_v3"]["none"]["eer"])
+
+
+
+# ------------------------------------------------------------------ critique round 1 (13:30): the untested paths
+
+
+def test_speaker_groups_put_lj_in_one_group_even_when_the_fold_file_splits_it_by_chapter():
+    import pandas as pd
+
+    f = pd.DataFrame({"speaker": ["lj", "lj", "lj", "libri_1", "libri_2"],
+                      "group": ["lj_ch1", "lj_ch2", "lj_ch3", "g1", "g2"]})  # fmt: skip
+    g = lam.speaker_groups(f)
+    assert g.iloc[0] == g.iloc[1] == g.iloc[2] and g.nunique() == 3
+
+
+def test_crossover_reading_needs_the_whole_interval_on_one_side():
+    assert lam.crossover_reading(0.5, (0.4, 0.6), 0.32).startswith("above")
+    assert lam.crossover_reading(0.2, (0.1, 0.3), 0.32).startswith("below")
+    assert lam.crossover_reading(0.51, (0.12, 0.64), 0.32).startswith("indeterminate")
+    assert lam.crossover_reading(float("nan"), (0.1, 0.6), 0.32).startswith("undefined")
+
+
+def test_acc_ci_has_no_interval_when_most_resamples_are_refused():
+    rng = np.random.default_rng(0)
+    p_clean, p_wild = rng.uniform(0.4, 0.6, 200), rng.uniform(0.45, 0.65, 200)  # TPR - FPR ~ 0.2 or less
+    g = np.arange(200).astype(str)
+    lo, hi = lam.acc_ci(rng.uniform(0, 1, 300), p_clean, g, p_wild, g, n=100)
+    assert np.isnan(lo) and np.isnan(hi)
+
+
+def test_cache_identity_refuses_a_mismatch_and_an_orphan_cache(tmp_path):
+    cache, meta = tmp_path / "c.csv", tmp_path / "c.meta.json"
+    lam.check_cache_identity(meta, cache, {"v": 1})  # no cache yet: writes the identity
+    cache.write_text("key\n")
+    lam.check_cache_identity(meta, cache, {"v": 1})  # same identity: fine
+    with pytest.raises(SystemExit):
+        lam.check_cache_identity(meta, cache, {"v": 2})
+    meta.unlink()
+    with pytest.raises(SystemExit):
+        lam.check_cache_identity(meta, cache, {"v": 1})
+
+
+def test_json_safe_writes_strict_json():
+    import json
+
+    out = lam.json_safe({"a": float("nan"), "b": [1.0, float("inf")], "c": {"d": 2}})
+    assert json.dumps(out, allow_nan=False) == '{"a": null, "b": [1.0, null], "c": {"d": 2}}'
+
+
+def test_parse_key_and_crop_to():
+    assert lam.parse_key("/a.wav") == ("/a.wav", "", None)
+    assert lam.parse_key("/a.wav|mp3-64k@16000") == ("/a.wav", "mp3-64k@16000", None)
+    assert lam.parse_key("/a.wav||3.41") == ("/a.wav", "", 3.41)
+    x = _speechlike(6.0)
+    y = lam.crop_to(x, 2.0, 1)
+    assert y.size == 2 * SR and np.array_equal(y, lam.crop_to(x, 2.0, 1))
+    assert lam.crop_to(x, None, 1) is x
+
+
+def _p(effects, n=500):
+    return {"mean_abs_d_auc": {"spectra_aasist": 0.001, "m1b_v3": 0.004}, "n_paired": n,
+            "e_step_effect_min_dcf": dict(zip(m3p.PERTURBATIONS, effects))}  # fmt: skip
+
+
+def test_verdict_from_is_inconclusive_on_any_nan_step_effect_even_when_max_would_skip_it():
+    m = {"e_applied_share": 0.01, "n": 572}
+    assert m3p.verdict_from(_p([0.0, -0.01, 0.0, -0.02, -0.02]), m)["verdict"] == "kept"
+    assert m3p.verdict_from(_p([-0.008, float("nan"), 0.0, -0.02, -0.02]), m)["verdict"] == "inconclusive"
+    assert m3p.verdict_from(_p([0.0, 0.0, 0.0, 0.03, 0.0]), m)["verdict"] == "at risk"
+    assert m3p.verdict_from(_p([0.0] * 4), m)["verdict"] == "inconclusive"  # a perturbation missing
+
+
+def test_verdict_from_is_inconclusive_when_a_probe_is_short_of_its_cohort():
+    good = _p([0.0] * 5)
+    assert m3p.verdict_from(_p([0.0] * 5, n=300), {"e_applied_share": 0.01, "n": 572})["verdict"] == "inconclusive"
+    assert m3p.verdict_from(good, {"e_applied_share": 0.01, "n": 100})["verdict"] == "inconclusive"
+    assert m3p.verdict_from(good, {"n": 572})["verdict"] == "inconclusive"  # damped share missing
+
+
+def test_select_requested_drops_stale_rows_from_other_cohorts():
+    import pandas as pd
+
+    rows = pd.DataFrame({"path": ["a", "b"], "seed": [0, 1]})
+    cache = pd.DataFrame({"key": ["a|none|0", "b|none|1", "a|none|7", "b|none|1"], "v": [1, 2, 3, 4]})
+    got = m3p.select_requested(cache, rows, ("none",))
+    assert sorted(got.key) == ["a|none|0", "b|none|1"] and got.set_index("key").loc["b|none|1", "v"] == 4
+
+
+@pytest.mark.skipif(not HAVE_FFMPEG, reason="needs ffmpeg")
+@pytest.mark.parametrize("spec", [("aac", 64, 44100), ("aac", 32, 16000), ("mp3", 64, 44100)])
+def test_codec_round_trips_align_at_both_encode_rates(spec):
+    from hearsay.compression import launder
+
+    x = _speechlike(2.0)
+    y = m3p.align_to(launder(x, *spec), x)
+    assert y.size == x.size and np.corrcoef(x, y)[0, 1] > 0.8
+
+
+@pytest.mark.skipif(not HAVE_FFMPEG, reason="needs ffmpeg")
+def test_a_failed_codec_round_trip_raises_instead_of_returning_audio():
+    from hearsay.audio import DecodeError
+
+    with pytest.raises((DecodeError, ValueError)):
+        m3p.perturb(np.zeros(0, np.float32), "mp3", 0)
+
+
+def test_highband_stats_ignore_leading_and_trailing_silence():
+    x = _lowpassed(7000)
+    padded = np.r_[np.zeros(SR, np.float32), x, np.zeros(SR, np.float32)]
+    a, b = cc.highband_stats(x), cc.highband_stats(padded)
+    for k in ("drop_7500_vs_6500", "lvl_6500", "hb_flatness_6_7k"):
+        assert abs(a[k] - b[k]) < 1.0, (k, a[k], b[k])

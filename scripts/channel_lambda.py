@@ -20,7 +20,9 @@ Usage: uv run python scripts/channel_lambda.py [--workers 6] [--limit N]
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -34,13 +36,15 @@ SHIPPED_TSV = REPO / "submissions" / "20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE
 CROSSOVER = 0.32
 MIN_MARGIN = 0.2  # TPR - FPR below this: adjusted classify-and-count is refused
 # Read above 7 kHz (module docstring). clip_floor_db is the 1st percentile of the WHOLE
-# spectrogram, i.e. the 7-8 kHz stopband: NSA test files sit at -118 dB as delivered and -157 dB
-# after the pipeline's second low-pass (action B, outputs/channel/codec_match.json), so it
-# measured the double filtering. Dropped at 13:00 after the first full run; see the report.
+# spectrogram, i.e. the 7-8 kHz stopband: NSA test files sit at -118 dB as delivered
+# (outputs/channel/codec_match.json, action B) and -157 dB after the pipeline's second low-pass
+# (test median in outputs/channel/lambda_features.csv), so it measured the double filtering.
+# Dropped after the first full run (commit 32d6402); see the report.
 DROP = ("bw_hz", "band_7_8k_db", "hf_slope_db_per_khz", "clip_floor_db")
 FRAME, HOP = 400, 160  # 25 ms frames, 10 ms hop at 16 kHz
 BLOCK = 50  # frames per 0.5 s block for noise-floor stationarity
 DECAY = 12  # frames (120 ms) after an offset for the decay slope
+FEATURE_VERSION = "channel_stats_v1"  # bump when channel_stats changes; the cache refuses a mismatch
 
 
 # ---------------------------------------------------------------- per-clip statistics
@@ -98,16 +102,37 @@ def channel_stats(x: np.ndarray) -> dict[str, float]:
     return f
 
 
+def parse_key(key: str) -> tuple[str, str, float | None]:
+    """key = path[|codec-spec[|crop_s]]: a clip, optionally laundered, optionally cropped."""
+    path, _, rest = key.partition("|")
+    spec, _, crop = rest.partition("|")
+    return path, spec, (float(crop) if crop else None)
+
+
+def crop_to(x: np.ndarray, crop_s: float | None, seed: int) -> np.ndarray:
+    """Silence-trim, then a seeded crop to crop_s seconds (never pads)."""
+    from hearsay.audio import trim_silence
+
+    if crop_s is None:
+        return x
+    x = trim_silence(x)
+    n = int(crop_s * 16000)
+    if x.size <= n:
+        return x
+    off = int(np.random.default_rng(seed).integers(0, x.size - n + 1))
+    return x[off : off + n]
+
+
 def _row(key: str) -> dict | None:
-    """key = path, or path|codec-kbpsk@sr for a laundered control clip."""
     from hearsay.audio import load_audio
     from hearsay.compression import launder, parse_laundering
 
-    path, _, spec = key.partition("|")
+    path, spec, crop = parse_key(key)
     try:
         x = load_audio(path)
         if spec:
             x = launder(x, *parse_laundering(spec))
+        x = crop_to(x, crop, int(hashlib.sha1(path.encode()).hexdigest()[:8], 16))
         return {"key": key, **channel_stats(x)}
     except Exception as e:  # noqa: BLE001 - reported by the caller
         return {"key": key, "error": repr(e)[:200]}
@@ -148,6 +173,63 @@ def grouped_oof(X: np.ndarray, y: np.ndarray, groups: np.ndarray, k: int = 5) ->
         va = fold == i
         p[va] = make_clf().fit(X[~va], y[~va]).predict_proba(X[va])[:, 1]
     return p
+
+
+def fold_models(X: np.ndarray, y: np.ndarray, groups: np.ndarray, k: int = 5) -> list[tuple[np.ndarray, object]]:
+    """(validation mask, model fit on the rest) per grouped fold."""
+    fold = grouped_folds(groups, k)
+    return [(fold == i, make_clf().fit(X[fold != i], y[fold != i])) for i in range(k)]
+
+
+def per_fold_auc(y: np.ndarray, oof: np.ndarray, groups: np.ndarray, k: int = 5) -> list[float | None]:
+    """AUC inside each validation fold; None for a one-class fold (e.g. the single LJ speaker)."""
+    from sklearn.metrics import roc_auc_score
+
+    fold = grouped_folds(groups, k)
+    out = []
+    for i in range(k):
+        m = fold == i
+        out.append(round(float(roc_auc_score(y[m], oof[m])), 4) if len(np.unique(y[m])) == 2 else None)
+    return out
+
+
+def speaker_groups(folds: pd.DataFrame) -> pd.Series:
+    """Speaker groups for the domain classifier: the fold file's `speaker` column, so LJ (one
+    reader, grouped by chapter in the fold file) is one group."""
+    return "spk_" + folds.speaker.astype(str)
+
+
+def crossover_reading(lam: float, ci: tuple[float, float], crossover: float = CROSSOVER) -> str:
+    """"above"/"below" only when the whole interval is on one side of the crossover."""
+    lo, hi = ci
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (lam, lo, hi)):
+        return "undefined (missing estimate or interval)"
+    if lo > crossover:
+        return f"above the {crossover} crossover (interval {lo:.2f}-{hi:.2f})"
+    if hi < crossover:
+        return f"below the {crossover} crossover (interval {lo:.2f}-{hi:.2f})"
+    return f"indeterminate: the interval {lo:.2f}-{hi:.2f} contains the {crossover} crossover"
+
+
+def check_cache_identity(meta_path: Path, cache_path: Path, ident: dict) -> None:
+    """Refuse a cache written under a different identity, or one with no identity at all."""
+    if cache_path.exists():
+        if not meta_path.exists():
+            raise SystemExit(f"{cache_path} exists without {meta_path.name}; delete it to rerun")
+        if json.loads(meta_path.read_text()) != ident:
+            raise SystemExit(f"{cache_path} was written under a different identity; delete it to rerun")
+    meta_path.write_text(json.dumps(ident, indent=2))
+
+
+def json_safe(o):
+    """NaN/inf -> None so the output is strict JSON."""
+    if isinstance(o, dict):
+        return {k: json_safe(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [json_safe(v) for v in o]
+    if isinstance(o, float) and not math.isfinite(o):
+        return None
+    return o
 
 
 def lambda_mean_posterior(p_test: np.ndarray) -> float:
@@ -256,7 +338,7 @@ def rows() -> pd.DataFrame:
     # Speaker groups, not the fold file's `group` (LJ is grouped by chapter there): LJ is one
     # speaker, so it is one group here and never spans a training and a validation fold.
     clean = pd.DataFrame({"path": clean.path.map(_abs), "domain": "clean",
-                          "group": "spk_" + clean.speaker.astype(str), "source": clean.source})  # fmt: skip
+                          "group": speaker_groups(clean).to_numpy(), "source": clean.source})  # fmt: skip
     itw = pd.read_csv(REPO / "outputs" / "manifests" / "itw_stress.csv")
     itw = itw[itw.label == "bonafide"]
     wild = pd.DataFrame({"path": itw.path.map(_abs), "domain": "wild",
@@ -279,15 +361,28 @@ def rows() -> pd.DataFrame:
         pd.DataFrame({"path": real_in.path.map(_abs), "domain": "ctl_inner_real_mp3_64k@16k",
                       "launder": "mp3-64k@16000"}),
     ]  # fmt: skip
-    out = pd.concat([clean, wild, test, *ctl], ignore_index=True)
+    # Duration-matched copies of the two reference domains (test-length crops, seeded per clip):
+    # whole clips run to the 8 s cap while test clips median 3.4 s, and length enters the block
+    # and percentile statistics.
+    from hearsay.embed import test_duration_sampler
+
+    draw = test_duration_sampler(0)
+    dm = pd.concat([clean, wild], ignore_index=True).copy()
+    dm["domain"] = "dm_" + dm.domain
+    dm["launder"] = ""
+    dm["crop"] = [round(draw(), 3) for _ in range(len(dm))]
+    out = pd.concat([clean, wild, test, *ctl, dm], ignore_index=True)
     out["launder"] = out.launder.fillna("") if "launder" in out else ""
-    out["key"] = out.path + np.where(out.launder != "", "|" + out.launder, "")
+    crop = out["crop"] if "crop" in out else pd.Series([np.nan] * len(out))
+    out["key"] = [p + (f"|{l}|{c}" if pd.notna(c) else (f"|{l}" if l else ""))
+                  for p, l, c in zip(out.path, out.launder, crop)]  # fmt: skip
     return out
 
 
 def extract(r: pd.DataFrame, workers: int) -> pd.DataFrame:
     OUT.mkdir(parents=True, exist_ok=True)
     cache = OUT / "lambda_features.csv"
+    check_cache_identity(OUT / "lambda_features.meta.json", cache, {"feature_version": FEATURE_VERSION})
     done = pd.read_csv(cache) if cache.exists() else pd.DataFrame(columns=["key"])
     if "key" not in done:
         done = done.rename(columns={"path": "key"})
@@ -328,6 +423,7 @@ def main() -> None:
     cols = [c for c in feats.columns if c not in ("key", "error", "n_offsets") and c not in DROP]
 
     tr = d[d.domain.isin(["clean", "wild"])].reset_index(drop=True)
+    assert len(tr) == len(r[r.domain.isin(["clean", "wild"])]) or args.limit, "reference rows missing features"
     ctl = d[d.domain.str.startswith("ctl_")].reset_index(drop=True)
     te = d[d.domain == "test"].reset_index(drop=True)
     X, y, g = tr[cols].to_numpy(float), (tr.domain == "wild").to_numpy(int), tr.group.to_numpy()
@@ -337,6 +433,8 @@ def main() -> None:
 
     oof = grouped_oof(X, y, g)
     auc = float(roc_auc_score(y, oof))
+    fm = fold_models(X, y, g)
+    p_test_ens = np.mean([m.predict_proba(Xt)[:, 1] for _, m in fm], axis=0)
     clf = make_clf().fit(X, y)
     p_test = clf.predict_proba(Xt)[:, 1]
     p_clean, p_wild = oof[y == 0], oof[y == 1]
@@ -347,7 +445,7 @@ def main() -> None:
     res = {
         "n": {"clean": int((y == 0).sum()), "wild": int((y == 1).sum()), "test": len(te)},
         "features": cols, "dropped": list(DROP),
-        "domain_auc_grouped_oof": round(auc, 4), "tpr_oof": round(tpr, 4), "fpr_oof": round(fpr, 4),
+        "domain_auc_grouped_oof": round(auc, 4), "domain_auc_per_fold": per_fold_auc(y, oof, g), "tpr_oof": round(tpr, 4), "fpr_oof": round(fpr, 4),
         "lambda_mean_posterior": round(lambda_mean_posterior(p_test), 4),
         "lambda_mean_posterior_ci95": [round(v, 4) for v in bootstrap_ci(lambda_mean_posterior, [p_test])],
         "test_share_above_0.5": round(q, 4),
@@ -384,6 +482,12 @@ def main() -> None:
     res["coef_std"] = {c: round(float(w), 3) for c, w in sorted(zip(cols, coef), key=lambda kv: -abs(kv[1]))}
     res["per_source_oof_mean"] = {s: round(float(oof[(tr.source == s).to_numpy()].mean()), 4)
                                   for s in sorted(tr.source.unique())}  # fmt: skip
+    # Rate consistency: q from the average of the fold models (the models whose OOF rates give
+    # TPR/FPR), not from the full fit, whose in-sample FPR is lower.
+    res["lambda_acc_fold_ensemble"] = round(acc_stat(p_test_ens, p_clean, p_wild), 4)
+    full_in = clf.predict_proba(X)[:, 1]
+    res["lambda_acc_in_sample_rates"] = round(acc_stat(p_test, full_in[y == 0], full_in[y == 1]), 4)
+
     # Sensitivity: the clean side without LJ (one speaker, 885 of 1,858 clean clips).
     keep = (tr.source != "ljspeech").to_numpy()
     oof2 = grouped_oof(X[keep], y[keep], g[keep])
@@ -401,10 +505,26 @@ def main() -> None:
         keep_c = [i for i, c in enumerate(cols) if c not in drop]
         o3 = grouped_oof(X[:, keep_c], y, g)
         p3 = make_clf().fit(X[:, keep_c], y).predict_proba(Xt[:, keep_c])[:, 1]
+        v3, why3 = lambda_acc(float(np.mean(p3 > 0.5)), float(np.mean(o3[y == 1] > 0.5)),
+                              float(np.mean(o3[y == 0] > 0.5)))  # fmt: skip
         res[f"lambda_acc_{tag}"] = {
-            "dropped": sorted(drop), "domain_auc": round(float(roc_auc_score(y, o3)), 4),
-            "lambda_acc": round(acc_stat(p3, o3[y == 0], o3[y == 1]), 4),
+            "dropped": sorted(drop), "domain_auc_pooled_oof": round(float(roc_auc_score(y, o3)), 4),
+            "domain_auc_per_fold": per_fold_auc(y, o3, g),
+            "lambda_acc": round(v3, 4), "refused": why3,
             "lambda_mean_posterior": round(float(p3.mean()), 4)}  # fmt: skip
+
+    # Sensitivity: duration-matched reference domains (test-length crops).
+    dmr = d[d.domain.isin(["dm_clean", "dm_wild"])].reset_index(drop=True)
+    if len(dmr):
+        Xd, yd, gd = dmr[cols].to_numpy(float), (dmr.domain == "dm_wild").to_numpy(int), dmr.group.to_numpy()
+        od = grouped_oof(Xd, yd, gd)
+        pd_t = make_clf().fit(Xd, yd).predict_proba(Xt)[:, 1]
+        vd, whyd = lambda_acc(float(np.mean(pd_t > 0.5)), float(np.mean(od[yd == 1] > 0.5)),
+                              float(np.mean(od[yd == 0] > 0.5)))  # fmt: skip
+        res["lambda_acc_duration_matched"] = {
+            "n": len(dmr), "domain_auc_pooled_oof": round(float(roc_auc_score(yd, od)), 4),
+            "domain_auc_per_fold": per_fold_auc(yd, od, gd), "lambda_acc": round(vd, 4), "refused": whyd,
+            "lambda_mean_posterior": round(float(pd_t.mean()), 4)}  # fmt: skip
 
     p_ctl = clf.predict_proba(ctl[cols].to_numpy(float))[:, 1] if len(ctl) else np.array([])
     res["controls_mean_pwild"] = {
@@ -418,11 +538,10 @@ def main() -> None:
     res["lambda_hat"] = (round(lam_acc, 4) if ok and np.isfinite(lam_acc) else None)
     res["lambda_hat_reading"] = (
         "unidentifiable: " + "; ".join(why) if not ok else
-        f"lambda-hat {lam_acc:.3f} vs crossover {CROSSOVER}: "
-        + ("above (wild-like test set; In-the-Wild should weigh heavily)" if lam_acc > CROSSOVER
-           else "below (holdout-like test set)"))  # fmt: skip
+        f"lambda-hat {lam_acc:.3f}: " + crossover_reading(lam_acc, tuple(res["lambda_acc_ci95"])))  # fmt: skip
     res["seconds"] = round(time.time() - t0)
-    (OUT / "lambda.json").write_text(json.dumps(res, indent=2))
+    res = json_safe(res)
+    (OUT / "lambda.json").write_text(json.dumps(res, indent=2, allow_nan=False))
     te.assign(p_wild=p_test)[["filename", "p_wild"]].to_csv(OUT / "lambda_test_pwild.csv", index=False)
     print(json.dumps({k: v for k, v in res.items() if k not in ("per_feature", "coef_std", "features")},
                      indent=2))  # fmt: skip
