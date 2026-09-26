@@ -62,9 +62,13 @@ def find_runs(root: Path, arm: str, train_top: int | None = None) -> dict[str, P
         if train_top is not None and (meta.get("config") or {}).get("train_top") != train_top:
             continue
         d = rm.parent
-        if not (d / "model" / "hashes.json").exists():
+        fold = str(meta["fold"])
+        # fold models contribute scores only; the full model must carry its weights
+        if fold == "full" and not (d / "model" / "hashes.json").exists():
             continue
-        out[str(meta["fold"])] = d
+        if fold != "full" and not (d / f"scores_{fold}.csv").exists():
+            continue
+        out[fold] = d
     return out
 
 
