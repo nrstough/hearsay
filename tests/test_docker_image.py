@@ -256,6 +256,11 @@ def test_p2_pcm_hash_detects_a_changed_sample(tmp_path):
     parity.pcm_hash(b, tmp_path / "t2.tsv", None, tmp_path / "b2.json")
     bad = parity.pcm_diff(tmp_path / "a2.json", tmp_path / "b2.json")
     assert bad == ["junk.wav: decode failed (both); a failed decode never counts as a match"]
+    # one-sided failure is labelled with its side
+    sf.write(b / "junk.wav", x[:SR // 2], SR, subtype="PCM_16")
+    parity.pcm_hash(b, tmp_path / "t2.tsv", None, tmp_path / "b3.json")
+    bad = parity.pcm_diff(tmp_path / "a2.json", tmp_path / "b3.json")
+    assert bad == ["junk.wav: decode failed (A); a failed decode never counts as a match"]
 
 
 def test_p3_smoke_script_runs_offline_and_checks_order():

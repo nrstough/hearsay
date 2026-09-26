@@ -69,7 +69,9 @@ def pcm_diff(a: Path, b: Path) -> list[str]:
         if va is None or vb is None:
             bad.append(f"{i}: only in {'A' if vb is None else 'B'}")
         elif not va["pcm_sha256"] or not vb["pcm_sha256"] or not va["n_samples"] or not vb["n_samples"]:
-            where = "both" if not (va["pcm_sha256"] and vb["pcm_sha256"]) else ("A" if not va["pcm_sha256"] else "B")
+            fa = not va["pcm_sha256"] or not va["n_samples"]
+            fb = not vb["pcm_sha256"] or not vb["n_samples"]
+            where = "both" if fa and fb else ("A" if fa else "B")
             bad.append(f"{i}: decode failed ({where}); a failed decode never counts as a match")
         elif va["pcm_sha256"] != vb["pcm_sha256"] or va["n_samples"] != vb["n_samples"]:
             bad.append(f"{i}: pcm differs ({va['n_samples']} vs {vb['n_samples']} samples)")
