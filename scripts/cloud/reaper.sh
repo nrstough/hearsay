@@ -11,7 +11,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 DEADLINE="${DEADLINE:-$(date -j -f '%H:%M' '11:45' '+%s' 2>/dev/null || date -d '11:45' '+%s')}"
 STALL_MIN="${STALL_MIN:-40}"; POLL="${POLL:-60}"
 STATE="$HOME/.hearsay_vast"
-LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"
+LEDGER="${LEDGER:-$REPO/docs/reports/cloud-expense-ledger.md}"   # tests point this at a temp file
 export VAST_API_KEY="${VAST_API_KEY:-$(cat "$HOME/.config/vastai/vast_api_key")}"
 VAST="uvx vastai"
 py() { "$REPO/.venv/bin/python" -c "$@"; }

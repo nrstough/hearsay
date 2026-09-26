@@ -10,6 +10,19 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 CLOUD = REPO / "scripts" / "cloud"
+LEDGER = REPO / "docs" / "reports" / "cloud-expense-ledger.md"
+
+
+@pytest.fixture(autouse=True)
+def _tracked_ledger_never_changes(tmp_path, monkeypatch):
+    """Every script honours LEDGER; the tests point it at a temp file and this guard proves the
+    tracked ledger is byte-identical after each test (Codex round 11: mocked launches had
+    appended fake rentals to the real ledger)."""
+    monkeypatch.setenv("LEDGER", str(tmp_path / "ledger.md"))
+    before = LEDGER.read_bytes() if LEDGER.exists() else None
+    yield
+    after = LEDGER.read_bytes() if LEDGER.exists() else None
+    assert before == after, "a test wrote to the tracked expense ledger"
 SHELL = sorted(CLOUD.glob("*.sh"))
 M5_PY = sorted(REPO.glob("scripts/m5_*.py")) + [CLOUD / "box_codecs.py",
                                                 REPO / "src/hearsay/m5_data.py",
@@ -542,15 +555,11 @@ esac
         f.chmod(0o755)
     home = _stub_home(tmp_path)
     ledger = tmp_path / "ledger.md"
-    src = (CLOUD / "launch.sh").read_text().replace('LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"', f'LEDGER="{ledger}"')
-    src = src.replace('HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"', f'HERE="{CLOUD}"')
-    script = tmp_path / "launch_t.sh"
-    script.write_text(src)
     import os
 
     env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "DESTROY_WAIT": "0",
-           "BOOT_WAIT": "0", "NET_TRIES": "1", "NET_WAIT": "0"}
-    r = subprocess.run(["bash", str(script), "gj", "fold=0", "0.5", "1"], capture_output=True, text=True,
+           "BOOT_WAIT": "0", "NET_TRIES": "1", "NET_WAIT": "0", "LEDGER": str(ledger)}
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "gj", "fold=0", "0.5", "1"], capture_output=True, text=True,
                        cwd=REPO, env=env, check=False)
     assert r.returncode != 0
     gen = (home / ".hearsay_vast" / "gj" / "GEN").read_text().strip()

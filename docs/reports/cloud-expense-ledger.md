@@ -35,9 +35,3 @@ and `scripts/cloud/teardown_check.sh` appends the credit left. Balance: `uvx vas
 | 2026-09-26 05:40 | vast.ai | 52724249 | abl_cons attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
 | 2026-09-26 05:45 | vast.ai | 52725556 (51341862) | abl_cons attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
 | 2026-09-26 08:57 | vast.ai | M5 resume probes (52746167 failed setup, 52747172 DONE) | G4 evidence | A100 SXM4 $0.61/h | | | $0.33 (credit $33.28 → $32.95) | 
-| 2026-09-26 10:32 | vast.ai | 4242 (111) | tjob | created | | | gen 1790433157-79665 | 
-| 2026-09-26 10:33 | vast.ai | 4343 (222) | tjob2 | created | | | gen 1790433208-80085 | 
-| 2026-09-26 10:33 | vast.ai | 5151 (1) | rj | created | | | gen 1790433222-81070 | 
-| 2026-09-26 10:34 | vast.ai | 4242 (111) | tjob | created | | | gen 1790433274-82264 | 
-| 2026-09-26 10:35 | vast.ai | 4343 (222) | tjob2 | created | | | gen 1790433326-82732 | 
-| 2026-09-26 10:35 | vast.ai | 5151 (1) | rj | created | | | gen 1790433341-83456 | 

@@ -29,5 +29,5 @@ sleep "${DESTROY_WAIT:-5}"
 LEFT=$(instances | py 'import sys,json; print(len(json.load(sys.stdin)))' 2>/dev/null) || { echo "FATAL: cannot confirm the instance list after destroy" >&2; exit 2; }
 CREDIT=$($VAST show user --raw 2>/dev/null | py 'import sys,json; print(round(json.load(sys.stdin).get("credit",0),2))')
 echo "instances left: $LEFT; credit now: \$$CREDIT"
-printf '| %s | vast.ai | teardown check | | | | | credit left $%s | \n' "$(date '+%Y-%m-%d %H:%M')" "$CREDIT" >> "$REPO/docs/reports/cloud-expense-ledger.md"
+printf '| %s | vast.ai | teardown check | | | | | credit left $%s | \n' "$(date '+%Y-%m-%d %H:%M')" "$CREDIT" >> "${LEDGER:-$REPO/docs/reports/cloud-expense-ledger.md}"
 [ "$LEFT" = 0 ]
