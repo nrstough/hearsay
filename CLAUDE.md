@@ -122,6 +122,7 @@ Keep this current through the weekend; copy into Devpost. The rules require cred
   - the software-only rescope: plan, detector contract, doc-consistency tests
   - reading the NSA brief, instructions and scoring code
   - the D-track engineered detectors (Sat Sep 26, CPU-only chat): handcrafted spectral + prosody, compression forensics, container/metadata, ENF and splice detectors, their fold-validated training and fusion score exports (`outputs/detector_scores/*.csv`), the container and high-band inventories, and the test-set band-match finding (`docs/reports/2026-09-26_cpu-detectors.md`)
+  - M3 (Sat Sep 26, Spectra-AASIST chat): the Spectra-AASIST score stream through the shared band-matched input path with test-length crops (`scripts/score_spectra.py`, `hearsay.spectra`), its short-clip pad-mode pilot, direction and failure gates, the hermetic tests (`tests/test_spectra.py`) and the report (`docs/reports/2026-09-26_m3-spectra.md`)
 
   _Add specifics as they happen._
 - `/plan-review` workflow (a Claude Code skill): used to plan and review rungs taking over an hour. Its plan review and post-commit audit call OpenAI Codex (Codex CLI, via `.claude/review-*.sh`) when the CLI is installed. Used for the software-only rescope (Sep 25–26): Codex plan review, Claude critique and exploration agents.
@@ -131,7 +132,7 @@ Downloaded before the event to `weights/`; fill in "how used" as each is actuall
 - XLS-R 300M, `facebook/wav2vec2-xls-r-300m` (Hugging Face, Meta), Apache-2.0: core SSL front end (planned M1/M5).
 - WavLM Large, `microsoft/wavlm-large` (Hugging Face, Microsoft): bake-off challenger. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT). _Verify before submission._
 - WavLM Base, `microsoft/wavlm-base` (Hugging Face, Microsoft): bake-off / speed spare. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT). _Verify before submission._
-- Spectra-AASIST, `lab260/Spectra-AASIST` (Hugging Face): off-the-shelf detector score stream (planned M3). License unclear: repo header says Apache-2.0, model card text says MIT. Output index 0 = spoof, 1 = bonafide.
+- Spectra-AASIST, `lab260/Spectra-AASIST` (Hugging Face): M3 score stream (`outputs/detector_scores/spectra_aasist.csv`), run off the shelf with no training through the shared band-matched input path, as a second deep score for fusion beside the XLS-R probe. License unclear: repo header says Apache-2.0, model card text says MIT. Output index 0 = spoof, 1 = bonafide.
 
 **Public datasets** (name, source, license, how used)
 Downloaded before the event to `data/`; fill in "how used" as each is actually used.

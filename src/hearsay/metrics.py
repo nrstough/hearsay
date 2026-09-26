@@ -18,9 +18,13 @@ Selection (layer, bake-off, fusion, CSV) uses normalized minDCF; EER is reported
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 from sklearn.metrics import roc_curve
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 C_FA = 4.0
 C_MISS = 1.0
@@ -104,3 +108,20 @@ def report(y, llr, pi_synth=PI_SYNTH) -> dict:
         "sponsor_code_asis": round(sponsor_min_dcf(y, llr, flip=False), 4),
         "sponsor_code_flipped": round(sponsor_min_dcf(y, llr, flip=True), 4),
     }
+
+
+def by_group(dv: pd.DataFrame, yv: np.ndarray, s: np.ndarray, pi: float = PI_SYNTH) -> tuple[dict, dict]:
+    """minDCF/EER per generator (its spoofs vs every bona fide clip) and per bona fide source
+    (its bona fide clips vs every spoof). Copied here from scripts/train_handcrafted.py for M3;
+    the trainer keeps its own copy (it imports LightGBM, which must never load next to torch)."""
+    bona, spoof = s[yv == 0], s[yv == 1]
+    per_gen, per_src = {}, {}
+    for g in sorted(set(dv.generator) - {"bonafide"}):
+        m = (dv.generator == g).to_numpy()
+        yy, ss = np.r_[np.zeros(bona.size), np.ones(m.sum())], np.r_[bona, s[m]]
+        per_gen[g] = {"min_dcf": round(min_cost(yy, ss, pi), 4), "eer": round(eer(yy, ss), 4)}
+    for src in sorted(set(dv.loc[yv == 0, "source"])):
+        m = ((dv.source == src) & (yv == 0)).to_numpy()
+        yy, ss = np.r_[np.zeros(m.sum()), np.ones(spoof.size)], np.r_[s[m], spoof]
+        per_src[src] = {"min_dcf": round(min_cost(yy, ss, pi), 4), "eer": round(eer(yy, ss), 4)}
+    return per_gen, per_src
