@@ -253,6 +253,8 @@ def test_p2_pcm_hash_detects_a_changed_sample(tmp_path):
 def test_p3_smoke_script_runs_offline_and_checks_order():
     assert "--network none" in SMOKE and ":/data:ro" in SMOKE
     assert "--entrypoint python" in SMOKE and "assets.py verify" in SMOKE and "--full" in SMOKE
+    assert "-e TRANSFORMERS_OFFLINE=0" in SMOKE and "refused without the offline variables" in SMOKE, \
+        "the negative offline check (D2) is part of the smoke test"
     assert "c_tone.flac b_noise.mp3 a_sine.wav" in SMOKE, "reversed template order is asserted"
     assert "max |diff|" in SMOKE and "1e-6" in SMOKE, "repeat runs are compared with a tolerance"
     assert "outputs/docker/smoke" in SMOKE and "/tmp" not in SMOKE.replace("/tmpl/", ""), \

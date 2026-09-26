@@ -21,6 +21,15 @@ $RUN --entrypoint python "$IMAGE" docker/assets.py verify --root /app --manifest
 $RUN --entrypoint ffmpeg "$IMAGE" -version | head -1
 $RUN --entrypoint python "$IMAGE" -c "import numpy as np; from hearsay.detectors.base import ClipContext, safe_run; from hearsay.detectors import speaker_drift as sd; x=(0.1*np.random.default_rng(0).standard_normal(48000)).astype('f4'); r=safe_run(sd.DETECTOR, ClipContext.from_array(x)); assert r.status=='ok', r.error; print('speaker_drift OK (offline ECAPA):', r.evidence[:60])"
 
+echo "== offline enforcement: a container started without an offline variable must be refused"
+mkdir -p "$ROOT/outneg"
+if $RUN -e TRANSFORMERS_OFFLINE=0 -v "$ROOT/data:/data:ro" -v "$ROOT/outneg:/out" "$IMAGE" > "$ROOT/neg.log" 2>&1; then
+  echo "smoke: the container ran with TRANSFORMERS_OFFLINE=0; --require-offline is not enforced" >&2; exit 1
+fi
+grep -qi "offline" "$ROOT/neg.log" || { echo "smoke: refusal did not mention the offline variables:" >&2; tail -3 "$ROOT/neg.log" >&2; exit 1; }
+[ ! -f "$ROOT/outneg/smoke_predictions.tsv" ] || { echo "smoke: a TSV was written despite the refusal" >&2; exit 1; }
+echo "smoke: refused without the offline variables, no TSV written (as required)"
+
 echo "== three files + reversed template"
 ffmpeg -nostdin -v error -y -f lavfi -i "sine=frequency=220:sample_rate=16000:duration=2" -ac 1 "$ROOT/data/a_sine.wav"
 ffmpeg -nostdin -v error -y -f lavfi -i "anoisesrc=color=pink:sample_rate=44100:duration=2:seed=1" -ac 2 -b:a 96k "$ROOT/data/b_noise.mp3"
