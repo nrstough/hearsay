@@ -1,0 +1,28 @@
+# Build context for the HEARSAY inference image (run spec docs/specs/2026-09-26_k-docker-image.md).
+# Everything not needed at inference stays out; the shipped probe and handcrafted bundle are
+# staged by docker/build.sh into docker/build/ (models/ itself is excluded because
+# models/hc_selected is a symlink that COPY of a tree would keep dangling).
+.git
+.venv
+.cache
+.pytest_cache
+.ruff_cache
+**/__pycache__
+data
+outputs
+submissions
+models
+weights/wavlm-*
+weights/*/.cache
+docs
+tests
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+.env
+.env.example
+.claude
+.dockerignore
+Dockerfile

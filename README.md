@@ -35,11 +35,22 @@ Datasets go in `data/`, model weights in `weights/`, and submission TSVs in `sub
 
 ## Docker
 
-Planned; see the Docker section of [docs/plan.md](docs/plan.md). The target interface is to run offline on a directory of test audio and write `teamName_predictions.tsv`:
+The image runs the whole pipeline offline on CPU (linux/amd64): every engineered detector, the XLS-R probe and Spectra-AASIST, the persisted fusion rule, the non-speech gate, and the TSV writer. Nothing is downloaded at run time; all weights are baked in.
 
 ```bash
-docker run --network none -v <test_dir>:/data:ro -v <out_dir>:/out hearsay
+bash docker/build.sh                      # builds hearsay:<stamp> and hearsay:latest for linux/amd64
+docker run --network none \
+  -v <test_dir>:/data:ro -v <out_dir>:/out \
+  -e HEARSAY_TEAM=<teamName> hearsay
 ```
+
+Outputs under `<out_dir>`: `<teamName>_predictions.tsv` (header `filename<TAB>cm-score`, probability that the file is synthetic, 1.0 = synthetic), one JSON per file under `results/` with every detector's score, evidence and the routing log, a resumable `results.jsonl` (rerun the same command to continue after a crash), `timings.csv` and `run_meta.json`. A run never overwrites an earlier TSV.
+
+Row order comes from NSA's template when one is available: mount it and set `HEARSAY_TEMPLATE=/tmpl/key.tsv` (`-v <key.tsv>:/tmpl/key.tsv:ro`), or drop the `.tsv` beside the audio and the entrypoint finds it. Without a template the rows are the sorted filenames. Other settings: `HEARSAY_RULE` (`zmean`, the default, or `stack_nonlj`), `OMP_NUM_THREADS` (default: the container's CPU quota, at most six). Extra arguments go to `scripts/run_pipeline.py`, for example `--limit 50 --compare-tsv /ref/logged.tsv` for a parity check.
+
+Speed: about 4 s per file inside the image on an Apple Silicon Mac through Rosetta (the whole test set in about two hours), and about 0.8 s per file natively on the Mac's CPU; a native amd64 box should land in between. All models stay loaded; peak memory is under 3 GB.
+
+Checks: `bash docker/smoke.sh` runs three files (WAV, MP3, FLAC) with a reversed template through the image with `--network none` and asserts the row order, byte-identical repeat runs and the in-image self-checks; `docker/parity.py pcm-hash` compares decoded audio between the Mac and the image; `uv run pytest -q tests/test_docker_image.py` checks the build files without Docker. Building needs Docker with buildx (Colima with Rosetta works on Apple Silicon: `colima start --vm-type vz --vz-rosetta`). Design and results: `docs/specs/2026-09-26_k-docker-image.md`.
 
 ## Layout
 

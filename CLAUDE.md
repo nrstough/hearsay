@@ -124,6 +124,8 @@ Keep this current through the weekend; copy into Devpost. The rules require cred
   - the D-track engineered detectors (Sat Sep 26, CPU-only chat): handcrafted spectral + prosody, compression forensics, container/metadata, ENF and splice detectors, their fold-validated training and fusion score exports (`outputs/detector_scores/*.csv`), the container and high-band inventories, and the test-set band-match finding (`docs/reports/2026-09-26_cpu-detectors.md`)
   - M3 (Sat Sep 26, Spectra-AASIST chat): the Spectra-AASIST score stream through the shared band-matched input path with test-length crops (`scripts/score_spectra.py`, `hearsay.spectra`), its short-clip pad-mode pilot, direction and failure gates, the hermetic tests (`tests/test_spectra.py`) and the report (`docs/reports/2026-09-26_m3-spectra.md`)
 
+  - K (Sat Sep 26, Docker chat): the offline CPU linux/amd64 inference image (`Dockerfile`, `.dockerignore`, `docker/`: build, entrypoint, smoke, shipped-asset manifest, PCM parity), the Colima + Rosetta build setup on this Mac, the hermetic build-file tests (`tests/test_docker_image.py`), and the smoke and 50-file parity checks of the image against the logged fusion TSV (`docs/specs/2026-09-26_k-docker-image.md`)
+
   _Add specifics as they happen._
 - `/plan-review` workflow (a Claude Code skill): used to plan and review rungs taking over an hour. Its plan review and post-commit audit call OpenAI Codex (Codex CLI, via `.claude/review-*.sh`) when the CLI is installed. Used for the software-only rescope (Sep 25–26): Codex plan review, Claude critique and exploration agents.
 
