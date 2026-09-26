@@ -141,3 +141,16 @@ At 19:10, via the orchestrator, the CPU chat is running `handcrafted_v6` after a
 The numbers come from the CPU chat's report and are passed to the sweep as `--hnoise-evidence NOISE_AUC,CLEAN_AUC`. Without them, the diagnostic fails, as written above. No threshold changes.
 
 The refit seat (`wavlm_l` in M1b's seat, via `fuse_sweep_m5.py --refit-m1b wavlm_l`) is printed beside P_wl as a **diagnostic only**. It is not a candidate, never enters the gate and cannot be ratified tonight (Nathan, 19:10).
+
+## Erratum to the 43916ee note (clock times)
+
+The note is headed "(19:15, pre-data)" and cites "19:10". Commit 43916ee was made at **19:08:02**, and `wavlm_l.csv` was written at **19:07:01**. The times in the note were the relay's labels, not the clock.
+- **Refit-seat item:** written about a minute after the WavLM export existed, though before any number from it had been computed or seen (the locked run is 19:08:36). It adds a diagnostic only, with no gate and no ratification path, so its timing cannot bias a verdict.
+- **H_noise item:** still pre-data (its export does not exist at this erratum).
+
+The sweep doc's provenance line is qualified to match. Also from audit round 2:
+- The H_noise evidence must now come with `--hnoise-evidence-source PATH`, and that file's sha256 goes into the report's inputs.
+- AUCs outside [0, 1] are rejected.
+- An H_noise export with in-file ITW rows is accepted when the separate `_itw` file is absent, with coverage still enforced.
+
+No threshold changes.

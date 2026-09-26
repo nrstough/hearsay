@@ -537,7 +537,8 @@ def test_world_broken_export_is_invalid_not_fatal(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("ev,ok", [(None, False), ((0.90, 0.998), True), ((0.8999, 0.998), False),
-                                   ((0.95, 0.993), True), ((0.95, 0.9929), False), ((0.95, float("nan")), False)])
+                                   ((0.95, 0.993), True), ((0.95, 0.9929), False), ((0.95, float("nan")), False),
+                                   ((0.95, 1.002), False), ((1.2, 0.998), False)])
 def test_hnoise_diag(ev, ok):
     assert v3.hnoise_diag(ev)["ok"] is ok
 
@@ -551,8 +552,12 @@ def test_world_h_noise_uses_evidence(tmp_path, monkeypatch):
 
 def test_world_h_noise_fails_not_invalid(tmp_path, monkeypatch):
     world, w = _world(tmp_path, monkeypatch)
-    _export(w, tmp_path, "handcrafted_v6")  # in-file ITW rows but the declared _itw file is absent
-    assert v3.run_candidates(world)["H_noise"]["status"] == "INVALID"
+    _export(w, tmp_path, "handcrafted_v6", itw_separate=True)
+    (tmp_path / "_itw_handcrafted_v6.csv").unlink()  # no ITW rows anywhere -> coverage fails
+    bad = v3.run_candidates(world)["H_noise"]
+    assert bad["status"] == "INVALID" and "itw coverage" in bad["reason"]
+    _export(w, tmp_path, "handcrafted_v6")  # ITW rows in-file, declared _itw file absent -> in-file rows used
+    assert v3.run_candidates(world)["H_noise"]["status"] == "FAIL"
     _export(w, tmp_path, "handcrafted_v6", itw_separate=True)
     h = v3.run_candidates(world)["H_noise"]
     assert h["status"] == "FAIL" and h["diagnostic"]["ok"] is False and "5_diagnostic" in h["gate"]["failed"]
@@ -667,3 +672,29 @@ def test_main_exits_2_on_self_check_failure(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as e:
         v3.main([])
     assert e.value.code == 2 and (tmp_path / "sweep_v3_report.json").exists()
+
+
+@pytest.mark.parametrize("text,ok", [("0.95,0.997", True), ("0.95", False), ("0.95,0.99,0.9", False),
+                                     ("a,b", False), ("1.2,0.99", False)])
+def test_parse_hnoise(text, ok):
+    if ok:
+        assert v3.parse_hnoise(text) == (0.95, 0.997)
+    else:
+        with pytest.raises(ValueError):
+            v3.parse_hnoise(text)
+
+
+def test_candidate_cols_is_the_union_for_every_candidate():
+    base = {"m1b_v3": 1, "handcrafted_v5": 2, "m5_xlsr_ft": 3}
+    for name, spec in v3.CANDIDATES.items():
+        cols = v3.candidate_cols(spec, base, "NEW" if spec["new"] else None)
+        assert set(base) <= set(cols) and set(spec["weights"]) <= set(cols), name
+    with pytest.raises(ValueError):
+        v3.candidate_cols(v3.CANDIDATES["H_noise"], base, None)
+
+
+def test_hnoise_evidence_requires_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(v3, "sha_ok", lambda *a, **k: True)
+    with pytest.raises(SystemExit) as e:
+        v3.main(["--hnoise-evidence", "0.95,0.997"])
+    assert e.value.code == 2  # argparse error: no --hnoise-evidence-source

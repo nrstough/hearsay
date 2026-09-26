@@ -346,10 +346,23 @@ def load_raw(name: str, itw: str | None) -> pd.DataFrame:
 
 
 def resolve_itw(col: str, itw: str | None) -> str | None:
-    """The export's separate ITW file: the declared one, else _itw_<col>.csv if present, else None (in-file)."""
-    if itw is None and (S / f"_itw_{col}.csv").exists():
-        return f"_itw_{col}.csv"
-    return itw
+    """The export's separate ITW file if it exists (the declared name, else _itw_<col>.csv); otherwise None, and the
+    export's own itw/stress rows are used. Coverage is then enforced by validate_export."""
+    for name in (itw, f"_itw_{col}.csv"):
+        if name and (S / name).exists():
+            return name
+    return None
+
+
+def candidate_cols(spec: dict, base_cols: dict, new_df: pd.DataFrame | None = None) -> dict:
+    """The context a candidate is evaluated AND written from: CURRENT's three columns plus the new one (union), so
+    CURRENT is rebuilt on identical rows and fusion_v3's rank references come from the rows the Platt map saw."""
+    cols = dict(base_cols)
+    if spec["new"] is not None:
+        if new_df is None:
+            raise ValueError("candidate_cols: a new-column candidate needs its export")
+        cols[spec["new"][0]] = new_df
+    return cols
 
 
 def load_labels() -> tuple[pd.DataFrame, pd.Series]:
@@ -406,7 +419,7 @@ def perturb_eval(df: pd.DataFrame, consts: dict, rules: dict) -> dict:
     return {"cells": cells, "tripwire": trip, "scores": scores, "y": y}
 
 
-def evaluate(hnoise_evidence: tuple[float, float] | None = None) -> dict:
+def evaluate(hnoise_evidence: tuple[float, float] | None = None, hnoise_source: Path | None = None) -> dict:
     """Everything the report holds; no writes."""
     shipped_df = pd.read_csv(SHIPPED_TSV, sep="\t")
     shipped = shipped_df.set_index("filename")["cm-score"]
@@ -419,6 +432,9 @@ def evaluate(hnoise_evidence: tuple[float, float] | None = None) -> dict:
         SHIPPED_TSV, FUSION_V2, PERTURB_CSV, S / "m1b_v3.csv", S / "handcrafted_v5.csv", S / "_itw_handcrafted_v5.csv",
         S / "m5_xlsr_ft.csv", S / "_itw_m5.csv", S / "spectra_aasist.csv", REPO / "outputs/spectra/itw_stress/scores.csv",
         REPO / "splits/nsa_folds.csv", REPO / "outputs/manifests/itw_stress.csv")}  # fmt: skip
+    if hnoise_evidence is not None:  # the numbers and the file they were copied from are part of the locked inputs
+        inputs[f"hnoise_evidence_source:{hnoise_source}"] = sha256(hnoise_source)
+        inputs["hnoise_evidence"] = list(hnoise_evidence)
     base = build(base_cols, m3, labels)
     cur = rule_eval(base, CURRENT_W, E_TIERS, shipped)
     sc_ok = {k: cur["readout"][k] == v for k, v in EXPECTED_CURRENT.items()}
@@ -457,9 +473,20 @@ def hnoise_diag(evidence: tuple[float, float] | None) -> dict:
     if evidence is None:
         return {"ok": False, "reason": "no noise-AUC evidence supplied (--hnoise-evidence NOISE_AUC,CLEAN_AUC)"}
     noise, clean_ = (float(v) for v in evidence)
-    ok = bool(np.isfinite(noise) and np.isfinite(clean_) and noise >= HNOISE["noise_auc_min"] - EPS
+    ok = bool(0.0 <= noise <= 1.0 and 0.0 <= clean_ <= 1.0 and noise >= HNOISE["noise_auc_min"] - EPS
               and abs(clean_ - HNOISE["clean_auc_v5"]) <= HNOISE["clean_tol"] + EPS)  # fmt: skip
     return {"ok": ok, "noise_auc": noise, "clean_auc": clean_, "bar": HNOISE}
+
+
+def parse_hnoise(text: str) -> tuple[float, float]:
+    """'NOISE_AUC,CLEAN_AUC' -> two floats in [0, 1]; anything else raises ValueError."""
+    parts = text.split(",")
+    if len(parts) != 2:
+        raise ValueError("--hnoise-evidence takes NOISE_AUC,CLEAN_AUC")
+    vals = tuple(float(v) for v in parts)
+    if not all(0.0 <= v <= 1.0 for v in vals):
+        raise ValueError("AUCs must lie in [0, 1]")
+    return vals
 
 
 def pwl_diag_ok(n_catch: int, corr: dict) -> bool:
@@ -476,8 +503,6 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
         if not (S / f"{col}.csv").exists():
             return {**out, "status": "NOT RUN", "reason": f"{col}.csv absent"}
         itw = resolve_itw(col, itw)
-        if itw and not (S / itw).exists():
-            return {**out, "status": "INVALID", "reason": f"{col}.csv present but its ITW file {itw} is absent"}
         raw = load_raw(col, itw)
         inputs[f"outputs/detector_scores/{col}.csv"] = sha256(S / f"{col}.csv")
         if itw:
@@ -486,7 +511,7 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
         if probs:
             return {**out, "status": "INVALID", "reason": "; ".join(probs)}
         d = raw.drop_duplicates("path").set_index("path")
-        cols[col] = d  # union: CURRENT's three plus the new column, so CURRENT is rebuilt on identical rows
+        cols = candidate_cols(spec, base_cols, d)
         ctx = build(cols, m3, labels)
         auc = roc_auc_score(ctx["y"]["inner_oof"], ctx["logit"][col]["inner_oof"])
         out["new_column_inner_auc"] = round(float(auc), 4)
@@ -668,6 +693,8 @@ def main(argv=None) -> None:
     ap.add_argument("--new-column-model", help="P_wl: the wavlm_l probe directory (its meta.json is hashed)")
     ap.add_argument("--hnoise-evidence", metavar="NOISE_AUC,CLEAN_AUC",
                     help="H_noise diagnostic numbers from the CPU chat's report (20 dB noise AUC, clean AUC)")
+    ap.add_argument("--hnoise-evidence-source", metavar="PATH",
+                    help="the CPU chat's report the --hnoise-evidence numbers come from (hashed into the inputs)")
     ap.add_argument("--report-sha256", help="with --write: the sha256 of the locked report, as recorded in the sweep doc")
     args = ap.parse_args(argv)
     if args.write and (args.ratified_by != "nathan" or not args.candidate or not args.report_sha256):
@@ -680,12 +707,13 @@ def main(argv=None) -> None:
     hn = None
     if args.hnoise_evidence:
         try:
-            hn = tuple(float(v) for v in args.hnoise_evidence.split(","))
-            assert len(hn) == 2
-        except (ValueError, AssertionError):
-            ap.error("--hnoise-evidence takes NOISE_AUC,CLEAN_AUC")
+            hn = parse_hnoise(args.hnoise_evidence)
+        except ValueError as e:
+            ap.error(str(e))
+        if not args.hnoise_evidence_source or not Path(args.hnoise_evidence_source).exists():
+            ap.error("--hnoise-evidence requires --hnoise-evidence-source PATH (an existing file)")
 
-    rep = evaluate(hn) if hn else evaluate()
+    rep = evaluate(hn, Path(args.hnoise_evidence_source)) if hn else evaluate()
     print(f"rows (base): {rep['rows_base']}")
     sc = rep["self_check"]
     print(f"self-check: {'ok' if sc['ok'] else 'FAIL'}; got {sc['got']}; Spearman vs shipped {sc['spearman']:.6f}")
@@ -729,13 +757,14 @@ def do_write(args, rep: dict, locked: dict) -> None:
 
     c, spec = rep["candidates"][args.candidate], CANDIDATES[args.candidate]
     labels, _ = load_labels()
-    cols = {k: fs.load(k, str(S / i) if i else None) for k, i in
-            (("m1b_v3", None), ("handcrafted_v5", "_itw_handcrafted_v5.csv"), ("m5_xlsr_ft", "_itw_m5.csv"))
-            if k in spec["weights"]}  # fmt: skip
-    new_model = None
+    base_cols = {k: fs.load(k, str(S / i) if i else None) for k, i in
+                 (("m1b_v3", None), ("handcrafted_v5", "_itw_handcrafted_v5.csv"), ("m5_xlsr_ft", "_itw_m5.csv"))}
+    new_model, new_df = None, None
     if spec["new"]:
         col, itw = spec["new"]
-        cols[col] = load_raw(col, resolve_itw(col, itw)).drop_duplicates("path").set_index("path")
+        new_df = load_raw(col, resolve_itw(col, itw)).drop_duplicates("path").set_index("path")
+    cols = candidate_cols(spec, base_cols, new_df)  # the same union the evaluation used
+    if spec["new"]:
         new_model = {"name": col, "dir": str(Path(args.new_column_model)),
                      "meta_sha256": sha256(Path(args.new_column_model) / "meta.json")}  # fmt: skip
     ctx = build(cols, fs.load("spectra_aasist", str(REPO / "outputs/spectra/itw_stress/scores.csv")), labels)

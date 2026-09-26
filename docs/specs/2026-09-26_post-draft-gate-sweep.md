@@ -174,3 +174,17 @@ Every finding below was fixed in the follow-up commit.
 6. **Nits:** the report is JSON-safe (NaN written as null, `allow_nan=False`); W4's gate record carries `governing: false`; the `fusion_v3` payload carries a `status`; `--new-column-model` is refused for candidates without a new column.
 
 The re-run verdicts are unchanged: T2 FAIL, W4 BAKEOFF FAIL, P_wl and H_noise NOT RUN, KEEP. Report sha256 `07090750…` (19:06, pre-WavLM). `tests/test_fuse_sweep_v3.py`: 86 passed.
+
+## Post-commit audit, round 2 (Claude, 19:12; Overall Needs-work)
+
+10 of the 11 round-1 findings were verified resolved. The eleventh, blend order vs `DETECTOR_ORDER`, belongs to the integration job and is moot with no passer. Round 2 found:
+- **A.** `do_write` built H_noise's context from its own weights only. Now both evaluation and writing use `candidate_cols`, the union. Tested.
+- **B.** The clock times in the 43916ee note were wrong. An erratum was appended to the manifest, and the sweep doc's provenance line is qualified.
+- **C.** The H_noise evidence had no source. `--hnoise-evidence-source PATH` is now required, and that file's sha256 and the numbers go into the report's inputs.
+- **D.** AUCs outside [0, 1] are now rejected.
+- **E.** `parse_hnoise` replaces an `assert`. Tested.
+- **F.** H_noise's in-file ITW rows are now accepted, with coverage still enforced.
+- **G.** The heads report is committed (`e611d1b`).
+- **H.** The 20:30 H_noise run will record its new report sha256 in the sweep doc.
+
+A re-run with the fixed code reproduces the locked report byte for byte (sha256 `c2b6bc22…`). `tests/test_fuse_sweep_v3.py`: 102 passed.

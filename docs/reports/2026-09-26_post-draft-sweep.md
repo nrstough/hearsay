@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| Pre-declaration | `docs/reports/2026-09-26_post-draft-manifest.md`: `141b254` (17:39), clarifications `b877760`, the P_wl "with room" amendment `ae9c4c4`, the H_noise note `43916ee`. Every one was committed before the number it governs existed. |
+| Pre-declaration | `docs/reports/2026-09-26_post-draft-manifest.md`: `141b254` (17:39), clarifications `b877760`, the P_wl "with room" amendment `ae9c4c4`, the H_noise note `43916ee`. Every one was committed before the number it governs was computed. The refit-seat line in `43916ee` came about a minute after `wavlm_l.csv` existed but before it was read; it is a diagnostic only (see the manifest's erratum). |
 | Script | `scripts/fuse_sweep_v3.py` at `43916ee`, run once at 19:08, a minute after `wavlm_l.csv` landed |
 | Locked report | `outputs/fusion/sweep_v3_report.json`, sha256 `c2b6bc22d69f67acb037cb1f5e1c11e0762f2b66d34ce1a8a60139c376ed69ad`; also archived as `sweep_v3_report_20260926-190836.json`. `--write` requires this hash. |
 | WavLM export | `outputs/detector_scores/wavlm_l.csv` (sha256 `cef08ea6…`; 16,142 / 3,858 / 1,671 / 3,000 rows) |
