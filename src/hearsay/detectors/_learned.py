@@ -88,10 +88,10 @@ class FeatureModelDetector:
     def run(self, ctx: ClipContext) -> DetectorResult:
         b = self.bundle
         fn = type(self).feature_fn
-        feats = ctx.memo(
-            self.memo_key,
-            lambda: fn(ctx.audio, crop_mode=b["crop_mode"], band_match=b.get("band_match", False)),
-        )
+        kw: dict = {"crop_mode": b["crop_mode"], "band_match": b.get("band_match", False)}
+        if b.get("families"):
+            kw["families"] = tuple(b["families"])  # v4 families (handcrafted only)
+        feats = ctx.memo(self.memo_key, lambda: fn(ctx.audio, **kw))
         x = np.array([feats[c] for c in b["features"]], dtype=np.float32)
         p = float(np.clip(predictor(b).predict_proba(x[None, :])[0, 1], 1e-6, 1 - 1e-6))
         logit = float(np.log(p / (1 - p)))

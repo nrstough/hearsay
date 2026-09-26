@@ -45,7 +45,10 @@ def main() -> None:
                     help="segment = hearsay.embed.prepare_segment (v2); first4s = v1")
     ap.add_argument("--band-match", action=argparse.BooleanOptionalAction, default=True,
                     help="apply hearsay.handcrafted.band_limit (NSA test-set roll-off; v3)")
+    ap.add_argument("--families", default="",
+                    help="comma-separated hearsay.hc_v4 families to append (v4), e.g. lfcc,phase")
     args = ap.parse_args()
+    families = tuple(n for n in args.families.split(",") if n)
 
     m = pd.read_csv(args.manifest)
     if args.crop == "test":
@@ -58,10 +61,11 @@ def main() -> None:
     seeds = [args.seed + r for r in range(len(m))]
     modes = [args.crop_mode] * len(m)
     bands = [args.band_match] * len(m)
+    fams = [families] * len(m)
 
     t0 = time.time()
     with ProcessPoolExecutor(args.workers) as ex:
-        rows = list(ex.map(features_for_path, m.path, crop_s, seeds, modes, bands,
+        rows = list(ex.map(features_for_path, m.path, crop_s, seeds, modes, bands, fams,
                            chunksize=32))  # fmt: skip
     feats = pd.DataFrame([r or {} for r in rows])
     out = pd.concat([m.reset_index(drop=True), feats], axis=1)
@@ -71,8 +75,8 @@ def main() -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(dest, index=False)
     meta = {"manifest": str(args.manifest), "crop_mode": args.crop_mode, "crop": args.crop,
-            "band_match": args.band_match, "seed": args.seed, "workers": args.workers,
-            "rows": len(out),
+            "band_match": args.band_match, "families": list(families), "seed": args.seed,
+            "workers": args.workers, "rows": len(out),
             "n_features": int(feats.shape[1]), "failures": int((out.hc_flag != "").sum()),
             "seconds": round(time.time() - t0)}  # fmt: skip
     dest.with_suffix(".meta.json").write_text(json.dumps(meta, indent=2))

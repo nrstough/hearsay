@@ -127,10 +127,11 @@ def main() -> None:
     side_meta = json.loads(side.read_text()) if side.exists() else {}
     crop_mode = side_meta.get("crop_mode", "first4s")
     band_match = bool(side_meta.get("band_match", False))
+    families = [str(n) for n in side_meta.get("families", [])]
     n_laundered = int((d_all.get("cmp_launder", pd.Series(dtype=str)).fillna("") != "").sum())
     print(f"{args.train}: {len(d)} rows ({(d_all[flag_col] != '').sum()} feature failures "
           f"dropped), {len(feat_cols)} features, crop_mode={crop_mode}, band_match={band_match}, "
-          f"laundered={n_laundered}, inner {tr.sum()} / holdout {va.sum()}")
+          f"families={families}, laundered={n_laundered}, inner {tr.sum()} / holdout {va.sum()}")
 
     auc = {c: round(float(roc_auc_score(y[tr], d.loc[tr, c])), 4) for c in feat_cols}
     top = sorted(auc.items(), key=lambda kv: -abs(kv[1] - 0.5))[:15]
@@ -198,7 +199,8 @@ def main() -> None:
     out = REPO / "models" / f"{args.model_prefix}_{best}_{stamp}"
     out.mkdir(parents=True, exist_ok=True)
     bundle = {"features": feat_cols, "kind": best, "feature_stats": stats,
-              "crop_mode": crop_mode, "band_match": band_match, "prefix": args.model_prefix,
+              "crop_mode": crop_mode, "band_match": band_match, "families": families,
+              "prefix": args.model_prefix,
               "train": args.train, "folds": str(args.folds)}  # fmt: skip
     if best == "lgbm":
         # Store the dumped trees, not the lightgbm object: inference must not import lightgbm
@@ -216,7 +218,8 @@ def main() -> None:
     export.to_csv(out / "scores.csv", index=False)
     fdir_txt = str(fdir.relative_to(REPO)) if fdir.is_relative_to(REPO) else str(fdir)
     meta = {"rung": args.rung, "train": args.train, "features_dir": fdir_txt,
-            "crop_mode": crop_mode, "band_match": band_match, "n_laundered": n_laundered,
+            "crop_mode": crop_mode, "band_match": band_match, "families": families,
+            "n_laundered": n_laundered,
             "folds": str(args.folds), "model": best, "cv": cv,
             "cv_by_generator": cv_gen, "cv_by_bonafide_source": cv_src,
             "n_features": len(feat_cols), "n_inner": int(tr.sum()), "n_holdout": int(va.sum()),

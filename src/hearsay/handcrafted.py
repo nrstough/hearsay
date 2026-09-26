@@ -71,13 +71,15 @@ def _crop(
 
 def features(
     x: np.ndarray, crop_s: float | None = None, seed: int | None = None,
-    crop_mode: str = "segment", band_match: bool = True,
+    crop_mode: str = "segment", band_match: bool = True, families: tuple[str, ...] = (),
 ) -> dict[str, float]:  # fmt: skip
+    """The 75 v3 features, plus any `hearsay.hc_v4.FAMILIES` named in `families` (v4)."""
     import librosa
 
     x = _crop(x, crop_s, seed, crop_mode, band_match).astype(np.float32)
     f: dict[str, float] = {}
-    s = np.abs(librosa.stft(x, n_fft=N_FFT, hop_length=HOP)) ** 2
+    Z = librosa.stft(x, n_fft=N_FFT, hop_length=HOP)
+    s = np.abs(Z) ** 2
     freqs = librosa.fft_frequencies(sr=SR, n_fft=N_FFT)
     tot = s.sum(axis=0) + 1e-12
     for hz in (4000, 6000, 7000):
@@ -128,14 +130,21 @@ def features(
     f["pause_count"] = float(np.sum(np.diff(pause.astype(int)) == 1))
     zcr = librosa.feature.zero_crossing_rate(x, frame_length=400, hop_length=HOP)[0]
     f["zcr_mean"], f["zcr_std"] = float(np.mean(zcr)), float(np.std(zcr))
+    if families:
+        from hearsay.hc_v4 import FAMILIES
+
+        ctx = {"x": x, "Z": Z, "S": s, "freqs": freqs, "voiced": voiced, "rms_db": rms_db,
+               "f0": f0}  # fmt: skip
+        for name in families:
+            f.update(FAMILIES[name](ctx))
     return {k: (v if np.isfinite(v) else 0.0) for k, v in f.items()}
 
 
 def features_for_path(
     path: str, crop_s: float | None = None, seed: int | None = None,
-    crop_mode: str = "segment", band_match: bool = True,
+    crop_mode: str = "segment", band_match: bool = True, families: tuple[str, ...] = (),
 ) -> dict[str, float] | None:  # fmt: skip
     try:
-        return features(load_audio(path), crop_s, seed, crop_mode, band_match)
+        return features(load_audio(path), crop_s, seed, crop_mode, band_match, families)
     except Exception:  # noqa: BLE001 - one bad file becomes a missing row, reported by caller
         return None

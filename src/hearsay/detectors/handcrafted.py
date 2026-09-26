@@ -52,6 +52,24 @@ LABELS = {
 LABELS |= {f"contrast{i}_mean": f"spectral contrast, band {i}" for i in range(6)}
 LABELS |= {f"mfcc{i}_mean": f"MFCC {i} mean" for i in range(20)}
 LABELS |= {f"mfcc{i}_std": f"MFCC {i} variability" for i in range(20)}
+# v4 families (hearsay.hc_v4)
+LABELS |= {f"lfcc{i}_mean": f"LFCC {i} mean" for i in range(20)}
+LABELS |= {f"lfcc{i}_std": f"LFCC {i} variability" for i in range(20)}
+LABELS |= {f"lfcc{i}_dstd": f"LFCC {i} frame-to-frame change" for i in range(20)}
+LABELS |= {
+    "gd_std_mean": "group-delay spread across harmonics",
+    "gd_std_std": "variability of the group-delay spread",
+    "gd_std_p10": "group-delay spread, quietest frames",
+    "gd_std_p90": "group-delay spread, most spread frames",
+    "gd_iqr_mean": "group-delay interquartile spread",
+    "gd_iqr_std": "variability of the group-delay interquartile spread",
+    "gd_iqr_p10": "group-delay interquartile spread (10th pct)",
+    "gd_iqr_p90": "group-delay interquartile spread (90th pct)",
+    "pc_err_median": "phase-vs-magnitude disagreement at harmonics (median, Hz)",
+    "pc_err_mean": "phase-vs-magnitude disagreement at harmonics (mean, Hz)",
+    "pc_err_p90": "phase-vs-magnitude disagreement at harmonics (90th pct, Hz)",
+    "pc_frac_incoherent": "share of harmonics with incoherent phase",
+}
 
 __all__ = ["LABELS", "NAME", "HandcraftedDetector", "contributions", "latest_model_dir"]
 
