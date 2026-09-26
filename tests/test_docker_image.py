@@ -100,8 +100,10 @@ def test_b6_copy_destinations_match_the_loaders():
         assert (embed.REPO / "weights" / name).parts[-2:] == ("weights", name)
     assert "COPY docker/build/models ./models" in DOCKERFILE
     assert learned.MODELS.name == "models" and pipeline.HC_DIR.parts[-2:] == ("models", "hc_selected")
-    assert pipeline.PROBE_DIR.parent.name == "models" and pipeline.CONSTANTS_PATH.parts[-3:] == \
-        ("models", "fusion_v0", "constants.json")
+    assert pipeline.PROBE_DIR.parent.name == "models"
+    assert pipeline.DEFAULT_CONSTANTS_PATH.parts[-3:] == ("models", "fusion_v1", "constants.json"), \
+        "the shipped rule's file (e_on_a) is staged by build.sh with every models/fusion_*/"
+    assert pipeline.CONSTANTS_PATH.parts[-3:] == ("models", "fusion_v0", "constants.json")
     # weights before code: a code edit must not re-copy the weight layers
     assert DOCKERFILE.index("COPY weights/wav2vec2-xls-r-300m") < DOCKERFILE.index("COPY src ./src")
     assert DOCKERFILE.index("COPY src ./src") < DOCKERFILE.index("assets.py freeze")
@@ -268,6 +270,7 @@ def test_p2_pcm_hash_detects_a_changed_sample(tmp_path):
 def test_p3_smoke_script_runs_offline_and_checks_order():
     assert "--network none" in SMOKE and ":/data:ro" in SMOKE
     assert "--entrypoint python" in SMOKE and "assets.py verify" in SMOKE and "--full" in SMOKE
+    assert '"$IMAGE" --flip' in SMOKE and "smoke_predictions_FLIPPED.tsv" in SMOKE, "the --flip twin is smoked"
     assert "-e TRANSFORMERS_OFFLINE=0" in SMOKE and "refused without the offline variables" in SMOKE, \
         "the negative offline check (D2) is part of the smoke test"
     neg = SMOKE.index("-e TRANSFORMERS_OFFLINE=0")
@@ -292,5 +295,6 @@ def test_p4_build_script_targets_amd64_and_records_provenance():
     assert (REPO / "docker" / ".gitignore").read_text().strip() == "build/"
     # the system disk hosts the VM's sparse disk: a free-space guard before, pruning after
     assert "MIN_FREE_GB" in BUILD and 'df -Pk "$VM_DIR"' in BUILD
+    assert BUILD.index("KEEP=") < BUILD.index("docker buildx build"), "superseded tags are removed before the build"
     assert "docker image prune -f" in BUILD and "docker builder prune" not in BUILD, \
         "old tags and dangling images go; the layer cache stays for the next build"

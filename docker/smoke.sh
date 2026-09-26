@@ -66,5 +66,28 @@ decode_errors = m.get("n_decode_error", sum(v for k, v in flags.items() if "deco
 print("gated:", m.get("n_gated"), "decode errors:", decode_errors, "flags:", flags, "threads:", m.get("threads"), "wall:", m.get("wall_seconds"), "s")
 assert decode_errors == 0, "a smoke file failed to decode in the image"
 PY
+echo "== --flip: the pre-flipped twin re-fused from the cache"
+$RUN -v "$ROOT/data:/data:ro" -v "$ROOT/template.tsv:/tmpl/key.tsv:ro" -v "$ROOT/out1:/out" \
+     -e HEARSAY_TEMPLATE=/tmpl/key.tsv -e HEARSAY_TEAM=smoke "$IMAGE" --flip
+FL="$ROOT/out1/smoke_predictions_FLIPPED.tsv"
+[ -f "$FL" ] || { echo "smoke: --flip wrote no smoke_predictions_FLIPPED.tsv" >&2; exit 1; }
+python3 - "$TSV" "$FL" "$ROOT/out1/run_meta.json" <<'PY'
+import csv, itertools, json, sys
+a, b = (list(csv.reader(open(p), delimiter="\t")) for p in sys.argv[1:3])
+assert a[0] == b[0] == ["filename", "cm-score"] and [r[0] for r in a] == [r[0] for r in b], "flipped file order differs"
+pa, pb = [float(r[1]) for r in a[1:]], [float(r[1]) for r in b[1:]]
+assert all(0.0 <= v <= 1.0 for v in pa + pb), "scores outside [0, 1]"
+# Gated (non-speech) files form a pinned block below 0.001 in both polarities by the runner's
+# policy, so only determinate rows (>= 0.001 in both files) must reverse their order.
+det = [(x, y) for x, y in zip(pa, pb) if x >= 0.001 and y >= 0.001]
+for (x1, y1), (x2, y2) in itertools.combinations(det, 2):
+    if x1 != x2:
+        assert (x1 < x2) == (y1 > y2), f"flipped ranking is not the reverse: {pa} vs {pb}"
+assert all((x < 0.001) == (y < 0.001) for x, y in zip(pa, pb)), "a file is gated in one polarity only"
+m = json.load(open(sys.argv[3]))
+pol = (m.get("version") or {}).get("polarity") or m.get("polarity")
+assert pol == "flipped", f"run_meta polarity is {pol!r}, expected 'flipped'"
+print(f"smoke: --flip wrote the FLIPPED twin ({len(pb)} rows, same order, reversed where untied), polarity recorded")
+PY
 echo "== smoke OK: $TSV"
 cat "$TSV"

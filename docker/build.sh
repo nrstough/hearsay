@@ -50,6 +50,14 @@ if [ "${1:-}" = "--print-args" ]; then
   echo "FUSION_DIRS=${FUSION_DIRS[*]}"; echo "BUILD_INFO=$BUILD_INFO"; exit 0
 fi
 
+# Free VM disk before building: superseded tags (all but the current :latest) and dangling images go
+# first, since the 20 GB cap cannot hold a third 7.5 GB tag mid-build (build 8, 08:41).
+KEEP="$(docker image inspect "$IMAGE:latest" --format '{{.Id}}' 2>/dev/null || true)"
+for tag in $(docker images "$IMAGE" --format '{{.Tag}}' | grep -v '^latest$'); do
+  [ "$(docker image inspect "$IMAGE:$tag" --format '{{.Id}}')" = "$KEEP" ] || docker rmi "$IMAGE:$tag" >/dev/null 2>&1 || true
+done
+docker image prune -f >/dev/null 2>&1 || true
+
 rm -rf docker/build && mkdir -p docker/build/models
 cp -RL "$PROBE_REAL" "docker/build/models/$(basename "$PROBE_REAL")"
 cp -RL "$HC_REAL" docker/build/models/hc_selected
