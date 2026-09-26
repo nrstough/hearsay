@@ -1,4 +1,4 @@
-# Consult: fusion, selection, false alarms and the "default answer" (Sat Sep 26, 2026, ~03:30 EDT)
+# Consult: fusion, selection, false alarms and the "default answer" (Sat Sep 26, 2026, ~03:30 EDT; updated ~04:30 with In-the-Wild and band-limit findings)
 
 **Target:** a frontier LLM, for strategic and technical opinion.
 **Scope:** everything **except** the M5 fine-tune recipe, which has its own consult: `2026-09-26_m5-extra-data-finetune_CONSULTATION.md`.
@@ -47,6 +47,7 @@ You are an applied researcher in audio deepfake detection and in detection-cost 
 4. No tiling; training crops are drawn from the test-duration distribution; test-time uses the whole clip.
 
 **Shortcuts found and neutralized:**
+- **7.2 kHz band wall.** Every NSA test file is low-passed at about 7.2 kHz: the median energy share in 7.5–8 kHz is 1.6e-8, against 6e-4 to 6e-3 in LJ, LibriSpeech and DiffSSD. That band was a train-only cue. It's now removed by an identical Kaiser low-pass on train and test, in both the deep and engineered paths (since ~04:20). **All deep numbers below predate this fix** and are being re-measured.
 - peak level (AUC 0.66 on its own)
 - leading silence (LibriSpeech 0.37 s vs test 0.06 s)
 - a tiling seam from padding short clips
@@ -81,6 +82,21 @@ Normalized minDCF at π = 0.3 unless stated. Holdout = outer holdout.
 - Score distribution: 28% of files above 0.9 and 40% above 0.5 (NSA says about 30% synthetic).
 - Preflight: **pure silence scores 0.9996 and a synthetic music chord scores 1.0**, i.e. confidently wrong on non-speech. The test set looks all-speech (median voiced fraction 0.8).
 
+## Real-world stress test (In-the-Wild, evaluation only, never trained on)
+
+The sample is 2,000 real clips from 54 speakers plus 1,000 fakes, web-sourced celebrity audio. "Inner threshold" is the threshold that minimizes inner-fold out-of-fold DCF.
+
+| | M1 (NSA-only real) | M1b (+ASVspoof 2019 LA real: 40 VCTK speakers, 5.1k clips, plus a 2.5k A01–A06 anchor) |
+|---|---|---|
+| NSA holdout minDCF | 0.146 | 0.079 (better on every slice; inside holdout noise) |
+| Inner-fold CV minDCF | 0.250 | 0.248 |
+| **In-the-Wild minDCF** | **0.374** | 0.405 |
+| In-the-Wild P_FA at the inner threshold | **1.2%** | 5.7% |
+
+- **Both models are 3–5× worse on real-world audio** than on the NSA-domain holdout. The brief says the test's real audio may include smartphone, telephony and field recordings.
+- **Adding VCTK read speech did not help on In-the-Wild.** An earlier consult predicted it would.
+- Part of the gap may be the 7.2 kHz band mismatch (In-the-Wild isn't low-passed either); the re-measurement will show.
+
 ## What I want (ranked)
 
 For each question: your recommendation, a concrete procedure we can run in under 1 hour of CPU, and EV × effort.
@@ -101,12 +117,13 @@ For each question: your recommendation, a concrete procedure we can run in under
      - Account for the minDCF threshold sweep.
    - How does the answer change if NSA actually runs their shipped code unmodified (a higher score treated as bona fide, Pspoof = 0.5)?
    - Is there any hedge that is safe under both directions, or is the draft review the only real protection?
-3. **False alarms on unfamiliar real speakers.** Our real training data is one LJ speaker plus about 80 LibriSpeech readers. The brief says the test real audio may span studio, smartphone, telephony and field recordings.
-   - What is the cheapest effective way to reduce false alarms on out-of-domain real speech in the next ~20 hours?
-     - more bona fide corpora (which?)
-     - one-class or center-loss objectives
-     - per-utterance score normalization
-     - unsupervised adaptation on the unlabeled test embeddings (standardizing with test statistics, CORAL)
+3. **Channel robustness: false alarms on real-world real speech.** This is now the top question. Our real training data is one LJ speaker, about 80 LibriSpeech readers, and optionally 40 VCTK speakers, all clean read speech. In-the-Wild shows 3–5× worse minDCF, and more read-speech speakers didn't help. The test's real audio may include smartphone, telephony and field recordings.
+   - What is the cheapest effective lever in the next ~20 hours, using In-the-Wild real-speech P_FA as the proxy?
+     - channel augmentation on both classes: telephony band-limit, codecs, RIR, noise, RawBoost convolutive
+     - score normalization
+     - test-statistics standardization or CORAL on the unlabeled test embeddings
+     - which bona fide corpora actually add channel variety (not just more read speech)
+     - center-loss or one-class objectives (another consult warned these are contraindicated with narrow bona fide data)
    - What is safe to do with the unlabeled test set? We have ruled out pseudo-labeling.
    - Is checking whether test real clips are LJ-like (nearest-neighbor to LJ embeddings) useful or a trap?
 4. **Explainability and the diversity score.** Our engineered detectors carry no signal because every test file is identical in format. Should we:
