@@ -25,9 +25,8 @@ from typing import Any
 import numpy as np
 import scipy.signal
 
-from hearsay import SR
 from hearsay.audio import load_audio, probe_audio
-from hearsay.metrics import C_FA, C_MISS, PI_SYNTH, min_cost, sigmoid
+from hearsay.metrics import C_FA, C_MISS, PI_SYNTH, sigmoid
 
 
 def compute_sha256(path: Path) -> str:
