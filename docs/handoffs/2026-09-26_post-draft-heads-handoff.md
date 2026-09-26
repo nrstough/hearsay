@@ -54,3 +54,5 @@ pgrep -fl "extract_embeddings|score_spectra|m5_score|run_pipeline"   # the GPU m
 
 - `docs/consults/2026-09-26_post-draft-review_RESPONSE.md` (plan, gate, Round 2), `…_RESPONSE_fable.md` (the layer-probe negative result and the miss-tail counts), `…_CONSULTATION.md`.
 - `docs/reports/2026-09-26_m1b-asv19-bonafide.md`, `src/hearsay/embed.py`, `src/hearsay/probe.py`, `scripts/{extract_embeddings,train_probe,export_probe_scores}.py`, `CLAUDE.md`.
+
+**Correction (19:05):** the miss counts above (158; M1b 1, M5 33, Spectra 107) are at the In-the-Wild argmin. The gate's diagnostic uses CURRENT's inner-OOF threshold: 122 misses, M5 19, Spectra 79 (`b877760`). Report both, and use the inner-threshold count as the one the gate reads.
