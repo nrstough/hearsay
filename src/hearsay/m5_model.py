@@ -42,7 +42,7 @@ class M5Config:
     seed: int = 0
     mix: dict = field(default_factory=lambda: {
         "real": {"ljspeech": 0.25, "librispeech": 0.35, "asvspoof2019": 0.40},
-        "spoof": {"diffssd": 0.62, "mlaad": 0.28, "asvspoof2019": 0.10},
+        "spoof": {"diffssd": 0.78, "mlaad": 0.12, "asvspoof2019": 0.10},  # MLAAD 12%: probe A
         "mlaad_cap_per_model": 120,
     })
 

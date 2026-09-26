@@ -24,7 +24,7 @@ from hearsay import SR
 
 OPS = ("noise", "band", "reverb", "gain_clip", "rawboost_conv", "codec")
 SNR_DB = (5.0, 30.0)
-CUTOFFS_HZ = (3400.0, 4000.0, 7000.0)
+CUTOFFS_HZ = (3400.0, 4000.0)  # telephony; the 7.25 kHz NSA match is deterministic, not an op
 RT60_S = (0.2, 0.8)
 GAIN_DB = (-12.0, 12.0)
 

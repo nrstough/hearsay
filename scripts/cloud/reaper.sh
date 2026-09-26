@@ -17,7 +17,7 @@ VAST="uvx vastai"
 py() { "$REPO/.venv/bin/python" -c "$@"; }
 kill_() { echo y | $VAST destroy instance "$1" >/dev/null 2>&1; }
 
-declare -A LAST SEEN
+# per-job state lives in files (macOS ships bash 3.2: no associative arrays)
 while :; do
   NOW=$(date +%s)
   ACTIVE=0
@@ -27,8 +27,10 @@ while :; do
     [ -f "$d/DESTROYED" ] && continue
     ACTIVE=$((ACTIVE + 1))
     ST=$(rclone cat "${HEARSAY_R2_PREFIX}runs/$JOB/STATUS" 2>/dev/null || echo "?")
-    if [ "${LAST[$JOB]:-}" != "$ST" ]; then LAST[$JOB]="$ST"; SEEN[$JOB]=$NOW; fi
-    AGE=$(( (NOW - ${SEEN[$JOB]:-$NOW}) / 60 ))
+    LAST=$(cat "$d/LAST" 2>/dev/null || echo "")
+    if [ "$LAST" != "$ST" ]; then echo "$ST" > "$d/LAST"; echo "$NOW" > "$d/SEEN"; fi
+    SEEN=$(cat "$d/SEEN" 2>/dev/null || echo "$NOW")
+    AGE=$(( (NOW - SEEN) / 60 ))
     REASON=""
     case "$ST" in
       DONE) REASON="done" ;;
@@ -46,9 +48,10 @@ while :; do
     fi
   done
   if [ "$ACTIVE" -eq 0 ]; then
-    LEFT=$($VAST show instances --raw 2>/dev/null | py 'import sys,json; print(len(json.load(sys.stdin) or []))')
+    LEFT=$($VAST show instances --raw 2>/dev/null | py 'import sys,json; print(len(json.load(sys.stdin) or []))' 2>/dev/null || echo "?")
     echo "no active jobs; instances on the account: $LEFT"
-    [ "$LEFT" = 0 ] && exit 0
+    # never exit early: jobs are launched after the reaper starts; stop 30 min past the deadline
+    [ "$NOW" -ge $((DEADLINE + 1800)) ] && [ "$LEFT" = 0 ] && exit 0
   fi
   sleep "$POLL"
 done

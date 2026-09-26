@@ -29,7 +29,14 @@ from hearsay.m5_data import FOLDS, INNER_FOLDS, check_folds_file
 from hearsay.metrics import eer, min_cost, report
 
 REPO = Path(__file__).resolve().parents[1]
-M1_DIR = REPO / "models" / "m1_wav2vec2-xls-r-300m_L7_20260926-0302"
+def newest_m1_dir() -> Path:
+    """The M1 bar moves as the main chat re-extracts (band-matched v3 due ~05:15): always read
+    the newest models/m1_* meta.json unless --m1-dir is given."""
+    ds = sorted((REPO / "models").glob("m1_*"), key=lambda p: p.stat().st_mtime)
+    return ds[-1] if ds else REPO / "models" / "m1_missing"
+
+
+M1_DIR = newest_m1_dir()
 
 
 def find_runs(root: Path, arm: str) -> dict[str, Path]:

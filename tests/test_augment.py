@@ -51,11 +51,11 @@ def test_d2_noise_snr_is_accurate():
 def test_d3_band_limit_attenuates_above_cutoff():
     rng = np.random.default_rng(0)
     white = rng.standard_normal(4 * SR).astype(np.float32)
-    for cut, stop_from, min_db in ((3400.0, 4250.0, 40), (4000.0, 5000.0, 40), (7000.0, 7800.0, 8)):
+    for cut, stop_from, min_db in ((3400.0, 4250.0, 40), (4000.0, 5000.0, 40)):
         y = band_limit(white, rng, cut)
         f, p = signal.welch(y, fs=SR, nperseg=2048)
         inband = p[(f > 200) & (f < cut * 0.8)].mean()
-        stop = p[f >= stop_from].mean()  # 7 kHz leaves only 7.8-8 kHz below Nyquist
+        stop = p[f >= stop_from].mean()
         assert 10 * np.log10(inband / stop) > min_db
 
 
