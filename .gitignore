@@ -21,6 +21,8 @@ submissions/*
 # Environment and secrets
 .venv/
 .env
+.env*.local
+.env.local
 
 # Python / OS noise
 __pycache__/
@@ -29,3 +31,11 @@ __pycache__/
 
 # Claude Code per-user settings (project .claude/skills and settings.json ARE tracked)
 .claude/settings.local.json
+
+# Node & Next.js build artifacts
+node_modules/
+.next/
+dist/
+build/
+*.log
+*.tsbuildinfo

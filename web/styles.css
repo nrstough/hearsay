@@ -1,0 +1,1176 @@
+/* =====================================================================
+   LUMENIX / HEARSAY — BESPOKE UI/UX DESIGN SYSTEM
+   Zero Emojis — 100% Tailored SVG Micro-Icons
+   Typography: Exclusively 100% 'Aileron' (Japanese Neo-Grotesque)
+   Visualizations: Dual-Axis LineChart, 8-Band Spectrogram, 6-Axis Radar
+   ===================================================================== */
+
+/* 1. Universal Aileron Typography */
+@font-face {
+  font-family: 'Aileron';
+  font-style: normal;
+  font-weight: 300;
+  src: url('fonts/Aileron-Light.woff') format('woff'),
+       url('https://fonts.cdnfonts.com/s/16225/Aileron-Light.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aileron';
+  font-style: normal;
+  font-weight: 400;
+  src: url('fonts/Aileron-Regular.woff') format('woff'),
+       url('https://fonts.cdnfonts.com/s/16225/Aileron-Regular.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aileron';
+  font-style: normal;
+  font-weight: 600;
+  src: url('fonts/Aileron-SemiBold.woff') format('woff'),
+       url('https://fonts.cdnfonts.com/s/16225/Aileron-SemiBold.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aileron';
+  font-style: normal;
+  font-weight: 700;
+  src: url('fonts/Aileron-Bold.woff') format('woff'),
+       url('https://fonts.cdnfonts.com/s/16225/Aileron-Bold.woff') format('woff');
+  font-display: swap;
+}
+
+:root {
+  --font-main: 'Aileron', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Reference Color Palette */
+  --bg-app: #f8f9fa;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f9fafb;
+  --bg-pill-audio: #141416;
+
+  /* Borders & Dividers */
+  --border-card: #eaecf0;
+  --border-light: #f2f4f7;
+  --border-medium: #d0d5dd;
+
+  /* Typography Colors */
+  --text-primary: #101828;
+  --text-secondary: #344054;
+  --text-muted: #667085;
+  --text-light: #98a2b3;
+
+  /* Brand Accents */
+  --brand-coral: #ef4444;
+  --brand-coral-subtle: #fef2f2;
+  --brand-coral-border: #fee2e2;
+
+  --status-green: #059669;
+  --status-green-bg: #ecfdf5;
+  --status-green-border: #a7f3d0;
+
+  --status-red: #dc2626;
+  --status-red-bg: #fef2f2;
+
+  /* Exact Dual-Axis Chart Colors */
+  --chart-1: #2563eb;          /* Desktop: Vibrant Royal Blue */
+  --chart-2: #818cf8;          /* Mobile: Precision Indigo */
+  --chart-grid: #f2f4f7;
+
+  /* Metric & Visualization Palettes */
+  --color-concentration: #3b82f6;  /* Blue */
+  --color-awkwardness: #d97706;    /* Amber */
+  --color-contemplation: #ea580c;  /* Orange */
+  --color-determination: #f43f5e;  /* Rose */
+  --color-sympathy: #6366f1;       /* Indigo */
+  --color-satisfactions: #10b981;  /* Teal/Emerald */
+  --color-excitement: #10b981;     /* Green */
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+
+  /* Elevations */
+  --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.05), 0 1px 2px rgba(16, 24, 40, 0.03);
+  --shadow-hover: 0 4px 12px rgba(16, 24, 40, 0.08);
+}
+
+/* Global Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-main) !important;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-main) !important;
+  font-size: 13.5px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* App Wrapper */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Tailored SVG Micro-Icons Base */
+.ico {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  stroke-width: 2px;
+  stroke: currentColor;
+  fill: none;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.ico-blue { color: var(--color-concentration); }
+.ico-amber { color: var(--color-awkwardness); }
+.ico-orange { color: var(--color-contemplation); }
+.ico-rose { color: var(--color-determination); }
+.ico-indigo { color: var(--color-sympathy); }
+.ico-emerald { color: var(--color-satisfactions); }
+.ico-green { color: var(--color-excitement); }
+
+/* =====================================================================
+   1. TOP NAVIGATION BAR (Pixel-Perfect from References)
+   ===================================================================== */
+.top-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  height: 64px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-card);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  height: 100%;
+}
+
+.brand-logo-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.brand-icon-spark {
+  width: 22px;
+  height: 22px;
+  color: var(--brand-coral);
+}
+
+.brand-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.nav-links-list {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  list-style: none;
+  gap: 8px;
+}
+
+.nav-item {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 100%;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+}
+
+.nav-link.active {
+  color: var(--brand-coral);
+  font-weight: 600;
+  border-bottom-color: var(--brand-coral);
+}
+
+.nav-link svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Center Quick Search */
+.nav-center {
+  flex: 0 1 340px;
+}
+
+.quick-search-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  width: 100%;
+  cursor: text;
+  transition: border-color 0.15s ease;
+}
+
+.quick-search-box:focus-within {
+  border-color: var(--brand-coral);
+  background: #ffffff;
+}
+
+.search-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.search-input::placeholder {
+  color: var(--text-light);
+}
+
+.search-shortcut-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-weight: 600;
+}
+
+/* Right Nav Controls */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.btn-upgrade-pro {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-upgrade-pro:hover {
+  background: var(--bg-card-subtle);
+  border-color: var(--border-medium);
+}
+
+.credits-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
+}
+
+.nav-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius-pill);
+  position: relative;
+}
+.nav-icon-btn:hover {
+  background: var(--bg-card-subtle);
+  color: var(--text-primary);
+}
+
+.notification-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--brand-coral);
+  border-radius: 50%;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.user-avatar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.avatar-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #a3e635;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* =====================================================================
+   2. MAIN WORKSPACE & PAGE TITLE
+   ===================================================================== */
+.main-container {
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 32px 64px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.page-header-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-main-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.page-main-caption {
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+/* Card Base */
+.clean-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.card-title-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-help-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--text-light);
+  cursor: help;
+}
+
+.card-subtitle-text {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+/* =====================================================================
+   3. TOP ROW: 3 CARDS (AUDIO, SESSION DETAILS, CONFIG)
+   ===================================================================== */
+.top-cards-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  gap: 16px;
+}
+
+/* Card 1: Audio Player */
+.audio-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.black-audio-pill {
+  background: var(--bg-pill-audio);
+  border-radius: var(--radius-pill);
+  height: 52px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.audio-play-white-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #101828;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  flex-shrink: 0;
+}
+.audio-play-white-btn:hover {
+  transform: scale(1.05);
+}
+
+.audio-waveform-bars-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 28px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.audio-bar-tick {
+  width: 2.5px;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 1px;
+  transition: height 0.15s ease, background 0.15s ease;
+}
+.audio-bar-tick.active {
+  background: #ffffff;
+}
+
+.audio-pill-duration {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.audio-bottom-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pill-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pill-action-btn:hover {
+  background: var(--bg-card-subtle);
+  border-color: var(--border-medium);
+}
+
+/* Card 2: Session Details */
+.session-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: 16px;
+  column-gap: 16px;
+  margin-top: 6px;
+}
+
+.session-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.session-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.session-stat-value {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  width: fit-content;
+}
+.badge-completed {
+  background: var(--status-green-bg);
+  color: var(--status-green);
+  border: 1px solid var(--status-green-border);
+}
+.badge-synthetic {
+  background: var(--status-red-bg);
+  color: var(--status-red);
+  border: 1px solid #fecaca;
+}
+
+/* Card 3: Config */
+.config-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.config-assistant-box {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.assistant-info-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assistant-icon-red {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--brand-coral-subtle);
+  border: 1px solid var(--brand-coral-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-coral);
+}
+
+.assistant-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.assistant-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.assistant-ver {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.btn-upload-outline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-upload-outline:hover {
+  background: #f9fafb;
+  border-color: var(--border-medium);
+}
+
+.config-ids-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.config-id-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.id-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.id-code-copy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.id-code-copy:hover {
+  color: var(--text-primary);
+}
+
+/* =====================================================================
+   4. MIDDLE ROW: DISTRIBUTION & SUMMARY (65% / 35%)
+   ===================================================================== */
+.middle-analytics-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 16px;
+}
+
+.user-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.user-dropdown-btn:hover {
+  background: var(--bg-card-subtle);
+}
+
+.mini-avatar-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #a3e635;
+}
+
+/* Distribution Bars */
+.distribution-section-group {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.dist-group-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.dist-bars-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.dist-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dist-bar-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.bar-metric-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.bar-metric-val {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dist-bar-track {
+  width: 100%;
+  height: 6px;
+  background: #f2f4f7;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.dist-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+/* Summary Card */
+.summary-content-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.summary-narrative-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.highlight-blue {
+  color: #2563eb;
+  font-weight: 600;
+}
+.highlight-coral {
+  color: var(--brand-coral);
+  font-weight: 600;
+}
+
+.areas-improvement-card {
+  background: var(--brand-coral-subtle);
+  border: 1px solid var(--brand-coral-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.areas-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.red-brain-icon {
+  width: 22px;
+  height: 22px;
+  background: #fee2e2;
+  color: var(--brand-coral);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.areas-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.areas-bullet-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.areas-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: #7f1d1d;
+  line-height: 1.4;
+}
+
+.areas-bullet-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--brand-coral);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* =====================================================================
+   5. ADVANCED VISUALIZATIONS ROW (NEW: SPECTROGRAM & RADAR)
+   ===================================================================== */
+.visualizations-row-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 16px;
+}
+
+/* Visualization 1: 8-Band Acoustic Spectrogram */
+.spectrogram-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.spectrogram-matrix-container {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  height: 180px;
+  align-items: flex-end;
+}
+
+.spectrogram-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.freq-bar-wrapper {
+  width: 100%;
+  height: 120px;
+  background: rgba(16, 24, 40, 0.04);
+  border-radius: 4px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  position: relative;
+}
+
+.freq-bar-fill {
+  width: 100%;
+  border-radius: 4px;
+  transition: height 0.3s ease, background 0.3s ease;
+}
+
+.freq-band-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.freq-db-readout {
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+/* Visualization 2: 6-Axis Acoustic Biometric Radar */
+.radar-card-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
+.radar-svg-container {
+  width: 100%;
+  max-width: 320px;
+  height: 220px;
+}
+
+/* =====================================================================
+   6. BOTTOM SECTION: TIMELINE & EXACT DUAL-AXIS LINECHART
+   ===================================================================== */
+.timeline-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timeline-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-export-outline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #101828;
+  border: 1px solid #101828;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-export-outline:hover {
+  background: #1f2a37;
+}
+
+/* SVG Chart Container (With Zero Clipping & Smart Tooltip) */
+.chart-mount-container {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  overflow: visible !important;
+}
+
+.chart-svg-root {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Required Floating Tooltip */
+.chart-floating-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #111827;
+  color: #ffffff;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 11.5px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  z-index: 10000 !important;
+  white-space: nowrap;
+}
+
+.chart-tooltip-header {
+  font-size: 10.5px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 3px;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+/* Timeline Lanes from Screenshot */
+.timeline-visual-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  position: relative;
+}
+
+.timeline-lane-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  height: 32px;
+}
+
+.timeline-chip {
+  position: absolute;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.chip-concentration { background: var(--color-concentration); }
+.chip-awkwardness { background: var(--color-awkwardness); }
+.chip-contemplation { background: var(--color-contemplation); }
+.chip-excitement { background: var(--color-excitement); }
+
+/* Timeline Summary Axis at bottom */
+.timeline-bottom-axis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+.axis-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.axis-time-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.axis-metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.axis-metric-pill span.sub {
+  color: var(--text-light);
+  font-size: 10px;
+}
+
+/* =====================================================================
+   7. NSA COMPETITION TABLE (Clean, Professional Light Design)
+   ===================================================================== */
+.competition-table-wrap {
+  margin-top: 8px;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.comp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.comp-table th {
+  background: var(--bg-card-subtle);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-card);
+}
+
+.comp-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+
+.comp-table tr:hover td {
+  background: #f9fafb;
+}
+
+/* Modal Dialog */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.6);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-dialog-box {
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 520px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Responsive */
+@media (max-width: 1120px) {
+  .top-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .middle-analytics-grid {
+    grid-template-columns: 1fr;
+  }
+  .visualizations-row-grid {
+    grid-template-columns: 1fr;
+  }
+  .dist-bars-row {
+    grid-template-columns: 1fr;
+  }
+}

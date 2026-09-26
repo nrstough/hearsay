@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lumenix / HEARSAY — Voice Intelligence & Audio Forensics</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- 1. Top Navigation Bar (Exact Clone of Reference, Zero Emojis) -->
+    <header class="top-navbar">
+      <div class="nav-left">
+        <a href="#" class="brand-logo-group">
+          <!-- Coral Radial Spark Glyph -->
+          <svg class="brand-icon-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="2" x2="12" y2="6"/>
+            <line x1="12" y1="18" x2="12" y2="22"/>
+            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+            <line x1="2" y1="12" x2="6" y2="12"/>
+            <line x1="18" y1="12" x2="22" y2="12"/>
+            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+            <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+          </svg>
+          <span class="brand-title">Lumenix</span>
+        </a>
+
+        <ul class="nav-links-list">
+          <li class="nav-item">
+            <a class="nav-link" href="#dashboard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#voices">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5v14M7 8v8M2 11v2M22 11v2"/></svg>
+              Voices
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#playground">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              Playground
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#projects">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Projects
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" href="#build">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Build
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Quick Search Bar -->
+      <div class="nav-center">
+        <div class="quick-search-box">
+          <div class="search-inner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-light);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="quick-search-input" placeholder="Quick search..." class="search-input">
+          </div>
+          <span class="search-shortcut-badge">/</span>
+        </div>
+      </div>
+
+      <!-- Right Controls -->
+      <div class="nav-right">
+        <button class="btn-upgrade-pro">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Upgrade to Pro
+        </button>
+
+        <!-- Tailored Gift/Token Icon (No Emoji) -->
+        <div class="credits-pill">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5A4.8 4.8 0 0 1 12 8a4.8 4.8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>
+          Credits: 43
+        </div>
+
+        <button class="nav-icon-btn" title="Notifications">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notification-dot"></span>
+        </button>
+
+        <button class="user-avatar-btn" id="top-user-avatar">
+          <div class="avatar-circle"></div>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. Main Workspace -->
+    <main class="main-container">
+
+      <!-- Page Sub-Header -->
+      <section class="page-header-block">
+        <h1 class="page-main-title">Build</h1>
+        <p class="page-main-caption">Review conversation performance and uncover actionable emotional insights.</p>
+      </section>
+
+      <!-- 3. Top Row Cards (Audio, Session Details, Config) -->
+      <section class="top-cards-grid">
+
+        <!-- Card 1: Audio Player -->
+        <div class="clean-card">
+          <div class="card-title-row">
+            <span class="card-title-text">Audio</span>
+          </div>
+          <p class="card-subtitle-text">Replay the original conversation recording</p>
+
+          <div class="audio-card-content">
+            <!-- Pill Audio Bar -->
+            <div class="black-audio-pill" id="audio-pill-bar">
+              <button class="audio-play-white-btn" id="btn-play-pause" title="Play / Pause">
+                <svg id="icon-play" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <svg id="icon-pause" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                  <rect x="6" y="4" width="4" height="16"/>
+                  <rect x="14" y="4" width="4" height="16"/>
+                </svg>
+              </button>
+
+              <!-- Waveform Equalizer Bars -->
+              <div class="audio-waveform-bars-wrap" id="audio-bars-container">
+                <!-- Dynamically populated vertical bars -->
+              </div>
+
+              <span class="audio-pill-duration" id="audio-time-label">02:00</span>
+            </div>
+
+            <!-- Bottom Action Buttons -->
+            <div class="audio-bottom-actions">
+              <button class="pill-action-btn" id="btn-speed-toggle">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Speed: 1x
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <button class="pill-action-btn" id="btn-download-audio">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Session Details -->
+        <div class="clean-card">
+          <div class="card-title-row">
+            <span class="card-title-text">
+              Session Details
+              <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+          </div>
+          <p class="card-subtitle-text">Review the conversation metadata, status, and duration.</p>
+
+          <div class="session-details-grid">
+            <div class="session-stat-item">
+              <span class="session-stat-label">Started</span>
+              <span class="session-stat-value" id="stat-started">
+                <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Mar 26, 2:20 PM
+              </span>
+            </div>
+
+            <div class="session-stat-item">
+              <span class="session-stat-label">Status</span>
+              <span class="status-badge-pill badge-completed" id="stat-status-badge">Completed</span>
+            </div>
+
+            <div class="session-stat-item">
+              <span class="session-stat-label">Ended</span>
+              <span class="session-stat-value" id="stat-ended">
+                <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Mar 26, 2:22 PM
+              </span>
+            </div>
+
+            <div class="session-stat-item">
+              <span class="session-stat-label">Durations</span>
+              <span class="session-stat-value" id="stat-duration">
+                <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                2 minutes
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Config -->
+        <div class="clean-card">
+          <div class="card-title-row">
+            <span class="card-title-text">
+              Config
+              <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+          </div>
+          <p class="card-subtitle-text">View the assistant configuration and session</p>
+
+          <div class="config-card-content">
+            <div class="config-assistant-box">
+              <div class="assistant-info-left">
+                <div class="assistant-icon-red">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </div>
+                <div class="assistant-title-group">
+                  <span class="assistant-name" id="cfg-assistant-name">Voice Assistant V2</span>
+                  <span class="assistant-ver" id="cfg-assistant-ver">Version 2</span>
+                </div>
+              </div>
+
+              <button class="btn-upload-outline" id="btn-upload-file">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                Upload file
+              </button>
+              <input type="file" id="audio-file-input" accept="audio/*,.wav,.mp3" style="display:none;">
+            </div>
+
+            <div class="config-ids-row">
+              <div class="config-id-col">
+                <span class="id-label">Chat ID</span>
+                <span class="id-code-copy" id="copy-chat-id">
+                  Chat ID: f58705d0-739b
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </span>
+              </div>
+
+              <div class="config-id-col">
+                <span class="id-label">Group ID</span>
+                <span class="id-code-copy" id="copy-group-id">
+                  301715c3-c729-4189
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 4. Middle Row: Emotion Distribution & Summary -->
+      <section class="middle-analytics-grid">
+
+        <!-- Left: Emotion Distribution -->
+        <div class="clean-card">
+          <div class="card-title-row">
+            <span class="card-title-text">
+              Emotion Distribution
+              <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+
+            <button class="user-dropdown-btn" id="btn-select-user">
+              <span class="mini-avatar-dot"></span>
+              <span id="user-selector-label">James (User)</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+          <p class="card-subtitle-text">Compare the user's average emotions and highest emotional peak</p>
+
+          <div class="distribution-section-group">
+            <!-- Row 1: Top Averages -->
+            <div>
+              <span class="dist-group-title">Top averages</span>
+              <div class="dist-bars-row">
+                <div class="dist-bar-item">
+                  <div class="dist-bar-label-row">
+                    <span class="bar-metric-name">
+                      <svg class="ico ico-blue" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+                      Concentration
+                    </span>
+                    <span class="bar-metric-val" id="val-concentration">27%</span>
+                  </div>
+                  <div class="dist-bar-track">
+                    <div class="dist-bar-fill" id="bar-concentration" style="width: 27%; background: var(--color-concentration);"></div>
+                  </div>
+                </div>
+
+                <div class="dist-bar-item">
+                  <div class="dist-bar-label-row">
+                    <span class="bar-metric-name">
+                      <svg class="ico ico-amber" viewBox="0 0 24 24"><path d="M12 3v18M8 8l8 8M8 16l8-8"/></svg>
+                      Awkwardness
+                    </span>
+                    <span class="bar-metric-val" id="val-awkwardness">13%</span>
+                  </div>
+                  <div class="dist-bar-track">
+                    <div class="dist-bar-fill" id="bar-awkwardness" style="width: 13%; background: var(--color-awkwardness);"></div>
+                  </div>
+                </div>
+
+                <div class="dist-bar-item">
+                  <div class="dist-bar-label-row">
+                    <span class="bar-metric-name">
+                      <svg class="ico ico-orange" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                      Contemplation
+                    </span>
+                    <span class="bar-metric-val" id="val-contemplation">40%</span>
+                  </div>
+                  <div class="dist-bar-track">
+                    <div class="dist-bar-fill" id="bar-contemplation" style="width: 40%; background: var(--color-contemplation);"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Highest Peaks -->
+            <div>
+              <span class="dist-group-title">Highest peaks</span>
+              <div class="dist-bars-row">
+                <div class="dist-bar-item">
+                  <div class="dist-bar-label-row">
+                    <span class="bar-metric-name">
+                      <svg class="ico ico-rose" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                      Determination
+                    </span>
+                    <span class="bar-metric-val" id="val-determination">42%</span>
+                  </div>
+                  <div class="dist-bar-track">
+                    <div class="dist-bar-fill" id="bar-determination" style="width: 42%; background: var(--color-determination);"></div>
+                  </div>
+                </div>
+
+                <div class="dist-bar-item">
+                  <div class="dist-bar-label-row">
+                    <span class="bar-metric-name">
+                      <svg class="ico ico-indigo" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                      Sympathy
+                    </span>
+                    <span class="bar-metric-val" id="val-sympathy">30%</span>
+                  </div>
+                  <div class="dist-bar-track">
+                    <div class="dist-bar-fill" id="bar-sympathy" style="width: 30%; background: var(--color-sympathy);"></div>
+                  </div>
+                </div>
+
+                <div class="dist-bar-item">
+                  <div class="dist-bar-label-row">
+                    <span class="bar-metric-name">
+                      <svg class="ico ico-emerald" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      Satisfactions
+                    </span>
+                    <span class="bar-metric-val" id="val-satisfactions">35%</span>
+                  </div>
+                  <div class="dist-bar-track">
+                    <div class="dist-bar-fill" id="bar-satisfactions" style="width: 35%; background: var(--color-satisfactions);"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Summary -->
+        <div class="clean-card">
+          <div class="card-title-row">
+            <span class="card-title-text">
+              Summary
+              <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+          </div>
+
+          <div class="summary-content-block">
+            <p class="summary-narrative-text" id="summary-narrative">
+              <strong>James</strong> opens the episode with a <span class="highlight-blue">warm</span> and <span class="highlight-blue">welcoming</span> tone. Although the delivery remains friendly and engaging, <span class="highlight-coral">several pauses</span> and <span class="highlight-coral">filler words</span> suggest moments of hesitation.
+            </p>
+
+            <!-- Areas for Improvement Box (Red Tint Card) -->
+            <div class="areas-improvement-card">
+              <div class="areas-header-row">
+                <div class="red-brain-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4.5 4.5 0 0 0-4.5 4.5c0 1.25.51 2.38 1.34 3.19A6 6 0 0 0 4 15c0 3.31 2.69 6 6 6h4c3.31 0 6-2.69 6-6a6 6 0 0 0-4.84-5.31A4.5 4.5 0 0 0 16.5 6.5 4.5 4.5 0 0 0 12 2z"/></svg>
+                </div>
+                <span class="areas-title">Areas for improvement</span>
+              </div>
+
+              <ul class="areas-bullet-list">
+                <li class="areas-bullet-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  <span>Reduce filler words such as <strong>"uh"</strong> and <strong>"hmm"</strong></span>
+                </li>
+                <li class="areas-bullet-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  <span>Improve confidence when introducing guests</span>
+                </li>
+                <li class="areas-bullet-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  <span>Maintain a <strong>smoother speaking rhythm</strong> with fewer pauses</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 5. Advanced Visualizations Row (NEW: Spectrogram & Biometric Radar) -->
+      <section class="visualizations-row-grid">
+
+        <!-- Visualization A: 8-Band Frequency Spectrogram -->
+        <div class="clean-card">
+          <div class="card-title-row">
+            <span class="card-title-text">
+              Spectral Energy Distribution (FFT)
+              <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+            <span style="font-size:11.5px; font-weight:600; color:var(--text-muted);" id="spec-nyquist-badge">16 kHz Mono • 8 kHz Nyquist</span>
+          </div>
+          <p class="card-subtitle-text">Multi-band spectral rolloff and harmonic overtone density analysis.</p>
+
+          <div class="spectrogram-card-content">
+            <div class="spectrogram-matrix-container" id="spectrogram-matrix">
+              <!-- Dynamically populated 8 frequency columns -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Visualization B: 6-Axis Biometric Radar -->
+        <div class="clean-card">
+          <div class="card-title-row">
+            <span class="card-title-text">
+              Acoustic Biometric Radar
+              <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+            <div style="display:flex; align-items:center; gap:10px; font-size:11.5px;">
+              <span style="display:flex; align-items:center; gap:4px; color:var(--chart-1); font-weight:600;"><span style="width:8px; height:8px; background:var(--chart-1); border-radius:50%;"></span> Active</span>
+              <span style="display:flex; align-items:center; gap:4px; color:var(--text-light);"><span style="width:8px; height:8px; background:var(--border-medium); border-radius:50%;"></span> Human Norm</span>
+            </div>
+          </div>
+          <p class="card-subtitle-text">6-dimensional voice fingerprint mapped against human normative baseline.</p>
+
+          <div class="radar-card-content">
+            <div class="radar-svg-container" id="radar-container">
+              <!-- SVG Radar Chart rendered via app.js -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 6. Bottom Section: Emotion Timeline & LineChart -->
+      <section class="clean-card timeline-card">
+        <div class="card-title-row">
+          <span class="card-title-text">
+            Emotion Timeline
+            <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </span>
+
+          <div class="timeline-header-right">
+            <button class="user-dropdown-btn">
+              <span class="mini-avatar-dot"></span>
+              <span>James (User)</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button class="btn-export-outline" id="btn-export-data">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Export
+            </button>
+          </div>
+        </div>
+        <p class="card-subtitle-text">Explore how emotions evolved across different moments of the conversation</p>
+
+        <!--
+          REQUIRED COMPONENT IMPLEMENTATION:
+          <LineChart data={chartData} margin={{ top: 8, right: 56, bottom: 40, left: 56 }}>
+            <Grid horizontal />
+            <Line dataKey="desktop" yAxisId="left" />
+            <Line dataKey="mobile" yAxisId="right" stroke="var(--chart-2)" />
+            <YAxis yAxisId="left" />
+            <YAxis yAxisId="right" orientation="right" />
+            <XAxis />
+            <ChartTooltip />
+          </LineChart>
+        -->
+        <div class="chart-mount-container" id="chart-mount-box">
+          <div id="chart-mount" class="chart-svg-root"></div>
+          <div id="chart-tooltip" class="chart-floating-tooltip" style="display:none;"></div>
+        </div>
+
+        <!-- Timeline Block Lanes (Exact from Reference 35d576, Zero Emojis) -->
+        <div class="timeline-visual-lanes">
+          <!-- Lane 1: Concentration -->
+          <div class="timeline-lane-row">
+            <div class="timeline-chip chip-concentration" style="left: 0%; width: 22%;">
+              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+              <span>Concentration <small>00:00 - 00:22</small></span>
+            </div>
+            <div class="timeline-chip chip-concentration" style="left: 29%; width: 14%;">
+              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+              <span>Concentration <small>00:29 - 00:33</small></span>
+            </div>
+            <div class="timeline-chip chip-concentration" style="left: 45%; width: 18%;">
+              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+              <span>Concentration <small>00:45 - 01:04</small></span>
+            </div>
+            <div class="timeline-chip chip-concentration" style="left: 75%; width: 25%;">
+              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+              <span>Concentration <small>01:15 - 02:00</small></span>
+            </div>
+          </div>
+
+          <!-- Lane 2: Awkwardness & Contemplation & Excitement -->
+          <div class="timeline-lane-row">
+            <div class="timeline-chip chip-awkwardness" style="left: 22%; width: 7%;">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M12 3v18M8 8l8 8M8 16l8-8"/></svg>
+              <span>Awkwardness <small>00:23 - 00:28</small></span>
+            </div>
+            <div class="timeline-chip chip-contemplation" style="left: 34%; width: 11%;">
+              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <span>Contemplation <small>00:34 - 00:44</small></span>
+            </div>
+            <div class="timeline-chip chip-excitement" style="left: 64%; width: 11%;">
+              <svg class="ico" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Excitement <small>01:05 - 01:14</small></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Timeline Summary Axis (Zero Emojis) -->
+        <div class="timeline-bottom-axis">
+          <div class="axis-summary-item">
+            <span class="axis-time-badge">00:00</span>
+            <div class="axis-metric-pill">
+              <svg class="ico ico-blue" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+              <strong>Concentration</strong>
+              <span class="sub">Assistant: 58% User: 42%</span>
+            </div>
+          </div>
+
+          <div class="axis-summary-item">
+            <span class="axis-time-badge">00:30</span>
+            <div class="axis-metric-pill">
+              <svg class="ico ico-amber" viewBox="0 0 24 24"><path d="M12 3v18M8 8l8 8M8 16l8-8"/></svg>
+              <strong>Awkwardness</strong>
+              <span class="sub">Assistant: 58% User: 42%</span>
+            </div>
+          </div>
+
+          <div class="axis-summary-item">
+            <span class="axis-time-badge">01:00</span>
+            <div class="axis-metric-pill">
+              <svg class="ico ico-green" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <strong>Excitement</strong>
+              <span class="sub">Assistant: 58% User: 42%</span>
+            </div>
+          </div>
+
+          <div class="axis-summary-item">
+            <span class="axis-time-badge">02:00</span>
+            <div class="axis-metric-pill">
+              <svg class="ico ico-orange" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <strong>Contemplation</strong>
+              <span class="sub">Assistant: 58% User: 42%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. NSA Challenge Test Set Files (Queue Table) -->
+      <section class="clean-card">
+        <div class="card-title-row">
+          <span class="card-title-text">
+            Evaluation Batch Queue (1,671 Audio Recordings)
+            <svg class="info-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </span>
+
+          <input type="text" id="batch-filter-input" placeholder="Search filenames..." style="padding: 6px 12px; font-size: 12px; border: 1px solid var(--border-card); border-radius: var(--radius-pill); outline: none; width: 220px;">
+        </div>
+        <p class="card-subtitle-text">Official NSA test set with sponsor MinDCF scoring and TSV prediction exports.</p>
+
+        <div class="competition-table-wrap">
+          <table class="comp-table">
+            <thead>
+              <tr>
+                <th>RECORDING FILE</th>
+                <th>CLASSIFICATION</th>
+                <th>CONFIDENCE</th>
+                <th>PRIMARY ACOUSTIC SIGNAL</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="batch-table-rows">
+              <!-- Dynamically populated via app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- TSV Export Dialog Modal -->
+    <div id="export-dialog-modal" class="modal-overlay" style="display:none;">
+      <div class="modal-dialog-box">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="font-size:16px; font-weight:700; color:var(--text-primary);">Export Predictions TSV</h3>
+          <button id="btn-close-export-modal" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-muted);">&times;</button>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">
+          Generate the submission file <code>teamName_predictions.tsv</code> containing predictions for all 1,671 NSA challenge test files.
+        </p>
+        <div>
+          <label style="font-size:12px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">Team Name:</label>
+          <input type="text" id="team-name-val" value="TeamHearsay" style="width:100%; padding:8px 12px; border:1px solid var(--border-card); border-radius:6px; font-size:13px; outline:none;">
+        </div>
+        <div>
+          <label style="font-size:12px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">Preview:</label>
+          <textarea id="tsv-preview-box" rows="5" readonly style="width:100%; padding:8px; border:1px solid var(--border-card); border-radius:6px; font-size:11.5px; background:var(--bg-card-subtle); color:var(--text-muted); resize:none;"></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end;">
+          <button id="btn-download-tsv-file" class="btn-export-outline" style="padding:8px 18px; font-size:13px;">Download .tsv File</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
