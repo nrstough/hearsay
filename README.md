@@ -47,7 +47,7 @@ probability_synthetic = 0.0027  -> real
 
 Spectra-AASIST is sure this voice is fake. The probe and the handcrafted model both say real. Under the equal-weight rule we first tried (zmean, 06:02) Spectra's vote carried the file to 0.686, above the midpoint. Under the shipped rule it stays at 0.0027: we don't let a pretrained model with undisclosed training data push a file toward "synthetic", because being wrong in that direction is the expensive error. The drift and compression lines stay in the report as evidence and never touch the score.
 
-_Pending (CPU-detectors lane): 5–10 worked examples in `docs/reports/2026-09-26_worked-examples.md` and the router-on vs router-off ablation (`scripts/orchestration_ablation.py`). Their results go in [Orchestration](#orchestration-what-routing-changes)._
+Seven more real test files, each with its full routing log, every detector's evidence sentence, the shipped and the rejected equal-weight probability, and a paragraph on why the system said what it said, are in `docs/reports/2026-09-26_worked-examples.md`: a confident real, a confident fake, the file where Spectra's suppression fired, a fake with a stable mains hum, a real file with editing seams, a 21%-voiced file near the gate, and a genuinely uncertain file scored 0.471. All eight were reproduced live with the frozen rule to four decimals of the shipped TSV. The router-on vs router-off measurement is under [Orchestration](#orchestration-what-routing-changes).
 
 ---
 
@@ -115,7 +115,16 @@ Orchestration here is a set of fixed rules over measured file properties, not a 
 
 **The abstention path.** Undecidable files (non-speech, decode failures) get scores in [0, 0.001). Every scored file gets a score in [0.001, 1], so the block sits strictly below all of them. Inside the block, files are ordered by the weak M1b signal plus a hash of the filename, so no two share a value; decode failures go to the very bottom. Placing the block at the bottom is the right call under *both* possible readings of the sponsor's scorer. It is optimal under the brief's cost when the block's fake rate is below 80%, and under the scoring code's inverted cost when it is above 9.7%. Undecidable files should sit near the 30% base rate, which leaves roughly a 3× margin on each side (`docs/consults/2026-09-26_fusion-strategy_RESPONSE.md`, item 5). No test file is gated today, so this costs nothing on the current ranking. It only protects against a silent or musical file being scored as synthetic, which our deep models do: the first probe scored pure silence at 0.99.
 
-_Pending: router on vs off, both measured on the holdout and In-the-Wild, with the number of files each rule touched (`scripts/orchestration_ablation.py`, CPU-detectors lane). A null delta will be reported as a null delta._
+**Router on vs off, measured.** `scripts/orchestration_ablation.py` re-fuses the exported detector scores with each rule switched on and off and reports minDCF for both cost weightings plus the number of files each rule touched (`outputs/fusion/orchestration_ablation.md`). "Router off" is the plain rank blend: no Spectra suppression, no gate, no pinned block. "Fuse everything equally" is an equal-weight z-mean of M1b, the handcrafted model and Spectra.
+
+| Split | Router on (shipped) | No Spectra suppression | Router off | Fuse everything equally | Files Spectra suppression touched | Files the gate touched |
+|---|---|---|---|---|---|---|
+| Holdout, 3,858 rows | 0.014 | 0.030 | 0.030 | 0.0085 | 123 (all real) | 31 |
+| In-the-Wild, brief cost | 0.258 | 0.323 | 0.322 | 0.276 | 34 (all real) | 9 |
+| In-the-Wild, sponsor-code cost | 0.270 | 0.283 | 0.280 | 0.255 | | |
+| NSA test, share above 0.5 | 27.6% | 30.3% | 30.3% | 29.1% | 45 | 0 |
+
+Spectra suppression is the rule that changes decisions: it halves the holdout cost and takes 0.06 off In-the-Wild under the brief's cost, and every file it touched where a label exists was real. Fusing everything equally looks better on the holdout and under the sponsor-code weighting but worse under the brief's cost on In-the-Wild, the cost we are graded on in the domain we are least sure of. The gate touched 31 holdout rows (no change in cost), 9 In-the-Wild rows (7 real, 2 fake; 0.260 → 0.258) and 0 test files: a measured null on the test set, reported as one. The evidence-only detectors flagged 591, 504 and 180 holdout rows (hum, seams, drift) without moving a score, by design.
 
 ### The fusion rule, frozen at 08:13
 

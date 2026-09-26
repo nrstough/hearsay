@@ -42,6 +42,7 @@ The design:
 | Fusion, orchestrator, explanation report (M4) | Planned; starts when detector scores land (Sat 19:00), frozen Sat 22:00. Design and open decisions in `docs/architecture.md`. The fusion consult is drafted and not yet sent: `docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md`. |
 | Docker | Not started and unowned. First amd64 image (M1 payload) is due Sat 14:00. |
 | Tests | 351 passing over the tracked test files at ed31cb9 (`uv run pytest -q`; M3's `tests/test_spectra.py` has 40; other chats' untracked tests add more), ruff clean. |
+| Orchestration credit (ablation, worked examples) | **Done (Sat, CPU chat).** `scripts/orchestration_ablation.py` re-fuses the exported scores with each routing rule on and off (`outputs/fusion/orchestration_ablation.{json,md}`): M3 suppression halves the holdout cost (0.030 → 0.014) and takes In-the-Wild from 0.322 to 0.258 while touching only real files (123 holdout, 34 In-the-Wild); the gate touches 31 holdout rows, 9 In-the-Wild rows and 0 test files; fusing everything equally is better on the holdout (0.0085) and worse on In-the-Wild under the brief's cost (0.276). Eight real test files with their routing logs and every evidence sentence, reproduced live with the frozen rule to four decimals of the shipped TSV: `docs/reports/2026-09-26_worked-examples.md`. `CLAUDE.md` disclosure extended to every lane and "what we built vs. what AI did" filled per component. |
 
 ## Data
 
