@@ -92,7 +92,7 @@ Post these in writing (NSA x HexLabs Discord) and record the answers below.
 |---|--------|---------------|
 | metric | MinDCF, false alarm ×4, label 1 = synthetic, not log-loss | kickoff slides, Fri Sep 25; confirmed by Nathan |
 | format | TSV `filename<TAB>cm-score`, probability, no LLR | kickoff slides |
-| direction | **1.0 = synthetic** ("Output a synthetic probability score (0.0 to 1.0), 1.0 means synthetic"). We submit this and never flip; the sponsor's ASVspoof5 code treats higher = bona fide, so the draft review doubles as a check (a strong model scoring near 1.0 → raise it with NSA) | NSA brief; reaffirmed by Nathan, Sat Sep 26 |
+| direction | **1.0 = synthetic** ("Output a synthetic probability score (0.0 to 1.0), 1.0 means synthetic"). We submit this and never flip; the sponsor's ASVspoof5 code treats higher = bona fide, so the draft review doubles as a check (a strong model scoring near 1.0 → raise it with NSA). NSA's document seen Sat ~11:50 repeats it in plain words: "0.0 for 100% confident Real to 1.0 for 100% confident synthetic". | NSA brief; reaffirmed by Nathan, Sat Sep 26; NSA doc Sat 11:50 |
 | balance | **70/30 real/synthetic, confirmed by NSA** (Sat Sep 26, ~12:10, via Nathan). The 0.3 prior in `hearsay.metrics` and the fusion calibration already assume this; nothing changes. | presenter at kickoff; NSA confirmation Sat Sep 26 |
 | 1 | Yes: the brief lists ASVspoof 2019/2021/5, WaveFake, In-the-Wild, MLAAD, ADD, VCTK, LibriSpeech, VOiCES for training/calibration | `docs/nsa-challenge.md` |
 | 2 | Yes: "any open-source or commercial tools"; AASIST, RawNet, wav2vec 2.0/WavLM/Whisper front ends suggested | `docs/nsa-challenge.md` |
@@ -100,5 +100,5 @@ Post these in writing (NSA x HexLabs Discord) and record the answers below.
 | 4 | | |
 | 5 | Filename including its extension | `docs/nsa-challenge.md` |
 | 6 | Test set is ~70% real / 30% synthetic (the slide's ~50/50 was wrong) | NSA, Sat Sep 26, ~12:10, via Nathan |
-| 7 | | |
+| 7 | **minDCF only.** The draft review returns the minDCF number and nothing else (no EER, P_FA or P_miss). Decoding therefore rests on the minDCF bands in `docs/reports/2026-09-26_draft-review-branches.md`; the 0.45–0.90 band is the one that cannot be resolved without a second number. NSA's own document (screenshot `data/nsa/hearsay-doc-screenshot-2026-09-26.png`, gitignored) also says: score "ranges from 0.0 for 100% confident Real to 1.0 for 100% confident synthetic"; "approximately 70% of the files are real"; the "Analyst scenario", ASVspoof 5 track-1 DCF, false alarm penalised 4× a miss; teams should use "Game Theory or Benchmark maxing to determine what the default answer [should] be if you cannot determine an answer" (our pinned block); their answer key carries a placeholder of `.006` "to keep track of files done and not done" (our copy of the key has 0.5 in every row; either way every row must be filled and none removed). | NSA, Sat Sep 26, ~11:50, via Nathan |
 | 8 | | |

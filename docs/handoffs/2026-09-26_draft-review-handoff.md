@@ -26,7 +26,7 @@ Read first: `docs/reports/2026-09-26_draft-review-branches.md` (the decoding tab
 
 **Team name: Cross Exam.** The file goes out as **`CrossExam_predictions.tsv`** (the brief's pattern is `teamName_predictions.tsv`). Made at 11:20: `~/Downloads/CrossExam_predictions.tsv`, byte-identical to the logged 08:13 file (sha256 `096f3f0c9e3cfa9a…`), checker output `OK rows 1671 min 0.0012 max 0.9997 share>=0.5 0.274`. The runner and the image take the name as `--team CrossExam` / `HEARSAY_TEAM=CrossExam` (their default is `HEARSAY`, which is wrong for the deliverable).
 
-**How to send:** as a DM in the NSA × HexLabs Discord channel (kickoff notes, `docs/reports/2026-09-25_sponsor-questions.md`). Say it is the optional draft for review. **Ask for P_FA, P_miss and EER alongside minDCF**; minDCF alone does not say which way the errors lean, and EER alone decodes the direction (2–5% ours, 95–98% theirs).
+**How to send:** as a DM in the NSA × HexLabs Discord channel (kickoff notes, `docs/reports/2026-09-25_sponsor-questions.md`). Say it is the optional draft for review. **NSA returns minDCF only** (confirmed Sat ~11:50): no EER, P_FA or P_miss, so the decoding table below is the whole decoder. Its weak spot is the 0.45–0.90 band, which one number cannot resolve; if the number lands there, ask NSA directly whether they run `calculate_metrics.py` as shipped (higher = bona fide) or invert first, and do not flip on a guess.
 
 **Before the DM, re-check the exact bytes that leave the machine:**
 
