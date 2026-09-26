@@ -73,6 +73,7 @@ GATE = {"itw_brief_gain": 0.020, "itw_averse_reg": 0.002, "inner_brief_gain": 0.
 STANDING = {"itw_brief_gain": 0.01, "itw_averse_reg": 0.01, "holdout_brief_reg": 0.05, "inner_brief_reg": 0.03}
 ROOM = {"itw_brief_gain": 0.030, "itw_averse_gain": 0.030, "catches": 19}
 PWL_MIN_CATCHES, CORRECTIVE_MIN = 16, 0.5
+HNOISE = {"noise_auc_min": 0.90, "clean_auc_v5": 0.998, "clean_tol": 0.005}  # the CPU chat's pre-declared bar
 BOOT_N, BOOT_SEED, PERTURB_REG, TRIPWIRE = 2000, 0, 0.010, 1e-9
 POPS, COSTS = ("inner", "holdout", "itw"), ("brief", "averse")
 CELLS = [f"{p}_{c}" for p in POPS for c in COSTS]
@@ -405,7 +406,7 @@ def perturb_eval(df: pd.DataFrame, consts: dict, rules: dict) -> dict:
     return {"cells": cells, "tripwire": trip, "scores": scores, "y": y}
 
 
-def evaluate() -> dict:
+def evaluate(hnoise_evidence: tuple[float, float] | None = None) -> dict:
     """Everything the report holds; no writes."""
     shipped_df = pd.read_csv(SHIPPED_TSV, sep="\t")
     shipped = shipped_df.set_index("filename")["cm-score"]
@@ -433,7 +434,7 @@ def evaluate() -> dict:
     consts = json.loads(FUSION_V2.read_text())
     world = {"base": base, "base_cols": base_cols, "m3": m3, "labels": labels, "folds": folds, "shipped": shipped,
              "perturb": perturb, "consts": consts, "test_names": set(shipped.index), "itw_paths": set(base["idx"]["itw"]),
-             "inputs": inputs}  # fmt: skip
+             "inputs": inputs, "hnoise_evidence": hnoise_evidence}  # fmt: skip
     rep["candidates"] = run_candidates(world)
     return finalize(rep, self_check_ok=True, ctxs={"base_cols": base_cols, "m3": m3, "labels": labels,
                                                    "shipped": shipped})  # fmt: skip
@@ -450,13 +451,24 @@ def run_candidates(world: dict) -> dict:
     return out
 
 
+def hnoise_diag(evidence: tuple[float, float] | None) -> dict:
+    """H_noise mechanism diagnostic (manifest): 20 dB noise AUC >= 0.90 on the channel cohort and clean AUC within
+    0.005 of v5's 0.998, read from the CPU chat's report (the check needs audio). No evidence fails."""
+    if evidence is None:
+        return {"ok": False, "reason": "no noise-AUC evidence supplied (--hnoise-evidence NOISE_AUC,CLEAN_AUC)"}
+    noise, clean_ = (float(v) for v in evidence)
+    ok = bool(np.isfinite(noise) and np.isfinite(clean_) and noise >= HNOISE["noise_auc_min"] - EPS
+              and abs(clean_ - HNOISE["clean_auc_v5"]) <= HNOISE["clean_tol"] + EPS)  # fmt: skip
+    return {"ok": ok, "noise_auc": noise, "clean_auc": clean_, "bar": HNOISE}
+
+
 def pwl_diag_ok(n_catch: int, corr: dict) -> bool:
     """P_wl mechanism diagnostic (manifest): >= 16 new catches AND corrective share > 0.5 on inner and ITW."""
     return bool(n_catch >= PWL_MIN_CATCHES and all(np.isfinite(v) and v > CORRECTIVE_MIN for v in corr.values()))
 
 
 def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, perturb, consts, test_names, itw_paths,
-                   inputs) -> dict:  # fmt: skip
+                   inputs, hnoise_evidence=None) -> dict:  # fmt: skip
     out = {"test": spec["test"], "weights": spec["weights"], "tiers": [list(t) for t in spec["tiers"]]}
     ctx, cols = base, dict(base_cols)
     if spec["new"]:
@@ -528,8 +540,8 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
                              "ok": bool(diag_ok)}  # fmt: skip
         out["room"] = room(d, n_catch)
     elif name == "H_noise":
-        diag_ok = False
-        out["diagnostic"] = {"ok": False, "reason": "no noise-AUC evidence supplied (withdrawn by the CPU lane 17:42)"}
+        out["diagnostic"] = hnoise_diag(hnoise_evidence)
+        diag_ok = out["diagnostic"]["ok"]
     else:  # W4: governed by its bake-off; the gate is recorded for the record only (no diagnostic defined)
         diag_ok = True
         out["diagnostic"] = {"ok": True, "reason": "none under the gate; W4 is governed by its bake-off"}
@@ -654,6 +666,8 @@ def main(argv=None) -> None:
     ap.add_argument("--ratified-by", help="must be 'nathan' with --write")
     ap.add_argument("--candidate", help="the ratified candidate (must equal the locked report's pick)")
     ap.add_argument("--new-column-model", help="P_wl: the wavlm_l probe directory (its meta.json is hashed)")
+    ap.add_argument("--hnoise-evidence", metavar="NOISE_AUC,CLEAN_AUC",
+                    help="H_noise diagnostic numbers from the CPU chat's report (20 dB noise AUC, clean AUC)")
     ap.add_argument("--report-sha256", help="with --write: the sha256 of the locked report, as recorded in the sweep doc")
     args = ap.parse_args(argv)
     if args.write and (args.ratified_by != "nathan" or not args.candidate or not args.report_sha256):
@@ -663,8 +677,15 @@ def main(argv=None) -> None:
     if not sha_ok(SHIPPED_TSV):
         sys.exit(f"shipped TSV {SHIPPED_TSV.name} no longer hashes to {SHIPPED_SHA_PREFIX}…; stop")
     locked = precheck_write(args) if args.write else None
+    hn = None
+    if args.hnoise_evidence:
+        try:
+            hn = tuple(float(v) for v in args.hnoise_evidence.split(","))
+            assert len(hn) == 2
+        except (ValueError, AssertionError):
+            ap.error("--hnoise-evidence takes NOISE_AUC,CLEAN_AUC")
 
-    rep = evaluate()
+    rep = evaluate(hn) if hn else evaluate()
     print(f"rows (base): {rep['rows_base']}")
     sc = rep["self_check"]
     print(f"self-check: {'ok' if sc['ok'] else 'FAIL'}; got {sc['got']}; Spearman vs shipped {sc['spearman']:.6f}")

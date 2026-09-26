@@ -131,3 +131,13 @@ Ruled by Nathan in this chat, relayed from his 18:30 and 18:55 instructions. `ou
 - The shipped TSV and `submissions/CrossExam_predictions.tsv` stay untouched until parity passes.
 
 **Unchanged:** W4 is still governed only by its bake-off (Nathan, ~17:40). Rule 7's one-candidate-per-packet rule and the pre-data clarifications (`b877760`) stand.
+
+## Note (19:15, pre-data): H_noise back in the run
+
+At 19:10, via the orchestrator, the CPU chat is running `handcrafted_v6` after all, with its export expected ~20:30. Clarification 4 assumed the withdrawal. With the export coming, H_noise is judged by the original pre-declared diagnostic above:
+- 20 dB noise AUC ≥ 0.90 on the channel cohort;
+- clean AUC within 0.005 of 0.998.
+
+The numbers come from the CPU chat's report and are passed to the sweep as `--hnoise-evidence NOISE_AUC,CLEAN_AUC`. Without them, the diagnostic fails, as written above. No threshold changes.
+
+The refit seat (`wavlm_l` in M1b's seat, via `fuse_sweep_m5.py --refit-m1b wavlm_l`) is printed beside P_wl as a **diagnostic only**. It is not a candidate, never enters the gate and cannot be ratified tonight (Nathan, 19:10).

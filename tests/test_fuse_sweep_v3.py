@@ -536,6 +536,19 @@ def test_world_broken_export_is_invalid_not_fatal(tmp_path, monkeypatch):
     assert v3.run_candidates(world)["P_wl"]["status"] == "INVALID"
 
 
+@pytest.mark.parametrize("ev,ok", [(None, False), ((0.90, 0.998), True), ((0.8999, 0.998), False),
+                                   ((0.95, 0.993), True), ((0.95, 0.9929), False), ((0.95, float("nan")), False)])
+def test_hnoise_diag(ev, ok):
+    assert v3.hnoise_diag(ev)["ok"] is ok
+
+
+def test_world_h_noise_uses_evidence(tmp_path, monkeypatch):
+    world, w = _world(tmp_path, monkeypatch)
+    _export(w, tmp_path, "handcrafted_v6", itw_separate=True)
+    h = v3.run_candidates({**world, "hnoise_evidence": (0.95, 0.997)})["H_noise"]
+    assert h["diagnostic"]["ok"] is True and "5_diagnostic" not in h["gate"]["failed"]
+
+
 def test_world_h_noise_fails_not_invalid(tmp_path, monkeypatch):
     world, w = _world(tmp_path, monkeypatch)
     _export(w, tmp_path, "handcrafted_v6")  # in-file ITW rows but the declared _itw file is absent
