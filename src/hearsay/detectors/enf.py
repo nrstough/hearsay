@@ -51,6 +51,10 @@ def _frames(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 def analyze(x: np.ndarray) -> dict[str, float]:
     """Hum measurements for the better of the 50/60 Hz candidates."""
     spec, freqs = _frames(x)
+    if not np.isfinite(spec).all() or spec.max() <= 0.0:  # digital silence: nothing to track
+        return {"enf_candidate_hz": 0.0, "enf_snr_db": 0.0, "enf_frac_present": 0.0,
+                "enf_freq_hz": 0.0, "enf_freq_std_hz": 0.0, "enf_freq_range_hz": 0.0,
+                "enf_n_frames": float(spec.shape[0]), "enf_present": 0.0, "enf_stable": 0.0}  # fmt: skip
     df = float(freqs[1] - freqs[0])
     best: dict[str, float] | None = None
     for f0 in CANDIDATES:
@@ -63,7 +67,7 @@ def analyze(x: np.ndarray) -> dict[str, float]:
         denom = la - 2 * lb + lc
         delta = np.where(np.abs(denom) > 1e-12, 0.5 * (la - lc) / np.where(denom == 0, 1, denom), 0)
         f_track = freqs[pk] + np.clip(delta, -1, 1) * df
-        snr = 10 * np.log10(b / (np.median(spec[:, nb], axis=1) + 1e-30))
+        snr = 10 * np.log10((b + 1e-30) / (np.median(spec[:, nb], axis=1) + 1e-30))  # 0 dB on silence
         on = snr >= SNR_DB
         f_on = f_track[on]
         res = {

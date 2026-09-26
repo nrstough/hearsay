@@ -27,6 +27,15 @@ def test_rule_based_detectors_run_without_any_model():
         assert r.status == "ok" and r.name == name and 0.0 <= r.score <= 1.0
 
 
+def test_rule_based_detectors_are_clean_on_digital_silence():
+    """The submission preflight runs silence through every detector; none may error."""
+    z = np.zeros(4 * SR, np.float32)
+    for name in ("enf", "splice", "speech_gate"):
+        r = safe_run(base.get(name), ClipContext.from_array(z))
+        assert r.status == "ok", (name, r.error)
+        assert all(np.isfinite(list(r.features.values())))
+
+
 def test_learned_detectors_without_a_bundle_become_error_results(tmp_path):
     """No models/ directory in CI: the contract still holds (error result, row kept)."""
     x = (0.1 * np.random.default_rng(0).standard_normal(2 * SR)).astype(np.float32)

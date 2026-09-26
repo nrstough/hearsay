@@ -81,6 +81,12 @@ def test_jumping_hum_scores_mildly_synthetic(det):
     assert "discontinuous" in r.evidence
 
 
+def test_digital_silence_is_a_clean_no_hum_result(det):
+    r = safe_run(det, ClipContext.from_array(np.zeros(4 * SR, np.float32)))
+    assert r.status == "ok" and r.score == SCORE_NONE and r.features["enf_present"] == 0.0
+    assert all(math.isfinite(v) for v in r.features.values())
+
+
 def test_short_clip_still_scores(det):
     r = safe_run(det, clip("stable", dur=1.5))
     assert r.status == "ok" and r.features["enf_n_frames"] >= 1.0

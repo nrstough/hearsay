@@ -67,6 +67,29 @@ def test_registered():
 
 @pytest.mark.needs_weights
 @pytest.mark.slow
+def test_encoder_loads_offline_from_the_weights_dir_with_an_empty_hf_cache(tmp_path):
+    """Docker has no HF cache: the encoder must load from weights/ alone (no Hub, no cache)."""
+    if not (sd.WEIGHTS / "embedding_model.ckpt").exists():
+        pytest.skip("ECAPA weights not present")
+    import os
+    import subprocess
+    import sys
+
+    code = (
+        "import numpy as np; from hearsay import SR; from hearsay.detectors.base import ClipContext, safe_run; "
+        "from hearsay.detectors.speaker_drift import DETECTOR, WEIGHTS; "
+        "r = safe_run(DETECTOR, ClipContext.from_array((0.1*np.random.default_rng(0).standard_normal(3*SR)).astype('float32'))); "
+        "assert r.status == 'ok', r.error; assert not (WEIGHTS / 'label_encoder.ckpt').is_symlink(); print('offline ok')"
+    )
+    env = {**os.environ, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
+           "HF_HOME": str(tmp_path / "empty_hf_home")}  # fmt: skip
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env,
+                         check=False)  # fmt: skip
+    assert out.returncode == 0 and "offline ok" in out.stdout, out.stderr[-800:]
+
+
+@pytest.mark.needs_weights
+@pytest.mark.slow
 def test_real_encoder_separates_a_two_speaker_splice():
     if not (sd.WEIGHTS / "embedding_model.ckpt").exists():
         pytest.skip("ECAPA weights not present")

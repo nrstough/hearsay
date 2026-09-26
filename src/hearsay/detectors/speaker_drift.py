@@ -37,16 +37,38 @@ SCORE_DRIFT, SCORE_NONE = 0.6, 0.5
 _ENCODER = None
 
 
+def _materialize_label_encoder(weights: Path) -> None:
+    """The Hub copy of hyperparams.yaml names `pretrained_path: speechbrain/spkrec-ecapa-voxceleb`,
+    so SpeechBrain's Pretrainer would fetch label_encoder.txt from the Hub and leave
+    label_encoder.ckpt as a symlink into the HF cache, which does not exist on a fresh
+    machine or in the Docker image. Keep a real file next to the checkpoints instead."""
+    import shutil
+
+    ckpt, txt = weights / "label_encoder.ckpt", weights / "label_encoder.txt"
+    if txt.exists() and (ckpt.is_symlink() or not ckpt.exists()):
+        try:
+            if ckpt.is_symlink():
+                ckpt.unlink()
+            shutil.copyfile(txt, ckpt)
+        except OSError:
+            pass  # read-only weights directory: rely on what is there
+
+
 def encoder(weights: Path = WEIGHTS):
-    """The ECAPA encoder, loaded once per process, CPU."""
+    """The ECAPA encoder, loaded once per process, CPU, from `weights` only: `pretrained_path`
+    is overridden to the local directory so nothing is fetched from the Hub or the HF cache
+    (HF_HUB_OFFLINE=1 with an empty HF_HOME works; a test pins it)."""
     global _ENCODER
     if _ENCODER is None:
         import torch
         from speechbrain.inference.speaker import EncoderClassifier
 
+        _materialize_label_encoder(weights)
         torch.set_num_threads(max(1, torch.get_num_threads() // 2))
-        _ENCODER = EncoderClassifier.from_hparams(source=str(weights), savedir=str(weights),
-                                                  run_opts={"device": "cpu"})  # fmt: skip
+        _ENCODER = EncoderClassifier.from_hparams(
+            source=str(weights), savedir=str(weights),
+            overrides={"pretrained_path": str(weights)}, run_opts={"device": "cpu"},
+        )  # fmt: skip
     return _ENCODER
 
 
