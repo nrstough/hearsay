@@ -13,7 +13,7 @@ Both deep detectors reach 0.007–0.07 minDCF on the NSA holdout and 0.23–0.34
 | A | λ̂: the test set's wild-domain weight from label-free channel statistics | yes, first | λ̂ with bootstrap interval, sent to the oversight chat before anything else |
 | E | Three M3 leakage probes (perturbation sensitivity; M1b–M3 rank agreement on holdout vs test; M3 on unseen MLAAD spoof), plus the model card | yes | a one-line verdict on M3's false-alarm-suppression role |
 | B | Is the 7.2 kHz wall a codec? LJ + LibriSpeech inner clips through a codec grid vs the test files | yes, beside E | codec-match table, or a recorded negative |
-| C | Symmetric codec round-trip refit of M1b | **only if** B finds a match **and** Nathan approves (rental and time) | not run by default; recorded as "not run, time box" otherwise |
+| C | Symmetric codec round-trip refit of M1b | **only if** B finds a match **and** the extraction can start by 13:45 (frozen P1, 12:16). Runs locally (MPS extraction, CPU refit), so no rental approval is needed; the column changes nothing until Nathan ratifies it through the main chat's `scripts/fuse_sweep_m5.py --refit-m1b` (acceptance contract: `docs/reports/2026-09-26_fusion-sweep-predeclared.md`, Addendum 2) | recorded as "not run" with the reason otherwise |
 | D | One wild bona fide corpus | **dropped** (time box) | recorded as not attempted |
 
 ## Design decisions

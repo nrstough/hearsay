@@ -8,7 +8,8 @@ out-of-fold rates. The consult's crossover is 0.32.
 
 Every clip is prepared the same way (hearsay.handcrafted._crop: band_limit -> trim_silence ->
 8 s cap -> RMS normalize), so lead silence, level and the >7 kHz band are not domain cues.
-Features that read above 7 kHz (bw_hz, band_7_8k_db, hf_slope_db_per_khz over 2-8 kHz) are
+Features that read above 7 kHz (bw_hz, band_7_8k_db, hf_slope_db_per_khz over 2-8 kHz, and
+clip_floor_db, a whole-spectrogram percentile that lands in the stopband) are
 dropped: the test files are filtered twice (their own wall, then the pipeline's), the others
 once, so those columns would separate the test set from both classes for a reason unrelated
 to the recording channel.
@@ -32,7 +33,11 @@ OUT = REPO / "outputs" / "channel"
 SHIPPED_TSV = REPO / "submissions" / "20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv"
 CROSSOVER = 0.32
 MIN_MARGIN = 0.2  # TPR - FPR below this: adjusted classify-and-count is refused
-DROP = ("bw_hz", "band_7_8k_db", "hf_slope_db_per_khz")  # read above 7 kHz (module docstring)
+# Read above 7 kHz (module docstring). clip_floor_db is the 1st percentile of the WHOLE
+# spectrogram, i.e. the 7-8 kHz stopband: NSA test files sit at -118 dB as delivered and -157 dB
+# after the pipeline's second low-pass (action B, outputs/channel/codec_match.json), so it
+# measured the double filtering. Dropped at 13:00 after the first full run; see the report.
+DROP = ("bw_hz", "band_7_8k_db", "hf_slope_db_per_khz", "clip_floor_db")
 FRAME, HOP = 400, 160  # 25 ms frames, 10 ms hop at 16 kHz
 BLOCK = 50  # frames per 0.5 s block for noise-floor stationarity
 DECAY = 12  # frames (120 ms) after an offset for the decay slope

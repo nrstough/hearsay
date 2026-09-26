@@ -176,3 +176,141 @@ def test_novelty_share_survives_a_constant_column():
 
 pytestmark = pytest.mark.filterwarnings("ignore::RuntimeWarning")
 HAVE_FFMPEG = shutil.which("ffmpeg") is not None
+
+
+# ------------------------------------------------------------------ E: perturbations and verdict
+
+m3p = _load("m3_probes")
+
+
+def test_each_perturbation_changes_the_signal_and_none_does_not():
+    x = _speechlike(2.0)
+    assert np.array_equal(m3p.perturb(x, "none", 0), x)
+    for k in ("noise20", "speed", "shift1"):
+        assert not np.array_equal(m3p.perturb(x, k, 0), x), k
+
+
+def test_noise_hits_twenty_db_snr():
+    x = _speechlike(3.0)
+    assert m3p.snr_db(x, m3p.perturb(x, "noise20", 7)) == pytest.approx(20.0, abs=0.5)
+
+
+def test_shift_is_exactly_one_sample():
+    x = _speechlike(1.0)
+    y = m3p.perturb(x, "shift1", 0)
+    assert np.array_equal(y[1:], x[:-1]) and y[0] == x[-1]
+
+
+@pytest.mark.parametrize(("seed", "ratio"), [(0, 50 / 51), (1, 51 / 50)])
+def test_speed_changes_length_by_two_percent(seed, ratio):
+    x = _speechlike(3.0)
+    assert abs(m3p.perturb(x, "speed", seed).size - x.size * ratio) <= 1
+
+
+def test_unknown_perturbation_is_refused():
+    with pytest.raises(ValueError):
+        m3p.perturb(_speechlike(1.0), "reverb", 0)
+
+
+@pytest.mark.parametrize("lag", [0, 37, 1105, -250])
+def test_align_to_undoes_a_codec_style_delay_and_restores_length(lag):
+    x = _speechlike(2.0)
+    y = np.r_[np.zeros(lag, np.float32), x, np.zeros(500, np.float32)] if lag >= 0 else x[-lag:]
+    z = m3p.align_to(y.astype(np.float32), x)
+    assert z.size == x.size
+    k = x.size - abs(lag) - 10
+    assert np.allclose(z[abs(lag) : k] if lag < 0 else z[:k], x[abs(lag) : k] if lag < 0 else x[:k], atol=1e-6)
+
+
+@pytest.mark.skipif(not HAVE_FFMPEG, reason="needs ffmpeg")
+@pytest.mark.parametrize("dur", [0.4, 3.0])
+def test_mp3_perturbation_keeps_length_and_alignment(dur):
+    x = _speechlike(dur)
+    y = m3p.perturb(x, "mp3", 0)
+    assert y.size == x.size and y.dtype == np.float32
+    assert np.corrcoef(x, y)[0, 1] > 0.8  # aligned (an unaligned round-trip correlates near 0)
+
+
+def test_delta_auc_sign_and_pairing():
+    rng = np.random.default_rng(0)
+    y = np.r_[np.zeros(200), np.ones(200)].astype(int)
+    clean = y + 0.01 * rng.standard_normal(400)
+    randomised = rng.standard_normal(400)
+    assert m3p.delta_auc(y, clean, randomised) == pytest.approx(-0.5, abs=0.1)
+    pert = clean.copy()
+    pert[:10] = np.nan  # unpaired rows are dropped, not scored
+    assert m3p.delta_auc(y, clean, pert) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_m3_verdict_each_guard_alone_and_nan_is_inconclusive():
+    assert m3p.m3_verdict(0.01, 0.01, 0.01, 0.0) == ("kept", [])
+    assert m3p.m3_verdict(0.05, 0.01, 0.01, 0.0)[0] == "at risk"  # (a)
+    assert m3p.m3_verdict(0.015, 0.005, 0.01, 0.0)[0] == "kept"  # (a) needs > 0.02 absolute too
+    assert m3p.m3_verdict(0.01, 0.01, 0.06, 0.0)[0] == "at risk"  # (c)
+    assert m3p.m3_verdict(0.01, 0.01, 0.01, 0.02)[0] == "at risk"  # (d)
+    assert m3p.m3_verdict(float("nan"), 0.01, 0.01, 0.0)[0] == "inconclusive"
+    assert m3p.m3_verdict(0.01, 0.01, None, 0.0)[0] == "inconclusive"
+
+
+def test_spearman_gap_zero_for_identical_rankings():
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal(300)
+    r = m3p.spearman_gap(a, a, a[:200], a[:200], n=200)
+    assert r["gap"] == 0 and r["gap_ci95"] == [0.0, 0.0]
+
+
+# ------------------------------------------------------------------ B: codec statistics and match rule
+
+cc = _load("channel_codec")
+
+
+def _lowpassed(cut_hz: float) -> np.ndarray:
+    from scipy.signal import butter, sosfiltfilt
+
+    x = np.random.default_rng(0).standard_normal(SR * 3) * 0.1
+    return sosfiltfilt(butter(12, cut_hz, fs=SR, output="sos"), x).astype(np.float32)
+
+
+def test_highband_stats_see_where_the_wall_is():
+    low, high = cc.highband_stats(_lowpassed(7000)), cc.highband_stats(_lowpassed(7750))
+    assert low["drop_7500_vs_6500"] < high["drop_7500_vs_6500"] - 10
+    assert all(np.isfinite(v) for v in low.values())
+
+
+def test_match_distance_units_and_degenerate_column():
+    import pandas as pd
+
+    rng = np.random.default_rng(0)
+    t = pd.DataFrame({s: rng.normal(0, 1, 2000) for s in cc.STATS})
+    t["floor_p2_db"] = 3.0  # zero IQR: excluded, never a division by zero
+    same, excl = cc.match_distance(t, t)
+    assert same == 0 and excl == ["floor_p2_db"]
+    iqr = t.drop(columns="floor_p2_db").quantile(0.75) - t.drop(columns="floor_p2_db").quantile(0.25)
+    shifted = t.copy()
+    for s in iqr.index:
+        shifted[s] = t[s] + iqr[s]
+    assert cc.match_distance(shifted, t)[0] == pytest.approx(1.0, abs=1e-9)
+
+
+def test_codec_match_rule_needs_distance_and_both_hole_statistics():
+    import pandas as pd
+
+    def table(dist, gd, gl):
+        return pd.DataFrame([
+            {"variant": "raw", "distance": 5.0, "gap_deep_hole_frac": 1, "gap_local_hole_frac": 1},
+            {"variant": "kaiser", "distance": 1.0, "gap_deep_hole_frac": 0.1, "gap_local_hole_frac": 0.1},
+            {"variant": "mp3-32k@16000", "distance": dist, "gap_deep_hole_frac": gd, "gap_local_hole_frac": gl},
+        ])  # fmt: skip
+
+    assert cc.codec_match(table(0.75, 0.05, 0.05))["match"] is True
+    assert cc.codec_match(table(0.75, 0.05, 0.2))["match"] is False  # worse on one hole statistic
+    assert cc.codec_match(table(0.85, 0.05, 0.05))["match"] is False  # only 15% better
+    r = cc.codec_match(table(0.85, 0.05, 0.05))
+    assert r["closest_variant"] == "mp3-32k@16000" and r["matched_variant"] is None
+
+
+def test_variant_grid_has_every_codec_alone_and_with_the_kaiser_pass():
+    g = cc.variant_grid()
+    codecs = [v for v in g if v not in ("raw", "kaiser") and not v.endswith("+kaiser")]
+    assert g[:2] == ["raw", "kaiser"] and len(codecs) == 16
+    assert all(f"{c}+kaiser" in g for c in codecs)
