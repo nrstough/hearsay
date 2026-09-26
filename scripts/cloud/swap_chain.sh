@@ -11,4 +11,4 @@ read -r HOST PORT < "$STATE/SSH"
 DEADLINE="${DEADLINE:-$(date -j -f '%H:%M' '11:45' '+%s' 2>/dev/null || date -d '11:45' '+%s')}"
 SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p $PORT root@$HOST"
 tar czf - -C "$HERE" box_setup.sh box_chain.sh box_codecs.py r2_guard.sh | $SSH 'mkdir -p /root/m5/cloud && tar xzf - -C /root/m5/cloud'
-$SSH "pkill -f box_chain.sh || true; sleep 1; rm -f /root/m5/code.tgz; setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' bash /root/m5/cloud/box_chain.sh >> /root/m5/chain.log 2>&1 < /dev/null & echo SWAPPED"
+$SSH "pkill -f "[b]ox_chain.sh" || true; sleep 1; rm -f /root/m5/code.tgz; setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' bash /root/m5/cloud/box_chain.sh >> /root/m5/chain.log 2>&1 < /dev/null & echo SWAPPED"

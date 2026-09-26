@@ -51,12 +51,15 @@ def newest_m1_dir(nsa_only: bool = True) -> Path:
 M1_DIR = newest_m1_dir()
 
 
-def find_runs(root: Path, arm: str) -> dict[str, Path]:
-    """{fold or 'full': run dir} for the newest DONE run per fold of the given arm."""
+def find_runs(root: Path, arm: str, train_top: int | None = None) -> dict[str, Path]:
+    """{fold or 'full': run dir} for the newest DONE run per fold of the given arm and recipe
+    (train_top: 0 = frozen backbone, 12 = full fine-tune; None = any)."""
     out: dict[str, Path] = {}
-    for rm in sorted(root.rglob("run_meta.json")):
+    for rm in sorted(root.rglob("run_meta.json"), key=lambda p: p.stat().st_mtime):
         meta = json.loads(rm.read_text())
         if meta.get("arm") != arm:
+            continue
+        if train_top is not None and (meta.get("config") or {}).get("train_top") != train_top:
             continue
         d = rm.parent
         if not (d / "model" / "hashes.json").exists():
@@ -109,6 +112,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=Path, default=REPO / "outputs" / "m5_runs")
     ap.add_argument("--arm", default="nsa_extra")
+    ap.add_argument("--train-top", type=int, default=None,
+                    help="recipe filter on run_meta config.train_top (0 = frozen backbone)")
     ap.add_argument("--bundle-manifest", type=Path,
                     default=Path("/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/m5_bundle/v1/manifest.csv"))
     ap.add_argument("--out-name", default="m5_xlsr_ft")
@@ -125,7 +130,7 @@ def main() -> None:
     folds = pd.read_csv(FOLDS)
     folds["fold"] = folds.fold.astype(str)
     test = pd.read_csv(REPO / "outputs/manifests/nsa_test.csv")
-    runs = find_runs(args.runs, args.arm)
+    runs = find_runs(args.runs, args.arm, args.train_top)
     print("runs:", {k: str(v) for k, v in runs.items()})
     if "full" not in runs:
         raise SystemExit("no full-model run for this arm")
@@ -202,7 +207,11 @@ def main() -> None:
         itw = {"n_bonafide": len(it), "oof_threshold_logit": round(thr, 4),
                "pfa": round(pfa, 4), "m1_pfa": m1_itw_pfa, "m1_pfa_source": m1_itw_src,
                "passed": pfa <= m1_itw_pfa}
+    m1_oof = (m1.get("cv_best") or {}).get("min_dcf")  # M1's generator-grouped inner CV
     gate = {
+        "m1_oof_min_dcf": m1_oof,
+        "oof_passed": (m1_oof is not None and oof_pooled is not None
+                       and oof_pooled["min_dcf"] < m1_oof),
         "m1_holdout_min_dcf": m1_bar,
         "m5_holdout_min_dcf": val_clean["min_dcf"],
         "holdout_passed": (m1_bar is not None and val_clean["min_dcf"] < m1_bar),
@@ -224,7 +233,8 @@ def main() -> None:
     export.to_csv(scores_path, index=False)
     export.to_csv(out_dir / "scores.csv", index=False)
     meta = {
-        "rung": "M5", "arm": args.arm, "stackable": bool(have_all_folds),
+        "rung": "M5", "arm": args.arm, "recipe_train_top": run_meta["config"].get("train_top"),
+        "stackable": bool(have_all_folds),
         "config": run_meta["config"], "config_hash": run_meta["config_hash"],
         "steps": run_meta["steps"], "bundle_tree": run_meta["bundle_tree"],
         "git_sha": run_meta.get("git_sha"), "gpu": run_meta.get("gpu"),
