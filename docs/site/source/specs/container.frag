@@ -18,6 +18,6 @@
 <h2 id="limits">Known limits</h2>
 <p>By design it cannot score this test set. A tag naming a synthesis tool would score a file toward synthetic, but no test file carries one.</p>
 <h2 id="tests">Tests that pin it</h2>
-<p><code>tests/test_container_detector.py</code>: a plain PCM WAV is neutral and carries the routing facts, a lossy codec is flagged but stays neutral, a tool tag scores 0.9, a synthesis claim 0.75, a table of tag rules (the FFmpeg tag, an empty tag, "Watts per channel", "Coqui TTS", "ai-generated", a key named tts), an unreadable file is an error, deterministic and filename-blind, no filesystem fields, registration.</p>
+<p><code>tests/test_container_detector.py</code>: a plain PCM WAV is neutral and carries the routing facts, a lossy codec is flagged but stays neutral, a tool tag scores {{num:0.9|src/hearsay/detectors/container.py#L93}}, a synthesis claim {{num:0.75|src/hearsay/detectors/container.py#L96}}, a table of tag rules (the FFmpeg tag, an empty tag, "Watts per channel", "Coqui TTS", "ai-generated", a key named tts), an unreadable file is an error, deterministic and filename-blind, no filesystem fields, registration.</p>
 <h2 id="sources">Sources</h2>
 <p>{{src:docs/reports/2026-09-26_cpu-detectors.md|The CPU detectors report, "Trap 1"}}; {{src:README.md#what-did-not-work|README, "The container is the label"}}.</p>

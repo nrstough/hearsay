@@ -57,7 +57,7 @@ function pages(dir, prefix) {
           title: document.title, h1: document.querySelectorAll("h1").length,
         }));
         const name = rel.replace(/[\/]/g, "__").replace(/\.html$/, "") + `--${width}-${theme}.png`;
-        await page.screenshot({ path: path.join(OUT, name), fullPage: width === 390 ? false : false });
+        await page.screenshot({ path: path.join(OUT, name), fullPage: false });
         shots += 1;
         const bad = [];
         if (m.sw > m.iw) bad.push(`overflow ${m.sw} > ${m.iw}`);

@@ -14,9 +14,9 @@
 <ul>
 <li><strong>The FFmpeg command</strong> takes the first audio stream, downmixes to mono and resamples to 16 kHz, emitting little-endian float32 ({{src:src/hearsay/audio.py#L31|audio.py, lines 31–36}}). Empty output raises <code>DecodeError</code> with FFmpeg's last line; a partial decode is kept; non-finite samples are zeroed.</li>
 <li><strong>No denoising and no loudness normalization</strong> anywhere on the path; a test pins it. Level is normalized per detector, later.</li>
-<li><strong>Silence trim:</strong> threshold {{num:35|src/hearsay/audio.py#L93}} dB below the loudest 20 ms frame, and the result is never shorter than {{num:1.0|src/hearsay/audio.py#L94}} s; with fewer than two frames or nothing above the threshold the clip is returned unchanged ({{src:src/hearsay/audio.py#L93|audio.py, lines 93–110}}).</li>
-<li><strong>Windows:</strong> the hop defaults to half a window; a clip shorter than one window is tiled; the last window is flush with the end ({{src:src/hearsay/audio.py#L76|audio.py, lines 76–90}}). Windows are the v1 path; the deep detectors now use segment mode (see <a href="segment-preparation.html">segment preparation</a>).</li>
-<li><strong>Probe:</strong> <code>ffprobe</code> with <code>-show_format -show_streams -select_streams a:0</code>; returns the fields above and never raises ({{src:src/hearsay/audio.py#L47|audio.py, lines 47–73}}).</li>
+<li><strong>Silence trim:</strong> threshold {{num:35|src/hearsay/audio.py#L90}} dB below the loudest 20 ms frame, and the result is never shorter than {{num:1.0|src/hearsay/audio.py#L91}} s; with fewer than two frames or nothing above the threshold the clip is returned unchanged ({{src:src/hearsay/audio.py#L90|audio.py, lines 90–107}}).</li>
+<li><strong>Windows:</strong> the hop defaults to half a window; a clip shorter than one window is tiled; the last window is flush with the end ({{src:src/hearsay/audio.py#L73|audio.py, lines 73–87}}). Windows are the v1 path; the deep detectors now use segment mode (see <a href="segment-preparation.html">segment preparation</a>).</li>
+<li><strong>Probe:</strong> <code>ffprobe</code> with <code>-show_format -show_streams -select_streams a:0</code>; returns the fields above and never raises ({{src:src/hearsay/audio.py#L44|audio.py, lines 44–70}}).</li>
 </ul>
 <h2 id="status">Status</h2>
 <p>Built and tested; unchanged since the M0 rung. Invariant 1 of the architecture document ("one audio path").</p>

@@ -58,14 +58,14 @@
 <h2 id="limits">Known limits</h2>
 <p>By design it cannot score this test set. A tag naming a synthesis tool would score a file toward synthetic, but no test file carries one.</p>
 <h2 id="tests">Tests that pin it</h2>
-<p><code>tests/test_container_detector.py</code>: a plain PCM WAV is neutral and carries the routing facts, a lossy codec is flagged but stays neutral, a tool tag scores 0.9, a synthesis claim 0.75, a table of tag rules (the FFmpeg tag, an empty tag, "Watts per channel", "Coqui TTS", "ai-generated", a key named tts), an unreadable file is an error, deterministic and filename-blind, no filesystem fields, registration.</p>
+<p><code>tests/test_container_detector.py</code>: a plain PCM WAV is neutral and carries the routing facts, a lossy codec is flagged but stays neutral, a tool tag scores <span class="num" data-src="src/hearsay/detectors/container.py#L93">0.9</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/container.py#L93" title="Source: src/hearsay/detectors/container.py line 93 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/container.py line 93 (GitHub; assumes main is public)</span></a>, a synthesis claim <span class="num" data-src="src/hearsay/detectors/container.py#L96">0.75</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/container.py#L96" title="Source: src/hearsay/detectors/container.py line 96 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/container.py line 96 (GitHub; assumes main is public)</span></a>, a table of tag rules (the FFmpeg tag, an empty tag, "Watts per channel", "Coqui TTS", "ai-generated", a key named tts), an unreadable file is an error, deterministic and filename-blind, no filesystem fields, registration.</p>
 <h2 id="sources">Sources</h2>
 <p><a class="srclink" href="../library/reports-2026-09-26-cpu-detectors.html" title="docs/reports/2026-09-26_cpu-detectors.md">The CPU detectors report, "Trap 1"</a>; <a class="srclink" href="../library/readme.html#what-did-not-work" title="README.md, section what-did-not-work">README, "The container is the label"</a>.</p>
 
 </article>
 <nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="compression.html">← Compression forensics</a><a class="next" rel="next" href="enf.html">ENF: mains hum →</a></nav>
 <footer class="page-footer">
-<p>Generated from <code>docs/site/source/specs/container.frag</code> <span class="hash">f6f5489b6f8c</span>, <code>src/hearsay/detectors/container.py</code> <span class="hash">a1bb9eaa4126</span>, <code>docs/reports/2026-09-26_cpu-detectors.md</code> <span class="hash">31a66d317d4a</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+<p>Generated from <code>docs/site/source/specs/container.frag</code> <span class="hash">9495b4d1800e</span>, <code>src/hearsay/detectors/container.py</code> <span class="hash">a1bb9eaa4126</span>, <code>docs/reports/2026-09-26_cpu-detectors.md</code> <span class="hash">31a66d317d4a</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
 </footer>
 </main>
 </div>

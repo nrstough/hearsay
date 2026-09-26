@@ -73,7 +73,7 @@ NUM_ALLOW = [
     r"\bHGT\d+\b",
     r"\b[A-Za-z]\d{3,}\b",
 ]
-NUM_RE = re.compile(r"(?<![\w.,/#-])(\d+(?:\.\d+)?%|\d{1,3}(?:,\d{3})+|\d+\.\d+|\d{3,})(?![\w.,%]|,\d)")
+NUM_RE = re.compile(r"(?<![\w.,/#-])(\d+(?:\.\d+)?%|\d{1,3}(?:,\d{3})+|\d+\.\d+|\d{3,})(?![\w%]|[.,]\d)")
 
 
 class BuildError(Exception):
@@ -581,6 +581,8 @@ class Converter:
                 if not v:
                     continue
             kept.append(f' {k}="{attr(v)}"')
+        if name == "img" and not any(k.startswith(" alt=") for k in kept):
+            kept.append(' alt=""')
         return f"<{name}{''.join(kept)}>"
 
     def _inline(self, text: str) -> str:
@@ -605,11 +607,18 @@ class Converter:
 
         def image(m):
             alt, src = m.group(1), m.group(2)
-            if src.startswith("data:"):
+            if src.startswith("data:image/"):
                 href = src
+            elif re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", src):
+                # an external or scripted image source never becomes a tag: the site is offline
+                self.warnings.append(f"external image source left as text: {src[:60]}")
+                return self._stash(esc(m.group(0)))
             else:
                 resolved = self.link(html.unescape(src))
                 href = resolved[0] if resolved else src
+                if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", href) and not href.startswith(GITHUB_BLOB):
+                    self.warnings.append(f"external image source left as text: {src[:60]}")
+                    return self._stash(esc(m.group(0)))
             return self._stash(f'<img src="{attr(href)}" alt="{attr(alt)}">')
 
         s = IMAGE_RE.sub(image, s)
@@ -725,8 +734,12 @@ class Site:
     def resolve(self, href: str, source_rel: str, page_url: str):
         """Return (url, note) for a markdown href found in source_rel, or None for a path that
         is not in the repository (gitignored). Records a warning for a missing target."""
-        if re.match(r"^(https?:|mailto:|data:)", href):
+        if re.match(r"^(https?:|mailto:)", href):
             return href, None
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", href) and not re.match(r"^[A-Za-z]:[\\/]", href):
+            # javascript:, vbscript:, data: and any other scheme: never a link
+            self._warn(f"unsafe link scheme left as text: {href[:60]} (from {source_rel})")
+            return None
         path, _, frag = href.partition("#")
         if not path:
             return "#" + frag, None
@@ -856,6 +869,8 @@ class Site:
                 anchor = "#" + frag if frag else ""
                 url = GITHUB_BLOB + path + anchor
                 where = path + (f" line {frag[1:]}" if frag.startswith("L") else "") + " (GitHub; assumes main is public)"
+            elif any(path.startswith(r) for r in GITIGNORED_ROOTS):
+                return None, path + " (not in the repository)"
             else:
                 raise BuildError(f"citation source not found: {src} on {page.url}")
             return url, where
@@ -881,6 +896,11 @@ class Site:
                 if not src:
                     raise BuildError(f"{{{{num}}}} without a source: {value} on {page.url}")
                 url, where = source_link(src)
+                if url is None:
+                    self._warn(f"{{{{num}}}} cites a gitignored file: {src} on {page.url}")
+                    return (f'<span class="num" data-src="{attr(src)}">{esc(value)}</span>'
+                            f'<code class="src-missing" title="{attr("Source: " + where)}">'
+                            f'<span class="sr">source: {esc(where)}</span></code>')
                 self.citations.append((value, src, page.url))
                 return (f'<span class="num" data-src="{attr(src)}">{esc(value)}</span>'
                         f'<a class="src" href="{attr(url)}" title="{attr("Source: " + where)}">'
@@ -888,6 +908,8 @@ class Site:
             if kind == "src":
                 src, _, label = body.partition("|")
                 url, where = source_link(src.strip())
+                if url is None:
+                    return f'<code title="{attr(where)}">{esc(label or src)}</code>'
                 stripped = re.sub(r"(?:lines?|§|L)\s*\d+(?:\.\d+)*(?:\s*[–-]\s*\d+)?", " ", label)
                 for tok in re.findall(r"\d+(?:\.\d+)?%?", stripped):
                     self.citations.append((tok, src.strip(), page.url))
@@ -1061,11 +1083,11 @@ divided by the best constant decision, {n["default"]}, so that 1.0 means "no bet
         page.raw = f'''<h2 id="what-is-here">What is here</h2>
 <p>Four sections. <strong>The story</strong> and <strong>Systems and subsystems</strong> are written by hand for this site, in plain English, and every figure on them carries a source link. <strong>The library</strong> is every markdown document in the repository (README, CLAUDE.md, the plan, architecture, status, code map, the NSA brief, and every report, run spec, audit, handoff, consult record, working-method skill and review rubric), rendered as it is. The markdown files are the record; these pages are a copy with navigation, diagrams and explainers.</p>
 <h2 id="numbers">The rule for numbers</h2>
-<p>A number on a story or spec page is never typed from memory. Each one is written as a citation to a file and, where the file has one, a section; the build fails if the literal number is not found there. Decimals, percentages, thousands-grouped numbers and integers of 100 or more must be cited; small counts (ten detectors, 12 layers) may stand alone. The README wins where two documents disagree, and each disagreement is listed below rather than resolved here. Where no document states a number, the page leaves it out.</p>
+<p>A number on a story or spec page is never typed from memory. Each one is written as a citation to a file and, where the file has one, a section; <code>--check-citations</code> fails if the literal number is not found there (the plain build only warns). Decimals, percentages, thousands-grouped numbers and integers of 100 or more must be cited; small counts (ten detectors, 12 layers) may stand alone. The README wins where two documents disagree, and each disagreement is listed below rather than resolved here. Where no document states a number, the page leaves it out.</p>
 <h2 id="hashes">Footers and versions</h2>
 <p>Every page's footer names its source file(s) with the first 12 characters of the SHA-256 of that file's bytes. The hash identifies the exact version of the markdown a page was built from; a later commit that changes the file changes the hash, which is how the freshness check notices. Pages carry no commit hash, because a document edited in the same commit as the site cannot know that commit's hash before it exists. The report for this site (<code>docs/reports/2026-09-26_docs-site.md</code>) records the commit each build came from.</p>
 <h2 id="build">How it is built</h2>
-<p>One standard-library Python script, <code>scripts/build_site.py</code>, reads the markdown corpus and the hand-written sources under <code>docs/site/source/</code> and writes everything else under <code>docs/site/</code>. The output is committed, so nothing needs building to read the site; it works opened from a checkout (<code>docs/site/index.html</code>), from <code>python3 -m http.server</code> in <code>docs/site</code>, and as a GitHub Pages site from <code>main</code> / <code>docs</code>. There is no runtime dependency: no CDN, no webfont, no library. Diagrams are Mermaid sources pre-rendered to SVG in light and dark by <code>docs/site/source/render-diagrams.js</code> (Node, Playwright, Mermaid 11.17.2); the manifest beside them records each source's hash, and the build refuses a diagram whose source changed since it was rendered.</p>
+<p>One standard-library Python script, <code>scripts/build_site.py</code>, reads the markdown corpus and the hand-written sources under <code>docs/site/source/</code> and writes everything else under <code>docs/site/</code>. The output is committed, so nothing needs building to read the site; it works opened from a checkout (<code>docs/site/index.html</code>), from <code>python3 -m http.server</code> in <code>docs/site</code>, and as a GitHub Pages site from <code>main</code> / <code>docs</code>. There is no runtime dependency: no CDN, no webfont, no library. Diagrams are Mermaid sources pre-rendered to SVG in light and dark by <code>docs/site/source/render-diagrams.js</code> (Node, Playwright, Mermaid 11.17.2); the manifest beside them records each source's hash, and <code>--strict</code> and <code>--check</code> refuse a diagram whose source changed since it was rendered.</p>
 <pre><code>uv run python scripts/build_site.py --strict          # rebuild
 uv run python scripts/build_site.py --check           # is the committed site fresh?
 uv run python scripts/build_site.py --check-citations # is every number where its citation says?
@@ -1227,6 +1249,11 @@ node docs/site/source/verify-pages.js --out /tmp/site-shots   # every page, two 
 
     # --- search --------------------------------------------------------------------------
 
+    def is_export(self, p: Page) -> bool:
+        """The HTML-heavy exports: a library page whose markdown source is over 200 kB."""
+        return p.section == "library" and any(
+            (REPO / src).is_file() and (REPO / src).stat().st_size > 200_000 for src in p.sources)
+
     def search_index(self) -> str:
         pages = sorted(self.pages, key=lambda p: p.url)
         records = []
@@ -1234,8 +1261,8 @@ node docs/site/source/verify-pages.js --out /tmp/site-shots   # every page, two 
         for pid, p in enumerate(pages):
             heads = " ".join(t for _, t, _ in p.headings)
             body = p.text
-            if p.section == "library" and len(body) > 200_000:
-                body = ""  # the three exports are indexed by title and headings only
+            if p.section == "library" and self.is_export(p):
+                body = ""  # the HTML-heavy exports are indexed by title and headings only
             body = re.sub(r"[A-Za-z0-9+/=]{60,}", " ", body)  # base64 fragments
             records.append({"u": p.url, "t": p.title, "s": SECTION_TITLES[p.section], "h": heads[:300]})
             for weight_text in (p.title, heads, body):
@@ -1433,21 +1460,29 @@ def extract_mermaid() -> int:
     return 0
 
 
-def run_check() -> int:
+def compare_generated(site: Site, fresh_dir: Path, committed_dir: Path) -> list[str]:
+    """The generated set of committed_dir against a fresh build in fresh_dir: a file missing
+    from, stale in, or different in committed_dir is a problem."""
+    problems = []
+    fresh = {p.relative_to(fresh_dir).as_posix(): p.read_bytes() for p in site.generated_paths(fresh_dir)}
+    committed = {p.relative_to(committed_dir).as_posix(): p.read_bytes()
+                 for p in site.generated_paths(committed_dir)}
+    for rel in sorted(set(fresh) | set(committed)):
+        if rel not in committed:
+            problems.append(f"missing from docs/site: {rel}")
+        elif rel not in fresh:
+            problems.append(f"stale file in docs/site: {rel}")
+        elif fresh[rel] != committed[rel]:
+            problems.append(f"differs: {rel}")
+    return problems
+
+
+def run_check(committed_dir: Path = SITE) -> int:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "site"
         site = Site(out)
         site.build()
-        problems = site.check_manifest()
-        fresh = {p.relative_to(out).as_posix(): p.read_bytes() for p in site.generated_paths(out)}
-        committed = {p.relative_to(SITE).as_posix(): p.read_bytes() for p in site.generated_paths(SITE)}
-        for rel in sorted(set(fresh) | set(committed)):
-            if rel not in committed:
-                problems.append(f"missing from docs/site: {rel}")
-            elif rel not in fresh:
-                problems.append(f"stale file in docs/site: {rel}")
-            elif fresh[rel] != committed[rel]:
-                problems.append(f"differs: {rel}")
+        problems = site.check_manifest() + compare_generated(site, out, committed_dir)
     for p in problems:
         print("CHECK:", p)
     print("check OK" if not problems else f"check FAILED ({len(problems)} problem(s))")

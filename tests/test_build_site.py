@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 from html.parser import HTMLParser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import numpy as np
 import pytest
@@ -300,8 +300,32 @@ def test_gitignored_targets_are_not_links(built):
     assert built.resolve("models/fusion_v2/constants.json", "README.md", "library/readme.html") is None
 
 
+def test_markdown_image_and_link_syntax_cannot_inject(bs, tmp_path):
+    site = bs.Site(tmp_path / "s", strict=False)
+    def link(h):
+        return site.resolve(h, "README.md", "library/readme.html")
+    html, c = conv(bs, "![pix](https://evil.example/t.png) [click](javascript:alert(1)) [d](data:text/html;base64,AAAA) [v](vbscript:x)", link=link)
+    assert "<img" not in html and "javascript:" not in html and "data:text" not in html and "vbscript" not in html
+    assert "![pix](https://evil.example/t.png)" in html and '<code title="not in the repository">click</code>' in html
+    assert sum("left as text" in w for w in site.warnings + c.warnings) == 4
+    html, _ = conv(bs, "![ok](data:image/png;base64,AAAA) ![flow](docs/img/architecture-flow.svg)", link=link)
+    assert html.count("<img") == 2 and 'src="data:image/png;base64,AAAA"' in html
+    html, _ = conv(bs, "[win](C:/x.md)", link=link)  # a drive letter is a path, not a scheme
+    assert "target not found" in html
+
+
+def test_no_external_images_or_script_hrefs_in_pages(pages):
+    for rel, html in pages.items():
+        if rel.startswith("source/"):
+            continue
+        assert not re.search(r'<img[^>]+src="(?:https?:|//)', html), rel
+        assert not re.search(r'<a\b[^>]*href="\s*(?:javascript|vbscript|data):', html, re.IGNORECASE), rel
+        for m in re.finditer(r"<img\b[^>]*>", html):
+            assert " alt=" in m.group(0), (rel, m.group(0)[:80])
+
+
 def test_external_links_untouched(built):
-    for href in ("https://docs.astral.sh/uv/", "mailto:x@y.z", "data:image/png;base64,AAAA"):
+    for href in ("https://docs.astral.sh/uv/", "mailto:x@y.z"):
         assert built.resolve(href, "README.md", "library/readme.html") == (href, None)
 
 
@@ -312,6 +336,10 @@ def test_missing_target_is_reported_and_strict_raises(bs, tmp_path):
     strict = bs.Site(tmp_path / "t", strict=True)
     with pytest.raises(bs.BuildError):
         strict.resolve("docs/does-not-exist.md", "README.md", "library/readme.html")
+    html, _ = conv(bs, "![missing](docs/img/nope.png)", link=lambda h: site.resolve(h, "README.md", "library/readme.html"))
+    assert any("nope.png" in w for w in site.warnings) and 'alt="missing"' in html
+    with pytest.raises(bs.BuildError):
+        conv(bs, "![missing](docs/img/nope.png)", link=lambda h: strict.resolve(h, "README.md", "library/readme.html"))
 
 
 def test_images_and_mmd_are_copied(built, pages):
@@ -439,11 +467,14 @@ def test_library_title_rules(built):
     assert "audit" in by_source["docs/specs/2026-09-26_k-docker-image-audit.md"]
 
 
-def test_prev_next_chain(built, pages):
-    story = sorted((p for p in built.pages if p.section == "story"), key=lambda p: (p.order, p.title))
-    for a, b in itertools.pairwise(story):
-        assert f'rel="next" href="{b.url}"' in pages[a.url]
-        assert f'rel="prev" href="{a.url}"' in pages[b.url]
+@pytest.mark.parametrize("section", ["story", "specs"])
+def test_prev_next_chain(built, pages, section):
+    chain = sorted((p for p in built.pages if p.section == section and not p.url.endswith("/index.html")),
+                   key=lambda p: (p.order, p.title))
+    assert len(chain) >= 9
+    for a, b in itertools.pairwise(chain):
+        assert f'rel="next" href="{PurePosixPath(b.url).name}"' in pages[a.url], (a.url, b.url)
+        assert f'rel="prev" href="{PurePosixPath(a.url).name}"' in pages[b.url], (a.url, b.url)
 
 
 def test_build_is_deterministic(bs, tmp_path):
@@ -456,13 +487,21 @@ def test_build_is_deterministic(bs, tmp_path):
     assert all(outs[0][k] == outs[1][k] for k in outs[0])
 
 
-def test_check_detects_a_stale_file(bs, tmp_path, monkeypatch):
-    site = bs.Site(tmp_path / "s", strict=True)
-    site.build()
-    fresh = {p.relative_to(site.out).as_posix(): p.read_bytes() for p in site.generated_paths(site.out)}
-    (site.out / "index.html").write_bytes(b"stale")
-    stale = {p.relative_to(site.out).as_posix(): p.read_bytes() for p in site.generated_paths(site.out)}
-    assert fresh != stale and fresh["index.html"] != stale["index.html"]
+def test_check_detects_missing_stale_and_differing_files(bs, built, tmp_path):
+    """The comparison --check runs: a copy of a fresh build passes; a modified, an added and a
+    deleted generated file are each reported; files under the input directories are not."""
+    import shutil
+    committed = tmp_path / "committed"
+    shutil.copytree(built.out, committed)
+    assert bs.compare_generated(built, built.out, committed) == []
+    (committed / "index.html").write_bytes(b"stale")
+    (committed / "zz-extra.html").write_bytes(b"extra")
+    (committed / "specs" / "metrics.html").unlink()
+    (committed / "source").mkdir(exist_ok=True)
+    (committed / "source" / "zz-input.txt").write_bytes(b"input, not generated")
+    problems = bs.compare_generated(built, built.out, committed)
+    assert problems == ["differs: index.html", "missing from docs/site: specs/metrics.html",
+                        "stale file in docs/site: zz-extra.html"]
 
 
 @STALE
@@ -487,12 +526,18 @@ def test_rendered_svgs_are_clean(built):
         assert "@import" not in text and 'href="http' not in text and "url(http" not in text and "<image" not in text, svg.name
 
 
-def test_light_and_dark_svg_ids_disjoint():
-    light = (SITE / "img" / "diagrams" / "pipeline-light.svg").read_text(encoding="utf-8")
-    dark = (SITE / "img" / "diagrams" / "pipeline-dark.svg").read_text(encoding="utf-8")
-    ids_l = set(re.findall(r' id="([^"]+)"', light))
-    ids_d = set(re.findall(r' id="([^"]+)"', dark))
-    assert ids_l and ids_d and not (ids_l & ids_d)
+def test_svg_ids_disjoint_across_diagrams_and_themes():
+    """Five architecture diagrams share one library page, and every diagram ships a light and a
+    dark file: no id may repeat across any pair of rendered SVGs."""
+    files = sorted((SITE / "img" / "diagrams").glob("*.svg"))
+    assert len(files) >= 20
+    seen: dict[str, str] = {}
+    for f in files:
+        ids = set(re.findall(r' id="([^"]+)"', f.read_text(encoding="utf-8")))
+        assert ids, f.name
+        for i in ids:
+            assert i not in seen, (i, seen.get(i), f.name)
+            seen[i] = f.name
 
 
 def test_fusion_diagram_matches_the_readme_rule():
@@ -591,13 +636,26 @@ def test_search_index_lists_every_page_and_is_a_classic_script(built):
 def test_search_index_loaded_lazily(pages, built):
     assert 'src="search-index.js"' not in pages["index.html"]
     js = (built.out / "site.js").read_text(encoding="utf-8")
-    assert "search-index" not in js or "data-search-index" in pages["index.html"]
+    assert "data-search-index" in js and "focus" in js and 'data-search-index="search-index.js"' in pages["index.html"]
+    assert not any(re.search(r'<script\b[^>]*src="[^"]*search-index\.js"', h) for h in pages.values())
 
 
-def test_exports_indexed_by_title_only(built):
+def test_exports_indexed_by_title_and_headings_only(built):
     js = (built.out / "search-index.js").read_text(encoding="utf-8")
     assert "iVBORw0KGgo" not in js
     assert len(js.encode("utf-8")) < 1_200_000
+    index = json.loads(js.split("=", 1)[1].strip().rstrip(";"))
+    exports = [p for p in built.pages if built.is_export(p)]
+    assert len(exports) == 3 and {p.sources[0] for p in exports} == {
+        "docs/scoping.md", "docs/consults/2026-09-26_fusion-strategy_RESPONSE_verbatim.md",
+        "docs/consults/2026-09-26_m5-extra-data-finetune_RESPONSE_verbatim.md"}
+    urls = [r["u"] for r in index["pages"]]
+    for p in exports:
+        pid = urls.index(p.url)
+        allowed = set(re.findall(r"[a-z0-9_]+", (p.title + " " + " ".join(t for _, t, _ in p.headings)).lower()))
+        indexed = {t for t, ids in index["terms"].items() if pid in ids}
+        body_only = indexed - allowed
+        assert not body_only, (p.url, sorted(body_only)[:10])
 
 
 # --- citations -----------------------------------------------------------------------------------
@@ -620,11 +678,21 @@ def test_wrong_number_is_caught(bs, tmp_path):
 def test_uncited_number_is_caught(bs, tmp_path):
     site = bs.Site(tmp_path / "s", strict=True)
     page = bs.Page("x.html", "x", "story")
-    page.body = "<p>the holdout is 0.0065 and 1,671 files and 27.4% and 500 rows but 12 layers and 2026-09-26 at 12:03 are fine</p>"
+    page.body = ("<p>the holdout is 0.0065 and 1,671 files and 27.4% and 500 rows but 12 layers and 2026-09-26 at 12:03 are fine. "
+                 "It was 0.014, and then 0.228. Above 0.5, the rank is halved; 2.5% of rows.</p>")
     site.pages = [page]
     problems = site.check_citations()
     flagged = {re.search(r"uncited number '([^']+)'", p).group(1) for p in problems}
-    assert flagged == {"0.0065", "1,671", "27.4%", "500"}
+    assert flagged == {"0.0065", "1,671", "27.4%", "500", "0.014", "0.228", "0.5", "2.5%"}
+
+
+def test_gitignored_citation_target_is_code_not_link(bs, tmp_path):
+    site = bs.Site(tmp_path / "s", strict=False)
+    page = bs.Page("x.html", "x", "story")
+    out = site.expand("{{num:0.5|models/fusion_v2/constants.json}} {{src:outputs/detector_scores/x.csv|the export}}", page)
+    assert "<a " not in out and out.count("not in the repository") >= 2 and out.count("<code") == 2
+    assert any("gitignored" in w for w in site.warnings)
+    assert site.citations == []
 
 
 def test_missing_source_and_bad_section_fail(bs, tmp_path):

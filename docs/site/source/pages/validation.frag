@@ -23,7 +23,7 @@
 <li>F missed the bar: its In-the-Wild gain was {{num:0.003|README.md#the-fusion-rule}}.</li>
 <li>A3 at weight {{num:0.2|README.md#the-fusion-rule}}, plus the same Spectra step, qualified: inner {{num:0.135|README.md#the-fusion-rule}} vs {{num:0.140|README.md#the-fusion-rule}}, holdout {{num:0.0065|README.md#the-fusion-rule}} vs {{num:0.014|README.md#the-fusion-rule}}, In-the-Wild {{num:0.228|README.md#the-fusion-rule}} / {{num:0.239|README.md#the-fusion-rule}} (brief / sponsor-code cost) vs {{num:0.260|README.md#the-fusion-rule}} / {{num:0.267|README.md#the-fusion-rule}}.</li>
 <li>We had predicted A3 would lose on short clips and LibriSpeech real speech. With the Spectra step it improved both.</li>
-<li>On the test set the switch changes little: Spearman {{num:0.974|README.md#the-fusion-rule}} against the previous rule's scores, and {{num:3 of 1,671|README.md#the-fusion-rule}} files cross 0.5.</li>
+<li>On the test set the switch changes little: Spearman {{num:0.974|README.md#the-fusion-rule}} against the previous rule's scores, and {{num:3 of 1,671|README.md#the-fusion-rule}} files cross {{num:0.5|README.md#the-fusion-rule}}.</li>
 </ul>
 <h2 id="timeline">The day, in order</h2>
 <p>Times are Saturday, September 26, local to the event. Each entry links to the document that records it; where documents disagree by a few minutes the README's time is shown.</p>

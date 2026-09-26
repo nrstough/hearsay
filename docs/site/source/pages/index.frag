@@ -16,7 +16,7 @@
 <thead><tr><th></th><th>Inner OOF</th><th>Holdout</th><th>In-the-Wild, brief cost</th><th>In-the-Wild, sponsor-code cost</th></tr></thead>
 <tbody>
 <tr><td><strong>Shipped rule</strong> ({{src:README.md#numbers|A3 w 0.2 + E}}: M1b, handcrafted and M5 by rank, Spectra suppression)</td><td>{{num:0.135|README.md#results-at-a-glance}}</td><td>{{num:0.0065|README.md#results-at-a-glance}}</td><td>{{num:0.228|README.md#results-at-a-glance}}</td><td>{{num:0.239|README.md#numbers}}</td></tr>
-<tr><td>Previous rule (E on α 0.2, no M5), the fallback</td><td>{{num:0.140|README.md#results-at-a-glance}}</td><td>{{num:0.014|README.md#results-at-a-glance}}</td><td>{{num:0.260|README.md#results-at-a-glance}}</td><td>{{num:0.267|README.md#numbers}}</td></tr>
+<tr><td>Previous rule (E on α {{num:0.2|README.md#results-at-a-glance}}, no M5), the fallback</td><td>{{num:0.140|README.md#results-at-a-glance}}</td><td>{{num:0.014|README.md#results-at-a-glance}}</td><td>{{num:0.260|README.md#results-at-a-glance}}</td><td>{{num:0.267|README.md#numbers}}</td></tr>
 <tr><td>{{term:M1b}} alone, the best single detector we trained</td><td>{{num:0.301|README.md#results-at-a-glance}}</td><td>{{num:0.072|README.md#results-at-a-glance}}</td><td>{{num:0.343|README.md#results-at-a-glance}}</td><td>{{num:0.296|README.md#numbers}}</td></tr>
 <tr><td>{{term:Spectra-AASIST}} off the shelf, a {{term:suppression|suppressor}} only</td><td colspan="2">not fused: its training data is undisclosed, so no row of ours is provably out-of-sample for it</td><td colspan="2">{{num:0.065|README.md#numbers}}, possibly in-sample for the same reason</td></tr>
 </tbody></table></div>
