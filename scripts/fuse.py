@@ -91,9 +91,12 @@ def main() -> None:
         idx["itw"] = pd.Index(sorted(common))
 
     Z, R = {}, {}
+    consts: dict = {"detectors": args.detectors, "pi_synth": pi, "standardize": {}, "rules": {}}
     for n, d in dets.items():
         ref = d.loc[idx["inner_oof"], "logit"].to_numpy()
         mu, sd = ref.mean(), ref.std() + 1e-9
+        consts["standardize"][n] = {"mean": float(mu), "std": float(sd),
+                                    "inner_oof_sorted": np.sort(ref).tolist()}  # fmt: skip
         srt = np.sort(ref)
         Z[n] = {s: (d.loc[ix, "logit"].to_numpy() - mu) / sd for s, ix in idx.items() if len(ix)}
         R[n] = {s: np.searchsorted(srt, d.loc[ix, "logit"].to_numpy()) / len(srt)
@@ -115,6 +118,8 @@ def main() -> None:
         rules["stack_nonlj"] = {s: st.decision_function(np.column_stack([Z[n][s] for n in args.detectors]))
                                 for s in Z[args.detectors[0]]}  # fmt: skip
         print("stack_nonlj weights:", dict(zip(args.detectors, st.coef_[0].round(3), strict=True)))
+        consts["rules"]["stack_nonlj"] = {"weights": st.coef_[0].tolist(),
+                                          "intercept": float(st.intercept_[0])}  # fmt: skip
 
     report = {}
     for name, sc in rules.items():
@@ -137,6 +142,11 @@ def main() -> None:
         platt = LogisticRegression(class_weight="balanced").fit(sc["inner_oof"][:, None], y["inner_oof"])
         p_test = sigmoid(platt.decision_function(sc["test"][:, None]) + math.log(pi / (1 - pi)))
         r["test_share_gt_0.5"] = round(float(np.mean(p_test > 0.5)), 4)
+        consts["rules"].setdefault(name, {})["platt"] = {
+            "a": float(platt.coef_[0, 0]), "b": float(platt.intercept_[0]),
+            "prior_shift": math.log(pi / (1 - pi)),
+            "p": "sigmoid(a * fused + b + prior_shift)",
+        }
         report[name] = r
         if name in args.write:
             dest = REPO / "outputs" / "fusion" / f"{name.replace(':', '_')}.csv"
@@ -147,6 +157,16 @@ def main() -> None:
     df = pd.DataFrame(report).T
     pd.set_option("display.width", 220)
     print(df.to_string())
+    consts["how"] = {
+        "z": "(logit - standardize[d].mean) / standardize[d].std, per detector",
+        "zmean": "mean of z over detectors",
+        "rankmean": "mean over detectors of searchsorted(inner_oof_sorted, logit) / len",
+        "stack_nonlj": "weights . z + intercept",
+        "alone:<d>": "z of that detector",
+    }
+    cdir = REPO / "models" / "fusion_v0"
+    cdir.mkdir(parents=True, exist_ok=True)
+    (cdir / "constants.json").write_text(json.dumps(consts))
     out = REPO / "outputs" / "fusion" / "report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"detectors": args.detectors, "pi_synth": pi, "rules": report}, indent=2))
