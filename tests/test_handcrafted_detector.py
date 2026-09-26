@@ -136,3 +136,26 @@ def test_real_model_on_a_test_file():
         pytest.skip("needs the NSA test set and a trained models/hc_* bundle")
     r = safe_run(HandcraftedDetector(), ClipContext(wavs[0]))
     assert r.status == "ok" and 0.0 <= r.score <= 1.0 and r.evidence
+
+
+def test_bundle_families_are_recomputed_at_inference(tmp_path):
+    """A v4 bundle names its families; the detector must compute them for new audio."""
+    fams = ("modulation", "breath")  # the cheap ones
+    rows, y = [], []
+    for i in range(6):
+        rows.append(features(_clip("noise", i).audio, families=fams)); y.append(1)
+        rows.append(features(_clip("tone", i).audio, families=fams)); y.append(0)
+    cols = list(rows[0])
+    assert any(c.startswith("mod_") for c in cols) and any(c.startswith("breath_") for c in cols)
+    X = np.array([[r[c] for c in cols] for r in rows], np.float32)
+    model = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=2000)).fit(X, y)
+    stats = {c: {"real_mean": 0.0, "real_std": 1.0, "auc": 0.5} for c in cols}
+    d = tmp_path / "hc_logreg_v4toy"
+    d.mkdir()
+    joblib.dump({"model": model, "features": cols, "kind": "logreg", "feature_stats": stats,
+                 "crop_mode": "segment", "band_match": True, "families": list(fams)},
+                d / "model.joblib")  # fmt: skip
+    r = safe_run(HandcraftedDetector(model_dir=d), _clip("noise", 9))
+    assert r.status == "ok", r.error
+    assert "mod_peak_hz" in r.features and "breath_frac" in r.features
+    assert len(r.features) == len(cols) + 1  # + hc_logit
