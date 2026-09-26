@@ -13,7 +13,8 @@ from hearsay import SR
 from hearsay.detectors import base
 from hearsay.detectors.base import ClipContext, safe_run
 from hearsay.detectors.speech_gate import (
-    DEFAULT_ANSWER,
+    BLOCK_TOP,
+    FAILURE_TOP,
     SpeechGateDetector,
     analyze,
     apply_default_answer,
@@ -94,14 +95,39 @@ def test_contract_and_determinism(det):
     assert safe_run(det, ClipContext.from_array(np.zeros(100, np.float32))).status == "ok"
 
 
-def test_default_answer_policy_orders_gated_below_speech():
-    fused = np.array([0.9, 0.1, 0.6, 0.02, 0.5])
-    is_speech = np.array([1, 1, 0, 0, 1])
+def test_default_answer_policy_pins_gated_files_strictly_below_every_scored_file():
+    fused = np.array([0.9, 0.0009, 0.0, 0.6, 0.02, 0.5])  # the runner scores some real files at 0.0009 and 0.0
+    is_speech = np.array([1, 1, 1, 0, 0, 1])
     out = apply_default_answer(fused, is_speech)
-    assert np.array_equal(out[[0, 1, 4]], fused[[0, 1, 4]])
-    assert (out[[2, 3]] < fused[[0, 1, 4]].min()).all()
-    assert out[2] > out[3]  # deterministic order among gated files follows the fused score
-    assert abs(out[3] - DEFAULT_ANSWER) < 1e-3 and DEFAULT_ANSWER < 0.5
+    det, gated = out[is_speech == 1], out[is_speech == 0]
+    assert (det >= BLOCK_TOP).all() and det.max() <= 1.0
+    assert (gated < BLOCK_TOP).all() and (gated >= FAILURE_TOP).all()
+    assert gated.max() < det.min()  # strictly below, even below the 0.0 file
+    assert np.array_equal(np.argsort(det), np.argsort(fused[is_speech == 1]))  # ranking kept
+    assert out[2] == BLOCK_TOP and out[0] == BLOCK_TOP + (1 - BLOCK_TOP) * 0.9
+    assert out[3] > out[4]  # within the block, the weak signal (fused here) orders files
+
+
+def test_block_uses_order_by_keys_and_puts_failures_at_the_bottom():
+    fused = np.array([0.3, 0.3, 0.3, np.nan, 0.3])
+    is_speech = np.zeros(5, dtype=bool)
+    weak = np.array([0.2, 0.8, 0.2, 0.9, 0.2])
+    keys = ["a.wav", "b.wav", "c.wav", "d.wav", "e.wav"]
+    out = apply_default_answer(fused, is_speech, order_by=weak, keys=keys, failed=[0, 0, 0, 0, 1])
+    assert out[1] > out[0] and out[1] > out[2] and out[1] > out[4]  # highest weak signal on top
+    assert len(set(out.tolist())) == 5  # jitter: no two files share a value
+    assert out[3] < FAILURE_TOP and out[4] < FAILURE_TOP  # NaN signal and flagged failure: bottom
+    assert (out[[0, 1, 2]] >= FAILURE_TOP).all() and (out < BLOCK_TOP).all()
+    again = apply_default_answer(fused, is_speech, order_by=weak, keys=keys, failed=[0, 0, 0, 0, 1])
+    assert np.array_equal(out, again)  # deterministic
+    with pytest.raises(ValueError):
+        apply_default_answer(fused, is_speech, keys=keys[:3])
+
+
+def test_only_the_gate_flag_gates_a_file():
+    """Disagreement or low confidence is a fusion matter: a speech file always stays determinate."""
+    out = apply_default_answer(np.array([0.5, 0.0, 1.0]), np.array([1, 1, 1]))
+    assert (out >= BLOCK_TOP).all()
 
 
 def test_registered():

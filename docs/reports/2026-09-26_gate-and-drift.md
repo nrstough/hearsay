@@ -25,9 +25,13 @@ Any failed cue gates the file; the failed cues are the reasons (`reason_silence`
 
 ## 3. The policy (`speech_gate.apply_default_answer`)
 
-A gated file gets `DEFAULT_ANSWER` = 0.02 plus `1e-4 × its fused score`. So every gated file ranks **below every speech file** (speech scores are never that low after calibration), gated files keep a **deterministic order among themselves** (the fused score still breaks ties, which matters if the sponsor's ranking has to be total), and the explanation report can say "no speech to judge (silence): default answer". A decode failure is handled upstream by `safe_run` (error result) and should take the same path. The orchestrator applies this after fusion; fusion itself never sees the gate as a column.
+Corrected Sat 08:30 after the fusion consult (`docs/consults/2026-09-26_fusion-strategy_RESPONSE.md`, item 5), which proved the pinned block is the one direction-robust hedge *only if it sits strictly below every determinate score*; the first version (0.02 + 1e-4 × fused) did not, because the pipeline scores some real files as low as 0.0009.
 
-Why 0.02 and not 0.0: the constant rollback submission is all 0.0, and a gated file should still be distinguishable from "no score at all" in the TSV and the log.
+- **Determinate files** (speech): the fused score is mapped monotonically into **[0.001, 1.000]** (`0.001 + 0.999 × fused`); the ranking among them is unchanged and none can fall into the block.
+- **Gated files**: a pinned block in **[0.000, 0.001)**, strictly below every determinate score under either scoring convention. Within the block, files are ordered by whatever weak signal remains (`order_by`: the raw M1b score is the natural choice; voiced fraction and duration can be folded into it; the fused score by default) with a 1% share of the block's range given to a deterministic hash jitter of the file key, so **no two files share a value** (a superset of thresholds can only help the sweep, never hurt). **Decode failures and files with no signal** (NaN, or `failed=True`) go to the bottom tenth of the block, `[0, 0.0001)`, by jitter alone.
+- **Only the gate flag gates a file.** High-disagreement or low-confidence files are a fusion matter and stay in the determinate range (the consult compresses them toward its low end there); they must not be collapsed into the block.
+
+Call shape unchanged for the runner: `apply_default_answer(fused, is_speech)`; the keyword options `order_by`, `keys`, `failed` refine the block. Zero test files are gated today, so this changes no submitted ranking; the determinate map shifts every score by at most 0.001.
 
 ## 4. Speaker-embedding drift (`hearsay.detectors.speaker_drift`)
 

@@ -24,11 +24,15 @@ the backstop for it. Score is always 0.5 (no class evidence); the decision is in
 (`is_speech`, one `reason_*` per cue) and the evidence sentence, so fusion never sees a
 constant-but-informative column and the orchestrator reads the flag directly.
 
-Policy (`apply_default_answer`): a gated file gets `DEFAULT_ANSWER` (0.02, the constant
-rollback score's neighbourhood) plus a tie-break of 1e-4 x its fused score, so every gated
-file ranks below every speech file, gated files keep a deterministic order among themselves,
-and the explanation report can say why. A decode failure is gated the same way upstream
-(`safe_run` error -> no speech to judge).
+Policy (`apply_default_answer`, per the fusion consult, docs/consults/2026-09-26_fusion-
+strategy_RESPONSE.md item 5): placement, not value. Determinate (speech) scores are mapped
+monotonically into [BLOCK_TOP, 1] = [0.001, 1]; gated files form a pinned block in
+[0, BLOCK_TOP), strictly below every determinate score under either scoring convention;
+within the block they are ordered by whatever weak signal remains (`order_by`, e.g. the raw
+M1b score; the fused score by default) with a deterministic hash jitter so no two files share
+a value (a superset of thresholds can only help the sweep); decode failures and files with no
+signal sit at the bottom of the block, in [0, FAILURE_TOP). Only `is_speech` gates a file:
+high-disagreement files are a fusion matter and stay in the determinate range.
 """
 
 from __future__ import annotations
@@ -45,8 +49,9 @@ MIN_VOICED_FRAC = 0.05  # NSA test minimum 0.099
 MIN_F0_STD_LOG = 0.02  # a tone or chord: ~0.00; NSA test minimum 0.099
 MIN_ENERGY_DB_STD = 3.0  # steady tone / noise: < 1; NSA test minimum 6.0
 MAX_FLATNESS = 0.5  # white noise 0.998; NSA test maximum 0.39
-DEFAULT_ANSWER = 0.02
-TIE_BREAK = 1e-4
+BLOCK_TOP = 0.001  # gated files live in [0, BLOCK_TOP); determinate scores in [BLOCK_TOP, 1]
+FAILURE_TOP = BLOCK_TOP / 10  # decode failures / no-signal files live in [0, FAILURE_TOP)
+JITTER_WEIGHT = 0.01  # share of the block's signal range given to the hash jitter
 REASONS = ("silence", "unvoiced", "tone", "static", "noise")
 
 
@@ -108,18 +113,51 @@ class SpeechGateDetector:
             label = {"silence": "silence", "unvoiced": "no voiced speech", "tone": "a steady tone or chord",
                      "static": "no loudness movement", "noise": "stationary broadband noise"}  # fmt: skip
             evidence = ("no speech to judge (" + ", ".join(label[k] for k in why) + "): the "
-                        f"default answer applies, {DEFAULT_ANSWER} at the real end of the ranking")
+                        f"default answer applies, pinned below every scored file (< {BLOCK_TOP})")
         return DetectorResult(self.name, 0.5, evidence, m)
 
 
-def apply_default_answer(fused: np.ndarray, is_speech: np.ndarray,
-                         default: float = DEFAULT_ANSWER) -> np.ndarray:  # fmt: skip
-    """The policy: gated files get `default` + 1e-4 x their fused score (below every speech
-    file, deterministic order among themselves); speech files keep their fused score."""
+def _jitter(keys, n: int) -> np.ndarray:
+    """Deterministic values in [0, 1) from a stable hash of each key (positions if no keys)."""
+    import hashlib
+
+    keys = list(range(n)) if keys is None else list(keys)
+    if len(keys) != n:
+        raise ValueError(f"keys has {len(keys)} entries for {n} scores")
+    return np.array([int.from_bytes(hashlib.sha1(str(k).encode()).digest()[:8], "big") / 2**64
+                     for k in keys])  # fmt: skip
+
+
+def apply_default_answer(fused, is_speech, *, order_by=None, keys=None, failed=None) -> np.ndarray:
+    """The policy. `fused` are the fused scores (NaN allowed), `is_speech` the gate's flag.
+
+    Determinate files (is_speech) -> BLOCK_TOP + (1 - BLOCK_TOP) * clip(fused, 0, 1): the
+    ranking among them is unchanged and none falls below BLOCK_TOP. Gated files -> the block
+    [FAILURE_TOP, BLOCK_TOP), ordered by `order_by` (a weak signal in [0, 1], e.g. the raw M1b
+    score; `fused` when None) with a JITTER_WEIGHT share of the range given to a hash jitter of
+    `keys` (paths or filenames; positions if None), so values are distinct. Gated files whose
+    signal is NaN, or flagged in `failed`, go to [0, FAILURE_TOP) by jitter alone: decode
+    failures and no-signal files sit at the very bottom."""
     fused = np.asarray(fused, dtype=np.float64)
-    gated = ~np.asarray(is_speech, dtype=bool)
-    out = fused.copy()
-    out[gated] = default + TIE_BREAK * np.clip(fused[gated], 0.0, 1.0)
+    speech = np.asarray(is_speech, dtype=bool)
+    n = fused.size
+    if speech.size != n:
+        raise ValueError("fused and is_speech must have the same length")
+    sig = fused if order_by is None else np.asarray(order_by, dtype=np.float64)
+    if sig.size != n:
+        raise ValueError("order_by must have the same length as fused")
+    fail = np.zeros(n, dtype=bool) if failed is None else np.asarray(failed, dtype=bool)
+    fail = fail | ~np.isfinite(sig)
+    j = _jitter(keys, n)
+    out = np.empty(n)
+    det = np.clip(np.nan_to_num(fused, nan=0.0), 0.0, 1.0)
+    out[speech] = BLOCK_TOP + (1.0 - BLOCK_TOP) * det[speech]
+    top = ~speech & ~fail
+    bottom = ~speech & fail
+    span = BLOCK_TOP - FAILURE_TOP
+    out[top] = FAILURE_TOP + span * ((1 - JITTER_WEIGHT) * np.clip(sig[top], 0.0, 1.0)
+                                      + JITTER_WEIGHT * j[top])  # fmt: skip
+    out[bottom] = FAILURE_TOP * j[bottom]
     return out
 
 
