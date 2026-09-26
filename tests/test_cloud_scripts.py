@@ -318,3 +318,53 @@ esac
     r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env,
                        check=False, timeout=60)
     assert "stale hold expired" in r.stdout and not (state / "held2" / "HOLD").exists()
+
+
+def test_g2_launcher_keeps_the_record_when_the_instance_query_fails(tmp_path):
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    (stubs / "uvx").write_text("#!/bin/bash\ncase \"$*\" in *'show instances'*) echo 'not json'; exit 1;; *'show user'*) echo '{\"credit\": 30}';; esac\n")
+    (stubs / "uvx").chmod(0o755)
+    home = _stub_home(tmp_path)
+    (home / ".hearsay_vast" / "j").mkdir(parents=True)
+    (home / ".hearsay_vast" / "j" / "CID").write_text("31")
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home)}
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "j", "fold=0", "0.5", "1"],
+                       capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode == 4 and "not confirmed" in r.stderr
+    assert (home / ".hearsay_vast" / "j" / "CID").read_text() == "31"
+
+
+def test_g2_reaper_fresh_hold_defers_a_stale_fail_status(tmp_path):
+    import time
+
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    state = tmp_path / "state"
+    (state / "sw").mkdir(parents=True)
+    (state / "sw" / "CID").write_text("61")
+    (state / "sw" / "HOLD").write_text(str(int(time.time())))
+    calls = tmp_path / "calls"
+    (stubs / "uvx").write_text(f"#!/bin/bash\necho \"$@\" >> {calls}\ncase \"$*\" in *'show instances'*) echo '[{{\"id\": 61}}]';; *) echo ok;; esac\n")
+    (stubs / "rclone").write_text("#!/bin/bash\necho 'FAIL full_frozen'\n")  # stale status from before the swap
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    home = _stub_home(tmp_path)
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "POLL": "1",
+           "DEADLINE": str(int(time.time()) + 3600)}
+    src = (CLOUD / "reaper.sh").read_text().replace('STATE="$HOME/.hearsay_vast"', f'STATE="{state}"')
+    src = src.replace('. "$HERE/r2_guard.sh"', f'. "{CLOUD}/r2_guard.sh"')
+    src = src.replace('REPO="$(cd "$HERE/../.." && pwd)"', f'REPO="{REPO}"')
+    src = src.replace('LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"', f'LEDGER="{tmp_path}/ledger.md"')
+    src = src.replace("while :; do", "for _i in 1 2; do", 1)
+    script = tmp_path / "reaper_bounded.sh"
+    script.write_text(src)
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env,
+                       check=False, timeout=60)
+    assert "held" in r.stdout and "deferred" in r.stdout, r.stdout + r.stderr
+    assert "destroy instance" not in (calls.read_text() if calls.exists() else "")
+    assert not (state / "sw" / "DESTROYED").exists()

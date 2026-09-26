@@ -37,8 +37,8 @@ if [ -f "$STATE/CID" ]; then
   STILL=$($VAST show instances --raw 2>/dev/null | py "import sys,json
 xs=json.load(sys.stdin) or []
 print('yes' if any(i['id']==$OLD for i in xs) else 'no')" 2>/dev/null)
-  if [ "$STILL" = yes ]; then
-    echo "REFUSED: job '$JOB' still has instance $OLD on the account; destroy it (reaper/teardown) or use another job name" >&2
+  if [ "$STILL" != no ]; then   # 'yes' OR an unreadable answer: never clear a record on doubt
+    echo "REFUSED: job '$JOB' has instance $OLD recorded and its absence is not confirmed (query: '${STILL:-failed}'); destroy it (reaper/teardown) or use another job name" >&2
     exit 4
   fi
   rm -f "$STATE"/CID "$STATE"/SSH "$STATE"/PROVISIONED "$STATE"/ORPHAN "$STATE"/DESTROYED "$STATE"/HOLD "$STATE"/LAST "$STATE"/SEEN

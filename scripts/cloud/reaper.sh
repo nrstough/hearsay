@@ -39,15 +39,19 @@ while :; do
     if [ "$LAST" != "$ST" ]; then echo "$ST" > "$d/LAST"; echo "$NOW" > "$d/SEEN"; fi
     SEEN=$(cat "$d/SEEN" 2>/dev/null || echo "$NOW")
     AGE=$(( (NOW - SEEN) / 60 ))
+    # order of precedence: ORPHAN, then the absolute deadline, then a fresh HOLD (which defers
+    # every status-based rule, including a stale FAIL left over from before a swap), then
+    # DONE / FAIL / stall (Codex round 7)
     REASON=""
-    case "$ST" in
-      DONE) REASON="done" ;;
-      FAIL*) REASON="failed: $ST" ;;
-    esac
     [ -f "$d/ORPHAN" ] && REASON="orphan from a failed launch"
     [ -z "$REASON" ] && [ "$NOW" -ge "$DEADLINE" ] && REASON="deadline"
-    # a hold only defers the stall/status rules, never the deadline or an orphan (Codex round 6)
-    [ -z "$REASON" ] && [ "$HELD" = 1 ] && { echo "$(date '+%H:%M:%S') [$JOB] held (swap in progress)"; continue; }
+    [ -z "$REASON" ] && [ "$HELD" = 1 ] && { echo "$(date '+%H:%M:%S') [$JOB] held (swap in progress; status '$ST' deferred)"; continue; }
+    if [ -z "$REASON" ]; then
+      case "$ST" in
+        DONE) REASON="done" ;;
+        FAIL*) REASON="failed: $ST" ;;
+      esac
+    fi
     [ -z "$REASON" ] && [ "$AGE" -ge "$STALL_MIN" ] && [ "$ST" != "?" ] && REASON="stalled ${AGE}m at '$ST'"
     [ -z "$REASON" ] && [ "$ST" = "?" ] && [ "$AGE" -ge $((STALL_MIN * 2)) ] && REASON="no STATUS for ${AGE}m"
     if [ -n "$REASON" ]; then
