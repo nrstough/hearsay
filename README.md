@@ -16,6 +16,8 @@ A logistic stacker fuses their scores into the final probability.
 
 _The team will rewrite this README in our own words before submission: approach, architecture, what worked and what didn't._
 
+**Joining now? Start with [docs/STATUS.md](docs/STATUS.md)** (current state, data, how to help).
+
 Project context, the detector contract, the model ladder, and working rules are in [CLAUDE.md](CLAUDE.md). The plan is in [docs/plan.md](docs/plan.md) and the NSA brief is in [docs/nsa-challenge.md](docs/nsa-challenge.md).
 
 ## Setup
