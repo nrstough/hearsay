@@ -37,17 +37,24 @@ changing what ships:
 | exported logits -> `fusion_v2` -> policy vs `20260926-0914_..._CANDIDATE_our_direction.tsv` (1,671 rows) | | 6.7e-16 | 7.3e-17 | the one ulp of `0.8 − 0.2` in the sweep script vs the file's rounded 0.6 |
 | same, `--flip`, vs `..._CANDIDATE_FLIPPED_...tsv` | | 7.2e-16 | 8.4e-17 | |
 | `fusion_v2` file vs the 09:14 candidate file | | 0.0 | | weights, all three references and Platt a, b identical |
+| exported logits -> `fusion_v1` -> policy on the new loader vs the 0813 TSVs (1,671 rows, both polarities) | | 1.1e-16 | 4.5e-17 | the frozen rule, one ulp tighter than the old 4.4e-16 (accumulation in weights order) |
 | live from audio, 50 template files, `--fusion models/fusion_v2/constants.json`, vs the candidate TSV | 1.000000 | 2.6e-4 | 1.2e-5 | 0 rows over 0.01; 0 E-rule flips; 0 verdict flips; `n_scorer_errors` all 0 |
 | M5 live logit vs the export, those 50 files | | 6.8e-3 | median 6.9e-4 | the recorded CPU-on-WAV vs A100-on-FLAC gap (`parity_f6.json`: 0.0118); gate 0.02 |
 | M5 batch 1 (runner) vs batch 8 (`m5_score.py`), same 50 clips | | 5.7e-6 | median 1.4e-6 | padding is inert on the real model |
 | live from audio, 50 files, the default `fusion_v1` after this change, vs the 0813 TSV | 1.000000 | 2.7e-5 | 6.5e-7 | unchanged from v2; three scorers, M5 neither loaded nor run |
-| live from audio, all 1,671 files, `fusion_v2`, our direction and `--flip` | _(v2_full: filled below)_ | | | |
+| live from audio, all 1,671 files, `fusion_v2`, our direction, vs the candidate TSV | 1.000000 | 9.3e-4 | 1.8e-5 | 0 rows over 0.01; 0 E-rule flips (the step fires on 47 rows); 0 verdict flips; `n_scorer_errors` all 0 |
+| same run, `--flip` re-fused from the cache (1,671 cached rows, 22 s), vs the FLIPPED candidate | 1.000000 | 9.3e-4 | 1.8e-5 | share above 0.5: 0.2735 / 0.7265 |
+| M5 live logit vs the export, all 1,671 rows | | 0.035 | median 7.0e-4 | p99 9.4e-3; 5 rows over 0.02, 16 over 0.01; no sign bias, no duration dependence; the tail of the CPU-on-WAV vs A100-on-FLAC gap (the 50-file `parity_f6` sample read 0.0118); bounded to 9.3e-4 in p |
 
 Timing and memory (Mac, 6 threads, `/usr/bin/time -l`, the 50-file v2 run): model load 8.8 s (M1 0.64,
 Spectra 3.74, M5 0.89 with the hash check), 1.10 s per file against 0.78 under v1 (M5 adds about
 0.3 s per clip here; `speaker_drift` halves torch's thread count after ECAPA loads, so the deep passes
 run at 3 threads), maximum resident set 4.0 GB (3.3 GiB before M5). Preflight: silence 0.0009, chord
-0.0010 (pre-gate 0.898 / 0.939), both gated.
+0.0010 (pre-gate 0.898 / 0.939), both gated. Full set (1,671 files): 1.34 s per file mean, median 0.98
+(the first 200 files overlapped the test suite), per stage M5 0.274 s, M1b 0.19 s, Spectra 0.49 s;
+wall 38 min; a full-set v2 run on a free Mac is therefore about 28 min against 22 under v1. The
+runner-made TSV is logged as `submissions/20260926-1131_M4_runner_fusion_v2_M5_live_PARITY_our_direction.tsv`
+(a parity artifact, not a submission; the default rule is still `fusion_v1`).
 
 
 ## v2 (08:35): the shipped fusion rule changed to `e_on_a`; parity re-established
@@ -177,7 +184,8 @@ columns a run computes are the constants file's own, whatever `--detectors` says
   git sha, probe, hc bundle, constants sha, scorers, m1 mode, fp16, truncation, and a resume
   requires an exact match, else the old cache is moved to `results.jsonl.stale-<stamp>`;
   `--fresh` forces that), `<team>_predictions.sidecar.csv` (per file: p, flag, is_speech, the
-  fused columns' logits, fused), `timings.csv` (per file and per stage), `run_meta.json`, `preflight/`.
+  logits of all four fused columns in `DETECTOR_ORDER`, empty where a column was not run, fused),
+  `timings.csv` (per file and per stage), `run_meta.json`, `preflight/`.
 - A rerun with another `--rule` or `--policy` re-fuses the cached logits without loading a model
   (0.1 s for 50 files) and rewrites the per-file JSON.
 - Preflight before the first file: silence and a chord through the whole pipeline twice; both

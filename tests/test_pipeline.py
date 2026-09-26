@@ -318,6 +318,7 @@ class FakeModels:
     def __init__(self, m1=LOGITS["m1b_v3"], spectra=LOGITS["spectra_aasist"], dets=None,
                  m1_fail=False, m5=None, m5_fail=False, m5_hashes=None):  # fmt: skip
         self._m1, self._sp, self._dets, self.m1_fail = m1, spectra, dets, m1_fail
+        self.threads, self.load_seconds = 1, {}  # what the runner prints and records
         self._m5, self.m5_fail = m5, m5_fail
         self.with_m5 = m5 is not None
         self.m5_hashes = dict(TOY_V2["m5_checkpoint"]) if m5_hashes is None else m5_hashes
@@ -543,6 +544,11 @@ BAD_V2 = [
     ("negative", _v2(weights={"m1b_v3": 1.1, "handcrafted_v5": -0.1}), "> 0"),
     ("zero", _v2(weights={"m1b_v3": 0.8, "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.0}), "> 0"),
     ("nan weight", _v2(weights={"m1b_v3": float("nan"), "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.2}), "finite"),
+    ("null weight", _v2(weights={"m1b_v3": 0.8, "handcrafted_v5": None}), "numbers"),
+    ("string weight", _v2(weights={"m1b_v3": "0.8", "handcrafted_v5": 0.2}), "numbers"),
+    ("bool weight", _v2(weights={"m1b_v3": True, "handcrafted_v5": 0.2}), "numbers"),
+    ("string alpha", {**{k: v for k, v in _v2().items() if k != "weights"}, "alpha_handcrafted": "0.2"}, "alpha"),
+    ("null hash", _v2(m5_checkpoint={**TOY_V2["m5_checkpoint"], "head_sha256": None}), "m5_checkpoint"),
     ("unknown key", _v2(weights={"m1b_v3": 0.8, "enf": 0.2}), "fused columns"),
     ("spectra weighted", _v2(weights={"m1b_v3": 0.8, "spectra_aasist": 0.2}), "spectra_aasist"),
     ("empty", _v2(weights={}), "non-empty"),
@@ -819,16 +825,55 @@ def test_runner_scorer_error_tally_and_exit_code():
 
     docs = {"a": doc(handcrafted="error", m1b_v3="ok", m5_xlsr_ft="ok", spectra_aasist="ok"),
             "b": doc(handcrafted="ok", m1b_v3="ok", m5_xlsr_ft="error", spectra_aasist="error"),  # a cached row
-            "c": {"detectors": []}}  # fmt: skip
+            "c": {"detectors": []},
+            "d": {**doc(handcrafted="error", m1b_v3="error", m5_xlsr_ft="error", spectra_aasist="error"),
+                  "flag": "decode_error"},  # the default answer by design, not a scorer crash
+            "e": {"detectors": [], "flag": "missing_file"}}  # fmt: skip
     sc = tuple(DETECTOR_ORDER)
     counts = rp.scorer_error_counts(docs, sc)
     assert counts == {"m1b_v3": 0, "handcrafted_v5": 1, "m5_xlsr_ft": 1, "spectra_aasist": 1}
-    assert rp.scorer_error_exit(counts, sc, 3, strict=True) == 4
+    assert rp.scorer_error_exit(counts, sc, 5, strict=True) == 4
     assert rp.scorer_error_exit({"spectra_aasist": 3}, sc, 3, strict=True) == 0  # suppression only: excluded
     assert rp.scorer_error_exit({"m5_xlsr_ft": 1}, sc, 1000, strict=False) == 0  # 0.1% under the 1% line
+    assert rp.scorer_error_exit({"m5_xlsr_ft": 10}, sc, 1000, strict=False) == 0  # exactly 1%: not over
     assert rp.scorer_error_exit({"m5_xlsr_ft": 11}, sc, 1000, strict=False) == 4
     assert rp.scorer_error_exit({"m5_xlsr_ft": 1}, sc, 1000, strict=True) == 4  # --compare-tsv: any failure
     assert rp.scorer_error_exit({}, sc, 10, strict=True) == 0
+
+
+def test_runner_exit_4_when_a_weighted_scorer_fails_but_the_tsv_is_written(tmp_path, monkeypatch):
+    import soundfile as sf
+
+    rp = _runner()
+    data = tmp_path / "data"
+    data.mkdir()
+    rng = np.random.default_rng(0)
+    for i in range(3):
+        sf.write(data / f"c{i}.wav", (0.1 * rng.standard_normal(2 * SR)).astype(np.float32), SR)
+    v2 = tmp_path / "fusion_v2" / "constants.json"
+    v2.parent.mkdir()
+    v2.write_text(json.dumps(TOY_V2))
+    m5 = tmp_path / "m5"
+    m5.mkdir()
+    m5.joinpath("hashes.json").write_text(json.dumps(TOY_V2["m5_checkpoint"]))
+    args = ["--in", str(data), "--fusion", str(v2), "--m5", str(m5), "--no-preflight", "--team", "t"]
+    monkeypatch.setattr(rp, "Models", lambda **kw: fake_models_v2(m5_fail=True))
+    assert rp.main([*args, "--out", str(tmp_path / "out")]) == 4  # 3 of 3 files: over the 1% line
+    meta = json.loads((tmp_path / "out" / "run_meta.json").read_text())
+    assert (tmp_path / "out" / "t_predictions.tsv").exists() and meta["n_files"] == 3  # written regardless
+    assert meta["n_scorer_errors"] == {"m1b_v3": 0, "handcrafted_v5": 0, "m5_xlsr_ft": 3, "spectra_aasist": 0}
+    assert meta["version"]["fusion"] == "fusion_v2/constants.json" and meta["version"]["scorers"] == list(DETECTOR_ORDER)
+    monkeypatch.setattr(rp, "Models", lambda **kw: fake_models_v2())
+    assert rp.main([*args, "--out", str(tmp_path / "out2")]) == 0
+    meta2 = json.loads((tmp_path / "out2" / "run_meta.json").read_text())
+    assert meta2["n_scorer_errors"]["m5_xlsr_ft"] == 0
+    bad_m5 = tmp_path / "m5_other"  # another checkpoint: refused before the cache is opened
+    bad_m5.mkdir()
+    bad_m5.joinpath("hashes.json").write_text(json.dumps({**TOY_V2["m5_checkpoint"], "head_sha256": "x" * 64}))
+    with pytest.raises(SystemExit) as e:
+        rp.main(["--in", str(data), "--fusion", str(v2), "--m5", str(bad_m5), "--no-preflight",
+                 "--out", str(tmp_path / "out3")])  # fmt: skip
+    assert "head_sha256" in str(e.value) and not (tmp_path / "out3" / "results.jsonl").exists()
 
 
 @pytest.mark.needs_data

@@ -353,12 +353,19 @@ def preflight(models: Models, consts: FusionConstants | None, rule: str, tmp: Pa
     return out
 
 
+DEFAULT_ANSWER_FLAGS = ("decode_error", "missing_file")  # rows where no scorer ran by design
+
+
 def scorer_error_counts(docs: Mapping[str, dict], scorers: Sequence[str]) -> dict[str, int]:
     """Errored entries per fused column over every row (cached or fresh); the handcrafted column's
-    entry is named `handcrafted`, mapped back through FUSED_FROM_DETECTOR."""
+    entry is named `handcrafted`, mapped back through FUSED_FROM_DETECTOR. A row that never
+    decoded or had no file (the default answer, counted in meta["flags"]) is not a scorer crash
+    and is skipped."""
     entry_of = {col: det for col, (det, _key) in FUSED_FROM_DETECTOR.items()}
     counts = {n: 0 for n in scorers}
     for doc in docs.values():
+        if doc.get("flag") in DEFAULT_ANSWER_FLAGS:
+            continue
         status = {d["name"]: d["status"] for d in doc.get("detectors", [])}
         for n in scorers:
             if status.get(entry_of.get(n, n)) == "error":

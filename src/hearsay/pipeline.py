@@ -123,6 +123,11 @@ class FusionOutput:
     detail: dict[str, Any] = field(default_factory=dict)
 
 
+def _is_number(v: Any) -> bool:
+    """A JSON number (not a bool, not a string, not null): what a weight or alpha must be."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
 @dataclass(frozen=True, eq=False)
 class FusionConstants:
     """The numbers scripts/fuse.py or scripts/fuse_sweep.py persisted; loaded once, never refit."""
@@ -161,13 +166,15 @@ class FusionConstants:
         if (alpha is None) == (weights is None):
             raise ValueError("constants: give exactly one of alpha_handcrafted (fusion_v1) or weights (fusion_v2)")
         if weights is None:
-            if not 0.0 <= float(alpha) <= 1.0:
-                raise ValueError(f"constants: alpha_handcrafted must be in [0, 1], got {alpha!r}")
+            if not _is_number(alpha) or not 0.0 <= float(alpha) <= 1.0:
+                raise ValueError(f"constants: alpha_handcrafted must be a number in [0, 1], got {alpha!r}")
             alpha = float(alpha)
             weights = {"m1b_v3": 1.0 - alpha, "handcrafted_v5": alpha}  # 1 - 0.2 == 0.8 exactly
         else:
             if not isinstance(weights, Mapping) or not weights:
                 raise ValueError(f"constants: weights must be a non-empty mapping, got {weights!r}")
+            if not all(_is_number(v) for v in weights.values()):
+                raise ValueError(f"constants: weights must be numbers, got {weights}")
             weights = {str(d): float(v) for d, v in weights.items()}
             bad = [d for d in weights if d not in DETECTOR_ORDER or d == "spectra_aasist"]
             if bad:
@@ -188,9 +195,10 @@ class FusionConstants:
             rank_ref[d] = ref
         ck = c.get("m5_checkpoint")
         if "m5_xlsr_ft" in ranked and (not isinstance(ck, Mapping) or any(
-                k not in ck for k in ("dir", "backbone_sha256", "head_sha256", "config_hash"))):
+                not isinstance(ck.get(k), str) or not ck.get(k)
+                for k in ("dir", "backbone_sha256", "head_sha256", "config_hash"))):
             raise ValueError("constants: a rule that weights m5_xlsr_ft must record m5_checkpoint "
-                             "{dir, backbone_sha256, head_sha256, config_hash}")
+                             "{dir, backbone_sha256, head_sha256, config_hash} as non-empty strings")
         pl = c["platt"]
         e = dict(c.get("e_rule") or {"applied": False})
         if e.get("applied"):
