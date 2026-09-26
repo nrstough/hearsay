@@ -155,10 +155,10 @@ def make_repo(root: Path, inner=(3, 3), hold=(2, 2), n_test=4, sec=2.0, bad=(),
 
 
 @pytest.fixture
-def repo(tmp_path, monkeypatch):
-    info = make_repo(tmp_path)
-    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", tmp_path / "splits" / "nsa_test_durations.csv")
-    return tmp_path, info
+def repo(tmp_path):
+    """No monkeypatch of hearsay.embed.TEST_DURATIONS: the script must draw crops from the
+    durations file under --repo-root, the one its resume hash fingerprints."""
+    return tmp_path, make_repo(tmp_path)
 
 
 def _run(mod, root: Path, *args, loader=None, **kw) -> int:
@@ -205,15 +205,18 @@ def test_a3_test_rows_no_crop_and_cap():
     assert prepare_input(_clip(3.0)).size == 3 * SR
 
 
-def test_a4_crop_plan_reproduces_shared_recipe(repo):
+def test_a4_crop_plan_reproduces_shared_recipe(repo, monkeypatch):
     root, _ = repo
     man = root / "outputs" / "manifests" / "nsa_train_sample.csv"
-    plan = crop_plan(man, 0)
+    durs = root / "splits" / "nsa_test_durations.csv"
+    plan = crop_plan(man, 0, durs)
     paths = pd.read_csv(man).path.tolist()
-    draw = duration_sampler(0)
+    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", durs)
+    draw = duration_sampler(0)  # the shared sampler on the same file: identical draws and seeds
     for i, p in enumerate(paths):
         assert plan[p] == (draw(), i)
-    other = crop_plan(man, 200)
+    assert crop_plan(man, 0) == plan  # the module-level file path gives the same plan
+    other = crop_plan(man, 200, durs)
     assert any(other[p][0] != plan[p][0] for p in paths) and other[paths[0]][1] == 200
     dup = root / "dup.csv"
     pd.DataFrame({"path": [paths[0], paths[0]]}).to_csv(dup, index=False)
@@ -229,6 +232,11 @@ def test_a4_real_seed0_draws_pinned(monkeypatch):
     draw = duration_sampler(0)
     got = [round(draw(), 6) for _ in range(5)]
     assert got == [3.552688, 3.25075, 3.041875, 3.1115, 3.3205], got
+    man = REPO / "outputs" / "manifests" / "nsa_train_sample.csv"
+    if man.exists():  # the script's path: crop_plan on the real manifest and the real durations file
+        plan = crop_plan(man, 0, real)
+        first = [round(plan[p][0], 6) for p in pd.read_csv(man).path.iloc[:5]]
+        assert first == got and plan[pd.read_csv(man).path.iloc[0]][1] == 0
 
 
 def _autocorr_at(v: np.ndarray, lag: int) -> float:
@@ -398,18 +406,26 @@ def test_c6_duplicate_paths_refused(repo):
         fusion_frame(["a", "a"], ["0", "0"], ["inner_oof", "inner_oof"], [0.1, 0.2])
 
 
-def test_c8_failure_gate_per_split(tmp_path, monkeypatch):
+def test_c8_failure_gate_per_split(tmp_path):
     mod = _load_script()
-    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", tmp_path / "a" / "splits" / "nsa_test_durations.csv")
     make_repo(tmp_path / "a", inner=(8, 8), hold=(0, 0), n_test=4, bad=(0, 1))  # 2 of 16 inner = 12.5%
     assert _run(mod, tmp_path / "a") == 3
     assert not (tmp_path / "a" / "outputs" / "detector_scores").exists()
-    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", tmp_path / "b" / "splits" / "nsa_test_durations.csv")
     make_repo(tmp_path / "b", inner=(10, 10), hold=(0, 0), n_test=0, bad=(0,))  # 1 of 20 = 5%
     assert _run(mod, tmp_path / "b") == 0
-    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", tmp_path / "c" / "splits" / "nsa_test_durations.csv")
     make_repo(tmp_path / "c", inner=(18, 18), hold=(0, 0), n_test=4, bad=(36, 37))  # 2/40 overall, 2/4 test
     assert _run(mod, tmp_path / "c") == 3
+
+
+def test_c8b_gate_uses_exact_counts_not_rounded_rate():
+    mod = _load_script()
+    raw = pd.DataFrame({"split": ["holdout"] * 3858, "flag": [""] * (3858 - 193) + ["decode_error"] * 193,
+                        "label": "bonafide", "generator": "bonafide"})  # fmt: skip
+    fails = mod.failure_table(raw)
+    assert fails["by_split"]["holdout"]["rate"] == 0.05  # rounds to the limit ...
+    assert "holdout" in mod.splits_over_gate(fails)  # ... and still fails (5.0026%)
+    raw.loc[raw.index[-1], "flag"] = ""  # 192 of 3,858 = 4.977%: passes
+    assert not mod.splits_over_gate(mod.failure_table(raw))
 
 
 def test_c9_direction_gate_blocks_export(repo):
@@ -497,9 +513,8 @@ def test_c15_no_lightgbm():
             assert not ln.strip().startswith(("import lightgbm", "from lightgbm")), p
 
 
-def test_b6_b7_row_failures_kept_and_counted(tmp_path, monkeypatch):
+def test_b6_b7_row_failures_kept_and_counted(tmp_path):
     mod = _load_script()
-    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", tmp_path / "splits" / "nsa_test_durations.csv")
     info = make_repo(tmp_path, inner=(32, 32), hold=(4, 4), n_test=8, bad=(3,))  # 3 of 64 inner = 4.7%
     fails = {2: "raise", 5: "nan"}  # forward calls 2 and 5 (bad row 3 never reaches the model)
     assert _run(mod, tmp_path, loader=lambda d: FakeSpectra(fail_calls=fails)) == 0
@@ -600,9 +615,8 @@ def test_d9_readout_mode_and_threshold_sweep(repo):
     assert stress_readout([0, 1, 0, 1], [0.9, 0.1, 0.8, 0.2], y, s)["at_inner_thresholds"]["thr_dcf"] is None
 
 
-def test_d11_failures_in_every_split_keep_every_readout(tmp_path, monkeypatch):
+def test_d11_failures_in_every_split_keep_every_readout(tmp_path):
     mod = _load_script()
-    monkeypatch.setattr(embed_mod, "TEST_DURATIONS", tmp_path / "splits" / "nsa_test_durations.csv")
     # 64 inner (rows 0-63), 20 holdout (64-83), 20 test (84-103); one bad file in each split (<= 5%)
     info = make_repo(tmp_path, inner=(32, 32), hold=(10, 10), n_test=20, bad=(5, 70, 90))
     assert _run(mod, tmp_path, "--pad-mode", "zero") == 0
@@ -680,4 +694,6 @@ def test_w1_real_model_all_modes_finite():
     outs = {m: spectra_logits(model, short, pad_mode=m) for m in PAD_MODES}
     assert all(o.shape == (2,) and np.all(np.isfinite(o)) for o in outs.values())
     assert not (np.allclose(outs["repeat"], outs["zero"]) and np.allclose(outs["zero"], outs["whole"]))
-    assert spectra_logits(model, long, pad_mode="whole").shape == (2,)
+    longs = {m: spectra_logits(model, long, pad_mode=m) for m in PAD_MODES}
+    assert all(o.shape == (2,) and np.all(np.isfinite(o)) for o in longs.values())
+    assert all(np.array_equal(longs["repeat"], o) for o in longs.values())  # >= one window: modes agree

@@ -78,6 +78,7 @@ LABEL_COLS = ["label", "generator", "source"]
 RAW_COLS = ["logit_spoof", "logit_bonafide", "synth_logit", "n_windows", "n_samples",
             "n_pad_samples", "crop_s", "peak", "flag", "seconds"]  # fmt: skip
 FAIL_RATE = 0.05
+DURATIONS = Path("splits/nsa_test_durations.csv")  # crop draws and the resume hash read this root-resolved file
 CAVEATS = {
     "in_the_wild_possibly_optimistic": True,
     "reason_in_the_wild": "the model card lists In-the-Wild only as an evaluation set (authors' EER 1.46%) "
@@ -174,7 +175,7 @@ def build_rows(args, root: Path) -> tuple[pd.DataFrame, str]:
         for c in ("generator", "source"):
             if c not in m.columns:
                 m[c] = np.where(m.label == "spoof", "spoof", "bonafide") if c == "generator" else "stress"
-        plan = crop_plan(_under(root, args.manifest), args.stress_seed)
+        plan = crop_plan(_under(root, args.manifest), args.stress_seed, _under(root, DURATIONS))
         rows = m[["path", "label", "generator", "source"]].assign(fold="stress", split="stress")
         if args.limit is not None:
             rows = rows.iloc[: args.limit]
@@ -182,7 +183,7 @@ def build_rows(args, root: Path) -> tuple[pd.DataFrame, str]:
     else:
         f = pd.read_csv(_under(root, args.folds))
         t = pd.read_csv(_under(root, args.test_manifest))
-        plan = crop_plan(_under(root, args.train_manifest), args.seed)
+        plan = crop_plan(_under(root, args.train_manifest), args.seed, _under(root, DURATIONS))
         missing = [p for p in f.path if p not in plan]
         if missing:
             _die(f"{len(missing)} fold-file paths are not in {args.train_manifest} "
@@ -213,9 +214,9 @@ def build_rows(args, root: Path) -> tuple[pd.DataFrame, str]:
 
 def config_hash(args, root: Path, mode: str, pad_modes: tuple[str, ...]) -> str:
     """Everything that determines a row's score or its crop; a stale partial never merges."""
-    files = [args.folds, args.test_manifest, args.train_manifest, Path("splits/nsa_test_durations.csv")]
+    files = [args.folds, args.test_manifest, args.train_manifest, DURATIONS]
     if args.manifest is not None:
-        files = [args.manifest, Path("splits/nsa_test_durations.csv")]
+        files = [args.manifest, DURATIONS]
     src = Path(__file__).resolve().parents[1] / "src" / "hearsay"
     parts = {"mode": mode, "pad_modes": list(pad_modes), "band_match": args.band_match,
              "peak_norm": args.peak_norm,
@@ -356,6 +357,12 @@ def failure_table(raw: pd.DataFrame) -> dict:
                                                 (lab.flag != "").groupby(lab.generator).sum().items()
                                                 if v}  # fmt: skip
     return out
+
+
+def splits_over_gate(fails: dict, limit: float = FAIL_RATE) -> dict:
+    """Splits whose exact not-ok share exceeds `limit`, on integer counts, never the rounded
+    rate: 193 of 3,858 is 5.0026%, which rounds to 0.05 and must still fail."""
+    return {s: v for s, v in fails["by_split"].items() if v["not_ok"] > limit * v["n"]}
 
 
 def split_readouts(sc: pd.DataFrame) -> dict:
@@ -542,7 +549,7 @@ def run(argv=None, loader=load_spectra) -> int:
                                       "offset seed = seed + row; test rows whole; cap 8 s"},
             "failures": fails, "seconds": seconds,
             "sec_per_clip": round(seconds / max(1, len(rows) - len(done)), 4)}  # fmt: skip
-    over = {s: v for s, v in fails["by_split"].items() if v["rate"] > FAIL_RATE}
+    over = splits_over_gate(fails)
     if over:
         (raw if len(pad_modes) > 1 else mode_frame(raw, pad_modes[0])).to_csv(run_dir / "raw.csv", index=False)
         meta["gate"] = {"failure_rate": "failed", "splits_over_5pct": over}

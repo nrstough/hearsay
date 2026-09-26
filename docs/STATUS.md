@@ -41,7 +41,7 @@ The design:
 | Fine-tuned XLS-R (M5) | In flight on rented A100s: 12-layer truncated backbone, attentive pooling, class-blind augmentation; gate is Sat 12:00 (beat M1 on inner folds and holdout, not worse on In-the-Wild false alarms). Spec: `docs/specs/2026-09-26_m5-xlsr-finetune.md`. |
 | Fusion, orchestrator, explanation report (M4) | Planned; starts when detector scores land (Sat 19:00), frozen Sat 22:00. Design and open decisions in `docs/architecture.md`. The fusion consult is drafted and not yet sent: `docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md`. |
 | Docker | Not started and unowned. First amd64 image (M1 payload) is due Sat 14:00. |
-| Tests | 351 passing over the tracked test files at ed31cb9 (`uv run pytest -q`; M3's `tests/test_spectra.py` has 39; other chats' untracked tests add more), ruff clean. |
+| Tests | 351 passing over the tracked test files at ed31cb9 (`uv run pytest -q`; M3's `tests/test_spectra.py` has 40; other chats' untracked tests add more), ruff clean. |
 
 ## Data
 

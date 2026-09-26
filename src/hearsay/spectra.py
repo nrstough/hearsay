@@ -167,15 +167,28 @@ def score_clip(model: torch.nn.Module, x: np.ndarray, pad_modes=("repeat",),
     return out
 
 
-def crop_plan(manifest_csv: str | Path, seed: int) -> dict[str, tuple[float, int]]:
-    """path -> (crop_s, offset seed): one test-duration draw per manifest row in order from
-    test_duration_sampler(seed), offset seed = seed + row index. Reproduces
-    extract_embeddings --segment --crop test --seed <seed> and extract_handcrafted exactly.
-    Draws for every row before any --limit, so a pilot crops each file as the full run does."""
+def crop_plan(manifest_csv: str | Path, seed: int,
+              durations_csv: str | Path | None = None) -> dict[str, tuple[float, int]]:  # fmt: skip
+    """path -> (crop_s, offset seed): one test-duration draw per manifest row in order, offset
+    seed = seed + row index. With `durations_csv` the draws come from that file through the same
+    generator as hearsay.embed.test_duration_sampler (default_rng(seed).choice over its
+    duration_s column), so a --repo-root run draws from the root's file, the one the resume hash
+    fingerprints; without it the shared sampler and its module-level file are used. Either way
+    this reproduces extract_embeddings --segment --crop test --seed <seed> and
+    extract_handcrafted exactly. Draws for every row before any --limit, so a pilot crops each
+    file as the full run does."""
     paths = pd.read_csv(manifest_csv).path.tolist()
     if len(set(paths)) != len(paths):
         raise ValueError(f"{manifest_csv}: duplicate paths; the crop plan is keyed by path")
-    draw = test_duration_sampler(seed)
+    if durations_csv is None:
+        draw = test_duration_sampler(seed)
+    else:
+        durs = pd.read_csv(durations_csv).duration_s.to_numpy()
+        rng = np.random.default_rng(seed)
+
+        def draw() -> float:
+            return float(rng.choice(durs))
+
     return {p: (draw(), seed + i) for i, p in enumerate(paths)}
 
 
