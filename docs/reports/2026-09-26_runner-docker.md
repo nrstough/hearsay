@@ -53,8 +53,9 @@ run at 3 threads), maximum resident set 4.0 GB (3.3 GiB before M5). Preflight: s
 0.0010 (pre-gate 0.898 / 0.939), both gated. Full set (1,671 files): 1.34 s per file mean, median 0.98
 (the first 200 files overlapped the test suite), per stage M5 0.274 s, M1b 0.19 s, Spectra 0.49 s;
 wall 38 min; a full-set v2 run on a free Mac is therefore about 28 min against 22 under v1. The
-runner-made TSV is logged as `submissions/20260926-1131_M4_runner_fusion_v2_M5_live_PARITY_our_direction.tsv`
-(a parity artifact, not a submission; the default rule is still `fusion_v1`).
+runner-made TSVs stay under `outputs/runner/v2_full/` (the 11:31 PARITY copy under `submissions/` was withdrawn
+at 12:15 pending Nathan's ruling on the run spec's per-row M5-logit mark, exceeded on 5 rows; the default rule
+is still `fusion_v1`).
 
 
 ## v2 (08:35): the shipped fusion rule changed to `e_on_a`; parity re-established
