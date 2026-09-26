@@ -25,6 +25,7 @@ while :; do
     [ -f "$d/CID" ] || continue
     JOB=$(basename "$d"); CID=$(cat "$d/CID")
     [ -f "$d/DESTROYED" ] && continue
+    [ -f "$d/HOLD" ] && { echo "$(date '+%H:%M:%S') [$JOB] held (swap in progress)"; continue; }
     ACTIVE=$((ACTIVE + 1))
     ST=$(rclone cat "${HEARSAY_R2_PREFIX}runs/$JOB/STATUS" 2>/dev/null || echo "?")
     LAST=$(cat "$d/LAST" 2>/dev/null || echo "")
