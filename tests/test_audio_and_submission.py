@@ -289,3 +289,21 @@ def test_test_duration_sampler_matches_test_range():
     draw = test_duration_sampler(0)
     xs = [draw() for _ in range(500)]
     assert 3.0 <= min(xs) and max(xs) <= 14.0 and 3.2 < float(np.median(xs)) < 3.7
+
+
+def test_prepare_segment_band_matches_to_nsa_wall():
+    from hearsay.embed import prepare_segment
+
+    rng = np.random.default_rng(0)
+    x = (0.1 * rng.standard_normal(4 * SR)).astype(np.float32)  # white: energy up to 8 kHz
+
+    def share_above(y, hz):
+        spec = np.abs(np.fft.rfft(y)) ** 2
+        f = np.fft.rfftfreq(y.size, 1 / SR)
+        return spec[f >= hz].sum() / spec.sum()
+
+    assert share_above(x, 7500) > 0.05
+    y = prepare_segment(x)
+    assert share_above(y, 7500) < 1e-4  # the wall is reproduced
+    assert share_above(prepare_segment(x, band_match=False), 7500) > 0.05  # counterfactual
+    assert abs(share_above(y, 1000) - share_above(x, 1000)) < 0.15  # passband mostly intact

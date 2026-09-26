@@ -61,7 +61,7 @@ def _crop(
     if crop_mode == "segment":
         from hearsay.embed import prepare_segment  # imports torch; lazy so v1 stays light
 
-        x = prepare_segment(x, crop_s, seed)
+        x = prepare_segment(x, crop_s, seed, band_match=False)  # band match handled above
     elif crop_mode == "first4s":
         x = trim_silence(x)[: int(CROP_S * SR)]
     else:

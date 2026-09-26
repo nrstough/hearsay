@@ -79,10 +79,21 @@ def test_duration_sampler(seed: int = 0):
 
 def prepare_segment(
     x: np.ndarray, crop_s: float | None = None, seed: int | None = None,
-    max_s: float = MAX_SEGMENT_S,
+    max_s: float = MAX_SEGMENT_S, band_match: bool = True,
 ) -> np.ndarray:  # fmt: skip
-    """trim_silence -> optional random crop to `crop_s` (never pads or tiles: a shorter clip
-    stays as is) -> cap at `max_s`. Test-time scoring calls it with no crop."""
+    """band_limit (NSA 7.25 kHz wall) -> trim_silence -> optional random crop to `crop_s`
+    (never pads or tiles: a shorter clip stays as is) -> cap at `max_s`. Test-time scoring
+    calls it with no crop.
+
+    Band match: every NSA test clip is low-passed at ~7.2 kHz (7.5-8 kHz energy share 1.6e-8
+    vs 6e-4..6e-3 in LJ, LibriSpeech and DiffSSD), so an unfiltered training clip carries a
+    band no test clip has. The filter is hearsay.handcrafted.band_limit (single
+    implementation, shared with the engineered detectors); callers that already filtered
+    pass band_match=False."""
+    if band_match:
+        from hearsay.handcrafted import band_limit
+
+        x = band_limit(x)
     x = trim_silence(x)
     if crop_s is not None and x.size > int(crop_s * SR):
         n = int(crop_s * SR)
