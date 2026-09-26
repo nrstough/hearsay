@@ -148,3 +148,29 @@ The manifest clarifications at `b877760` (P_wl misses at the inner-OOF threshold
 - **Deviations from the plan:**
   - W4's gate record uses `diag_ok = True` ("no diagnostic under the gate"), so its gate failures list only the metric rules. W4 is governed by the bake-off alone.
   - `ruff format` was not applied: the repo's scripts carry `# fmt: skip` markers and CI runs `ruff check` only.
+
+## Post-commit audit, round 1 (Claude pre-audit, 19:00; Overall Fail on test coverage)
+
+Every finding below was fixed in the follow-up commit.
+1. **Exceptions could escape.** `run_candidates` now catches any exception per candidate as INVALID, and the rule-7 re-score falls back to KEEP with `rule7_error`. `load_raw` refuses exports that lack `path`, `split` or `logit`, and a declared ITW file that is absent makes the candidate INVALID.
+2. **H_noise came out INVALID instead of FAIL.** A candidate's context is now the union of CURRENT's columns and the new one, so CURRENT is rebuilt on identical rows (D2).
+3. **The report was not really locked.** Every run writes `sweep_v3_report.json` plus a timestamped archive copy and prints its sha256. `--write` requires `--report-sha256` equal to the locked report's hash (recorded in the sweep doc), and `precheck_write` makes every cheap refusal before evaluation.
+4. **The separate ITW file was not picked up.** `resolve_itw` now uses `_itw_<col>.csv` for a new column when that file is present.
+5. **Missing tests.** 15 tests were added on a hermetic synthetic world:
+   - NOT RUN with the other candidates still evaluated;
+   - the direction guard, and the catch wiring against both thresholds;
+   - a broken export becoming INVALID without ending the run;
+   - H_noise FAIL, not INVALID;
+   - a shrunk row set rebuilding its rank references;
+   - the separate ITW file;
+   - rule 7 on common rows, and its KEEP fallback;
+   - the T2 diagnostic counterfactual;
+   - `pwl_diag_ok` composition;
+   - the ITW brief side of the room rule;
+   - an unmatched test name;
+   - `clean()`;
+   - the `precheck_write` and `do_write` refusals;
+   - `main` exiting 2 on a self-check failure.
+6. **Nits:** the report is JSON-safe (NaN written as null, `allow_nan=False`); W4's gate record carries `governing: false`; the `fusion_v3` payload carries a `status`; `--new-column-model` is refused for candidates without a new column.
+
+The re-run verdicts are unchanged: T2 FAIL, W4 BAKEOFF FAIL, P_wl and H_noise NOT RUN, KEEP. Report sha256 `07090750…` (19:06, pre-WavLM). `tests/test_fuse_sweep_v3.py`: 86 passed.

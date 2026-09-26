@@ -445,3 +445,212 @@ def test_missing_export_not_run_others_evaluated(rep):
         pytest.skip("handcrafted_v6 export present")
     assert rep["candidates"]["H_noise"]["status"] == "NOT RUN"
     assert "readout" in rep["candidates"]["T2"] and "readout" in rep["candidates"]["W4"]
+
+
+# ------------------------------------------------------------------ hermetic synthetic world (audit round 1)
+def _world(tmp_path, monkeypatch, seed=0):
+    """A small labelled world with every split, the base columns, M3, a shipped file and a perturbation
+    cohort; v3.S points at an empty tmp dir so new-column exports are whatever a test writes there."""
+    rng = np.random.default_rng(seed)
+    recs = []
+    for split, n in (("inner_oof", 200), ("holdout", 100), ("test", 30), ("itw", 80)):
+        for i in range(n):
+            y = i % 2
+            p = f"/w/HGT{i}.wav" if split == "test" else f"/w/{split}{i}.wav"
+            src = ("ljspeech" if i % 4 == 0 else "librispeech") if y == 0 else "diffssd"
+            fold = "holdout" if split == "holdout" else (str(i % 5) if split == "inner_oof" else "")
+            recs.append({"path": p, "split": split, "y": y, "source": src, "speaker": f"s{i % 8}", "fold": fold})
+    w = pd.DataFrame(recs)
+    labels = w.assign(label=np.where(w.y == 1, "spoof", "bonafide")).set_index("path")[["label", "source", "speaker"]]
+    folds = w[w.split.isin(["inner_oof", "holdout"])].set_index("path").fold
+
+    def col(scale, noise):
+        return w.assign(logit=scale * w.y + rng.normal(0, noise, len(w))).set_index("path")[["split", "logit"]]
+
+    base_cols = {"m1b_v3": col(2.0, 1.0), "handcrafted_v5": col(1.0, 1.0), "m5_xlsr_ft": col(1.5, 1.0)}
+    m3 = w.assign(logit=np.where(w.y == 1, 2.0, -5.0) + rng.normal(0, 2.0, len(w))).set_index("path")[["split", "logit"]]
+    base = v3.build(base_cols, m3, labels)
+    shipped = pd.Series(rng.uniform(0.01, 1.0, 30), index=[f"HGT{i}.wav" for i in range(30)])
+    consts = {"rank_ref_inner_oof_sorted": {k: base["ref"][k].tolist() for k in base_cols}}
+    pk = pd.DataFrame({"kind": np.repeat(["none", "mp3"], 40), "label": np.tile(["bonafide", "spoof"], 40)})
+    for k in base_cols:
+        pk[k] = rng.normal(0, 1.5, len(pk))
+    pk["spectra_aasist"] = rng.normal(-2, 1.5, len(pk))
+    ranks = {k: v3.rank_vs(base["ref"][k], pk[k].to_numpy()) for k in base_cols}
+    pk["fused_base"] = v3.blend(ranks, v3.CURRENT_W)
+    pk["fused"] = v3.apply_tiers(pk.fused_base.to_numpy(), pk.spectra_aasist.to_numpy(), v3.E_TIERS)
+    monkeypatch.setattr(v3, "S", tmp_path)
+    world = {"base": base, "base_cols": base_cols, "m3": m3, "labels": labels, "folds": folds, "shipped": shipped,
+             "perturb": pk, "consts": consts, "test_names": set(shipped.index), "itw_paths": set(base["idx"]["itw"]),
+             "inputs": {}}  # fmt: skip
+    return world, w
+
+
+def _export(w, tmp_path, name, sign=1.0, drop_inner=0, itw_separate=False, seed=9):
+    rng = np.random.default_rng(seed)
+    d = w.assign(logit=sign * (1.8 * w.y + rng.normal(0, 1.0, len(w))), score=0.5)[["path", "fold", "split", "score",
+                                                                                     "logit"]]  # fmt: skip
+    if drop_inner:
+        d = d.drop(d.index[d.split == "inner_oof"][:drop_inner])
+    if itw_separate:
+        d[d.split == "itw"][["path", "logit"]].to_csv(tmp_path / f"_itw_{name}.csv", index=False)
+        d = d[d.split != "itw"]
+    d.to_csv(tmp_path / f"{name}.csv", index=False)
+
+
+def test_world_not_run_and_others_evaluated(tmp_path, monkeypatch):
+    world, _ = _world(tmp_path, monkeypatch)
+    out = v3.run_candidates(world)
+    assert out["P_wl"]["status"] == "NOT RUN" and out["H_noise"]["status"] == "NOT RUN"
+    assert "readout" in out["T2"] and "bakeoff" in out["W4"]
+    assert out["W4"]["gate"]["governing"] is False and out["T2"]["gate"]["governing"] is True
+
+
+def test_world_direction_guard_and_catch_wiring(tmp_path, monkeypatch):
+    world, w = _world(tmp_path, monkeypatch)
+    _export(w, tmp_path, "wavlm_l", sign=-1.0)
+    bad = v3.run_candidates(world)["P_wl"]
+    assert bad["status"] == "INVALID" and "AUC" in bad["reason"]
+    _export(w, tmp_path, "wavlm_l", sign=1.0)
+    good = v3.run_candidates(world)["P_wl"]
+    assert "readout" in good and good["status"] in {"PASS WITH ROOM", "GATE PASS, NO ROOM", "FAIL"}
+    # catch wiring: misses at CURRENT's inner-OOF threshold, catches at the column's own inner-OOF threshold
+    ctx = world["base"]
+    _, cur = v3.score(ctx, v3.CURRENT_W, v3.E_TIERS)
+    thr = v3.inner_threshold(ctx["y"]["inner_oof"], cur["inner_oof"])
+    assert good["diagnostic"]["itw_misses_at_current_inner_thr"] == int(
+        np.sum((ctx["y"]["itw"] == 1) & (cur["itw"] < thr)))
+    col = pd.read_csv(tmp_path / "wavlm_l.csv").set_index("path")
+    ci, cw = col.loc[ctx["idx"]["inner_oof"], "logit"].to_numpy(), col.loc[ctx["idx"]["itw"], "logit"].to_numpy()
+    assert good["diagnostic"]["new_catches"] == v3.new_catches(ctx["y"]["itw"], cur["itw"], thr, cw,
+                                                                v3.inner_threshold(ctx["y"]["inner_oof"], ci))
+
+
+def test_world_broken_export_is_invalid_not_fatal(tmp_path, monkeypatch):
+    world, w = _world(tmp_path, monkeypatch)
+    w.assign(logit=0.0)[["path", "logit"]].to_csv(tmp_path / "wavlm_l.csv", index=False)  # no split column
+    out = v3.run_candidates(world)
+    assert out["P_wl"]["status"] == "INVALID" and "lacks columns" in out["P_wl"]["reason"]
+    assert "readout" in out["T2"] and "readout" in out["W4"]
+    (tmp_path / "wavlm_l.csv").write_bytes(b"\x00\x01garbage")
+    assert v3.run_candidates(world)["P_wl"]["status"] == "INVALID"
+
+
+def test_world_h_noise_fails_not_invalid(tmp_path, monkeypatch):
+    world, w = _world(tmp_path, monkeypatch)
+    _export(w, tmp_path, "handcrafted_v6")  # in-file ITW rows but the declared _itw file is absent
+    assert v3.run_candidates(world)["H_noise"]["status"] == "INVALID"
+    _export(w, tmp_path, "handcrafted_v6", itw_separate=True)
+    h = v3.run_candidates(world)["H_noise"]
+    assert h["status"] == "FAIL" and h["diagnostic"]["ok"] is False and "5_diagnostic" in h["gate"]["failed"]
+
+
+def test_world_shrunk_rows_rebuild_refs(tmp_path, monkeypatch):
+    world, w = _world(tmp_path, monkeypatch)
+    _export(w, tmp_path, "wavlm_l", drop_inner=10)
+    p = v3.run_candidates(world)["P_wl"]
+    assert p["rows_shrunk_vs_base"] and p["rows"]["inner_oof"] == 190 and world["base"]["rows"]["inner_oof"] == 200
+    ctx = v3.build({**world["base_cols"], "wavlm_l": v3.load_raw("wavlm_l", None).set_index("path")}, world["m3"],
+                   world["labels"])  # fmt: skip
+    assert len(ctx["ref"]["m1b_v3"]) == 190  # rank references from the shrunk context's own inner rows
+
+
+def test_world_separate_itw_file_picked_up(tmp_path, monkeypatch):
+    world, w = _world(tmp_path, monkeypatch)
+    _export(w, tmp_path, "wavlm_l", itw_separate=True)
+    p = v3.run_candidates(world)["P_wl"]
+    assert "readout" in p and p["rows"]["itw"] == 80
+
+
+def test_world_rule7_common_rows_and_fallback(tmp_path, monkeypatch):
+    world, w = _world(tmp_path, monkeypatch)
+    _export(w, tmp_path, "wavlm_l", drop_inner=10)
+    cells = {c: 0.1 for c in v3.CELLS}
+    rep = {"candidates": {"W4": {"ratifiable": True, "readout": cells}, "P_wl": {"ratifiable": True, "readout": cells}}}
+    out = v3.finalize(rep, True, ctxs=world)
+    assert out["rule7_common_rows"]["rows"]["inner_oof"] == 190  # both passers compared on the same rows
+    assert set(out["rule7_common_rows"]["cells"]) == {"W4", "P_wl"}
+    (tmp_path / "wavlm_l.csv").unlink()
+    rep2 = {"candidates": {"W4": {"ratifiable": True, "readout": cells}, "P_wl": {"ratifiable": True, "readout": cells}}}
+    out2 = v3.finalize(rep2, True, ctxs=world)
+    assert out2["decision"]["pick"] is None and "rule7_error" in out2 and out2["decision"]["line"].startswith("KEEP")
+
+
+def test_world_t2_diagnostic_counterfactual(tmp_path, monkeypatch):
+    world, _ = _world(tmp_path, monkeypatch)
+    pk = world["perturb"].copy()
+    pk.loc[pk.index[1], ["spectra_aasist", "fused_base"]] = [-7.0, 0.8]  # one spoof row in kind 'none'
+    world["perturb"] = pk
+    t2 = v3.run_candidates(world)["T2"]
+    assert t2["diagnostic"]["deeper_tier_fires"]["perturb_none"]["spoof"] == 1
+    assert t2["diagnostic"]["ok"] is False and "5_diagnostic" in t2["gate"]["failed"]
+
+
+def test_pwl_diag_ok_composition():
+    assert v3.pwl_diag_ok(16, {"inner_oof": 0.6, "itw": 0.6})
+    assert not v3.pwl_diag_ok(15, {"inner_oof": 0.6, "itw": 0.6})
+    assert not v3.pwl_diag_ok(16, {"inner_oof": 0.5, "itw": 0.6})
+    assert not v3.pwl_diag_ok(16, {"inner_oof": 0.6, "itw": float("nan")})
+
+
+def test_room_itw_brief_side():
+    d = _cells(itw_brief=0.0299, itw_averse=0.03)
+    assert v3.room(d, 19)["failed"] == ["itw_brief_gain_0.030"]
+
+
+def test_test_agreement_same_length_unmatched_raises():
+    sh = _shipped()
+    paths = [f"/x/{n}" for n in sh.index[:-1]] + ["/x/NOTSHIPPED.wav"]
+    with pytest.raises(ValueError):
+        v3.test_agreement(paths, np.zeros(6), (1.0, 0.0), sh)
+
+
+def test_clean_makes_json_safe():
+    out = v3.clean({"a": float("nan"), "b": [np.float64(1.5), np.bool_(True), np.int64(3)], "c": (np.inf,)})
+    assert out == {"a": None, "b": [1.5, True, 3], "c": [None]}
+    json.dumps(out, allow_nan=False)
+
+
+class _Args:
+    def __init__(self, candidate="W4", sha="x", model=None):
+        self.candidate, self.report_sha256, self.new_column_model, self.ratified_by = candidate, sha, model, "nathan"
+
+
+def test_precheck_write_refusals(tmp_path, monkeypatch):
+    rp = tmp_path / "rep.json"
+    monkeypatch.setattr(v3, "REPORT", rp)
+    with pytest.raises(SystemExit, match="no locked report"):
+        v3.precheck_write(_Args())
+    rp.write_text(json.dumps({"decision": {"pick": "P_wl"}, "inputs": {}}))
+    sha = v3.sha256(rp)
+    with pytest.raises(SystemExit, match="not the locked one"):
+        v3.precheck_write(_Args(sha="0" * 64))
+    with pytest.raises(SystemExit, match="not the locked pick"):
+        v3.precheck_write(_Args(candidate="W4", sha=sha))
+    with pytest.raises(SystemExit, match="new-column-model"):
+        v3.precheck_write(_Args(candidate="P_wl", sha=sha))
+    (tmp_path / "probe").mkdir()
+    (tmp_path / "probe" / "meta.json").write_text("{}")
+    assert v3.precheck_write(_Args(candidate="P_wl", sha=sha, model=str(tmp_path / "probe")))["decision"]["pick"] == "P_wl"
+    rp.write_text(json.dumps({"decision": {"pick": "W4"}, "inputs": {}}))
+    with pytest.raises(SystemExit, match="not used by W4"):
+        v3.precheck_write(_Args(candidate="W4", sha=v3.sha256(rp), model=str(tmp_path / "probe")))
+
+
+def test_do_write_refuses_changed_inputs_or_decision():
+    locked = {"inputs": {"a": "1"}, "decision": {"pick": "W4", "passers": ["W4"], "line": "x"}}
+    with pytest.raises(SystemExit, match="inputs changed"):
+        v3.do_write(_Args(), {"inputs": {"a": "2"}, "decision": locked["decision"]}, locked)
+    with pytest.raises(SystemExit, match="decision differs"):
+        v3.do_write(_Args(), {"inputs": {"a": "1"}, "decision": {**locked["decision"], "pick": None}}, locked)
+
+
+def test_main_exits_2_on_self_check_failure(tmp_path, monkeypatch):
+    rep = v3.finalize({"candidates": {}, "rows_base": {}, "self_check": {"ok": False, "got": {}, "spearman": 0.0},
+                       "current": {}}, self_check_ok=False)  # fmt: skip
+    monkeypatch.setattr(v3, "evaluate", lambda: rep)
+    monkeypatch.setattr(v3, "sha_ok", lambda *a, **k: True)
+    monkeypatch.setattr(v3, "REPORT", tmp_path / "sweep_v3_report.json")
+    with pytest.raises(SystemExit) as e:
+        v3.main([])
+    assert e.value.code == 2 and (tmp_path / "sweep_v3_report.json").exists()

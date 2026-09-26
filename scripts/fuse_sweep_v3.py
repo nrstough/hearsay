@@ -333,12 +333,22 @@ def write_constants(path: Path, payload: dict) -> None:
 def load_raw(name: str, itw: str | None) -> pd.DataFrame:
     """fs.load without the dedup, so validation sees duplicates."""
     d = pd.read_csv(S / f"{name}.csv")
+    missing = {"path", "split", "logit"} - set(d.columns)
+    if missing:
+        raise ValueError(f"{name}.csv lacks columns {sorted(missing)}")
     d["split"] = d.split.replace({"stress": "itw"})
     if itw:
         x = pd.read_csv(S / itw).assign(split="itw")
         d = pd.concat([d[d.split != "itw"], x[["path", "split", "logit"]]], ignore_index=True)
     d["path"] = d.path.map(fs.norm)
     return d
+
+
+def resolve_itw(col: str, itw: str | None) -> str | None:
+    """The export's separate ITW file: the declared one, else _itw_<col>.csv if present, else None (in-file)."""
+    if itw is None and (S / f"_itw_{col}.csv").exists():
+        return f"_itw_{col}.csv"
+    return itw
 
 
 def load_labels() -> tuple[pd.DataFrame, pd.Series]:
@@ -421,15 +431,28 @@ def evaluate() -> dict:
 
     perturb = pd.read_csv(PERTURB_CSV)
     consts = json.loads(FUSION_V2.read_text())
-    test_names, itw_paths = set(shipped.index), set(base["idx"]["itw"])
-    for name, spec in CANDIDATES.items():
-        try:
-            rep["candidates"][name] = eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, perturb,
-                                                     consts, test_names, itw_paths, inputs)  # fmt: skip
-        except (ValueError, KeyError, AssertionError) as e:
-            rep["candidates"][name] = {"status": "INVALID", "reason": f"{type(e).__name__}: {e}"}
+    world = {"base": base, "base_cols": base_cols, "m3": m3, "labels": labels, "folds": folds, "shipped": shipped,
+             "perturb": perturb, "consts": consts, "test_names": set(shipped.index), "itw_paths": set(base["idx"]["itw"]),
+             "inputs": inputs}  # fmt: skip
+    rep["candidates"] = run_candidates(world)
     return finalize(rep, self_check_ok=True, ctxs={"base_cols": base_cols, "m3": m3, "labels": labels,
                                                    "shipped": shipped})  # fmt: skip
+
+
+def run_candidates(world: dict) -> dict:
+    """Every candidate in manifest order; any exception is that candidate's INVALID, never the run's end."""
+    out = {}
+    for name, spec in CANDIDATES.items():
+        try:
+            out[name] = eval_candidate(name, spec, **world)
+        except Exception as e:  # noqa: BLE001 - a broken export must not kill the locked run
+            out[name] = {"status": "INVALID", "reason": f"{type(e).__name__}: {e}"}
+    return out
+
+
+def pwl_diag_ok(n_catch: int, corr: dict) -> bool:
+    """P_wl mechanism diagnostic (manifest): >= 16 new catches AND corrective share > 0.5 on inner and ITW."""
+    return bool(n_catch >= PWL_MIN_CATCHES and all(np.isfinite(v) and v > CORRECTIVE_MIN for v in corr.values()))
 
 
 def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, perturb, consts, test_names, itw_paths,
@@ -440,6 +463,9 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
         col, itw = spec["new"]
         if not (S / f"{col}.csv").exists():
             return {**out, "status": "NOT RUN", "reason": f"{col}.csv absent"}
+        itw = resolve_itw(col, itw)
+        if itw and not (S / itw).exists():
+            return {**out, "status": "INVALID", "reason": f"{col}.csv present but its ITW file {itw} is absent"}
         raw = load_raw(col, itw)
         inputs[f"outputs/detector_scores/{col}.csv"] = sha256(S / f"{col}.csv")
         if itw:
@@ -448,8 +474,7 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
         if probs:
             return {**out, "status": "INVALID", "reason": "; ".join(probs)}
         d = raw.drop_duplicates("path").set_index("path")
-        cols = {k: v for k, v in base_cols.items() if k in spec["weights"]}
-        cols[col] = d
+        cols[col] = d  # union: CURRENT's three plus the new column, so CURRENT is rebuilt on identical rows
         ctx = build(cols, m3, labels)
         auc = roc_auc_score(ctx["y"]["inner_oof"], ctx["logit"][col]["inner_oof"])
         out["new_column_inner_auc"] = round(float(auc), 4)
@@ -495,7 +520,7 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
                 for s in ("inner_oof", "itw")}  # fmt: skip
         if not all(np.isfinite(v) for v in corr.values()):
             return {**out, "status": "INVALID", "reason": f"non-finite corrective share {corr}"}
-        diag_ok = n_catch >= PWL_MIN_CATCHES and all(v > CORRECTIVE_MIN for v in corr.values())
+        diag_ok = pwl_diag_ok(n_catch, corr)
         rho_m1b = {s: round(float(spearmanr(ctx["logit"][col][s], ctx["logit"]["m1b_v3"][s]).statistic), 4)
                    for s in ("holdout", "test")}  # fmt: skip
         out["diagnostic"] = {"itw_misses_at_current_inner_thr": n_miss, "new_catches": n_catch,
@@ -510,7 +535,7 @@ def eval_candidate(name, spec, base, base_cols, m3, labels, folds, shipped, pert
         out["diagnostic"] = {"ok": True, "reason": "none under the gate; W4 is governed by its bake-off"}
         out["known_number_check"] = {k: cand["readout"][k] == v for k, v in EXPECTED_W4.items()}
 
-    out["gate"] = gate(d, cand["test"]["spearman"], diag_ok)
+    out["gate"] = {**gate(d, cand["test"]["spearman"], diag_ok), "governing": name != "W4"}
     if name == "W4":
         st = standing_rule(d)
         pe = perturb_eval(perturb, consts, {"CURRENT": (CURRENT_W, E_TIERS), "W4": (spec["weights"], E_TIERS)})
@@ -540,16 +565,11 @@ def finalize(rep: dict, self_check_ok: bool, ctxs: dict | None = None) -> dict:
     passers = [n for n, c in rep["candidates"].items() if c.get("ratifiable")]
     common = {}
     if len(passers) >= 2 and ctxs:  # rule 7 on the intersection of every passer's row set
-        cols = dict(ctxs["base_cols"])
-        for n in passers:
-            if CANDIDATES[n]["new"]:
-                col, itw = CANDIDATES[n]["new"]
-                cols[col] = load_raw(col, itw).drop_duplicates("path").set_index("path")
-        cctx = build(cols, ctxs["m3"], ctxs["labels"])
-        for n in passers:
-            _, sc = score(cctx, CANDIDATES[n]["weights"], CANDIDATES[n]["tiers"])
-            common[n] = six(readout(cctx["y"], cctx["src"], sc))
-        rep["rule7_common_rows"] = {"rows": cctx["rows"], "cells": common}
+        try:
+            common = rule7_common(passers, ctxs, rep)
+        except Exception as e:  # noqa: BLE001 - fall back to KEEP, never crash the locked run
+            rep["rule7_error"] = f"{type(e).__name__}: {e}"
+            common = {}
     elif passers:
         common = {passers[0]: six(rep["candidates"][passers[0]]["readout"])}
     pick = pareto_pick(common)
@@ -557,10 +577,28 @@ def finalize(rep: dict, self_check_ok: bool, ctxs: dict | None = None) -> dict:
         line = "KEEP (no candidate passes; submissions/CrossExam_predictions.tsv stays final)"
     elif pick:
         line = f"RECOMMEND {pick} for Nathan's ratification"
+    elif "rule7_error" in rep:
+        line = "KEEP (two or more pass; the rule-7 comparison failed, see rule7_error)"
     else:
         line = "KEEP (two or more pass, none Pareto-dominant)"
     rep["decision"] = {"passers": passers, "pick": pick, "line": line}
     return rep
+
+
+def rule7_common(passers: list, ctxs: dict, rep: dict) -> dict:
+    """Every passer re-scored on the intersection of all passers' row sets (clarification 5)."""
+    cols = dict(ctxs["base_cols"])
+    for n in passers:
+        if CANDIDATES[n]["new"]:
+            col, itw = CANDIDATES[n]["new"]
+            cols[col] = load_raw(col, resolve_itw(col, itw)).drop_duplicates("path").set_index("path")
+    cctx = build(cols, ctxs["m3"], ctxs["labels"])
+    common = {}
+    for n in passers:
+        _, sc = score(cctx, CANDIDATES[n]["weights"], CANDIDATES[n]["tiers"])
+        common[n] = six(readout(cctx["y"], cctx["src"], sc))
+    rep["rule7_common_rows"] = {"rows": cctx["rows"], "cells": common}
+    return common
 
 
 def print_table(rep: dict) -> None:
@@ -577,28 +615,67 @@ def print_table(rep: dict) -> None:
     print(pd.DataFrame(rows).T.to_string())
 
 
-def main() -> None:
+def clean(x):
+    """JSON-safe: numpy scalars to Python, non-finite floats to None (never bare NaN in the report)."""
+    if isinstance(x, dict):
+        return {k: clean(v) for k, v in x.items()}
+    if isinstance(x, list | tuple):
+        return [clean(v) for v in x]
+    if isinstance(x, np.bool_ | bool):
+        return bool(x)
+    if isinstance(x, np.integer):
+        return int(x)
+    if isinstance(x, float | np.floating):
+        return float(x) if np.isfinite(x) else None
+    return x
+
+
+def precheck_write(args) -> dict:
+    """Cheap refusals before any evaluation: the locked report must exist, hash to --report-sha256, name
+    --candidate as its pick; a new-column candidate needs --new-column-model DIR/meta.json, others refuse it."""
+    if not REPORT.exists():
+        sys.exit("no locked report; run without --write first")
+    if sha256(REPORT) != args.report_sha256:
+        sys.exit("the report on disk is not the locked one (sha256 differs from --report-sha256); refuse")
+    locked = json.loads(REPORT.read_text())
+    if locked["decision"]["pick"] != args.candidate:
+        sys.exit(f"--candidate {args.candidate} is not the locked pick ({locked['decision']['pick']}); refuse")
+    if CANDIDATES[args.candidate]["new"]:
+        if not args.new_column_model or not (Path(args.new_column_model) / "meta.json").exists():
+            sys.exit("--new-column-model DIR with a meta.json is required for a new column; refuse")
+    elif args.new_column_model:
+        sys.exit(f"--new-column-model is not used by {args.candidate}; refuse")
+    return locked
+
+
+def main(argv=None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true", help="write models/fusion_v3/constants.json for the ratified pick")
     ap.add_argument("--ratified-by", help="must be 'nathan' with --write")
     ap.add_argument("--candidate", help="the ratified candidate (must equal the locked report's pick)")
     ap.add_argument("--new-column-model", help="P_wl: the wavlm_l probe directory (its meta.json is hashed)")
-    args = ap.parse_args()
-    if args.write and (args.ratified_by != "nathan" or not args.candidate):
-        ap.error("--write requires --ratified-by nathan and --candidate NAME")
+    ap.add_argument("--report-sha256", help="with --write: the sha256 of the locked report, as recorded in the sweep doc")
+    args = ap.parse_args(argv)
+    if args.write and (args.ratified_by != "nathan" or not args.candidate or not args.report_sha256):
+        ap.error("--write requires --ratified-by nathan, --candidate NAME and --report-sha256 HEX")
     if args.candidate and args.candidate not in CANDIDATES:
         ap.error(f"--candidate must be one of {list(CANDIDATES)}")
     if not sha_ok(SHIPPED_TSV):
         sys.exit(f"shipped TSV {SHIPPED_TSV.name} no longer hashes to {SHIPPED_SHA_PREFIX}…; stop")
+    locked = precheck_write(args) if args.write else None
 
     rep = evaluate()
     print(f"rows (base): {rep['rows_base']}")
     sc = rep["self_check"]
     print(f"self-check: {'ok' if sc['ok'] else 'FAIL'}; got {sc['got']}; Spearman vs shipped {sc['spearman']:.6f}")
     if args.write:
-        return do_write(args, rep)
+        return do_write(args, rep, locked)
+    text = json.dumps(clean(rep), indent=2, allow_nan=False)
     REPORT.parent.mkdir(parents=True, exist_ok=True)
-    REPORT.write_text(json.dumps(rep, indent=2, default=float))
+    REPORT.write_text(text)
+    stamp = pd.Timestamp.now().strftime("%Y%m%d-%H%M%S")
+    (REPORT.parent / f"sweep_v3_report_{stamp}.json").write_text(text)  # every run kept; the lock is by sha256
+    print(f"report sha256 {sha256(REPORT)} (archived as sweep_v3_report_{stamp}.json)")
     if not sc["ok"]:
         print("SELF-CHECK FAIL: no candidate read")
         sys.exit(2)
@@ -621,16 +698,11 @@ def main() -> None:
     print(f"wrote {REPORT.relative_to(REPO)}")
 
 
-def do_write(args, rep: dict) -> None:
-    if not REPORT.exists():
-        sys.exit("no locked report; run without --write first")
-    locked = json.loads(REPORT.read_text())
+def do_write(args, rep: dict, locked: dict) -> None:
     if locked.get("inputs") != rep["inputs"]:
         sys.exit("inputs changed since the locked report; refuse")
-    if locked["decision"] != rep["decision"]:
+    if locked["decision"] != clean(rep["decision"]):
         sys.exit("recomputed decision differs from the locked report; refuse")
-    if rep["decision"]["pick"] != args.candidate:
-        sys.exit(f"--candidate {args.candidate} is not the locked pick ({rep['decision']['pick']}); refuse")
     # only here; hearsay.pipeline imports neither torch nor lightgbm
     from hearsay.pipeline import M5_DIR
 
@@ -642,9 +714,7 @@ def do_write(args, rep: dict) -> None:
     new_model = None
     if spec["new"]:
         col, itw = spec["new"]
-        cols[col] = load_raw(col, itw).drop_duplicates("path").set_index("path")
-        if not args.new_column_model or not (Path(args.new_column_model) / "meta.json").exists():
-            sys.exit("--new-column-model DIR with a meta.json is required for a new column")
+        cols[col] = load_raw(col, resolve_itw(col, itw)).drop_duplicates("path").set_index("path")
         new_model = {"name": col, "dir": str(Path(args.new_column_model)),
                      "meta_sha256": sha256(Path(args.new_column_model) / "meta.json")}  # fmt: skip
     ctx = build(cols, fs.load("spectra_aasist", str(REPO / "outputs/spectra/itw_stress/scores.csv")), labels)
@@ -652,6 +722,7 @@ def do_write(args, rep: dict) -> None:
     a, b = c["platt"]
     tiers = spec["tiers"]
     payload = {
+        "status": f"RATIFIED by {args.ratified_by} from the locked post-draft sweep (report sha256 {args.report_sha256})",
         "final": args.candidate, "ratified_by": args.ratified_by, "manifest_commits": MANIFEST_COMMITS,
         "inputs": rep["inputs"], "pi_synth": PI,
         "rank_ref_inner_oof_sorted": {n: ctx["ref"][n].tolist() for n in spec["weights"]},
