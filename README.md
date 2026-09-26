@@ -278,10 +278,10 @@ Data, weights, model directories and submission TSVs are gitignored; only `submi
 ### Score a directory on the Mac
 
 ```bash
-uv run python scripts/run_pipeline.py --in data/nsa/HackGTHearsayTesting --out outputs/runner/final --template data/nsa/HearsayScoreKey4TeamX.tsv --team <teamName>
+uv run python scripts/run_pipeline.py --in data/nsa/HackGTHearsayTesting --out outputs/runner/final --template data/nsa/HearsayScoreKey4TeamX.tsv --team CrossExam
 ```
 
-The runner uses the shipped rule (`e_on_a` from `models/fusion_v1/constants.json`) by default. It writes `<teamName>_predictions.tsv`, one explanation JSON per file under `results/`, a resumable `results.jsonl`, `timings.csv` and `run_meta.json`. Rerun the same command to resume after a crash. `--flip` also writes the pre-flipped twin. `--rule`, `--policy` and `--flip` re-fuse the cached logits in about 0.1 s without reloading a model. Speed: 0.78 s per file with 4 threads (1,671 files in 22 minutes, `docs/reports/2026-09-26_runner-docker.md`).
+The runner uses the shipped rule (`e_on_a` from `models/fusion_v1/constants.json`) by default. It writes `CrossExam_predictions.tsv`, one explanation JSON per file under `results/`, a resumable `results.jsonl`, `timings.csv` and `run_meta.json`. Rerun the same command to resume after a crash. `--flip` also writes the pre-flipped twin. `--rule`, `--policy` and `--flip` re-fuse the cached logits in about 0.1 s without reloading a model. Speed: 0.78 s per file with 4 threads (1,671 files in 22 minutes, `docs/reports/2026-09-26_runner-docker.md`).
 
 **Parity** (`docs/reports/2026-09-26_runner-docker.md`):
 
@@ -301,14 +301,16 @@ bash docker/build.sh
 ```
 
 ```bash
-docker run --network none -v <test_dir>:/data:ro -v <out_dir>:/out -e HEARSAY_TEAM=<teamName> hearsay
+docker run --network none -v <test_dir>:/data:ro -v <out_dir>:/out -v <path>/HearsayScoreKey4TeamX.tsv:/tmpl/key.tsv:ro -e HEARSAY_TEMPLATE=/tmpl/key.tsv -e HEARSAY_TEAM=CrossExam hearsay:20260926-0916
 ```
+
+This is the deliverable run line (`docs/specs/2026-09-26_k-docker-image.md`); it writes `<out_dir>/CrossExam_predictions.tsv`. Our team is Cross Exam. The runner's default team name is `HEARSAY`, so always pass `HEARSAY_TEAM`; it is read at run time, so changing it needs no rebuild.
 
 The image contains every detector, the M1b probe, Spectra-AASIST, the ECAPA speaker model, the handcrafted bundle and the fusion constants, with a sha manifest of the shipped files checked at start. It refuses to start unless it is offline, and nothing is downloaded at run time. Row order comes from NSA's template: mount it and set `HEARSAY_TEMPLATE=/tmpl/key.tsv` (`-v <key.tsv>:/tmpl/key.tsv:ro`), or put the `.tsv` beside the audio. Without a template, rows are the sorted filenames. Extra arguments pass through to the runner, e.g. `--limit 50 --compare-tsv /ref/logged.tsv` for a parity check. Outputs are the same as the Mac runner's, and a run never overwrites an earlier TSV.
 
 Checks: `bash docker/smoke.sh` (WAV, MP3 and FLAC with a reversed template under `--network none`; row order, repeat runs within 1e-6, in-image self-checks, and a negative check that an online container is refused); `docker/parity.py pcm-hash` (decoded audio, Mac vs image); `uv run pytest -q tests/test_docker_image.py` (build files, no Docker needed). On Apple Silicon, Colima with Rosetta builds it (`colima start --vm-type vz --vz-rosetta`).
 
-Recorded on build `hearsay:20260926-0753` (`docs/specs/2026-09-26_k-docker-image.md`): 50 test files inside the image vs the logged 06:02 zmean TSV, Spearman 1.0, max abs diff 1.43e-4; decoded audio byte-identical to the Mac on 50/50 files; about 4 s per file under Rosetta emulation and 3.3 GiB resident. _Pending: the rebuild on the shipped rule `e_on_a` and its parity against the 08:13 TSV._
+Shipped image: `hearsay:20260926-0916` (build 9, source `37c26b8`), running the shipped rule `e_on_a` (`docs/specs/2026-09-26_k-docker-image.md`). 50 test files scored inside the image vs `submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv`: Spearman 1.0, max abs diff 2.02e-4. Decoded audio is identical to the Mac on 50 of 50 files. The smoke test passed, including the `--flip` twin and the refusal to run online. About 4 s per file on an idle VM under Rosetta emulation; 3.3 GiB resident (measured on the earlier build 7).
 
 ### Where each artifact lives
 
