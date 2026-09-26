@@ -83,6 +83,13 @@ LABELS |= {
 LABELS |= {f"cqcc{i}_mean": f"CQCC {i} mean" for i in range(24)}
 LABELS |= {f"cqcc{i}_std": f"CQCC {i} variability" for i in range(24)}
 LABELS |= {f"cqcc{i}_dstd": f"CQCC {i} frame-to-frame change" for i in range(24)}
+LABELS |= {
+    "jit_local": "cycle-to-cycle pitch jitter",
+    "jit_rap": "pitch jitter (3-cycle average)",
+    "shim_local": "cycle-to-cycle amplitude shimmer",
+    "shim_apq3": "amplitude shimmer (3-cycle average)",
+    "jit_coverage": "share of voiced speech with clean pitch cycles",
+}
 
 __all__ = ["LABELS", "NAME", "HandcraftedDetector", "contributions", "latest_model_dir"]
 

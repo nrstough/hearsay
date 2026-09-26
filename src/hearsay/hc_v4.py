@@ -7,7 +7,7 @@ Each family is a function of a context dict (`x`, `Z` complex STFT, `S` power ST
 `voiced` frame mask, `rms_db`, `f0`) returning a flat {name: float}; `FAMILIES` maps names to
 functions and `features(..., families=(...))` appends them. Rules from the brief: nothing above
 7 kHz (the test set is low-passed there), no level, no duration, no onset/offset cues; means,
-stds, percentiles and rates only. Column prefixes: `lfcc`, `gd_`, `pc_`, `cqcc`, `mod_`, `breath_`.
+stds, percentiles and rates only. Column prefixes: `lfcc`, `gd_`, `pc_`, `cqcc`, `mod_`, `breath_`, `jit_`/`shim_`.
 """
 
 from __future__ import annotations
@@ -239,6 +239,65 @@ def breath(ctx: dict) -> dict[str, float]:
     return f
 
 
+# --- 8.5 Jitter and shimmer, cycle level ------------------------------------------------------
+
+JIT_MIN_RUN_FRAMES, JIT_MIN_CYCLES, JIT_MAX_STEP = 5, 5, np.log(1.5)
+
+
+def jitter(ctx: dict) -> dict[str, float]:
+    """Cycle-to-cycle period (jitter) and peak-amplitude (shimmer) irregularity. The YIN track
+    (median-filtered, 5 frames) defines voiced runs of >= 50 ms; the signal is band-passed to
+    0.7-1.4x the clip's median F0 and positive-going zero crossings inside the runs mark the
+    cycles. Runs with fewer than five cycles or an octave-like jump (|d log T| > log 1.5) are
+    rejected. Ratios only (no counts); `jit_coverage` is the share of voiced frames covered."""
+    from scipy.ndimage import median_filter
+    from scipy.signal import butter, sosfiltfilt
+
+    x = np.asarray(ctx["x"], dtype=np.float64)
+    f0 = median_filter(np.asarray(ctx["f0"], dtype=np.float64), size=5)
+    voiced = np.asarray(ctx["voiced"], dtype=bool)[: f0.size]
+    zero = {"jit_local": 0.0, "jit_rap": 0.0, "shim_local": 0.0, "shim_apq3": 0.0,
+            "jit_coverage": 0.0}  # fmt: skip
+    if voiced.sum() < JIT_MIN_RUN_FRAMES:
+        return zero
+    fmed = float(np.median(f0[voiced]))
+    if not 60.0 < fmed < 400.0:
+        return zero
+    sos = butter(2, [0.7 * fmed, 1.4 * fmed], btype="bandpass", fs=SR, output="sos")
+    y = sosfiltfilt(sos, x)
+    marks = np.where((y[:-1] < 0) & (y[1:] >= 0))[0] + 1
+    mark_frame = marks // HOP
+    T_all, A_all, covered = [], [], 0
+    # voiced runs (in frames) of at least JIT_MIN_RUN_FRAMES
+    edges = np.diff(np.concatenate([[0], voiced.astype(int), [0]]))
+    for a, b in zip(np.where(edges == 1)[0], np.where(edges == -1)[0], strict=True):
+        if b - a < JIT_MIN_RUN_FRAMES:
+            continue
+        m = marks[(mark_frame >= a) & (mark_frame < b)]
+        if m.size < JIT_MIN_CYCLES + 1:
+            continue
+        T = np.diff(m).astype(np.float64)
+        if np.abs(np.diff(np.log(T))).max() > JIT_MAX_STEP:
+            continue
+        A = np.array([np.abs(x[m[i] : m[i + 1]]).max() for i in range(m.size - 1)])
+        T_all.append(T)
+        A_all.append(A)
+        covered += b - a
+    if not T_all:
+        return zero
+    T, A = np.concatenate(T_all), np.concatenate(A_all) + 1e-9
+    rap = np.mean([abs(T[i] - T[i - 1 : i + 2].mean()) for i in range(1, T.size - 1)]) if T.size > 2 else 0.0
+    apq3 = np.mean([abs(A[i] - A[i - 1 : i + 2].mean()) for i in range(1, A.size - 1)]) if A.size > 2 else 0.0
+    return {
+        "jit_local": float(np.abs(np.diff(T)).mean() / T.mean()),
+        "jit_rap": float(rap / T.mean()),
+        "shim_local": float(np.abs(np.diff(A)).mean() / A.mean()),
+        "shim_apq3": float(apq3 / A.mean()),
+        "jit_coverage": float(covered / max(int(voiced.sum()), 1)),
+    }
+
+
 FAMILIES: dict[str, Callable[[dict], dict[str, float]]] = {
     "lfcc": lfcc, "phase": phase, "cqcc": cqcc, "modulation": modulation, "breath": breath,
+    "jitter": jitter,
 }

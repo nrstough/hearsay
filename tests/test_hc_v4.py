@@ -40,6 +40,7 @@ EXPECTED = {
     "cqcc": {f"cqcc{i}_{s}" for i in range(N_CQCC) for s in ("mean", "std", "dstd")},
     "modulation": {"mod_1_2", "mod_2_4", "mod_4_8", "mod_8_16", "mod_peak_hz", "mod_entropy"},
     "breath": {"breath_frac", "breath_centroid_ratio", "breath_flatness_ratio", "breath_flatness"},
+    "jitter": {"jit_local", "jit_rap", "shim_local", "shim_apq3", "jit_coverage"},
 }
 
 
@@ -83,6 +84,17 @@ def test_modulation_band_fractions_sum_to_one_and_peak_tracks_the_envelope():
     assert math.isclose(sum(f[k] for k in ("mod_1_2", "mod_2_4", "mod_4_8", "mod_8_16")), 1.0,
                         abs_tol=1e-6)  # fmt: skip
     assert 1.0 <= f["mod_peak_hz"] < 16.0 and 0.0 <= f["mod_entropy"] <= 1.0
+
+
+def test_jitter_is_small_for_a_steady_tone_and_zero_without_voicing():
+    rng = np.random.default_rng(0)
+    t = np.arange(3 * SR) / SR
+    ph = 2 * np.pi * 150.0 * t
+    steady = (0.05 * sum(np.sin(k * ph) / k for k in range(1, 12)) + 0.001 * rng.standard_normal(t.size)).astype(np.float32)
+    f = features(steady, crop_mode="first4s", families=("jitter",))
+    assert f["jit_coverage"] > 0.5 and f["jit_local"] < 0.02 and f["shim_local"] < 0.1
+    n = features(_noise(), crop_mode="first4s", families=("jitter",))
+    assert n["jit_coverage"] <= 1.0 and math.isfinite(n["jit_local"])
 
 
 def test_unknown_family_raises():
