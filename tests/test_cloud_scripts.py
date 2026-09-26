@@ -153,6 +153,44 @@ exit 1
     assert "PROVISIONED" not in r.stdout
     assert "destroy instance 4242" in log.read_text()
     assert not (home / ".hearsay_vast" / "tjob" / "PROVISIONED").exists()
+    # the instance id was persisted at creation, before anything could fail
+    assert (home / ".hearsay_vast" / "tjob" / "CID").read_text().strip() == "4242"
+
+
+def test_g2_launcher_retries_destroy_and_leaves_an_orphan_marker(tmp_path):
+    """Same failure, but the first destroy call does not take: the launcher retries, and if the
+    box is still listed it leaves CID + ORPHAN for the reaper instead of forgetting it."""
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    log = tmp_path / "vast.log"
+    (stubs / "uvx").write_text(f"""#!/bin/bash
+echo "$@" >> {log}
+n=$(grep -c 'destroy instance' {log} 2>/dev/null || echo 0)
+case "$*" in
+  *'show user'*) echo '{{"credit": 30.0}}';;
+  *'create instance'*) echo '{{"new_contract": 4343}}';;
+  *'show instances'*) if [ "$n" -ge 2 ]; then echo '[]'; else echo '[{{"id": 4343, "actual_status": "running", "ssh_host": "h", "ssh_port": "1", "dph_total": 0.6}}]'; fi;;
+  *'destroy instance'*) echo ok;;
+esac
+""")
+    (stubs / "ssh").write_text("#!/bin/bash\nfor a in \"$@\"; do case \"$a\" in *NET-OK*) echo NET-OK; exit 0;; esac; done\nexit 1\n")
+    (stubs / "rclone").write_text("#!/bin/bash\nexit 0\n")
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    home = tmp_path / "home"
+    (home / ".config" / "vastai").mkdir(parents=True)
+    (home / ".config" / "vastai" / "vast_api_key").write_text("stub")
+    (home / ".config" / "cloudflare-r2-pa-source.txt").write_text("account_id=a\naccess_key_id=k\nsecret_access_key=s\n")
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "DESTROY_TRIES": "2",
+           "DESTROY_WAIT": "0"}
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "tjob2", "fold=0", "0.5", "222"],
+                       capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode != 0
+    assert log.read_text().count("destroy instance 4343") == 2  # retried until absent
+    assert (home / ".hearsay_vast" / "tjob2" / "CID").read_text().strip() == "4343"
+    assert not (home / ".hearsay_vast" / "tjob2" / "ORPHAN").exists()  # gone on the 2nd try
 
 
 def test_g2_reaper_retries_until_the_instance_is_gone(tmp_path):
@@ -185,6 +223,8 @@ esac
     # run the reaper's loop body three times by replacing its infinite loop with a bounded one
     src = (CLOUD / "reaper.sh").read_text().replace('STATE="$HOME/.hearsay_vast"', f'STATE="{state}"')
     src = src.replace('. "$HERE/r2_guard.sh"', f'. "{CLOUD}/r2_guard.sh"')  # the copy lives in tmp
+    src = src.replace('REPO="$(cd "$HERE/../.." && pwd)"', f'REPO="{REPO}"')  # real .venv python
+    src = src.replace('LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"', f'LEDGER="{tmp_path}/ledger.md"')
     src = src.replace("while :; do", "for _i in 1 2 3; do", 1).replace("sleep 5\n", "sleep 0\n")
     script = tmp_path / "reaper_bounded.sh"
     script.write_text(src)

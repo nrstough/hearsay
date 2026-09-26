@@ -47,13 +47,28 @@ for i in json.load(sys.stdin) or []:
 issh() { $VAST show instances --raw 2>/dev/null | py "import sys,json
 for i in json.load(sys.stdin) or []:
     if i['id']==$1: print(i.get('ssh_host'), i.get('ssh_port'))"; }
-kill_() { echo y | $VAST destroy instance "$1" >/dev/null 2>&1; }
+gone() { $VAST show instances --raw 2>/dev/null | py "import sys,json
+xs=json.load(sys.stdin) or []
+print('yes' if not any(i['id']==$1 for i in xs) else 'no')" 2>/dev/null; }
+# destroy with confirmation and bounded retries; a box that will not go away is recorded as an
+# ORPHAN (CID stays persisted) so the reaper keeps trying — never forgotten (Codex round 5)
+kill_() {
+  local id="$1" i
+  for i in $(seq 1 "${DESTROY_TRIES:-5}"); do
+    echo y | $VAST destroy instance "$id" >/dev/null 2>&1
+    sleep "${DESTROY_WAIT:-5}"
+    [ "$(gone "$id")" = yes ] && { rm -f "$STATE/ORPHAN"; return 0; }
+  done
+  echo "  WARNING: instance $id still listed after ${DESTROY_TRIES:-5} destroy attempts; left for the reaper" >&2
+  date +%s > "$STATE/ORPHAN"
+  return 1
+}
 
 CID=""
 cleanup() {
-  # any exit before PROVISIONED destroys the box we created
+  # any exit before PROVISIONED destroys the box we created (CID is persisted at creation)
   if [ -n "$CID" ] && [ ! -f "$STATE/PROVISIONED" ]; then
-    echo "[cleanup] destroying $CID (launch did not complete)"; kill_ "$CID"
+    echo "[cleanup] destroying $CID (launch did not complete)"; kill_ "$CID" || true
   fi
 }
 trap cleanup EXIT
@@ -64,9 +79,10 @@ for OFFER in "$@"; do
 try: print(json.load(sys.stdin).get("new_contract","") or "")
 except Exception: print("")')
   [ -n "$CID" ] || { echo "  create failed"; CID=""; continue; }
+  echo "$CID" > "$STATE/CID"   # persisted the moment it exists, before anything can fail
   echo "  CID=$CID waiting for running..."; ST=""
   for _ in $(seq 1 40); do ST=$(ist "$CID"); [ "$ST" = running ] && break; sleep 15; done
-  [ "$ST" = running ] || { echo "  stuck ($ST) -> destroy"; kill_ "$CID"; CID=""; continue; }
+  [ "$ST" = running ] || { echo "  stuck ($ST) -> destroy"; kill_ "$CID" && CID="" || exit 1; continue; }
   read -r HOST PORT <<<"$(issh "$CID")"
   SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p $PORT root@$HOST"
   NET=BAD
@@ -74,7 +90,7 @@ except Exception: print("")')
     if $SSH 'echo nameserver 8.8.8.8 > /etc/resolv.conf; curl -sS -m 10 -o /dev/null https://rclone.org && echo NET-OK' 2>/dev/null | grep -q NET-OK; then NET=OK; break; fi
     sleep 10
   done
-  [ "$NET" = OK ] || { echo "  no outbound network -> destroy"; kill_ "$CID"; CID=""; continue; }
+  [ "$NET" = OK ] || { echo "  no outbound network -> destroy"; kill_ "$CID" && CID="" || exit 1; continue; }
   echo "  network OK; provisioning..."
   ACCT=$(grep '^account_id=' "$CREDS" | cut -d= -f2)
   AK=$(grep '^access_key_id=' "$CREDS" | cut -d= -f2)
@@ -84,18 +100,18 @@ except Exception: print("")')
     | $SSH 'set -e; cd /root; (command -v rclone >/dev/null) || (curl -sS -m 60 -O https://downloads.rclone.org/rclone-current-linux-amd64.deb && dpkg -i rclone-current-linux-amd64.deb >/dev/null);
       mkdir -p /root/.config/rclone; { echo "[r2]"; echo "type = s3"; echo "provider = Cloudflare"; echo "no_check_bucket = true"; cat; } > /root/.config/rclone/rclone.conf; chmod 600 /root/.config/rclone/rclone.conf;
       rclone lsd r2:pa-source/hearsay/ >/dev/null && echo RCLONE-OK' | grep -q RCLONE-OK \
-    || { echo "  rclone setup failed -> destroy"; kill_ "$CID"; CID=""; continue; }
+    || { echo "  rclone setup failed -> destroy"; kill_ "$CID" && CID="" || exit 1; continue; }
   # ship the box scripts and start the chain detached; PROVISIONED is written ONLY after the
   # chain is confirmed running (a box whose chain never started is destroyed, Codex round 3)
   if ! tar czf - -C "$HERE" box_setup.sh box_chain.sh box_codecs.py r2_guard.sh 2>/dev/null \
        | $SSH 'mkdir -p /root/m5/cloud && tar xzf - -C /root/m5/cloud 2>/dev/null'; then
-    echo "  script transfer failed -> destroy"; kill_ "$CID"; CID=""; continue
+    echo "  script transfer failed -> destroy"; kill_ "$CID" && CID="" || exit 1; continue
   fi
   if ! $SSH "setsid env JOB='$JOB' JOBS='$JOBS' DEADLINE='$DEADLINE' bash /root/m5/cloud/box_chain.sh > /root/m5/chain.log 2>&1 < /dev/null & sleep 3; pgrep -f 'bash /root/m5/cloud/box_ch[a]in.sh' >/dev/null && echo CHAIN-UP" 2>/dev/null | grep -q CHAIN-UP; then
-    echo "  chain did not start -> destroy"; kill_ "$CID"; CID=""; continue
+    echo "  chain did not start -> destroy"; kill_ "$CID" && CID="" || exit 1; continue
   fi
   echo PROVISIONED
-  echo "$CID" > "$STATE/CID"; echo "$HOST $PORT" > "$STATE/SSH"; date +%s > "$STATE/PROVISIONED"
+  echo "$HOST $PORT" > "$STATE/SSH"; date +%s > "$STATE/PROVISIONED"
   DPH=$($VAST show instances --raw | py "import sys,json
 for i in json.load(sys.stdin) or []:
     if i['id']==$CID: print(i.get('dph_total'), i.get('gpu_name'))")

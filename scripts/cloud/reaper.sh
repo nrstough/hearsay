@@ -40,6 +40,7 @@ while :; do
       DONE) REASON="done" ;;
       FAIL*) REASON="failed: $ST" ;;
     esac
+    [ -f "$d/ORPHAN" ] && REASON="orphan from a failed launch"
     [ -z "$REASON" ] && [ "$NOW" -ge "$DEADLINE" ] && REASON="deadline"
     [ -z "$REASON" ] && [ "$AGE" -ge "$STALL_MIN" ] && [ "$ST" != "?" ] && REASON="stalled ${AGE}m at '$ST'"
     [ -z "$REASON" ] && [ "$ST" = "?" ] && [ "$AGE" -ge $((STALL_MIN * 2)) ] && REASON="no STATUS for ${AGE}m"
