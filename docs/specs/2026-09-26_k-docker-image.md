@@ -1,5 +1,7 @@
 # Run spec: K, the offline CPU Docker image and the end-to-end runner (Sat Sep 26, 2026, ~06:20)
 
+> Not a graded deliverable (NSA, Sat Sep 26 ~12:00); kept as reproducibility evidence.
+
 Status: P1 and P2 frozen (deep mode). Plan: `docs/reports/2026-09-26_k-docker-image-plan.md`.
 - **Worktree:** branch `main`, `~/Projects/hearsay`, shared with the main chat, the D-track chat, the M3 chat, the M5 chat and the oversight chat. Stage only K files by path; never `git add -A`; never push without Nathan.
 - **Handoff:** `docs/handoffs/2026-09-26_docker-handoff.md` (updated by the oversight chat at ~06:15 with the speech gate and speaker-drift rows).
