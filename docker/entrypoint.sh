@@ -4,7 +4,8 @@
 # runner (scripts/run_pipeline.py) with /data and /out. Env the runner itself reads:
 #   HEARSAY_TEAM (default HEARSAY)  HEARSAY_TEMPLATE (path inside the container)
 #   HEARSAY_RULE (zmean | stack_nonlj, default zmean)
-# Env this script reads: OMP_NUM_THREADS (default min(nproc, cgroup cpu quota, 6)).
+# Env this script reads: OMP_NUM_THREADS (default min(nproc, cgroup cpu quota, 6); the runner caps
+# torch at 6 too, and the cap here keeps numpy/numba from oversubscribing on a big box).
 # Extra arguments are passed through to the runner (e.g. --limit 50 --compare-tsv /ref/x.tsv).
 set -euo pipefail
 
@@ -17,6 +18,7 @@ if [ -z "${OMP_NUM_THREADS:-}" ]; then
       [ "$q" -lt "$n" ] && n=$q
     fi
   fi
+  [ "$n" -gt 6 ] && n=6
   [ "$n" -ge 1 ] || n=1
   export OMP_NUM_THREADS="$n"
 fi
@@ -38,4 +40,4 @@ fi
 [ -d /data ] || { echo "hearsay: /data is not mounted" >&2; exit 2; }
 echo "hearsay: build=$(cat /app/BUILD_INFO 2>/dev/null || echo unknown) threads=$OMP_NUM_THREADS" \
      "team=${HEARSAY_TEAM:-HEARSAY} rule=${HEARSAY_RULE:-zmean} template=${HEARSAY_TEMPLATE:-none}"
-exec python /app/scripts/run_pipeline.py --in /data --out /out --threads "$OMP_NUM_THREADS" "$@"
+exec python /app/scripts/run_pipeline.py --in /data --out /out --threads "$OMP_NUM_THREADS" --require-offline "$@"

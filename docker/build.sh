@@ -32,7 +32,7 @@ CONSTANTS="models/fusion_v0/constants.json"
 # MIN_FREE_GB on that drive and prune leftovers afterwards.
 MIN_FREE_GB="${MIN_FREE_GB:-8}"
 VM_DIR="$(python3 -c 'import os; p = os.path.expanduser("~/.colima"); print(os.path.realpath(p) if os.path.exists(p) else "/")')"
-FREE_GB="$(df -g "$VM_DIR" | awk 'NR==2 {print $4}')"
+FREE_GB="$(( $(df -Pk "$VM_DIR" | awk 'NR==2 {print $4}') / 1048576 ))"
 if [ "${FREE_GB:-0}" -lt "$MIN_FREE_GB" ]; then
   echo "build.sh: only ${FREE_GB} GB free on the drive hosting $VM_DIR; need ${MIN_FREE_GB} GB (prune images or free space)" >&2
   exit 1
@@ -40,7 +40,7 @@ fi
 
 STAMP="$(date +%Y%m%d-%H%M)"
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-DIRTY="$(git status --porcelain 2>/dev/null | grep -q . && echo dirty || echo clean)"
+DIRTY="$([ -n "$(git status --porcelain 2>/dev/null)" ] && echo dirty || echo clean)"
 BUILD_INFO="sha=$SHA $DIRTY stamp=$STAMP probe=$(basename "$PROBE_REAL") hc=$(basename "$HC_REAL") cmp=$(basename "$CMP_REAL") fusion=fusion_v0"
 
 if [ "${1:-}" = "--print-args" ]; then
@@ -58,8 +58,9 @@ docker buildx build --platform linux/amd64 --load \
   --build-arg BUILD_INFO="$BUILD_INFO" --build-arg GIT_SHA="$SHA" \
   -t "$IMAGE:$STAMP" -t "$IMAGE:latest" .
 docker image inspect "$IMAGE:latest" --format 'image {{.Architecture}} {{.Size}} bytes'
-# Keep the footprint small: only this build's tag plus :latest survive; no dangling layers or cache.
+# Keep the footprint small: only this build's tag plus :latest survive, dangling images go; the
+# builder cache stays so the next build reuses the dependency and weight layers (about 2 min
+# instead of about 4 from scratch); the VM's hard disk cap bounds it.
 for tag in $(docker images "$IMAGE" --format '{{.Tag}}' | grep -v -e latest -e "^$STAMP$"); do docker rmi "$IMAGE:$tag" >/dev/null 2>&1 || true; done
 docker image prune -f >/dev/null 2>&1 || true
-docker builder prune -f >/dev/null 2>&1 || true
-echo "build.sh: $(df -g "$VM_DIR" | awk 'NR==2 {print $4}') GB free on the drive hosting $VM_DIR after pruning"
+echo "build.sh: $(( $(df -Pk "$VM_DIR" | awk 'NR==2 {print $4}') / 1048576 )) GB free on the drive hosting $VM_DIR after pruning"

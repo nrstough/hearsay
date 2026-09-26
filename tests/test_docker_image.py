@@ -75,8 +75,11 @@ def test_b4_context_excludes_and_never_copies_private_trees():
     for name in (".git", ".venv", "data", "outputs", "submissions", "models", "weights/wavlm-*",
                  "tests", "docs", ".env", "*.wav"):
         assert name in DOCKERIGNORE, name
+    copies = [ln.split()[1:-1] for ln in DOCKERFILE.splitlines() if ln.startswith("COPY ")]
+    sources = [s for srcs in copies for s in srcs if not s.startswith("--")]
     for bad in ("data", "outputs", "submissions", "wavlm", ".venv", ".git", "tests"):
-        assert not re.search(rf"^COPY .*\b{re.escape(bad)}\b", DOCKERFILE, re.MULTILINE), bad
+        assert not any(s == bad or s.startswith(bad + "/") or f"/{bad}" in s for s in sources), (bad, sources)
+    assert sources, "no COPY sources parsed"
 
 
 def test_b5_context_keeps_what_the_image_copies():
@@ -115,11 +118,14 @@ def test_b8_scripts_parse_and_are_strict(path):
 
 
 def test_b8_entrypoint_contract_matches_the_runner():
-    assert "exec python /app/scripts/run_pipeline.py --in /data --out /out --threads" in ENTRYPOINT
+    assert ('exec python /app/scripts/run_pipeline.py --in /data --out /out --threads "$OMP_NUM_THREADS" '
+            '--require-offline "$@"') in ENTRYPOINT
     assert "/sys/fs/cgroup/cpu.max" in ENTRYPOINT and "OMP_NUM_THREADS" in ENTRYPOINT
+    assert '[ "$n" -gt 6 ] && n=6' in ENTRYPOINT, "threads are capped at six, as the README says"
     assert "assets.py verify" in ENTRYPOINT and "HEARSAY_TEMPLATE" in ENTRYPOINT
     text = (REPO / "scripts" / "run_pipeline.py").read_text()
-    for flag in ('"--in"', '"--out"', '"--threads"', '"--template"', '"--team"', '"--rule"'):
+    for flag in ('"--in"', '"--out"', '"--threads"', '"--template"', '"--team"', '"--rule"',
+                 '"--require-offline"'):
         assert flag in text, flag
     for env in ("HEARSAY_TEAM", "HEARSAY_TEMPLATE", "HEARSAY_RULE"):
         assert env in text, env
@@ -192,9 +198,10 @@ def test_b10_assets_freeze_verify_and_tamper(tmp_path):
     assert assets.verify(tmp_path, m, hash_over_mb=0.00005) == []
     assert assets.verify(tmp_path, m, full=True) == ["sha256 mismatch: weights/w/big.bin"]
     (tmp_path / "models" / "a" / "f.bin").write_bytes(b"x" * 11)
-    assert assets.verify(tmp_path, m) == ["size mismatch: models/a/f.bin (11 != 10)",
-                                          "sha256 mismatch: weights/w/big.bin"] or \
-        "size mismatch: models/a/f.bin (11 != 10)" in assets.verify(tmp_path, m)
+    both = ["size mismatch: models/a/f.bin (11 != 10)", "sha256 mismatch: weights/w/big.bin"]
+    assert assets.verify(tmp_path, m) == both  # big.bin is under 100 MB, so it is hashed by default
+    assert assets.verify(tmp_path, m, full=True) == both
+    assert assets.verify(tmp_path, m, hash_over_mb=0.00005) == both[:1]  # size-only fast path
     (tmp_path / "models" / "a" / "extra.txt").write_text("!")
     assert "extra: models/a/extra.txt" in assets.verify(tmp_path, m)
     # the manifest itself may live inside a frozen dir (the 06:46 smoke failure): never "extra"
@@ -263,5 +270,6 @@ def test_p4_build_script_targets_amd64_and_records_provenance():
     assert "COPY weights/spkrec-ecapa-voxceleb ./weights/spkrec-ecapa-voxceleb" in DOCKERFILE
     assert (REPO / "docker" / ".gitignore").read_text().strip() == "build/"
     # the system disk hosts the VM's sparse disk: a free-space guard before, pruning after
-    assert "MIN_FREE_GB" in BUILD and 'df -g "$VM_DIR"' in BUILD
-    assert "docker builder prune -f" in BUILD and "docker image prune -f" in BUILD
+    assert "MIN_FREE_GB" in BUILD and 'df -Pk "$VM_DIR"' in BUILD
+    assert "docker image prune -f" in BUILD and "docker builder prune" not in BUILD, \
+        "old tags and dangling images go; the layer cache stays for the next build"

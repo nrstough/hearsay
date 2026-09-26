@@ -6,7 +6,7 @@ Preconditions verified at 06:10: Colima running (vz, Rosetta, 6 CPU, 6 GB, VM di
 
 ## Execution note (06:35): the runner moved to the main chat
 
-Steps 2 and 3 below (the runner and its tests) were superseded before execution: the main chat shipped `scripts/run_pipeline.py` + `src/hearsay/pipeline.py`, so the image wraps their runner (run spec, "Scope change at 06:35"). Steps 1, 4, 5 (image tests only), 6 (`pcm-hash` only; score parity is their `--compare-tsv`), 7, 8, 9 and 10 were executed as written with these adjustments: the Dockerfile copies weights before code (the critique's finding 2); every `-v` source is absolute and under `$HOME`; in-image checks use `--entrypoint python`; the build started at 06:37 with the weights layers cached for later rebuilds. The Codex review's findings and how each was handled are in the run spec.
+Steps 2 and 3 below (the runner and its tests) were superseded before execution: the main chat shipped `scripts/run_pipeline.py` + `src/hearsay/pipeline.py`, so the image wraps their runner (run spec, "Scope change at 06:35"). Steps 1, 4, 5 (image tests only), 6 (`pcm-hash` only; score parity is their `--compare-tsv`), 7, 8, 9 and 10 were executed as written with these adjustments: the Dockerfile copies weights before code (the critique's finding 2); every `-v` source is absolute and under `$HOME`; in-image checks use `--entrypoint python`; the build started at 06:37 with the weights layers cached for later rebuilds. The Codex review's findings and how each was handled are in the run spec. Intermediate stops: 08:00 commit and Claude critique, 09:00 Codex audit, 09:30 T8 addendum, 10:00 hard stop and report.
 
 ## Anchors (current code, verified 06:20)
 
