@@ -19,6 +19,9 @@ dependencies = [
     "pydub",
     "ffmpeg-python",
     "speechbrain>=1.1.1",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.54.0",
+    "python-multipart>=0.0.32",
 ]
 
 [build-system]

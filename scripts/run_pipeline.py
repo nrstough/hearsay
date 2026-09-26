@@ -436,6 +436,8 @@ def main(argv=None) -> int:
                         doc = refuse(doc, consts, rule, apply_gate=apply_gate, pi_synth=args.pi_synth)
                     except (KeyError, ValueError):
                         doc = None  # the cache lacks a logit this rule needs: rescore below
+                    else:  # keep the per-file JSON in step with the TSV being written
+                        (out / "results" / f"{Path(fid).name}.json").write_text(json.dumps(doc, indent=1))
                 if doc is not None:
                     docs[fid] = doc
                     continue
