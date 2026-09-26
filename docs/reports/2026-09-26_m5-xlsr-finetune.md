@@ -43,16 +43,19 @@ Rule (main chat + oversight + consult): M5 replaces M1 as the primary deep detec
 
 M1 per-fold OOF recomputed from its saved embeddings (`outputs/m5_runs/m1_v{2,3}_oof_by_fold.json`); M5 rows from the run logs under `outputs/m5_runs/`.
 
-| Fold (held-out generators) | M1 v3 (bar) | M5 NSA-only, 2,500 steps | M5 NSA+extra, 2,500 steps |
-|---|---|---|---|
-| 0: grad_tts + unit_speech | 0.524 | 0.528 (EER 20.0%) | TBD |
-| 4: elevenlabs | 0.415 | 0.762 (EER 19.1%) | **0.410 (EER 8.8%)** |
-| pooled (5 folds) | 0.257 | | |
+| Fold (held-out generators) | M1 v3 (bar) | fine-tune, NSA-only | fine-tune, NSA+extra | **frozen backbone, NSA+extra** |
+|---|---|---|---|---|
+| 0: grad_tts + unit_speech | 0.524 | 0.528 (EER 20.0%) | 0.515 (EER 21.0%) | **0.520 (EER 17.9%)** |
+| 4: elevenlabs | 0.415 | 0.762 (EER 19.1%) | 0.410 / 0.377 (two seeds; EER 8.8 / 8.2%) | **0.308 (EER 5.9%)** |
+
+All M5 rows: 2,500 steps × 32 crops, augmentation p = 0.65, MLAAD 12% of the spoof side. "Fine-tune" = all 12 kept layers trainable at LR 1e-5 (LLRD 0.85); "frozen" = the same 12-layer XLS-R with only the learned layer-weighted sum, attentive statistics pooling and head trained. Seed-to-seed noise on a fold ≈ ±0.03.
+
+**Decision (06:40): the frozen-backbone recipe for all six final models.** It wins fold 4 by ~0.08 (≈3× the seed noise) over the fine-tune and by 0.11 over M1, ties on fold 0, runs twice as fast (12 min per fold model), and its learned layer weights peak at layers 5–6, consistent with M1's layer-7 optimum. The full fine-tune's failure mode is the classic one: training loss near the label-smoothing floor on the seen generators, poor transfer to the unseen commercial one.
 
 - **Pilot** (fold 4, 600 steps, LR decayed to zero): 0.81; throughput ~190 clips/s at 3.4 s crops on an A100 40 GB, 2,500 steps ≈ 16–20 min including evals and checkpoint pushes.
 - **The extra pools are the difference on the unseen commercial generator**: ASV19 bona fide (40 VCTK speakers) + the 2.5k A01–A06 anchor + MLAAD at 12% of the spoof side take fold 4 from 0.76 to 0.41. NSA-only fine-tuning fits the seen generators (training loss near the label-smoothing floor) and does not transfer.
 - Realized augmentation rates per source × label: 0.646–0.655 in every cell (class-blind confirmed).
-- Conservative recipes on fold 4 (frozen backbone + learned pooling head; top-3 layers at LR 5e-6): TBD.
+- The top-3-layers recipe (LR 5e-6) was cancelled once the frozen result came in; not measured.
 
 _TBD: pilot throughput; ablation (NSA-only vs NSA+extra, folds 0 and 4); holdout clean / augmented-slice / test-length-crop / 14 s readouts; per generator, per bona fide source, per length bucket, per augmentation op; both sponsor-code readings; MLAAD probe verdict; CPU parity; spend._
 
