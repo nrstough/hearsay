@@ -32,7 +32,7 @@ python - <<'EOF'
 import json
 from hearsay.m5_bundle import tree_sha
 meta = json.load(open('/root/m5/bundle/bundle_meta.json'))
-got = tree_sha('/root/m5/bundle', exclude=("TREE_SHA", "bundle_meta.json", "codecs"))
+got = tree_sha('/root/m5/bundle')
 assert got == meta['tree_sha'], f"tree sha {got[:12]} != {meta['tree_sha'][:12]}"
 print('bundle tree OK', got[:12], meta['n_rows'], 'rows')
 EOF

@@ -94,6 +94,10 @@ def test_b7_tree_sha_covers_every_file_and_clip_ok_gates_reuse(tmp_path):
     assert s1 != s2
     (root / "TREE_SHA").write_text(s2)  # the sha file itself is excluded
     assert tree_sha(root) == s2
+    (root / "codecs").mkdir()  # box-made variants and the upload marker never change the identity
+    (root / "codecs" / "x.flac").write_bytes(b"zz")
+    (root / "UPLOAD_DONE").write_text("done")
+    assert tree_sha(root) == s2
     assert clip_ok(root / "core" / "a.flac")
     assert clip_ok(root / "core" / "a.flac", expected_frames=SR)
     assert not clip_ok(root / "core" / "a.flac", expected_frames=SR + 1)

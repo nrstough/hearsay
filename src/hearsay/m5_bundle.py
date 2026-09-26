@@ -90,10 +90,13 @@ def source_stamp(src: str | Path) -> str:
     return f"{st.st_size}:{int(st.st_mtime)}"
 
 
-def tree_sha(root: str | Path,
-             exclude: tuple[str, ...] = ("TREE_SHA", "bundle_meta.json")) -> str:
-    """sha256 over sorted (relative path, file sha256) of every file under root, except the
-    two files that record the sha itself."""
+TREE_EXCLUDE = ("TREE_SHA", "bundle_meta.json", "codecs", "UPLOAD_DONE")
+
+
+def tree_sha(root: str | Path, exclude: tuple[str, ...] = TREE_EXCLUDE) -> str:
+    """sha256 over sorted (relative path, file sha256) of every file under root, except the two
+    files that record the sha itself, the box-made `codecs/` variants and the upload marker
+    (the Mac and every box must compute the same value whatever those contain)."""
     root = Path(root)
     h = hashlib.sha256()
     for p in sorted(q for q in root.rglob("*") if q.is_file() and q.name not in exclude

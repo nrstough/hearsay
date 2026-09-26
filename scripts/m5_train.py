@@ -251,7 +251,7 @@ def main() -> None:
     # --- bundle identity ---
     meta = json.loads((args.bundle / "bundle_meta.json").read_text())
     if not args.skip_tree_check:
-        got = tree_sha(args.bundle, exclude=("TREE_SHA", "bundle_meta.json", "codecs"))
+        got = tree_sha(args.bundle)
         if got != meta["tree_sha"]:
             sys.exit(f"FATAL: bundle tree sha {got[:12]} != {meta['tree_sha'][:12]}")
     weights_dir = args.weights_dir or (REPO / "weights" / "wav2vec2-xls-r-300m")
