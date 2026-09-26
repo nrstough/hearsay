@@ -646,6 +646,15 @@ def test_pwl_diag_ok_composition():
     assert not v3.pwl_diag_ok(15, {"inner_oof": 0.6, "itw": 0.6})
     assert not v3.pwl_diag_ok(16, {"inner_oof": 0.5, "itw": 0.6})
     assert not v3.pwl_diag_ok(16, {"inner_oof": 0.6, "itw": float("nan")})
+    assert not v3.pwl_diag_ok(16, {"inner_oof": 0.6, "itw": 0.5})  # ITW side at the boundary
+    assert not v3.pwl_diag_ok(40, {"inner_oof": 0.9, "itw": 0.3})  # ITW side below
+
+
+def test_holdout_argmin_includes_all_real():
+    y = {"inner_oof": np.array([0, 0, 1, 1]), "holdout": np.array([0, 0, 1, 1]), "itw": np.array([0, 1])}
+    src = {"holdout": np.array(["ljspeech", "librispeech", "diffssd", "diffssd"])}
+    sc = {"inner_oof": np.array([0.1, 0.2, 0.8, 0.9]), "holdout": np.full(4, 0.5), "itw": np.array([0.1, 0.9])}
+    assert v3.readout(y, src, sc)["holdout_argmin_FA_miss"] == [0, 2]  # calling all real beats 2 false alarms
 
 
 def test_room_itw_brief_side():

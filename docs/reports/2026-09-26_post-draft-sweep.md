@@ -1,6 +1,6 @@
 # Post-draft sweep: the locked table and the packet (Sat Sep 26, 2026, 19:08 EDT)
 
-**Recommendation: KEEP.** None of the four candidates (T2, W4, P_wl, H_noise) passes its pre-declared test. `submissions/CrossExam_predictions.tsv` (sha256 `fb783076…`, the file NSA scored at minDCF 0.0733) stays final. H_noise is still pending: its export is expected ~20:30 from the CPU chat and will be judged by the same frozen rule in a second run appended below. Both outside opinions put its test-set effect at zero.
+**Recommendation: KEEP.** None of the four candidates (T2, W4, P_wl, H_noise) passes its pre-declared test. `submissions/CrossExam_predictions.tsv` (sha256 `fb783076…`, the file NSA scored at minDCF 0.0733) stays final. H_noise was judged in Run 2 (19:17, final report `354502ca…`; section "Run 2" below). The "Pending" section below is the 19:08 state, kept for the record.
 
 **Provenance:**
 
@@ -74,14 +74,14 @@ There are no passers, so rule 7 does not arise. The decision is **KEEP**: `submi
 - **M5 at weight 0.4** failed a pre-declared fresh-evidence bake-off: −0.016 on one-sample-shifted audio, and a sponsor-cost ITW gain whose 5th percentile is below zero.
 - **Second M3 suppression tier:** inert. Identical metrics, and it never fires on a fake.
 
-## Pending (appended below when it runs)
+## Pending at 19:08 (superseded by Run 2 below)
 
 - **H_noise:** judged by the frozen gate. Its diagnostic uses the CPU chat's noise-AUC numbers via `--hnoise-evidence`; without them it fails.
 - **Nathan's ruling window:** the packet is ready now. With no passers there is nothing to ratify. His word confirms KEEP, or waits for H_noise.
 
 ## Run 2 (19:17): H_noise, and the final report
 
-The CPU chat's v6 export arrived at 19:16, earlier than the expected 20:30. It came with its noise-AUC evidence in `outputs/channel/hc_noise.json` (sha256 `2d4b4455…`; bundle `models/hc_lgbm_20260926-191630`). The run:
+The CPU chat's v6 export arrived at 19:16, earlier than the expected 20:30. It came with its noise-AUC evidence in `outputs/channel/hc_noise.json` (sha256 `2d4b4455…`; bundle `models/hc_lgbm_20260926-191630`; CPU chat commits `0065641` and `04f5391`, report `docs/reports/2026-09-26_post-draft-hc-noise.md`). The run:
 
 `uv run python scripts/fuse_sweep_v3.py --hnoise-evidence 0.7716,0.9931 --hnoise-evidence-source outputs/channel/hc_noise.json`
 

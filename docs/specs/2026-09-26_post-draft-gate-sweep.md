@@ -197,3 +197,12 @@ The audit is `docs/specs/2026-09-26_post-draft-gate-sweep-audit.md`. Scope Excel
 3. **Documentation.** The CLAUDE.md disclosure and the README asset table now say WavLM Large was evaluated as a probe, failed the pre-declared gate and is not shipped.
 
 The results are unchanged: the re-run reproduces the final report `354502ca…` byte for byte, with KEEP. `tests/test_fuse_sweep_v3.py`: 106 passed, 1 skipped (the NOT RUN data test, skipped because `handcrafted_v6` now exists).
+
+## Codex audit, round 2 (19:24; Overall Fail) and fixes
+
+1. **D6.** The holdout argmin now includes the "all real" threshold (+inf), as `inner_threshold` already did. Regression test: `test_holdout_argmin_includes_all_real`.
+2. **A5.** P_wl's ITW corrective-share side is tested independently, at 0.5 and at 0.3, with the catches and the inner share passing.
+3. **Docs.** The sweep report's opening now states the final outcome, and the 19:08 "Pending" section is marked as superseded.
+4. **Model-export identity.** Accepted as residual risk (C6); moot because no candidate passes.
+
+The re-run reproduces the final report `354502ca…` byte for byte. `tests/test_fuse_sweep_v3.py`: 107 passed, 1 skipped.

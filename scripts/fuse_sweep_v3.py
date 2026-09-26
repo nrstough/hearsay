@@ -138,7 +138,7 @@ def readout(y: dict, src: dict, sc: dict) -> dict:
          "holdout_brief": round(brief(y["holdout"], sc["holdout"]), 4),
          "holdout_averse": round(averse(y["holdout"], sc["holdout"]), 4)}  # fmt: skip
     hs, yh = sc["holdout"], y["holdout"]
-    t = min(np.unique(hs), key=lambda t_: cost_at(yh, hs, t_, PI))
+    t = min(np.r_[np.unique(hs), np.inf], key=lambda t_: cost_at(yh, hs, t_, PI))  # includes "all real"
     r["holdout_argmin_FA_miss"] = [int(np.sum(hs[yh == 0] >= t)), int(np.sum(hs[yh == 1] < t))]
     spoof = hs[yh == 1]
     for s_ in ("ljspeech", "librispeech"):
