@@ -4,7 +4,8 @@ Sat Sep 26, 2026, 04:00–. Brief: `docs/handoffs/2026-09-26_handcrafted-v4-brie
 
 ## Summary
 
-- **v4 wins on inner out-of-fold, the selection rule:** minDCF 0.614 → **0.434**, LibriSpeech real (the 4×-cost side) 0.77 → **0.54**, pro_diff 1.00 → **0.32**; holdout 0.254 → 0.170 (read once; inside the noise band). Export: `outputs/detector_scores/handcrafted_v4.csv`; bundle pinned at `models/hc_selected`.
+- **v4 wins on inner out-of-fold, the selection rule:** minDCF 0.614 → **0.434**, LibriSpeech real (the 4×-cost side) 0.77 → **0.54**, pro_diff 1.00 → **0.32**; holdout 0.254 → 0.170 (read once; inside the noise band). Export: `outputs/detector_scores/handcrafted_v4.csv`.
+- **But the first fusion run found a test-domain shift:** under a Platt map at the 0.3 prior, v4 alone calls 56% of the test set synthetic (v3: 49%; deep detectors: 27%). The shift is the spectral envelope of the test recordings (darker, codec-like), spread over nearly every column; no family and no column subset removes it. **v5b**, the same columns trained with augmented fit-only twins (codec round-trips, random tilt + low-pass), is the recommended fusion column: clean holdout 0.137, calibrated test share 51%, holdout-real false alarms 6.3% (v4: 9.1%), In-the-Wild real 0.40%, at an inner cost of 0.418 → 0.469. Export `handcrafted_v5.csv`; bundle pinned at `models/hc_selected`.
 - **Still blind:** grad_tts (1.00 in every variant; its phase cue is shown by no other generator, so it cannot be learned under generator-held-out folds) and ElevenLabs (0.80 → 0.92).
 - **In-the-Wild:** P_FA **0.65%** at the inner-OOF threshold on 2,000 real clips (safe on the expensive side), but P_miss 97% and minDCF 1.0 (does not catch that domain's fakes); AUC 0.64 → 0.76 vs v3.
 - **Families:** all six implemented and gated; cqcc, lfcc and phase carry the gain; jitter, modulation and breath are marginal. No passing column is a codec cue. Dropping corpus-cue columns hurt every variant.
@@ -116,7 +117,20 @@ No single family is responsible; the shift is spread over every envelope-carryin
 
 Removing the shifted columns does not remove the shift: the remaining columns still separate train from test at AUC 0.98, and the calibrated share goes *up*, so the variability columns are shifted in the fake direction too, just less visibly per column. Column pruning is not the remedy. The domain difference is a property of the whole feature description of the test recordings (darker, codec-processed), not of a few columns.
 
-_(v5 augmentation results: filled in below.)_
+**v5: training-side augmentation.** `scripts/extract_handcrafted.py --launder-frac 0.35 --tilt-frac 0.35` re-extracted the training sample with 11,550 of 20,000 rows augmented (MP3/AAC round-trip at 24–128 kbps and/or a random ±4 dB/kHz tilt plus a 4.5–7 kHz low-pass, drawn per row from `default_rng(seed + row)`, recorded in `hc_augment`); test and In-the-Wild rows untouched. Two ways to use those rows:
+- **v5a, replace:** train on the augmented sample as is (58% of rows altered). Its inner and holdout readouts mix clean and altered rows, so the table below re-reads its inner OOF on the 6,842 clean inner rows only, and reports the trainer's clean-only holdout.
+- **v5b, extra rows** (`--extra-rows-from`): train on the clean v4 rows plus the 9,300 augmented twins of the inner rows as fit-only extras (each takes its clean twin's fold, so no fold leakage); every readout and the export stay on clean rows, directly comparable with v4.
+
+| | Inner OOF (clean rows) | LibriSpeech real (inner) | pro_diff | elevenlabs | Holdout (clean) | Holdout LibriSpeech | Holdout real above 0.5, calibrated | Calibrated test share | ITW P_FA / P_miss at the inner threshold | ITW AUC |
+|---|---|---|---|---|---|---|---|---|---|---|
+| v3 | 0.614 | 0.77 | 1.00 | 0.80 | 0.254 | 0.32 | 9.5% | 48.8% | 0.55% / 98% | 0.64 |
+| v4a | 0.418 | 0.51 | 0.30 | 0.88 | 0.170 | 0.22 | 9.1% | 56.1% | 0.65% / 97% | 0.76 |
+| v5a, replace | 0.469 | 0.56 | 0.73 | 0.63 | 0.153 | 0.41* | 6.5% | 47.9% | 0.25% / 97% | 0.76 |
+| **v5b, extra rows** | 0.469 | 0.59 | 0.63 | 0.67 | **0.137** | **0.16** | **6.3%** | 50.6% | **0.40% / 96%** | 0.77 |
+
+*v5a's per-source holdout is on mixed rows. v4a's inner numbers here are on the same 6,842 clean inner rows as v5a's (its all-rows figure is 0.434).
+
+**Reading.** Augmentation buys robustness on the false-alarm side at a modest inner cost. v5b keeps most of v4's inner gain (0.469 vs 0.418 on the same rows), improves the clean holdout (0.170 → 0.137, LibriSpeech 0.22 → 0.16), and lowers every false-alarm reading we have: holdout real at the calibrated threshold 9.1% → 6.3%, In-the-Wild real 0.65% → 0.40%, calibrated test share 56% → 51%. It trades pro_diff (0.30 → 0.63) for ElevenLabs (0.88 → 0.67). Neither v5 brings the test share to the 30% prior; the inflation is largely inherent to describing these test recordings with envelope statistics (v3 already sat at 49%), and augmentation removes only the part the model can learn to ignore. **Recommendation for fusion: v5b** (`outputs/detector_scores/handcrafted_v5.csv`, bundle `models/hc_lgbm_20260926-055451`, pinned as `models/hc_selected`), because a false alarm costs 9.3 misses in this metric and v5b is better on that side everywhere it can be measured; `handcrafted_v4.csv` stays available for the leave-one-out comparison, and a fusion-side re-centering of the logit column (an additive shift; the ranking is unaffected) remains the fallback for the residual offset.
 
 ## What worked / what had no effect (v4)
 
@@ -137,5 +151,5 @@ _(v5 augmentation results: filled in below.)_
 
 - **Tracked:** `src/hearsay/hc_v4.py`, the `families` plumbing in `handcrafted.py`, `extract_handcrafted.py`, `train_handcrafted.py` (`--drop-columns`, second-resolution stamps), `_learned.py` (`<prefix>_selected`), `scripts/eval_bundle.py`, `tests/test_hc_v4.py`, this report.
 - **Not tracked (gitignored, regenerable):** `outputs/handcrafted/{nsa_test_v4,nsa_train_sample_v4,itw_stress_v4,hc_gate_*}.csv` (about 20 minutes at 4 workers), `models/hc_lgbm_20260926-0438` (the winner, pinned by `models/hc_selected`), `outputs/detector_scores/handcrafted_v4.csv` and the per-variant exports.
-- **Fusion:** `handcrafted.csv` is still v3; the main chat decides whether to switch to `handcrafted_v4.csv` (same 21,671 rows and format).
+- **Fusion:** `handcrafted.csv` is still v3; the main chat decides among `handcrafted_v4.csv` (max inner gain, 56% calibrated test share) and `handcrafted_v5.csv` (v5b, recommended: fewer false alarms, 51%); `handcrafted_v5a_replace.csv` is the replace-style run for the record. All have the same 21,671 rows and format.
 - **Open:** grad_tts and ElevenLabs remain the blind spots; speaker-embedding drift (rubric technique 6) is not started; the three losing variants' bundles were re-trained with second-resolution stamps only for their `meta.json` records.

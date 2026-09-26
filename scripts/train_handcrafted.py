@@ -117,6 +117,10 @@ def main() -> None:
     ap.add_argument("--pi-synth", type=float, default=PI_SYNTH)
     ap.add_argument("--drop-columns", default="",
                     help="comma-separated feature names or prefix* globs to leave out (v4 gate)")
+    ap.add_argument("--extra-rows-from", type=Path,
+                    help="feature CSV whose augmented rows (*_augment / *_launder != '') are added "
+                         "for FITTING only: they take their clean twin's fold and never enter the "
+                         "OOF readouts, the holdout readout or the export (v5b)")
     args = ap.parse_args()
     drop = [c for c in args.drop_columns.split(",") if c]
 
@@ -135,6 +139,20 @@ def main() -> None:
     y = (d.label == "spoof").to_numpy(int)
     tr, va = (d.fold != "holdout").to_numpy(), (d.fold == "holdout").to_numpy()
     folds = d.loc[tr, "fold"].astype(int).to_numpy()
+    extra = None
+    if args.extra_rows_from:
+        xa = pd.read_csv(args.extra_rows_from)
+        acol = next(c for c in xa.columns if c.endswith(("_augment", "_launder")))
+        xflag = next(c for c in xa.columns if c.endswith("_flag"))
+        xa = xa[(xa[acol].fillna("") != "") & (xa[xflag].fillna("") == "")].join(f, on="path")
+        assert xa.fold.notna().all(), "extra rows missing from the fold file"
+        missing = [c for c in feat_cols if c not in xa.columns]
+        assert not missing, f"extra rows lack columns {missing[:5]}"
+        extra = xa.reset_index(drop=True)
+        Xe = extra[feat_cols].to_numpy(np.float32)
+        ye = (extra.label == "spoof").to_numpy(int)
+        tre = (extra.fold != "holdout").to_numpy()
+        folds_e = extra.loc[tre, "fold"].astype(int).to_numpy()
     side = fdir / f"{args.train}.meta.json"
     side_meta = json.loads(side.read_text()) if side.exists() else {}
     crop_mode = side_meta.get("crop_mode", "first4s")
@@ -147,7 +165,8 @@ def main() -> None:
     print(f"{args.train}: {len(d)} rows ({(d_all[flag_col] != '').sum()} feature failures "
           f"dropped), {len(feat_cols)} features, crop_mode={crop_mode}, band_match={band_match}, "
           f"families={families}, dropped={n_dropped} columns, laundered={n_laundered}, "
-          f"inner {tr.sum()} / holdout {va.sum()}")
+          f"inner {tr.sum()} / holdout {va.sum()}"
+          + (f", + {int(tre.sum())} augmented fit-only rows" if extra is not None else ""))
 
     auc = {c: round(float(roc_auc_score(y[tr], d.loc[tr, c])), 4) for c in feat_cols}
     top = sorted(auc.items(), key=lambda kv: -abs(kv[1] - 0.5))[:15]
@@ -162,7 +181,11 @@ def main() -> None:
     for name, mk in models().items():
         oof = np.zeros(tr.sum())
         for a, b in PredefinedSplit(folds).split():
-            oof[b] = decision(mk().fit(X[tr][a], y[tr][a]), X[tr][b])
+            Xa, ya = X[tr][a], y[tr][a]
+            if extra is not None:  # augmented twins of the training folds only, never of fold b
+                keep = folds_e != folds[b][0]
+                Xa, ya = np.r_[Xa, Xe[tre][keep]], np.r_[ya, ye[tre][keep]]
+            oof[b] = decision(mk().fit(Xa, ya), X[tr][b])
         oofs[name] = oof
         cv[name] = {"min_dcf": round(min_cost(y[tr], oof, args.pi_synth), 4),
                     "eer": round(eer(y[tr], oof), 4)}  # fmt: skip
@@ -170,13 +193,23 @@ def main() -> None:
     best = min(cv, key=lambda k: (cv[k]["min_dcf"], cv[k]["eer"]))
     oof = oofs[best]
     cv_gen, cv_src = by_group(d[tr].reset_index(drop=True), y[tr], oof, args.pi_synth)
-    model = models()[best]().fit(X[tr], y[tr])
+    if extra is not None:
+        model = models()[best]().fit(np.r_[X[tr], Xe[tre]], np.r_[y[tr], ye[tre]])
+    else:
+        model = models()[best]().fit(X[tr], y[tr])
 
     s = decision(model, X[va])
     yv, dv = y[va], d[va].reset_index(drop=True)
     val = {f"val_{k}": v for k, v in report(yv, s, args.pi_synth).items()}
     val["val_auc"] = round(float(roc_auc_score(yv, s)), 4)
     per_gen, per_src = by_group(dv, yv, s, args.pi_synth)
+    extra_meta = {}
+    if extra is not None and (~tre).any():  # the augmented twins of the holdout rows, read once
+        se, ye_h = decision(model, Xe[~tre]), ye[~tre]
+        extra_meta["val_augmented_extra"] = {"n": int((~tre).sum()),
+                                             "min_dcf": round(min_cost(ye_h, se, args.pi_synth), 4),
+                                             "eer": round(eer(ye_h, se), 4)}  # fmt: skip
+        extra_meta["n_extra_rows_fit"] = int(tre.sum())
     extra = {}
     aug_col = next((c for c in dv.columns if c.endswith(("_launder", "_augment"))), None)
     if aug_col is not None:  # clean-only validation beside the augmented one (CLAUDE.md rule)
@@ -240,7 +273,9 @@ def main() -> None:
             "folds": str(args.folds), "model": best, "cv": cv,
             "cv_by_generator": cv_gen, "cv_by_bonafide_source": cv_src,
             "n_features": len(feat_cols), "n_inner": int(tr.sum()), "n_holdout": int(va.sum()),
-            **val, **extra, "val_by_generator": per_gen, "val_by_bonafide_source": per_src,
+            **val, **extra, **extra_meta, "val_by_generator": per_gen,
+            "val_by_bonafide_source": per_src,
+            "extra_rows_from": str(args.extra_rows_from) if args.extra_rows_from else None,
             "test": test_summary, "scores": str(scores_path.relative_to(REPO)),
             "feature_auc_top15": dict(top), "feature_auc": auc,
             "seconds": round(time.time() - t0)}  # fmt: skip
