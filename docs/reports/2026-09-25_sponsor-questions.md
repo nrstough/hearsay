@@ -62,7 +62,7 @@ With π_synth = 0.3 and C_FA = 4, normalized DCF = (4·0.7·P_FA + 0.3·P_miss) 
 
 ## What this changes (implemented)
 
-- `hearsay.metrics`: normalized minDCF with C_FA = 4, C_miss = 1, π_synth = 0.5. It is the selection metric for layer choice, bake-off, fusion and submissions. EER is logged alongside. The `validation_score` column in `submissions/log.csv` holds normalized minDCF.
+- `hearsay.metrics`: normalized minDCF with C_FA = 4, C_miss = 1, π_synth = 0.5 _(corrected Sep 26: now π_synth = 0.3, confirmed by the NSA instructions, "approximately 70% of the files are real")_. It is the selection metric for layer choice, bake-off, fusion and submissions. EER is logged alongside. The `validation_score` column in `submissions/log.csv` holds normalized minDCF.
 - `hearsay.submission.write_submission` writes the TSV above.
 - The constant rollback submission is all 0.0 ("always real"; 1.0 only if π_synth > 0.8). Its normalized minDCF is 1.0, which every model must beat.
 - Submissions are calibrated posteriors, sigmoid(LLR + logit π). Because MinDCF sweeps the threshold, the −ln 4 decision shift is opt-in (`--cost-shift`) and does not change the score.
@@ -70,8 +70,8 @@ With π_synth = 0.3 and C_FA = 4, normalized DCF = (4·0.7·P_FA + 0.3·P_miss) 
 
 ## Conflicts to resolve
 
-- **Class balance.** A pasted note (source not filled in) said 70% real / 30% synthetic. The slide says ~50/50. We use the slide's number until the NSA train labels are counted. If the train split really is 70/30, normalized minDCF becomes 9.33·P_FA + P_miss.
-- **Prior in the DCF.** The slide weights the false-alarm term by P(attack). That is not the usual ASVspoof 5 form (miss/FA roles and the P(attack) value differ). At P(attack) = 0.5 both readings give the same number.
+- **Class balance.** A pasted note (source not filled in) said 70% real / 30% synthetic. The slide says ~50/50. We use the slide's number until the NSA train labels are counted. _(Resolved Sep 26: the NSA instructions say about 70% real, so π_synth = 0.3.)_ If the train split really is 70/30, normalized minDCF becomes 9.33·P_FA + P_miss.
+- **Prior in the DCF.** The slide weights the false-alarm term by P(attack). That is not the usual ASVspoof 5 form (miss/FA roles and the P(attack) value differ). At P(attack) = 0.5 both readings give the same number. _(Sep 26: the sponsor's scoring code uses Pspoof = 0.5, Cmiss = 1, Cfa = 4 and treats a higher score as bona fide; see `docs/plan.md`, "Score direction".)_
 
 ## Questions for the sponsor
 

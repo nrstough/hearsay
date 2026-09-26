@@ -33,6 +33,7 @@ def ffmpeg_sine(out: Path, *, sr: int = 44_100, ch: int = 2, dur: float = 1.0, a
         ("aac.m4a", 48_000, 2, ()),
         ("lossless.flac", 48_000, 1, ()),
         ("opus.ogg", 48_000, 1, ("-c:a", "libopus")),
+        ("aac.mp4", 48_000, 2, ("-c:a", "aac", "-f", "mp4")),
     ],
 )
 def test_any_format_to_16k_mono_float32(tmp_path, name, sr, ch, args):

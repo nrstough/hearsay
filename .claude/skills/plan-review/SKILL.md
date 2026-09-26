@@ -29,25 +29,30 @@ typo, config), skip the full pipeline. Make a short checklist, code it, test it,
 
 ## HEARSAY localization (project-specific — read before Phase 0)
 
-- **When to use it here:** any model-ladder rung or change expected to take more than an
-  hour (CLAUDE.md working rule). Under an hour → relief valve.
-- **Budget:** the whole build is a 24–30 hour window. Every P1 names the rung (M0–M6), a
-  **time box** (a few hours max per rung), and the stop point. When the box runs out,
-  stop and report — do not push through.
-- **Always have a valid CSV:** from M1 onward, no plan may leave the repo unable to emit a
-  valid submission CSV. Every execution that touches the pipeline ends with a fresh valid
-  CSV **and** a new row in `submissions/log.csv` (timestamp, rung, validation score, CSV
-  path). Never overwrite a previously submitted CSV.
+- **When to use it here:** any rung or change expected to take more than an hour
+  (CLAUDE.md working rule). Under an hour → relief valve.
+- **Budget:** the build ends 8 AM Sunday (Sep 27); see the timeline and hard cutoffs in
+  `docs/plan.md`. Every P1 names the rung (M0, M1, D-track, M3, M5, M4, K, DOC), a **time
+  box** (a few hours max per rung), and the stop point. When the box runs out, stop and
+  report — do not push through.
+- **Always have a valid TSV:** from M1 onward, no plan may leave the repo unable to emit a
+  valid `teamName_predictions.tsv`. Every execution that touches the scoring pipeline ends
+  with a fresh valid TSV **and** a new row in `submissions/log.csv` (timestamp, rung,
+  outer-holdout minDCF, submission path), or names the blocker. Never overwrite a
+  previously submitted TSV.
 - **Freeze on Sunday morning (Sep 27):** no new plan-review runs start that cannot land
-  before the freeze. After the freeze, only demo/CSV-breaking fixes, via the relief valve.
-- **Data contract:** a change that touches a contract boundary (front end → detector →
-  tracker → head driver; see CLAUDE.md for the exact fields) must say so in P1 and name the
-  teammate who owns the other side. Contract fields do not change silently.
-- **Model rules (every rung):** validate by generator, not by clip; never train on the
-  validation split; log every CSV with its validation score; keep a clean-only validation
-  score alongside any replay-augmented one.
-- **Sources of truth:** `docs/scoping.md` and `docs/master-doc.md` are the super docs.
-- **Cloud GPU:** ask before renting one (M5 is GPU-only).
+  before the freeze. After the freeze, only TSV- or Docker-breaking fixes, via the relief
+  valve.
+- **Detector contract:** a change to `DetectorResult` / `ClipContext` / `safe_run`
+  (`src/hearsay/detectors/base.py`) must say so in P1 and name the detector owners it
+  affects (CLAUDE.md team table). Contract fields do not change silently.
+- **Model rules (every rung):** validate by generator and speaker via the fold file, not
+  by clip; never train on the validation split; log every TSV with its validation score;
+  keep a clean-only validation score alongside any augmented one.
+- **Sources of truth:** `docs/nsa-challenge.md` + the NSA instructions (rules, scoring) and
+  `docs/plan.md` (plan and scope) are the super docs; `docs/scoping.md` and
+  `docs/master-doc.md` are historical.
+- **Cloud GPU:** ask before renting one (M5 is GPU-only; cap about $75).
 
 ---
 
@@ -126,21 +131,22 @@ Wait for "freeze". Then move to Phase 2.
    - **HEARSAY standing failure modes** — every P2 in this project must address each of
      these (a test, a measurement, or an explicit one-line waiver saying why it doesn't
      apply to this change):
-     1. **Replay through phone speakers degrades live accuracy** — the demo hears clips
-        played through a phone speaker into the mic array; report the clean-only
-        validation score next to any replay-augmented score, and measure on replayed
-        audio before claiming a live-demo improvement.
-     2. **Overfitting to known generators** — validation must hold out whole generators;
-        a gain that only appears on seen generators is not a gain.
-     3. **Class imbalance in the NSA set** — the hidden test set's real/fake ratio may
-        differ from ours; check calibration and threshold behavior under a shifted prior,
-        not just accuracy.
-     4. **Scoring metric differs from what we validated on** — confirm which metric the
-        NSA challenge scores (EER, AUC, log-loss, accuracy at a threshold…) and report it;
-        if unknown, report several and say so.
+     1. **Laundering, telephony and replay in the test set** — the brief lists transcoded,
+        band-limited, noised and replayed fakes; report a clean-only score beside any
+        augmented one and measure on an augmented validation slice. Physical replay is not
+        covered (no hardware; simulated RIR only) — say so rather than claim it.
+     2. **Overfitting to known generators or speakers** — validation must hold out whole
+        generator and speaker groups via the fold file (grouped, nested); a gain that only
+        appears on seen groups is not a gain.
+     3. **Class imbalance and prior** — about 70% of test files are real (π_synth = 0.3);
+        check class counts per fold, class-balanced training, and whether a decision flips
+        between the metric readings in `docs/plan.md` (including the sponsor-code reading).
+     4. **Shortcuts** — duration, peak level, silence, container fields, the single LJ
+        speaker; check per-feature AUC against the label and compare clean vs transcoded
+        before trusting a gain.
      5. **Format conversion errors in the loader** — sample rate, channel count,
         int/float scaling, codec decoder padding, clipping. Everything must arrive as
-        16 kHz mono; pin it with fixture clips in each input format we expect.
+        16 kHz mono; pin it with fixture clips in each input format we expect (incl. MP4).
 2. Then specify:
    - What specific tests validate the change? (exact commands)
    - What are acceptance criteria? (pass/fail definitions)

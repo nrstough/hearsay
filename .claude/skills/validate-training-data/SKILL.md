@@ -17,7 +17,7 @@ no arguments, resolve the newest dataset artifact and say which one you picked.
 1. Read `CLAUDE.md` / `AGENTS.md` and the training docs for where datasets live and which
    manifest is canonical. Regenerable data often lives **outside the repo** (an external
    drive, object storage) — resolve the real path rather than reading a stale local copy.
-2. Find the artifact: manifest JSON/JSONL, parquet/CSV, a TFRecord/webdataset shard set,
+2. Find the artifact: manifest JSON/JSONL, parquet or .csv tables, a TFRecord/webdataset shard set,
    or a label directory.
 3. **Derive the schema from the data**, then state it back: record count, fields per
    record, feature shape/dtype, label vocabulary, group/split keys. Confirm it matches
@@ -36,8 +36,9 @@ no arguments, resolve the newest dataset artifact and say which one you picked.
   can learn the codec instead of the voice (a leak, not a signal). Same for duration and
   leading/trailing silence per class.
 - Compare our real/fake ratio with whatever is known about the NSA set, and report it.
-- Replay-augmented data (clips played through phone speakers) is tracked separately; the
-  clean-only validation set must stay clean.
+- Augmented data (laundering: codec/telephony round-trips, noise, simulated replay/RIR,
+  band-limiting) is tracked separately; the clean-only validation set must stay clean.
+  Also compare duration and peak level per class against the NSA test inventory.
 - The validation split is never trained on. Flag any path where it could leak into
   training (feature scalers, calibration, stacking folds).
 

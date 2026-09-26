@@ -9,8 +9,8 @@ A discipline for hard bugs. Skip phases only when explicitly justified.
 
 When exploring the codebase, build a clear mental model of the relevant modules. If the project happens to have a domain glossary or architectural decision records (ADRs) in the area you're touching, read them — they save time. Otherwise just rely on the code.
 
-**HEARSAY:** the natural seams are the data-contract boundaries in CLAUDE.md (front-end
-window → detector → tracker → head driver) — build the feedback loop at the boundary where
+**HEARSAY:** the natural seams are the pipeline stages in CLAUDE.md (ingest/loader →
+orchestrator → detector (`safe_run`) → fusion → TSV writer) — build the feedback loop at the boundary where
 the wrong value first appears. Keep a tiny fixture set of 16 kHz mono clips (plus the same
 clips in mp3/m4a/48 kHz/stereo) for loader bugs, which are the most likely class here
 (sample rate, channels, int/float scaling, decoder padding). Diagnosis is time-boxed like

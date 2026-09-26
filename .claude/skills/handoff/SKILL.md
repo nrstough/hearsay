@@ -21,9 +21,10 @@ Why this matters: run data, uncommitted outputs, and test state are the things t
 If the handoff dir already holds handoffs, read the newest one and match its shape.
 
 **HEARSAY:** handoffs live in `docs/handoffs/`. There is no archive location for large
-artifacts yet — mark `data/`, `weights/`, `outputs/`, and any submission CSV "NOT archived"
-unless someone has copied them off the laptop. Note: `submissions/*.csv` is **gitignored**
-(only `submissions/log.csv` is tracked), so submitted CSVs are always at-risk artifacts.
+artifacts except the external drive (`/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/`) —
+mark `data/`, `weights/`, `models/`, `outputs/`, and any submission TSV "NOT archived"
+unless someone has copied them there. Note: `submissions/*` is **gitignored** (only
+`submissions/log.csv` is tracked), so submitted TSVs are always at-risk artifacts.
 
 ## Step 1 — Inspect state (read it; don't guess)
 - **Branch + worktree:** `git branch --show-current`, and note which worktree you're in (`pwd`; `git worktree list` if the project uses them).
@@ -31,10 +32,10 @@ unless someone has copied them off the laptop. Note: `submissions/*.csv` is **gi
 - **Recent commits:** `git log --oneline -8`.
 - **At-risk artifacts:** run outputs, result JSONs, datasets, models living in job-tmp (`$CLAUDE_JOB_DIR/tmp`, `~/.claude/jobs/*/tmp`), a scratchpad dir, or anywhere regenerable-but-not-committed. Record their **paths** and whether they're **archived**. These are exactly what gets lost — a job-dir cleanup deletes them silently.
 - **In-flight work:** background jobs, cloud/remote runs, scheduled tasks, open PRs — anything that will still be running after this chat ends, plus how the next chat checks on it.
-- **HEARSAY status:** the current model-ladder rung (M0–M6), the last few rows of
-  `submissions/log.csv`, the path of the newest **valid** CSV, the best validation score
-  (clean-only and replay-augmented, by held-out generator), and hours left before the
-  Sunday-morning freeze. Flag any pending data-contract change and which teammate it
+- **HEARSAY status:** the current ladder rung (M0, M1, D-track, M3, M5, M4, K, DOC), the
+  last few rows of `submissions/log.csv`, the path of the newest **valid** TSV, the best
+  validation minDCF (clean-only and augmented, on the outer holdout), and hours left
+  before 8 AM Sunday. Flag any pending detector-contract change and which owners it
   affects.
 
 ## Step 2 — Capture the tests (non-negotiable)
@@ -75,8 +76,8 @@ Use this structure (adapt content, keep the sections):
 <key metrics, recent findings, gotchas, where data/models live>
 
 ## HEARSAY status
-Rung: <M?> · Latest valid CSV: <path> · Val (held-out generators): clean <x> / replay <y>
-Time left to freeze: <h> · Contract changes pending: <none | field → owner>
+Rung: <M?> · Latest valid TSV: <path> · Val minDCF (outer holdout): clean <x> / augmented <y>
+Time left to 8 AM Sun: <h> · Detector-contract changes pending: <none | field → owners>
 
 ## Pointers
 <relevant records / specs / memory files to read first>

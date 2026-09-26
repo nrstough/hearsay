@@ -23,25 +23,27 @@ Your job is to find problems the plan author may have missed.
 
 ## HEARSAY-specific checks (this project)
 
-- **Model rules** — does the plan validate by *generator* (whole generators held out),
-  never by clip? Does it keep a clean-only validation score beside any replay-augmented
-  one? Can the validation split leak into training through scalers, calibration, or
-  stacking folds?
-- **Always a valid CSV** — from M1 on, does every step leave the repo able to emit a valid
-  submission CSV, and does the plan end with a new CSV plus a `submissions/log.csv` row?
-  Does anything overwrite a previously submitted CSV?
-- **Time box** — does the plan state a time box of a few hours at most (24–30 hour total
-  budget, freeze Sunday morning) and a point where it stops and reports?
-- **Data contract** — does it change any field in the CLAUDE.md data contract? If so, is
-  the owning teammate named?
+- **Model rules** — does the plan validate by *generator and speaker* (whole groups held
+  out via the fold file, nested outer holdout), never by clip? Does it keep a clean-only
+  validation score beside any augmented one? Can the validation split leak into training
+  through scalers, calibration, imputation, or stacking folds?
+- **Always a valid TSV** — from M1 on, does every step leave the repo able to emit a valid
+  `teamName_predictions.tsv`, and does the plan end with a new TSV plus a
+  `submissions/log.csv` row (or name the blocker)? Does anything overwrite a previously
+  submitted TSV?
+- **Time box** — does the plan state a time box of a few hours at most (build ends 8 AM
+  Sunday; hard cutoffs in `docs/plan.md`) and a point where it stops and reports?
+- **Detector contract** — does it change `DetectorResult` / `ClipContext` / `safe_run`
+  (`src/hearsay/detectors/base.py`)? If so, are the affected detector owners named?
 - **16 kHz mono** — does every audio path resample/downmix at the loader boundary? Are
   format conversion errors (sample rate, channels, int/float scaling, decoder padding)
   covered by tests?
-- **Live path** — does anything add a hosted API to the live demo path, or a secret
-  outside `.env`?
-- **Standing failure modes** — does P2/verification address replay through phone
-  speakers, overfitting to known generators, NSA class imbalance, and a scoring metric
-  that differs from what we validated on?
+- **Offline scoring path** — does anything add a hosted API or LLM to the scoring path or
+  the Docker image, or a secret outside `.env`?
+- **Standing failure modes** — does P2/verification address laundering/telephony/replay in
+  the test set (physical replay not covered), generator/speaker overfitting, class
+  imbalance and the π_synth = 0.3 prior (including the metric readings), shortcuts
+  (duration, level, silence, container, single LJ speaker), and loader format errors?
 
 ## Output format
 

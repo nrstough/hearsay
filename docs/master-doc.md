@@ -1,4 +1,5 @@
 # HEARSAY: Master Doc (HackGT 13)
+> **Historical (pre-rescope, Fri Sep 25):** the working plan is `docs/plan.md`; the spec is `docs/nsa-challenge.md`.
 
 > Exported Sep 25, 2026 from `HEARSAY Master Doc (HackGT 13).pdf` (Claude Docs export, dated Sep 24)
 > with `pdftotext -layout`; page headers and footers removed, otherwise verbatim. Layout text is

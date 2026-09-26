@@ -6,7 +6,7 @@ weights/*
 models/
 outputs/
 
-# Submissions: keep the log, ignore the CSVs themselves
+# Submissions: keep the log, ignore the submission TSVs themselves
 submissions/*
 !submissions/.gitkeep
 !submissions/log.csv

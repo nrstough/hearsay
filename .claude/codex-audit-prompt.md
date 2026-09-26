@@ -53,14 +53,17 @@ issues are Acceptable, so they cannot by themselves make the overall Fail.)
 ## HEARSAY-specific checks (this project)
 
 Fold these into the dimensions above:
-- **Plan adherence / Test coverage** — validation is by held-out generator; any
-  replay-augmented score is reported next to a clean-only score; the validation split
-  was never trained on (including scalers, calibration, stacking folds).
-- **Regression check** — if the change touched the detector or CSV path, a valid CSV was
-  produced and `submissions/log.csv` gained a row (timestamp, rung, validation score, CSV
-  path). An overwritten submitted CSV is a Fail.
-- **Scope discipline** — changes to data-contract fields in CLAUDE.md, hosted APIs on the
-  live path, or secrets outside `.env` are Fails unless the run spec called for them.
+- **Plan adherence / Test coverage** — validation is by held-out generator and speaker
+  groups (fold file); any augmented score is reported next to a clean-only score; the
+  validation split was never trained on (including scalers, calibration, imputation,
+  stacking folds).
+- **Regression check** — if the change touched a detector or the submission path, a valid
+  TSV was produced and `submissions/log.csv` gained a row (timestamp, rung, validation
+  score, submission path), or the run spec names the blocker. An overwritten submitted TSV
+  is a Fail.
+- **Scope discipline** — changes to the detector contract (`src/hearsay/detectors/base.py`)
+  without naming affected owners, hosted APIs or LLMs on the scoring path, or secrets
+  outside `.env` are Fails unless the run spec called for them.
 - **Documentation** — any new pretrained model, checkpoint, or public dataset must appear
   in the CLAUDE.md "AI use disclosure" section (it is copied into Devpost).
 

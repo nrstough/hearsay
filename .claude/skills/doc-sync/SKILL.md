@@ -16,13 +16,13 @@ With no arguments, run every applicable check below.
 
 1. Read `CLAUDE.md` / `AGENTS.md` — if the project names its docs or ships a doc map
    (`docs/DOC_MAP.md` or similar), **that list is authoritative**; use it and stop guessing.
-   **HEARSAY:** the doc set is `CLAUDE.md`, `docs/scoping.md`, `docs/master-doc.md`, and
-   anything in `docs/`. Headline numbers are verified against `submissions/log.csv`, not
+   **HEARSAY:** the doc set is `CLAUDE.md`, `docs/plan.md`, `docs/nsa-challenge.md`,
+   `README.md`, and anything in `docs/` (`scoping.md`/`master-doc.md` are historical). Headline numbers are verified against `submissions/log.csv`, not
    against prose. Two CLAUDE.md sections are copied into Devpost and must be current:
    **Pre-event work** (only what was really done before 8 pm Friday) and **AI use
    disclosure** — every pretrained model, checkpoint, and public dataset referenced in
-   code must be listed there. Also check the data contract in CLAUDE.md against the
-   fields the code actually emits and consumes.
+   code must be listed there. Also check the detector contract in CLAUDE.md against
+   `src/hearsay/detectors/base.py`, and run `uv run pytest tests/test_docs_consistency.py`.
 2. Otherwise build the list yourself:
    ```bash
    ls README* CONTRIBUTING* CHANGELOG* 2>/dev/null

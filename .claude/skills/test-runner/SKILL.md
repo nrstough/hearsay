@@ -41,9 +41,9 @@ command, say so explicitly rather than inventing one.
 
 **HEARSAY:** the environment is the uv-managed `.venv` (Python 3.12, pinned in
 `.python-version`); run things with `uv run …` from the repo root. The test command is
-`uv run pytest` (config in `pyproject.toml`, tests in `tests/`); as of the pre-event setup
-the suite is empty, so pytest collects nothing (exit code 5) — report that as "no tests",
-not as a pass. Markers: `needs_data`, `needs_weights`, `slow`. Tests
+`uv run pytest` (config in `pyproject.toml`, tests in `tests/`; loader/submission,
+metrics, detector-contract and doc-consistency suites). If pytest ever collects nothing
+(exit code 5), report that as "no tests", not as a pass. Markers: `needs_data`, `needs_weights`, `slow`. Tests
 that need datasets or weights (gitignored, not on every teammate's laptop) must be marked
 and reported as "skipped because gated", never as passes.
 

@@ -44,13 +44,14 @@ Complete ALL planned steps without stopping:
 
 ## HEARSAY rules (project-specific)
 
-- If the change touches the detector or CSV path, finish with a fresh **valid CSV** and a
-  new row in `submissions/log.csv` (timestamp, rung, validation score, CSV path). Never
-  overwrite a previously submitted CSV; write a new file.
-- Report validation by generator (held-out generators), with the clean-only score next
-  to any replay-augmented one. Never train on the validation split.
-- Respect the plan's time box (rungs are capped at a few hours inside a 24–30 hour
-  budget). When it runs out, stop and report the state — do not push through.
-- After the Sunday-morning freeze, execute only demo/CSV-breaking fixes.
-- Do not change a data-contract field (see CLAUDE.md) unless the plan says so and names
-  the teammate on the other side.
+- If the change touches a detector or the submission path, finish with a fresh **valid
+  TSV** and a new row in `submissions/log.csv` (timestamp, rung, validation score,
+  submission path), or name the blocker. Never overwrite a previously submitted TSV; write
+  a new file.
+- Report validation by held-out generator and speaker groups (fold file), with the
+  clean-only score next to any augmented one. Never train on the validation split.
+- Respect the plan's time box (rungs are capped at a few hours; the build ends 8 AM
+  Sunday). When it runs out, stop and report the state — do not push through.
+- After the Sunday-morning freeze, execute only TSV- or Docker-breaking fixes.
+- Do not change the detector contract (`src/hearsay/detectors/base.py`) unless the plan
+  says so and names the affected detector owners.

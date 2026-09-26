@@ -22,9 +22,9 @@ Two things make this skill earn its keep: (1) an outsider has *zero* project con
 If the consult dir already holds records, **read the most recent one and model the new prompt's structure on it** — the house format beats the generic shape below.
 
 **HEARSAY:** consult records go in `docs/consults/`. Status source of truth is
-`docs/scoping.md` + `docs/master-doc.md` for the plan and `submissions/log.csv` for
-numbers. The consult that produced `docs/scoping.md` (the external review) is the first
-record; if it was not saved as a consult record, say so and link the doc instead.
+`docs/nsa-challenge.md` (rules) + `docs/plan.md` (plan) and `submissions/log.csv` for
+numbers. The consult that produced `docs/scoping.md` (the external review, now historical)
+is the first record; if it was not saved as a consult record, say so and link the doc.
 
 ## Step 1 — Confirm scope (ask only if unclear)
 - **Target:** frontier LLM (strategic opinion) or human expert? — changes tone/length/hand-holding.
@@ -37,15 +37,17 @@ Pull *current* state from the source of truth resolved in Step 0 — do not rely
 Paste the **actual numbers / results table**, not claims — an external source gives far sharper answers reasoning from evidence than from assertions.
 
 HEARSAY context every consult must carry (the outsider knows none of it):
-- The NSA challenge: any audio clip in → 0–100% likelihood the voice is AI-generated;
-  scored on a hidden test set via a submitted CSV. Plus the live demo: a pan-tilt
-  listening head with a 4-mic array, hearing two phones, flagging the cloned voice.
-- The data contract (verbatim from CLAUDE.md) if the ask touches the live path.
-- The model ladder (M0–M6), which rung we are on, and the model rules (validate by
-  generator, log every CSV, few-hour cap per rung, clean-only score beside replay score).
-- The `submissions/log.csv` rows as the results table — clean-only and replay-augmented.
-- Hard constraints: a 24–30 hour build, freeze on Sunday morning, always a valid CSV, no
-  hosted APIs on the live path, what hardware we have (laptop / GPU or not).
+- The NSA challenge: any audio file in → probability the voice is synthetic (1.0 =
+  synthetic); scored by MinDCF (false alarms cost 4×, about 70% of test files real) on a
+  1,671-file test set via `teamName_predictions.tsv`, plus Docker and README deliverables.
+  Software only: multi-detector system with a rule-based orchestrator and fusion.
+- The detector contract (summary from CLAUDE.md) if the ask touches detectors or fusion.
+- The ladder (M0, M1, D-track, M3, M5, M4, K, DOC), which rung we are on, and the model
+  rules (validate by generator and speaker, log every TSV, few-hour cap per rung,
+  clean-only score beside any augmented score).
+- The `submissions/log.csv` rows as the results table — clean-only and augmented.
+- Hard constraints: build ends 8 AM Sunday, always a valid TSV, no hosted API or LLM on
+  the scoring path, what compute we have (laptop MPS / rented GPU or not).
 
 Structure (adapt; this is the shape that works):
 - **Your role** — frame the expert and explicitly invite push-back.
