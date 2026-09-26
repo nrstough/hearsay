@@ -30,40 +30,27 @@ export VAST_API_KEY="$KEY"
 
 py() { "$REPO/.venv/bin/python" -c "$@"; }
 
-# --- a job name whose previous instance is still listed is never reused (its CID/ORPHAN record
-# must survive until the reaper confirms the box is gone; Codex round 6) ---
-if [ -f "$STATE/CID" ]; then
-  OLD=$(cat "$STATE/CID")
-  STILL=$($VAST show instances --raw 2>/dev/null | py "import sys,json
-xs=json.load(sys.stdin) or []
-print('yes' if any(i['id']==$OLD for i in xs) else 'no')" 2>/dev/null)
-  if [ "$STILL" != no ]; then   # 'yes' OR an unreadable answer: never clear a record on doubt
-    echo "REFUSED: job '$JOB' has instance $OLD recorded and its absence is not confirmed (query: '${STILL:-failed}'); destroy it (reaper/teardown) or use another job name" >&2
-    exit 4
-  fi
-  rm -f "$STATE"/CID "$STATE"/SSH "$STATE"/PROVISIONED "$STATE"/ORPHAN "$STATE"/DESTROYED "$STATE"/HOLD "$STATE"/LAST "$STATE"/SEEN
-fi
-
-# --- budget guard: credit minus the commitments of boxes already running ---
-CREDIT=$($VAST show user --raw 2>/dev/null | py 'import sys,json; print(json.load(sys.stdin).get("credit", 0))')
-RUNNING=$($VAST show instances --raw 2>/dev/null | py 'import sys,json
-xs=json.load(sys.stdin) or []
-print(sum(float(i.get("dph_total") or 0) for i in xs) if isinstance(xs, list) else 0)')
-NEED=$(py "print(round($EST_HOURS * 0.9 + 1.5, 2))")   # est hours at ~\$0.9/h upper bound + margin
-COMMIT=$(py "print(round($RUNNING * 2.0, 2))")          # running boxes: assume 2 h more each
-OK=$(py "print(int($CREDIT - $COMMIT >= $NEED))")
-echo "[budget] credit \$$CREDIT, running commitments \$$COMMIT, need \$$NEED"
-[ "$OK" = 1 ] || { echo "REFUSED: budget guard (top up or wait for a box to finish)" >&2; exit 3; }
-
 ist() { $VAST show instances --raw 2>/dev/null | py "import sys,json
 for i in json.load(sys.stdin) or []:
     if i['id']==$1: print(i.get('actual_status') or 'starting')"; }
 issh() { $VAST show instances --raw 2>/dev/null | py "import sys,json
 for i in json.load(sys.stdin) or []:
     if i['id']==$1: print(i.get('ssh_host'), i.get('ssh_port'))"; }
-gone() { $VAST show instances --raw 2>/dev/null | py "import sys,json
-xs=json.load(sys.stdin) or []
-print('yes' if not any(i['id']==$1 for i in xs) else 'no')" 2>/dev/null; }
+gone() {
+  # 'yes' only from a SUCCESSFUL query whose answer is a JSON list without the id; anything
+  # else (command failure, null, {}, garbage) is 'unknown' and never counts as absent
+  local raw rc
+  raw=$($VAST show instances --raw 2>/dev/null); rc=$?
+  [ "$rc" = 0 ] || { echo unknown; return; }
+  printf '%s' "$raw" | py "import sys,json
+try:
+    xs = json.load(sys.stdin)
+except Exception:
+    sys.exit(3)
+if not isinstance(xs, list):
+    sys.exit(3)
+print('yes' if not any(str(i.get('id')) == '$1' for i in xs) else 'no')" 2>/dev/null || echo unknown
+}
 # destroy with confirmation and bounded retries; a box that will not go away is recorded as an
 # ORPHAN (CID stays persisted) so the reaper keeps trying — never forgotten (Codex round 5)
 kill_() {
@@ -78,12 +65,41 @@ kill_() {
   return 1
 }
 
+# --- a job name whose previous instance is still listed is never reused (its CID/ORPHAN record
+# must survive until the reaper confirms the box is gone; Codex round 6) ---
+if [ -f "$STATE/CID" ]; then
+  OLD=$(cat "$STATE/CID")
+  G=$(gone "$OLD")
+  if [ "$G" != yes ]; then   # still listed OR an unreadable answer: never clear a record on doubt
+    echo "REFUSED: job '$JOB' has instance $OLD recorded and its absence is not confirmed (query: '$G'); destroy it (reaper/teardown) or use another job name" >&2
+    exit 4
+  fi
+fi
+# no live record (or a confirmed-absent one): every leftover marker is stale
+rm -f "$STATE"/CID "$STATE"/SSH "$STATE"/PROVISIONED "$STATE"/ORPHAN "$STATE"/DESTROYED "$STATE"/HOLD "$STATE"/LAST "$STATE"/SEEN
+# a previous generation's STATUS in R2 must not be applied to the new instance: retire it, and
+# hold the reaper until the chain is up (the hold is released on every exit path; Codex round 8)
+rclone deletefile "$(r2_path "${HEARSAY_R2_PREFIX}runs/$JOB/STATUS")" 2>/dev/null || true
+date +%s > "$STATE/HOLD"
+
+# --- budget guard: credit minus the commitments of boxes already running ---
+CREDIT=$($VAST show user --raw 2>/dev/null | py 'import sys,json; print(json.load(sys.stdin).get("credit", 0))')
+RUNNING=$($VAST show instances --raw 2>/dev/null | py 'import sys,json
+xs=json.load(sys.stdin) or []
+print(sum(float(i.get("dph_total") or 0) for i in xs) if isinstance(xs, list) else 0)')
+NEED=$(py "print(round($EST_HOURS * 0.9 + 1.5, 2))")   # est hours at ~\$0.9/h upper bound + margin
+COMMIT=$(py "print(round($RUNNING * 2.0, 2))")          # running boxes: assume 2 h more each
+OK=$(py "print(int($CREDIT - $COMMIT >= $NEED))")
+echo "[budget] credit \$$CREDIT, running commitments \$$COMMIT, need \$$NEED"
+[ "$OK" = 1 ] || { echo "REFUSED: budget guard (top up or wait for a box to finish)" >&2; exit 3; }
+
 CID=""
 cleanup() {
   # any exit before PROVISIONED destroys the box we created (CID is persisted at creation)
   if [ -n "$CID" ] && [ ! -f "$STATE/PROVISIONED" ]; then
     echo "[cleanup] destroying $CID (launch did not complete)"; kill_ "$CID" || true
   fi
+  rm -f "$STATE/HOLD"
 }
 trap cleanup EXIT
 
@@ -95,14 +111,14 @@ except Exception: print("")')
   [ -n "$CID" ] || { echo "  create failed"; CID=""; continue; }
   echo "$CID" > "$STATE/CID"   # persisted the moment it exists, before anything can fail
   echo "  CID=$CID waiting for running..."; ST=""
-  for _ in $(seq 1 40); do ST=$(ist "$CID"); [ "$ST" = running ] && break; sleep 15; done
+  for _ in $(seq 1 "${BOOT_TRIES:-40}"); do ST=$(ist "$CID"); [ "$ST" = running ] && break; sleep "${BOOT_WAIT:-15}"; done
   [ "$ST" = running ] || { echo "  stuck ($ST) -> destroy"; kill_ "$CID" && CID="" || exit 1; continue; }
   read -r HOST PORT <<<"$(issh "$CID")"
   SSH="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p $PORT root@$HOST"
   NET=BAD
-  for _ in $(seq 1 8); do
+  for _ in $(seq 1 "${NET_TRIES:-8}"); do
     if $SSH 'echo nameserver 8.8.8.8 > /etc/resolv.conf; curl -sS -m 10 -o /dev/null https://rclone.org && echo NET-OK' 2>/dev/null | grep -q NET-OK; then NET=OK; break; fi
-    sleep 10
+    sleep "${NET_WAIT:-10}"
   done
   [ "$NET" = OK ] || { echo "  no outbound network -> destroy"; kill_ "$CID" && CID="" || exit 1; continue; }
   echo "  network OK; provisioning..."

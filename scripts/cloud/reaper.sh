@@ -16,9 +16,20 @@ export VAST_API_KEY="${VAST_API_KEY:-$(cat "$HOME/.config/vastai/vast_api_key")}
 VAST="uvx vastai"
 py() { "$REPO/.venv/bin/python" -c "$@"; }
 kill_() { echo y | $VAST destroy instance "$1" >/dev/null 2>&1; }
-gone() { $VAST show instances --raw 2>/dev/null | py "import sys,json
-xs=json.load(sys.stdin) or []
-print('yes' if not any(i['id']==$1 for i in xs) else 'no')" 2>/dev/null; }
+gone() {
+  # 'yes' only from a SUCCESSFUL query whose answer is a JSON list without the id (Codex round 8)
+  local raw rc
+  raw=$($VAST show instances --raw 2>/dev/null); rc=$?
+  [ "$rc" = 0 ] || { echo unknown; return; }
+  printf '%s' "$raw" | py "import sys,json
+try:
+    xs = json.load(sys.stdin)
+except Exception:
+    sys.exit(3)
+if not isinstance(xs, list):
+    sys.exit(3)
+print('yes' if not any(str(i.get('id')) == '$1' for i in xs) else 'no')" 2>/dev/null || echo unknown
+}
 
 # per-job state lives in files (macOS ships bash 3.2: no associative arrays)
 while :; do

@@ -62,7 +62,8 @@ def test_g2_launcher_trap_and_reaper_branches():
 def test_g3_budget_guard_arithmetic_with_a_stub_vastai(tmp_path):
     """Run only the guard block of launch.sh against a stubbed `uvx vastai`."""
     src = (CLOUD / "launch.sh").read_text()
-    guard = src[src.index("# --- budget guard"): src.index("ist() {")]
+    start = src.index("# --- budget guard")
+    guard = src[start: src.index('CID=""', start)]
     stub = tmp_path / "uvx"
     stub.write_text("#!/bin/bash\ncase \"$*\" in\n  *'show user'*) echo '{\"credit\": 5.0}';;\n"
                     "  *'show instances'*) echo '[{\"id\": 1, \"dph_total\": 0.7}]';;\nesac\n")
@@ -184,7 +185,7 @@ esac
     import os
 
     env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "DESTROY_TRIES": "2",
-           "DESTROY_WAIT": "0"}
+           "DESTROY_WAIT": "0", "NET_TRIES": "1", "NET_WAIT": "0"}
     r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "tjob2", "fold=0", "0.5", "222"],
                        capture_output=True, text=True, cwd=REPO, env=env, check=False)
     assert r.returncode != 0
@@ -368,3 +369,67 @@ def test_g2_reaper_fresh_hold_defers_a_stale_fail_status(tmp_path):
     assert "held" in r.stdout and "deferred" in r.stdout, r.stdout + r.stderr
     assert "destroy instance" not in (calls.read_text() if calls.exists() else "")
     assert not (state / "sw" / "DESTROYED").exists()
+
+
+@pytest.mark.parametrize("answer, rc", [("null", 0), ("{}", 0), ("[]", 1), ("not json", 0)])
+def test_g2_absence_helpers_never_trust_a_bad_answer(tmp_path, answer, rc):
+    """gone() in both scripts says 'unknown' (never 'yes') unless the query succeeded and
+    returned a JSON list; the launcher then refuses to clear the record."""
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    (stubs / "uvx").write_text(f"#!/bin/bash\ncase \"$*\" in *'show instances'*) echo '{answer}'; exit {rc};; *'show user'*) echo '{{\"credit\": 30}}';; esac\n")
+    (stubs / "uvx").chmod(0o755)
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}"}
+    for script in ("launch.sh", "reaper.sh"):
+        src = (CLOUD / script).read_text()
+        body = src[src.index("gone() {"): src.index("\n}\n", src.index("gone() {")) + 3]
+        probe = (f'REPO="{REPO}"; VAST="uvx vastai"; py() {{ "$REPO/.venv/bin/python" -c "$@"; }}\n'
+                 + body + '\ngone 7')
+        r = subprocess.run(["bash", "-c", probe], capture_output=True, text=True, env=env, check=False)
+        assert r.stdout.strip() == "unknown", (script, answer, rc, r.stdout, r.stderr)
+    home = _stub_home(tmp_path)
+    (home / ".hearsay_vast" / "j").mkdir(parents=True)
+    (home / ".hearsay_vast" / "j" / "CID").write_text("7")
+    env["HOME"] = str(home)
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "j", "fold=0", "0.5", "1"],
+                       capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode == 4 and (home / ".hearsay_vast" / "j" / "CID").read_text() == "7"
+
+
+def test_g2_relaunch_retires_old_status_and_holds_the_reaper_until_provisioned(tmp_path):
+    """Relaunching a job name deletes its previous R2 STATUS before creating a box and keeps a
+    HOLD for the reaper while provisioning; the hold is gone when the launcher exits."""
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    log = tmp_path / "combined.log"
+    (stubs / "uvx").write_text(f"""#!/bin/bash
+echo "vast $@" >> {log}
+case "$*" in
+  *'show user'*) echo '{{"credit": 30.0}}';;
+  *'show instances'*) echo '[{{"id": 5151, "actual_status": "running", "ssh_host": "h", "ssh_port": "1", "dph_total": 0.6}}]';;
+  *'create instance'*) echo '{{"new_contract": 5151}}';;
+esac
+""")
+    (stubs / "rclone").write_text(f"#!/bin/bash\necho \"rclone $@\" >> {log}\nexit 0\n")
+    # ssh: the network check fails so the launcher gives up after one offer (exercises cleanup)
+    (stubs / "ssh").write_text(f"#!/bin/bash\n[ -f $HOME/.hearsay_vast/rj/HOLD ] && echo 'HOLD-PRESENT' >> {log}\nexit 1\n")
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    home = _stub_home(tmp_path)
+    (home / ".hearsay_vast" / "rj").mkdir(parents=True)
+    (home / ".hearsay_vast" / "rj" / "DESTROYED").write_text("1")  # left by the previous generation
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "DESTROY_WAIT": "0",
+           "DESTROY_TRIES": "1", "BOOT_TRIES": "1", "BOOT_WAIT": "0", "NET_TRIES": "1", "NET_WAIT": "0"}
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "rj", "fold=0", "0.5", "1"],
+                       capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    lines = log.read_text().splitlines()
+    i_del = next(i for i, ln in enumerate(lines) if "deletefile" in ln and "runs/rj/STATUS" in ln)
+    i_create = next(i for i, ln in enumerate(lines) if "create instance" in ln)
+    assert i_del < i_create  # old status retired before a new instance exists
+    assert "HOLD-PRESENT" in lines  # the reaper was held while the box was provisioning
+    assert not (home / ".hearsay_vast" / "rj" / "HOLD").exists()  # released on exit
+    assert not (home / ".hearsay_vast" / "rj" / "DESTROYED").exists()  # the old marker is gone
