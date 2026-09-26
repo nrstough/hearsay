@@ -21,7 +21,7 @@ JOB="${1:?job name}"; JOBS="${2:?jobs}"; EST_HOURS="${3:?est hours}"; shift 3
 IMAGE="${IMAGE:-pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime}"
 DISK_GB="${DISK_GB:-60}"
 DEADLINE="${DEADLINE:-$(date -j -f '%H:%M' '11:45' '+%s' 2>/dev/null || date -d '11:45' '+%s')}"
-STATE="$HOME/.hearsay_vast/$JOB"; rm -rf "$STATE"; mkdir -p "$STATE"   # never reuse stale state
+STATE="$HOME/.hearsay_vast/$JOB"; mkdir -p "$STATE"
 LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"
 CREDS="$HOME/.config/cloudflare-r2-pa-source.txt"
 KEY="${VAST_API_KEY:-$(cat "$HOME/.config/vastai/vast_api_key")}"
@@ -29,6 +29,20 @@ VAST="uvx vastai"
 export VAST_API_KEY="$KEY"
 
 py() { "$REPO/.venv/bin/python" -c "$@"; }
+
+# --- a job name whose previous instance is still listed is never reused (its CID/ORPHAN record
+# must survive until the reaper confirms the box is gone; Codex round 6) ---
+if [ -f "$STATE/CID" ]; then
+  OLD=$(cat "$STATE/CID")
+  STILL=$($VAST show instances --raw 2>/dev/null | py "import sys,json
+xs=json.load(sys.stdin) or []
+print('yes' if any(i['id']==$OLD for i in xs) else 'no')" 2>/dev/null)
+  if [ "$STILL" = yes ]; then
+    echo "REFUSED: job '$JOB' still has instance $OLD on the account; destroy it (reaper/teardown) or use another job name" >&2
+    exit 4
+  fi
+  rm -f "$STATE"/CID "$STATE"/SSH "$STATE"/PROVISIONED "$STATE"/ORPHAN "$STATE"/DESTROYED "$STATE"/HOLD "$STATE"/LAST "$STATE"/SEEN
+fi
 
 # --- budget guard: credit minus the commitments of boxes already running ---
 CREDIT=$($VAST show user --raw 2>/dev/null | py 'import sys,json; print(json.load(sys.stdin).get("credit", 0))')

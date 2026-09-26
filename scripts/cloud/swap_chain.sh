@@ -13,7 +13,8 @@ JOB="${1:?job}"; JOBS="${2:?jobs}"
 STATE="$HOME/.hearsay_vast/$JOB"
 read -r HOST PORT < "$STATE/SSH"
 DEADLINE="${DEADLINE:-$(date -j -f '%H:%M' '11:45' '+%s' 2>/dev/null || date -d '11:45' '+%s')}"
-touch "$STATE/HOLD"   # the reaper skips a held job (a stale FAIL status must not kill the box mid-swap)
+date +%s > "$STATE/HOLD"   # the reaper skips a held job (a stale FAIL status must not kill the box mid-swap)
+trap 'rm -f "$STATE/HOLD"' EXIT   # released on every exit path, including an ssh failure under set -e
 tar czf - -C "$HERE" box_setup.sh box_chain.sh box_codecs.py r2_guard.sh 2>/dev/null \
   | ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p "$PORT" "root@$HOST" 'mkdir -p /root/m5/cloud && tar xzf - -C /root/m5/cloud 2>/dev/null'
 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 -p "$PORT" "root@$HOST" 'pkill -f "[c]loud/box_chain" || true; pkill -f "[m]5_train" || true; sleep 1; echo "[swap] old chain stopped"'

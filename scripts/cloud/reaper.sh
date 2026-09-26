@@ -28,7 +28,11 @@ while :; do
     [ -f "$d/CID" ] || continue
     JOB=$(basename "$d"); CID=$(cat "$d/CID")
     [ -f "$d/DESTROYED" ] && continue
-    [ -f "$d/HOLD" ] && { echo "$(date '+%H:%M:%S') [$JOB] held (swap in progress)"; continue; }
+    HELD=0
+    if [ -f "$d/HOLD" ]; then
+      HOLD_AGE=$(( (NOW - $(cat "$d/HOLD" 2>/dev/null || echo "$NOW")) / 60 ))
+      if [ "$HOLD_AGE" -ge "${HOLD_MAX_MIN:-15}" ]; then rm -f "$d/HOLD"; echo "$(date '+%H:%M:%S') [$JOB] stale hold expired"; else HELD=1; fi
+    fi
     ACTIVE=$((ACTIVE + 1))
     ST=$(rclone cat "${HEARSAY_R2_PREFIX}runs/$JOB/STATUS" 2>/dev/null || echo "?")
     LAST=$(cat "$d/LAST" 2>/dev/null || echo "")
@@ -42,6 +46,8 @@ while :; do
     esac
     [ -f "$d/ORPHAN" ] && REASON="orphan from a failed launch"
     [ -z "$REASON" ] && [ "$NOW" -ge "$DEADLINE" ] && REASON="deadline"
+    # a hold only defers the stall/status rules, never the deadline or an orphan (Codex round 6)
+    [ -z "$REASON" ] && [ "$HELD" = 1 ] && { echo "$(date '+%H:%M:%S') [$JOB] held (swap in progress)"; continue; }
     [ -z "$REASON" ] && [ "$AGE" -ge "$STALL_MIN" ] && [ "$ST" != "?" ] && REASON="stalled ${AGE}m at '$ST'"
     [ -z "$REASON" ] && [ "$ST" = "?" ] && [ "$AGE" -ge $((STALL_MIN * 2)) ] && REASON="no STATUS for ${AGE}m"
     if [ -n "$REASON" ]; then

@@ -233,3 +233,88 @@ esac
     assert "not confirmed; retrying" in r.stdout, r.stdout + r.stderr
     assert (state / "job" / "DESTROYED").exists()
     assert calls.read_text().count("destroy instance 77") == 2
+
+
+def _stub_home(tmp_path):
+    home = tmp_path / "home"
+    (home / ".config" / "vastai").mkdir(parents=True)
+    (home / ".config" / "vastai" / "vast_api_key").write_text("stub")
+    (home / ".config" / "cloudflare-r2-pa-source.txt").write_text("account_id=a\naccess_key_id=k\nsecret_access_key=s\n")
+    return home
+
+
+def test_g2_launcher_refuses_to_reuse_a_job_whose_instance_is_still_listed(tmp_path):
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    log = tmp_path / "vast.log"
+    (stubs / "uvx").write_text(f"""#!/bin/bash
+echo "$@" >> {log}
+case "$*" in
+  *'show user'*) echo '{{"credit": 30.0}}';;
+  *'show instances'*) echo '[{{"id": 9000, "actual_status": "running", "dph_total": 0.6}}]';;
+  *'create instance'*) echo '{{"new_contract": 9001}}';;
+esac
+""")
+    (stubs / "uvx").chmod(0o755)
+    home = _stub_home(tmp_path)
+    (home / ".hearsay_vast" / "oldjob").mkdir(parents=True)
+    (home / ".hearsay_vast" / "oldjob" / "CID").write_text("9000")
+    (home / ".hearsay_vast" / "oldjob" / "ORPHAN").write_text("1")
+    import os
+
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home)}
+    r = subprocess.run(["bash", str(CLOUD / "launch.sh"), "oldjob", "fold=0", "0.5", "1"],
+                       capture_output=True, text=True, cwd=REPO, env=env, check=False)
+    assert r.returncode == 4 and "REFUSED" in r.stderr
+    assert "create instance" not in log.read_text()
+    # the record survives for the reaper
+    assert (home / ".hearsay_vast" / "oldjob" / "CID").read_text() == "9000"
+    assert (home / ".hearsay_vast" / "oldjob" / "ORPHAN").exists()
+
+
+def test_g2_reaper_destroys_a_held_job_past_the_deadline_and_expires_stale_holds(tmp_path):
+    import time
+
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    state = tmp_path / "state"
+    (state / "held").mkdir(parents=True)
+    (state / "held" / "CID").write_text("55")
+    (state / "held" / "HOLD").write_text(str(int(time.time())))  # a fresh hold
+    calls = tmp_path / "calls"
+    (stubs / "uvx").write_text(f"""#!/bin/bash
+echo "$@" >> {calls}
+case "$*" in
+  *'show instances'*) if grep -q 'destroy instance' {calls} 2>/dev/null; then echo '[]'; else echo '[{{"id": 55}}]'; fi;;
+  *'destroy instance'*) echo ok;;
+esac
+""")
+    (stubs / "rclone").write_text("#!/bin/bash\necho RUNNING\n")
+    for f in stubs.iterdir():
+        f.chmod(0o755)
+    home = _stub_home(tmp_path)
+    import os
+
+    base_env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "HOME": str(home), "POLL": "1"}
+    src = (CLOUD / "reaper.sh").read_text().replace('STATE="$HOME/.hearsay_vast"', f'STATE="{state}"')
+    src = src.replace('. "$HERE/r2_guard.sh"', f'. "{CLOUD}/r2_guard.sh"')
+    src = src.replace('REPO="$(cd "$HERE/../.." && pwd)"', f'REPO="{REPO}"')
+    src = src.replace('LEDGER="$REPO/docs/reports/cloud-expense-ledger.md"', f'LEDGER="{tmp_path}/ledger.md"')
+    src = src.replace("while :; do", "for _i in 1 2; do", 1).replace("sleep 5\n", "sleep 0\n")
+    script = tmp_path / "reaper_bounded.sh"
+    script.write_text(src)
+    # held + deadline passed -> destroyed anyway
+    env = {**base_env, "DEADLINE": str(int(time.time()) - 10)}
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env,
+                       check=False, timeout=60)
+    assert "deadline" in r.stdout and "destroy instance 55" in calls.read_text(), r.stdout + r.stderr
+    assert (state / "held" / "DESTROYED").exists()
+    # a stale hold (older than HOLD_MAX_MIN) is expired and the job is watched again
+    calls.write_text("")
+    (state / "held2").mkdir()
+    (state / "held2" / "CID").write_text("56")
+    (state / "held2" / "HOLD").write_text(str(int(time.time()) - 3600))
+    env = {**base_env, "DEADLINE": str(int(time.time()) + 3600), "HOLD_MAX_MIN": "15"}
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, cwd=REPO, env=env,
+                       check=False, timeout=60)
+    assert "stale hold expired" in r.stdout and not (state / "held2" / "HOLD").exists()
