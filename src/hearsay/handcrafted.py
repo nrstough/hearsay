@@ -167,8 +167,12 @@ def tilt_lowpass(x: np.ndarray, db_per_khz: float, lowpass_hz: float) -> np.ndar
     return sg.fftconvolve(y, h, mode="same").astype(np.float32)
 
 
-def draw_augment(rng: np.random.Generator, launder_frac: float, tilt_frac: float) -> str:
-    """"" (clean), "launder:<spec>", "tilt:<db>:<hz>" or both joined by "+"."""
+def draw_augment(rng: np.random.Generator, launder_frac: float, tilt_frac: float,
+                 noise_frac: float = 0.0, noise_snr_db: float = 20.0) -> str:
+    """"" (clean), or "+"-joined parts from "noise:<snr_db>:<seed>", "launder:<spec>" and
+    "tilt:<db>:<hz>". The noise draw comes last, so the launder and tilt draws for a row are
+    the same with or without it (v6 = v5's draws plus noise); its part goes first because
+    recording noise precedes the channel."""
     from hearsay.compression import draw_laundering
 
     parts = []
@@ -179,7 +183,16 @@ def draw_augment(rng: np.random.Generator, launder_frac: float, tilt_frac: float
         db = float(rng.uniform(*TILT_DB_PER_KHZ))
         hz = float(rng.uniform(*TILT_LOWPASS_HZ))
         parts.append(f"tilt:{db:.2f}:{hz:.0f}")
+    if noise_frac and rng.random() < noise_frac:
+        parts.insert(0, f"noise:{noise_snr_db:g}:{int(rng.integers(0, 2**31))}")
     return "+".join(parts)
+
+
+def white_noise(x: np.ndarray, snr_db: float, seed: int) -> np.ndarray:
+    """Additive white Gaussian noise at an exact SNR, the channel probes' `noise20` recipe."""
+    rng = np.random.default_rng(seed)
+    p = float(np.mean(x.astype(np.float64) ** 2))
+    return (x + rng.standard_normal(x.size) * np.sqrt(p / 10 ** (snr_db / 10))).astype(np.float32)
 
 
 def apply_augment(x: np.ndarray, spec: str) -> np.ndarray:
@@ -192,6 +205,9 @@ def apply_augment(x: np.ndarray, spec: str) -> np.ndarray:
         elif kind == "tilt":
             db, hz = rest.split(":")
             x = tilt_lowpass(x, float(db), float(hz))
+        elif kind == "noise":
+            snr, seed = rest.split(":")
+            x = white_noise(x, float(snr), int(seed))
         else:
             raise ValueError(f"unknown augmentation {part!r}")
     return x

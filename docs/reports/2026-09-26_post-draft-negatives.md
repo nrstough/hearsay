@@ -14,7 +14,13 @@ NSA returned minDCF 0.0733, EER 3.53% on our draft file. We then asked what coul
 
 **The numbers.** The layer-7 baseline reproduces M1b exactly: inner 0.2649, holdout 0.0717, In-the-Wild 0.342. Averaging layers 5–9 improves the holdout to 0.052. But In-the-Wild gets worse, 0.368, and its false-alarm rate doubles, from 0.8% to 1.55%. Concatenating layers 6–8, layers 5/7/9 and layers 5–9 gives In-the-Wild 0.353, 0.430 and 0.399.
 
-**Why.** At the threshold that minimizes its In-the-Wild cost, the shipped rule misses 158 fakes there. Each detector alone, at its own inner threshold, would catch these many of them: M1b 1, the handcrafted model 2, M5 33 and Spectra-AASIST 107. At the rule's inner-OOF threshold, the one the gate reads, it misses 122, of which M5 would catch 19 and Spectra-AASIST 79 (correction in `…_RESPONSE.md`, commit 589e9f2). So M1b's backbone does not see these fakes at any layer, and a new head on that backbone has the same blind spot. Only a different backbone can see them. That is why the one head experiment we ran tonight is a WavLM Large probe (`docs/reports/2026-09-26_post-draft-heads.md`, pending).
+**Why.** At the threshold that minimizes its In-the-Wild cost, the shipped rule misses 158 fakes there. Each detector alone, at its own inner threshold, would catch these many of them: M1b 1, the handcrafted model 2, M5 33 and Spectra-AASIST 107. At the rule's inner-OOF threshold, the one the gate reads, it misses 122, of which M5 would catch 19 and Spectra-AASIST 79 (correction in `…_RESPONSE.md`, commit 589e9f2). So M1b's backbone does not see these fakes at any layer, and a new head on that backbone has the same blind spot. Only a different backbone can see them. That is why the one head experiment we ran tonight is a WavLM Large probe.
+
+**The different backbone, measured.** WavLM Large, probed exactly like M1b, is level with M1b on the holdout (0.0717 both). It is not a clone: its test-set Spearman with M1b is 0.79. And it does reach the miss tail. Alone, it flags 41 of the shipped rule's 122 In-the-Wild misses at the inner-OOF threshold, against M1b's 1 and M5's 19. But it pays with false alarms on wild real speech (7.05% against M1b's 0.8%). As a fourth column at weight 0.2 it failed the pre-declared gate:
+- inner CV got worse by 0.021 (brief) and 0.033 (averse)
+- its In-the-Wild gain (+0.023 / +0.009) was short of the bar
+
+In M1b's seat it quadruples In-the-Wild false alarms. Not shipped (`docs/reports/2026-09-26_post-draft-heads.md`; `docs/reports/2026-09-26_post-draft-sweep.md`, commit 57b9c90).
 
 ## 2. Re-weighting the same three scores has a measured ceiling
 
@@ -116,9 +122,20 @@ If it fails any of the three, it becomes a measured negative: post hoc, and it d
 
 ---
 
+## 8. Noise twins did not make the handcrafted model noise-robust
+
+**What we tried.** The shipped rule's known weak spot is additive noise: at 20 dB white noise the handcrafted AUC falls from 0.998 to 0.64 (README). We retrained it exactly like v5b, adding a 20 dB white-noise copy of 35% of the training rows in both classes.
+
+**The numbers** (`docs/reports/2026-09-26_post-draft-hc-noise.md`), on the channel lane's 500 holdout clips:
+- **Under noise:** AUC 0.64 → 0.77. The pre-declared bar was 0.90.
+- **On clean clips:** minDCF 0.048 → 0.163.
+- **Outer holdout:** 0.137 → 0.227, mostly on LibriSpeech real speech (0.155 → 0.298).
+- **In-the-Wild AUC:** 0.768 → 0.722.
+
+**Why.** The handcrafted columns read fine spectral and phase structure in the quiet parts of the signal, and white noise fills exactly those parts. The model does not find a noise-proof version of the cues; it learns to trust them less, and that blurs clean clips too. Noise robustness for this detector would need different features (e.g. voiced-frame-only statistics), not more rows. As H_noise it fails the gate's rule 5 by construction, because its noise AUC is below 0.90 (the fused table is in `docs/reports/2026-09-26_post-draft-sweep.md`). `models/hc_selected` stays on v5b.
+
 ## Not run tonight, and why
 
-- **Noise twins for the handcrafted model** (one 20 dB white-noise copy per class). The README already records additive noise as the shipped rule's weak spot: at 20 dB the handcrafted AUC falls from 0.998 to 0.64. But the test set shows no additive noise. Its noise-floor percentiles sit beyond the *clean* end of our training data in the channel lane's per-feature table (`docs/reports/2026-09-26_channel-robustness.md`). Both outside opinions put the fix's effect on the test set at zero, so it stays a pointer, not a run.
 - **Delta-only handcrafted features.** The earlier column-pruning experiments failed every time (README), and this is the same experiment in different clothes.
 - **Averaging M5's fold models.** Naive averaging leaks each out-of-fold row into its own prediction (VeriLM memo). The fold checkpoints are also not on disk (Fable memo, option 11). And M5's problem is bias, not variance.
 - **New feature families** (LTAS residuals, vocoder harmonics, formants, sub-band modulation). Each is a research lane. Any of them would also have to survive the train-vs-test AUC-0.99 envelope shift (item 3).

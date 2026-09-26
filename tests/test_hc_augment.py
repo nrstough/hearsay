@@ -71,3 +71,22 @@ def test_features_for_path_signature_has_augment_default_off():
     from hearsay.handcrafted import features_for_path
 
     assert inspect.signature(features_for_path).parameters["augment"].default == ""
+
+
+def test_noise_draw_keeps_v5_draws_and_hits_the_snr():
+    """v6: --noise-frac 0 changes nothing, and with it on every row keeps its v5 launder/tilt
+    draw (noise is drawn last); the applied noise is white at the stated SNR."""
+    v5 = [draw_augment(np.random.default_rng(r), 0.35, 0.35) for r in range(300)]
+    assert [draw_augment(np.random.default_rng(r), 0.35, 0.35, 0.0) for r in range(300)] == v5
+    v6 = [draw_augment(np.random.default_rng(r), 0.35, 0.35, 0.35, 20.0) for r in range(300)]
+    assert [s.split("+", 1)[1] if s.startswith("noise:") and "+" in s else
+            "" if s.startswith("noise:") else s for s in v6] == v5  # fmt: skip
+    n_noise = sum(s.startswith("noise:20:") for s in v6)
+    assert 70 <= n_noise <= 140  # ~105 of 300
+    x = _noise(4)
+    spec = next(s for s in v6 if s.startswith("noise:") and "+" not in s)
+    y = apply_augment(x, spec)
+    assert y.shape == x.shape and y.dtype == np.float32
+    assert np.array_equal(y, apply_augment(x, spec))  # the seed is in the spec
+    snr = 10 * np.log10(np.mean(x.astype(np.float64) ** 2) / np.mean((y - x).astype(np.float64) ** 2))
+    assert abs(snr - 20.0) < 0.3

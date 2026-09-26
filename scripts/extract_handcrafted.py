@@ -52,6 +52,9 @@ def main() -> None:
                     help="training only: share of rows re-encoded through MP3/AAC first (v5)")
     ap.add_argument("--tilt-frac", type=float, default=0.0,
                     help="training only: share of rows given a random spectral tilt + low-pass (v5)")
+    ap.add_argument("--noise-frac", type=float, default=0.0,
+                    help="training only: share of rows given additive white noise (v6)")
+    ap.add_argument("--noise-snr-db", type=float, default=20.0, help="SNR of the --noise-frac rows")
     args = ap.parse_args()
     families = tuple(n for n in args.families.split(",") if n)
 
@@ -67,8 +70,10 @@ def main() -> None:
     modes = [args.crop_mode] * len(m)
     bands = [args.band_match] * len(m)
     fams = [families] * len(m)
-    augs = [draw_augment(np.random.default_rng(args.seed + r), args.launder_frac, args.tilt_frac)
-            if (args.launder_frac or args.tilt_frac) else "" for r in range(len(m))]  # fmt: skip
+    augs = [draw_augment(np.random.default_rng(args.seed + r), args.launder_frac, args.tilt_frac,
+                         args.noise_frac, args.noise_snr_db)
+            if (args.launder_frac or args.tilt_frac or args.noise_frac) else ""
+            for r in range(len(m))]  # fmt: skip
     t0 = time.time()
     with ProcessPoolExecutor(args.workers) as ex:
         rows = list(ex.map(features_for_path, m.path, crop_s, seeds, modes, bands, fams, augs,
@@ -84,6 +89,7 @@ def main() -> None:
     meta = {"manifest": str(args.manifest), "crop_mode": args.crop_mode, "crop": args.crop,
             "band_match": args.band_match, "families": list(families), "seed": args.seed,
             "launder_frac": args.launder_frac, "tilt_frac": args.tilt_frac,
+            "noise_frac": args.noise_frac, "noise_snr_db": args.noise_snr_db,
             "n_augmented": int(sum(1 for a in augs if a)), "workers": args.workers,
             "rows": len(out),
             "n_features": int(feats.shape[1]), "failures": int((out.hc_flag != "").sum()),
