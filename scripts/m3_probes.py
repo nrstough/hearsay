@@ -305,9 +305,23 @@ def mlaad_rows(n: int) -> pd.DataFrame:
 # ------------------------------------------------------------------ readouts
 
 
+SCORE_COLS = (*MODELS, "fused_base", "fused", "e_applied")
+
+
+def with_score_columns(d: pd.DataFrame) -> pd.DataFrame:
+    """An error-only cache (every clip failed) has no score columns: add them as NaN so the
+    readouts return an empty cohort and the verdict goes "inconclusive" instead of KeyError."""
+    d = d.copy()
+    for c in (*SCORE_COLS, "path", "kind", "label"):
+        if c not in d:
+            d[c] = np.nan
+    return d
+
+
 def perturb_readout(d: pd.DataFrame) -> dict:
     from hearsay.metrics import eer, min_cost
 
+    d = with_score_columns(d)
     d = d[d.get("error", pd.Series(index=d.index, dtype=object)).isna()] if "error" in d else d
     # Reindexed to every expected perturbation: an absent one becomes all-NaN columns, so the
     # cohort shrinks (to zero) and the readout stays computable instead of raising KeyError.
@@ -369,7 +383,7 @@ def complete_rows(d: pd.DataFrame, cols: tuple[str, ...]) -> pd.DataFrame:
 
 
 def mlaad_readout(d: pd.DataFrame, rows: pd.DataFrame) -> dict:
-    d = complete_rows(d, (*MODELS, "fused_base", "fused", "e_applied"))
+    d = complete_rows(with_score_columns(d), SCORE_COLS)
     d = d.merge(rows[["path", "model_name"]], on="path", how="left")
     res: dict = {"n": len(d), "n_models": int(d.model_name.nunique())}
     for c in MODELS:

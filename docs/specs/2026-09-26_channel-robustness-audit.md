@@ -2,19 +2,19 @@
 
 | Dimension | Grade | Notes |
 |-----------|-------|-------|
-| Plan adherence | Fail | An entirely missing perturbation crashes instead of producing “inconclusive.” |
-| Scope discipline | Excellent | Diagnostic scope preserved; deviations recorded; no scoring-path changes. |
-| Test coverage | Fail | Missing-perturbation coverage does not exercise the failing readout path. |
-| Review compliance | Fail | The adopted incomplete-probe requirement remains partly unimplemented. |
-| Freeze integrity | Acceptable | Skipped: no P1/P2/P3 hashes present. |
-| Regression check | Acceptable | Saved E readouts reproduce exactly; full-suite verification restricted by environment. Diagnostic-only submission exemption recorded. |
-| Documentation | Acceptable | Required report, STATUS entry, disclosure and shortcut-ledger entry present; 52 documentation tests pass. |
-| **Overall** | **Fail** | One reproducible incomplete-probe handling defect remains. |
+| Plan adherence | Fail | All-failed E probes still crash instead of producing “inconclusive.” |
+| Scope discipline | Excellent | Changes remain diagnostic; deviations are recorded. |
+| Test coverage | Fail | Missing regression coverage for error-only caches with no score columns. |
+| Review compliance | Fail | The adopted incomplete-probe contract remains partly unimplemented. |
+| Freeze integrity | Acceptable | Skipped: no P1/P2/P3 hashes found. |
+| Regression check | Acceptable | Saved E results and codec verdict reproduce; full-suite rerun limited by sandbox. |
+| Documentation | Acceptable | Required report, STATUS entry, disclosure and shortcut-ledger entry exist. |
+| **Overall** | **Fail** | One remaining completeness defect. |
 
 ### Commentary
 
-1. **Plan adherence / Test coverage / Review compliance — downgrade to Fail.** Removing every MP3 row from the saved perturbation cohort makes `perturb_readout` raise `KeyError: 'mp3'` at [scripts/m3_probes.py:330](/Users/nathanstough/Projects/hearsay/scripts/m3_probes.py:330). The completeness check correctly finds zero paired clips, but metric computation then indexes the absent column. This violates the adopted requirement that an unfinished E probe yield “inconclusive.” Reindex pivots to all expected perturbations or return an incomplete readout before computing metrics. Add a readout → verdict regression test for an entirely absent perturbation, including rows excluded because scoring failed.
+1. **Plan adherence / Test coverage / Review compliance — causes Fail.** When every clip fails decoding or scoring, `run_scoring` can produce an error-only cache without score columns. Both [perturb_readout](/Users/nathanstough/Projects/hearsay/scripts/m3_probes.py:314) and [mlaad_readout](/Users/nathanstough/Projects/hearsay/scripts/m3_probes.py:377) then raise `KeyError: 'm1b_v3'`. Reproduced both cases. The latest tests retain score columns, so they miss this failure. Normalize missing columns or return an explicit empty readout; test error-only caches through readout → verdict, requiring “inconclusive.”
 
-2. **Regression check — no failure downgrade.** Recomputed perturbation and MLAAD readouts exactly match the saved JSON: 500 and 572 clips, verdict “kept.” The 34-variant codec table also reproduces the recorded negative match. Finding 1 does not invalidate these completed measurements.
+2. **Regression check — no failure downgrade.** Recomputed perturbation, MLAAD and verdict JSONs match the saved outputs exactly: 500 paired clips, 572 MLAAD clips, verdict “kept.” The codec calculation also reproduces “no match,” with all 34 variants containing 100 reference clips and 1,671 test rows. Finding 1 does not invalidate those recorded results.
 
-3. **Test coverage / Regression check — verification limitation, no additional downgrade.** On `main` at `fd779fb`, Python 3.12.13, the documented `uv` commands were blocked by read-only cache permissions. Direct `.venv` execution collected 537 tests before four environment-related collection errors. A scoped channel/docs run produced **107 passed, one cache-permission failure, 15 deselected**; a separate documentation run passed **52 tests**. The recorded **581-pass full suite was not independently reproduced**. Changed files pass Ruff; repository-wide Ruff reports the three documented, unrelated `analyzer.py` findings.
+3. **Test coverage / Regression check — verification limitation, not an additional defect.** The spec records 583 passing tests. This read-only sandbox blocked `uv` cache initialization; direct targeted execution produced 117 passes, seven cache-related failures and one temporary-directory error. Documentation tests independently passed **52/52**. Changed files pass Ruff; repository-wide Ruff reports only the three recorded findings in `src/hearsay/analyzer.py`.

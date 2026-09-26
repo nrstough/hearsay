@@ -527,3 +527,18 @@ def test_an_entirely_absent_perturbation_gives_an_empty_cohort_and_an_inconclusi
     r = m3p.perturb_readout(d)
     assert r["n_paired"] == 0
     assert m3p.verdict_from(r, {"e_applied_share": 0.0, "n": 572}, n_perturb=8)["verdict"] == "inconclusive"
+
+
+def test_error_only_caches_give_inconclusive_not_keyerror(monkeypatch):
+    import pandas as pd
+
+    monkeypatch.setattr(m3p, "THRESHOLDS_FROM_EXPORTS", False)
+    monkeypatch.setattr(m3p, "inner_threshold", lambda c: 0.0)
+    err = pd.DataFrame({"key": [f"p{i}|{k}|0" for i in range(3) for k in m3p.PERTURBATIONS],
+                        "path": [f"p{i}" for i in range(3) for _ in m3p.PERTURBATIONS],
+                        "kind": [k for _ in range(3) for k in m3p.PERTURBATIONS],
+                        "label": "spoof", "error": "DecodeError('x')"})  # fmt: skip
+    p = m3p.perturb_readout(err)
+    m = m3p.mlaad_readout(err[err.kind == "none"], pd.DataFrame({"path": ["p0", "p1", "p2"], "model_name": "g"}))
+    assert p["n_paired"] == 0 and m["n"] == 0
+    assert m3p.verdict_from(p, m)["verdict"] == "inconclusive"
