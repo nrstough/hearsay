@@ -6,7 +6,7 @@ flowchart TB
   O["Runner, static routing<br/>every detector runs; routing log per file<br/>from container, bandwidth, hum, seams, speech gate"]
   M1["M1<br/>frozen XLS-R layer 7<br/>+ logistic probe"]
   M3["M3<br/>Spectra-AASIST<br/>off-the-shelf score stream"]
-  M5["M5<br/>frozen-head model, gate not passed<br/>exported column only"]
+  M5["M5<br/>frozen-head model, gate not passed<br/>exported column; live under fusion_v2 only (not shipped)"]
   HC["handcrafted<br/>75 spectral + prosody<br/>features to trees"]
   CP["compression<br/>19 codec-trace<br/>features to trees"]
   CT["container<br/>header facts<br/>tag rules"]

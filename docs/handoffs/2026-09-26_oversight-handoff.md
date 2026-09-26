@@ -13,7 +13,7 @@ Start by moving this session to the repo (`mcp__ccd_directory__change_directory`
 | **CPU detectors handoff --done** (D-track) | engineered detectors, `hearsay.hc_v4`, `speech_gate`, `speaker_drift`, `scripts/train_handcrafted.py`, `eval_bundle.py` | Lane done (v3, v4, v5b, gate, drift, placement rule e2d5291). Now: `scripts/orchestration_ablation.py`, `docs/reports/2026-09-26_worked-examples.md`, the `CLAUDE.md` disclosure update. |
 | **Greeting** (session `local_326aa380…`) | `README.md` | Just started from `docs/handoffs/2026-09-26_readme-orchestration-handoff.md`; draft due 20:00. |
 | **Greeting** (session `local_27659366…`) | channel robustness | Running `docs/handoffs/2026-09-26_channel-robustness-handoff.md` via `/plan-review`; hard stop 16:00; reports λ̂ first. |
-| **M5 XLS-R fine-tune on vast.ai** | `src/hearsay/m5_*`, `scripts/m5_*`, `scripts/cloud/*`, the ledger | Done; gate not passed (holdout 0.363 vs 0.159); ships as a stacker column only. Was asked at 08:50 what a new "resume_probe" box is for and to destroy it if not needed. Candidate to archive after it answers. |
+| **M5 XLS-R fine-tune on vast.ai** | `src/hearsay/m5_*`, `scripts/m5_*`, `scripts/cloud/*`, the ledger | Done; gate not passed (holdout 0.363 vs 0.159); ships as a stacker column only (and, since 8316e50, runnable live under the unshipped fusion_v2 candidate). Was asked at 08:50 what a new "resume_probe" box is for and to destroy it if not needed. Candidate to archive after it answers. |
 | **M3 Spectra AASIST handoff plan review** | `src/hearsay/spectra.py`, `scripts/score_spectra.py` | Done; export in `outputs/detector_scores/spectra_aasist.csv`; holdout 0.012, ITW 0.065. Archive. |
 | This chat's runner agent (finished) | `src/hearsay/pipeline.py`, `api.py`, `scripts/run_pipeline.py`, `tests/test_pipeline.py`, `test_api.py` | Final at 9614c18; nobody edits these now without telling the Docker chat, which rebuilds on every runner change. |
 
@@ -26,7 +26,7 @@ Messaging: `SendMessage` to a session by its title works for local sessions; the
 - M3 never inside a fitted stacker (undisclosed training data).
 - Equal-weight fusion (zmean, rankmean) rejected: doubles In-the-Wild misses.
 - "Test share above 0.5" is not a selection signal (monotone maps cannot change minDCF).
-- M5 ships as a column only. Speaker drift and compression are evidence only. Container, ENF and splice are routing and evidence only.
+- M5 ships as a column only (the fusion_v2 candidate that would score it live exists and qualifies, but is held pending the draft review; Nathan 09:25, "build now, switch later" ~10:20). Speaker drift and compression are evidence only. Container, ENF and splice are routing and evidence only.
 - The band match (`band_limit` inside `prepare_segment`) stays; augmentation is symmetric or not at all.
 
 ## Open items and who holds them

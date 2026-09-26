@@ -21,7 +21,7 @@ Legend for every diagram: green = built, amber = in flight, dashed grey = planne
 
 _Rendered from [img/architecture-flow.mmd](img/architecture-flow.mmd); edit that file and re-render if the flow changes._
 
-Since 08:35 the runner (`scripts/run_pipeline.py`) is the whole path: audio → every detector → the frozen fusion rule from `models/fusion_v1/constants.json` → the non-speech policy → TSV plus one explanation JSON per file with a routing log. M5 is not run live; its exported column exists for the stacker only. The rollback path is `--detectors m1b`, the M1b probe alone through its own Platt map.
+Since 08:35 the runner (`scripts/run_pipeline.py`) is the whole path: audio → every detector → the frozen fusion rule from `models/fusion_v1/constants.json` → the non-speech policy → TSV plus one explanation JSON per file with a routing log. M5 is not part of the shipped rule; its exported column exists for the stacker, and since 8316e50 the runner can also score it live, loaded only when the constants file weights it (`models/fusion_v2/constants.json`, the unshipped A3 w0.2 + E candidate). The rollback path is `--detectors m1b`, the M1b probe alone through its own Platt map.
 
 ## 3. Components
 
@@ -39,7 +39,7 @@ Since 08:35 the runner (`scripts/run_pipeline.py`) is the whole path: audio → 
 | Compression features + laundering | `src/hearsay/compression.py`, `scripts/extract_compression.py` | built | CPU |
 | Rule-based detectors + exporter | `src/hearsay/detectors/{container,enf,splice,speech_gate,speaker_drift}.py`, `scripts/score_detector.py` | built | CPU |
 | Learned-detector wrapper, numpy trees | `src/hearsay/detectors/_learned.py`, `src/hearsay/trees.py` | built | CPU |
-| Fusion | `scripts/fuse.py`, `scripts/fuse_sweep.py` → `models/fusion_v1/constants.json` (rank references, α = 0.2, M3 false-alarm suppression, Platt at the 0.3 prior); `fusion_v0` retained for zmean / stack_nonlj | rule frozen by pre-declared sweep at 08:13 (`docs/reports/2026-09-26_fusion-sweep-predeclared.md`); final freeze Sat 22:00 | main |
+| Fusion | `scripts/fuse.py`, `scripts/fuse_sweep.py` → `models/fusion_v1/constants.json` (rank references, α = 0.2, M3 false-alarm suppression, Platt at the 0.3 prior); `fusion_v0` retained for zmean / stack_nonlj; `scripts/fuse_sweep_m5.py --write` → `models/fusion_v2/constants.json` (A3 w0.2 + E: weights 0.6 / 0.2 / 0.2 over M1b v3, handcrafted v5, M5 in rank space, the same M3 step and Platt, M5 checkpoint hashes), runnable but not shipped | rule frozen by pre-declared sweep at 08:13 (`docs/reports/2026-09-26_fusion-sweep-predeclared.md`); fusion_v2 candidate qualifies (M5 addendum), held pending the draft review; final freeze Sat 22:00 | main |
 | End-to-end runner, per-file explanation JSON, API | `src/hearsay/pipeline.py`, `scripts/run_pipeline.py`, `src/hearsay/api.py` | built (routing log from detector features; orchestrator v1 is static rules) | oversight chat's agent |
 | Docker image | `Dockerfile`, `.dockerignore`, `docker/{build.sh,entrypoint.sh,assets.py}`, `tests/test_docker_image.py` | built and verified 07:56 (`hearsay:20260926-0753`, source 0963ed8): amd64, 2.66 GB compressed, offline-enforced, in-image 50-file parity max diff 1.4e-4, sha manifest of 70 shipped files checked at start | Docker chat |
 | Submission writer + log | `src/hearsay/submission.py` | built | main |
@@ -215,7 +215,7 @@ flowchart LR
   E1["m1b_v3 · logit"]
   E2["handcrafted_v5 · logit"]
   E3["spectra_aasist · synth_logit"]
-  E4["m5_xlsr_ft · logit<br/>exported column, re-sweep candidate only"]
+  E4["m5_xlsr_ft · logit<br/>exported column; live under fusion_v2 only (not shipped)"]
   R1["rank against inner out-of-fold references<br/>from models/fusion_v1/constants.json"]
   E1 --> R1
   E2 --> R1
