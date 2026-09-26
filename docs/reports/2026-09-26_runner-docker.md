@@ -37,7 +37,7 @@ changing what ships:
 | exported logits -> `fusion_v2` -> policy vs `20260926-0914_..._CANDIDATE_our_direction.tsv` (1,671 rows) | | 6.7e-16 | 7.3e-17 | the one ulp of `0.8 − 0.2` in the sweep script vs the file's rounded 0.6 |
 | same, `--flip`, vs `..._CANDIDATE_FLIPPED_...tsv` | | 7.2e-16 | 8.4e-17 | |
 | `fusion_v2` file vs the 09:14 candidate file | | 0.0 | | weights, all three references and Platt a, b identical |
-| exported logits -> `fusion_v1` -> policy on the new loader vs the 0813 TSVs (1,671 rows, both polarities) | | 1.1e-16 | 4.5e-17 | the frozen rule, one ulp tighter than the old 4.4e-16 (accumulation in weights order) |
+| exported logits -> `fusion_v1` -> policy on the new loader vs the 0813 TSVs (1,671 rows, both polarities) | | 1.1e-16 | 4.5e-17 | the frozen rule; bit-identical to the pre-change loader (0 mismatches over all rows and both polarities, which also reads 1.1e-16 today; the v2 table's 4.4e-16 was an earlier measurement) |
 | live from audio, 50 template files, `--fusion models/fusion_v2/constants.json`, vs the candidate TSV | 1.000000 | 2.6e-4 | 1.2e-5 | 0 rows over 0.01; 0 E-rule flips; 0 verdict flips; `n_scorer_errors` all 0 |
 | M5 live logit vs the export, those 50 files | | 6.8e-3 | median 6.9e-4 | the recorded CPU-on-WAV vs A100-on-FLAC gap (`parity_f6.json`: 0.0118); gate 0.02 |
 | M5 batch 1 (runner) vs batch 8 (`m5_score.py`), same 50 clips | | 5.7e-6 | median 1.4e-6 | padding is inert on the real model |
