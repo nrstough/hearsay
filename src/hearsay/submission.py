@@ -1,8 +1,12 @@
-"""Submission CSVs: score every test file in order, validate, write once, log.
+"""Submission files: score every test file in order, validate, write once, log.
+
+NSA format (kickoff slides, Fri Sep 25): tab-separated `TeamName_predictions.tsv`, header
+`filename<TAB>cm-score`, score = probability in [0, 1] (0.0 real/bona fide, 1.0 synthetic), no
+log-likelihood ratios, every test file present.
 
 Rules enforced here (plan.md, CLAUDE.md): every file yields exactly one finite score in exact
-input order; a submitted CSV is never overwritten; every CSV gets a row in submissions/log.csv.
-The score column is P(synthetic): it must increase with synthetic likelihood.
+input order; a submission is never overwritten; every one gets a row in submissions/log.csv.
+The score must increase with synthetic likelihood.
 """
 
 from __future__ import annotations
@@ -72,10 +76,11 @@ def write_submission(
     out_path: str | Path,
     *,
     id_col: str = "filename",
-    score_col: str = "score",
+    score_col: str = "cm-score",
     score_max: float = 1.0,
+    sep: str = "\t",
 ) -> Path:
-    """Validate and write a submission CSV; refuses to overwrite. Reads it back to verify."""
+    """Validate and write a submission (TSV by default); refuses to overwrite; reads it back."""
     out_path = Path(out_path)
     if out_path.exists():
         raise FileExistsError(f"{out_path} exists; every submission gets a new file")
@@ -93,12 +98,12 @@ def write_submission(
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("x", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, delimiter=sep, lineterminator="\n")
         w.writerow([id_col, score_col])
         w.writerows((i, repr(float(s))) for i, s in zip(ids, arr, strict=True))
 
     with out_path.open(newline="") as f:
-        rows = list(csv.reader(f))
+        rows = list(csv.reader(f, delimiter=sep))
     assert rows[0] == [id_col, score_col]
     assert [r[0] for r in rows[1:]] == list(ids), "row order changed on write"
     assert np.allclose([float(r[1]) for r in rows[1:]], arr, rtol=0, atol=0)

@@ -29,8 +29,9 @@ Model ladder (each rung measured on a held-out split, never without a valid CSV 
 
 ## Conventions
 
+- **NSA metric and format** (kickoff slides; full notes in `docs/reports/2026-09-25_sponsor-questions.md`): judged 60% on MinDCF with false alarms (real called synthetic) costing 4× a miss, so only score ranking matters. Select everything on normalized minDCF (`hearsay.metrics`) and report EER alongside. Submit `TeamName_predictions.tsv` with header `filename<TAB>cm-score` and probabilities (1.0 = synthetic), no LLRs; `hearsay.submission.write_submission` enforces this. The final file is due 8 AM Sunday.
 - **16 kHz mono everywhere.** Every loader resamples and downmixes at the boundary; nothing downstream sees another format.
-- **Every experiment appends a row to `submissions/log.csv`** with timestamp, rung, validation score, and CSV path. Columns: `timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes` (the clean-only column exists because of the model rule above; leave it equal to `validation_score` when no replay augmentation is used).
+- **Every experiment appends a row to `submissions/log.csv`** with timestamp, rung, validation score, and CSV path. Columns: `timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes` (the clean-only column exists because of the model rule above; leave it equal to `validation_score` when no replay augmentation is used). `validation_score` is normalized minDCF on the held-out split; put EER in `notes`.
 - **No hosted APIs on the live path.** The demo runs locally end to end.
 - **Secrets in `.env` only, never committed.** `.env` is gitignored.
 - Environment: `uv sync` once, then `uv run <cmd>` from the repo root (Python 3.12, pinned in `.python-version`). Data, weights, model outputs, submission CSVs, and audio files are gitignored; only `submissions/log.csv` is tracked.

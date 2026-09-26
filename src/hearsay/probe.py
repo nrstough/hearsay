@@ -14,19 +14,13 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_curve
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from hearsay.metrics import decision_logit, sigmoid
+
 REPO = Path(__file__).resolve().parents[2]
-
-
-def eer(y: np.ndarray, s: np.ndarray) -> float:
-    fpr, tpr, _ = roc_curve(y, s)
-    fnr = 1 - tpr
-    i = int(np.nanargmin(np.abs(fnr - fpr)))
-    return float((fpr[i] + fnr[i]) / 2)
 
 
 def load_embeddings(model: str, name: str) -> tuple[np.ndarray, pd.DataFrame]:
@@ -70,11 +64,20 @@ class Probe:
     win_s: float = 4.0
     max_windows: int = 4
 
-    def p_synthetic(self, emb: np.ndarray) -> np.ndarray:
-        """emb: (N, n_layers, dim) or (n_layers, dim) -> calibrated P(synthetic)."""
+    def llr(self, emb: np.ndarray) -> np.ndarray:
+        """emb: (N, n_layers, dim) or (n_layers, dim) -> Platt-calibrated, prior-neutral LLR
+        (class-balanced fit), increasing with synthetic likelihood."""
         emb = emb[None] if emb.ndim == 2 else emb
         z = self.clf.decision_function(emb[:, self.layer, :])
-        return 1 / (1 + np.exp(-(self.platt_a * z + self.platt_b)))
+        return self.platt_a * z + self.platt_b
+
+    def p_synthetic(self, emb: np.ndarray) -> np.ndarray:
+        """Prior-neutral calibrated P(synthetic)."""
+        return sigmoid(self.llr(emb))
+
+    def p_decision(self, emb: np.ndarray, pi_synth: float) -> np.ndarray:
+        """Cost-shifted output: > 0.5 exactly when the 4:1 Bayes decision says synthetic."""
+        return sigmoid(decision_logit(self.llr(emb), pi_synth))
 
     def save(self, path: Path, meta: dict) -> None:
         path.mkdir(parents=True, exist_ok=True)

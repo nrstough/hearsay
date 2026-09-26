@@ -122,12 +122,10 @@ def test_score_files_survives_scorer_exception(tmp_path):
     assert res.scores == [0.3] and res.flags == ["score_error:RuntimeError"]
 
 
-def test_write_submission_order_and_readback(tmp_path):
+def test_write_submission_nsa_tsv_format(tmp_path):
     ids = ["c.wav", "a.wav", "b.wav"]
-    out = write_submission(ids, [0.9, 0.1, 0.5], tmp_path / "s.csv")
-    with out.open() as f:
-        rows = list(csv.reader(f))
-    assert rows == [["filename", "score"], ["c.wav", "0.9"], ["a.wav", "0.1"], ["b.wav", "0.5"]]
+    out = write_submission(ids, [0.9, 0.1, 0.5], tmp_path / "s.tsv")
+    assert out.read_text() == "filename\tcm-score\nc.wav\t0.9\na.wav\t0.1\nb.wav\t0.5\n"
 
 
 def test_write_submission_never_overwrites(tmp_path):
@@ -190,3 +188,31 @@ def test_embed_clip_matches_bulk_extraction_path(tmp_path):
     bulk = embed_windows(model, list(clip_windows(x)), batch=1).mean(axis=0)
     assert per_clip.shape == (25, 1024)
     assert np.allclose(per_clip, bulk, atol=1e-3)
+
+
+# --- metrics (NSA rule: false alarm costs 4x a miss) ----------------------------------------
+
+
+def test_cost_constant_decisions_normalize_to_one():
+    from hearsay.metrics import cost_at
+
+    y = np.array([0] * 50 + [1] * 50)
+    s = np.zeros(100)
+    # always real: cost = pi_synth * 1 = 0.5; default = min(4*0.5, 0.5) = 0.5 -> 1.0
+    assert cost_at(y, s, thr=1.0, pi_synth=0.5) == 1.0
+    # always synthetic: 4 * 0.5 = 2.0 -> 4.0 normalized (worse than always-real)
+    assert cost_at(y, s, thr=0.0, pi_synth=0.5) == 4.0
+
+
+def test_min_cost_perfect_and_bayes_threshold():
+    import math
+
+    from hearsay.metrics import bayes_llr_threshold, decision_logit, min_cost, sigmoid
+
+    y = np.array([0, 0, 1, 1])
+    assert min_cost(y, np.array([-2.0, -1.0, 1.0, 2.0])) == 0.0
+    assert math.isclose(bayes_llr_threshold(0.5), math.log(4))
+    # posterior 0.8 at pi=0.5 <=> LLR ln4 <=> decision prob 0.5
+    assert math.isclose(float(sigmoid(decision_logit(math.log(4), 0.5))), 0.5)
+    # above pi_synth = 0.8 the constant decision flips to "synthetic"
+    assert sigmoid(decision_logit(0.0, 0.79)) < 0.5 < sigmoid(decision_logit(0.0, 0.81))
