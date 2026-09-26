@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from hearsay.embed import embed_clip, load_backbone
+from hearsay.embed import embed_clip, embed_segment, load_backbone, prepare_segment
 from hearsay.metrics import C_FA, C_MISS, sigmoid
 from hearsay.probe import Probe
 from hearsay.submission import (
@@ -58,7 +58,10 @@ def main() -> None:
     raw: list[float] = []
 
     def score(x: np.ndarray) -> float:
-        e = embed_clip(model, x, probe.win_s, probe.max_windows)
+        if getattr(probe, "segment", False):
+            e = embed_segment(model, prepare_segment(x))
+        else:
+            e = embed_clip(model, x, probe.win_s, probe.max_windows)
         llr = float(probe.llr(e)[0])
         raw.append(llr)  # last statement before return: a raise above leaves no entry
         return float(sigmoid(llr + shift))

@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import time
 from pathlib import Path
 
@@ -27,7 +28,13 @@ import torch
 
 from hearsay import SR
 from hearsay.audio import DecodeError, load_audio, windows
-from hearsay.embed import embed_windows, load_backbone
+from hearsay.embed import (
+    embed_segment,
+    embed_windows,
+    load_backbone,
+    prepare_segment,
+    test_duration_sampler,
+)
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -43,6 +50,11 @@ def main() -> None:
     ap.add_argument("--shard", type=int, default=1000)
     ap.add_argument("--limit", type=int)
     ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
+    ap.add_argument("--segment", action="store_true",
+                    help="v2: trimmed whole segment, no tiling, capped at 8 s")
+    ap.add_argument("--crop", choices=["none", "test"], default="none",
+                    help="segment mode: random crop to NSA test-duration lengths (training)")
+    ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
     m = pd.read_csv(args.manifest)
@@ -52,6 +64,11 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
 
     model = load_backbone(args.model, args.device)
+    draw = test_duration_sampler(args.seed) if args.crop == "test" else None
+    crop_s = [draw() for _ in range(len(m))] if draw else [None] * len(m)
+    (out / "extract_meta.json").write_text(json.dumps(
+        {"mode": "segment" if args.segment else "windows", "crop": args.crop, "seed": args.seed,
+         "win_s": args.win_s, "max_windows": args.max_windows}))  # fmt: skip
     win = int(args.win_s * SR)
     n_win_col, flag_col = np.zeros(len(m), int), [""] * len(m)
     t0, n_done = time.time(), 0
@@ -64,6 +81,25 @@ def main() -> None:
             n_win_col[rows] = z["n_windows"]
             for r, f in zip(rows, z["flag"], strict=True):
                 flag_col[r] = str(f)
+            continue
+        if args.segment:
+            embs = []
+            for r in rows:
+                try:
+                    x = prepare_segment(load_audio(m.path.iloc[r]), crop_s[r], args.seed + r)
+                except DecodeError:
+                    flag_col[r] = "decode_error"
+                    x = np.zeros(SR, dtype=np.float32)
+                n_win_col[r] = 1
+                embs.append(embed_segment(model, x))
+            np.savez(
+                shard_path, emb=np.stack(embs).astype(np.float16), row=np.array(rows),
+                n_windows=n_win_col[rows], flag=np.array([flag_col[r] for r in rows]),
+                crop_s=np.array([np.nan if c is None else c for c in (crop_s[r] for r in rows)]),
+            )  # fmt: skip
+            n_done += len(rows)
+            el = time.time() - t0
+            print(f"  {rows[-1] + 1}/{len(m)}  {el:.0f}s  {el / n_done:.3f}s/clip", flush=True)
             continue
         # Flatten all windows of the shard, forward in fixed-size batches, then re-group.
         owners, wins = [], []

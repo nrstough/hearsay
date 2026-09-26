@@ -75,6 +75,11 @@ def main() -> None:
     platt = LogisticRegression(class_weight="balanced").fit(oof[:, None], ytr)
     clf = make_clf(args.c).fit(Xtr[:, best], ytr)
     probe = Probe(args.model, best, clf, float(platt.coef_[0, 0]), float(platt.intercept_[0]))
+    meta_path = REPO / "outputs" / "embeddings" / args.model / args.train / "extract_meta.json"
+    if meta_path.exists():
+        em = json.loads(meta_path.read_text())
+        probe.segment = em.get("mode") == "segment"
+        probe.max_windows = em.get("max_windows", probe.max_windows)
 
     llr = probe.llr(Xva)
     auc = float(roc_auc_score(yva, llr))

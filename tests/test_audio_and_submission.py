@@ -265,3 +265,27 @@ def test_trim_silence_is_level_independent_and_safe():
     assert trim_silence(np.zeros(SR, np.float32)).size == SR  # all-silent: unchanged
     short = np.concatenate([np.zeros(SR, np.float32), tone[: SR // 4]])
     assert trim_silence(short).size == short.size  # would drop below 1 s: unchanged
+
+
+def test_prepare_segment_never_tiles_and_crops_deterministically():
+    from hearsay.embed import prepare_segment
+
+    rng = np.random.default_rng(0)
+    short = (0.1 * rng.standard_normal(int(3.2 * SR))).astype(np.float32)
+    assert prepare_segment(short).size == short.size  # no padding/tiling to 4 s
+    assert prepare_segment(short, crop_s=5.0, seed=1).size == short.size  # crop > clip: as is
+    long = (0.1 * rng.standard_normal(10 * SR)).astype(np.float32)
+    a, b = prepare_segment(long, crop_s=3.4, seed=7), prepare_segment(long, crop_s=3.4, seed=7)
+    assert a.size == int(3.4 * SR) and np.array_equal(a, b)
+    assert prepare_segment(long).size == 8 * SR  # test-time cap
+    assert prepare_segment(long, crop_s=3.4, seed=8).tobytes() != a.tobytes()
+
+
+def test_test_duration_sampler_matches_test_range():
+    from hearsay.embed import TEST_DURATIONS, test_duration_sampler
+
+    if not TEST_DURATIONS.exists():
+        pytest.skip("test durations not present")
+    draw = test_duration_sampler(0)
+    xs = [draw() for _ in range(500)]
+    assert 3.0 <= min(xs) and max(xs) <= 14.0 and 3.2 < float(np.median(xs)) < 3.7

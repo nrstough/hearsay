@@ -73,6 +73,7 @@ class Probe:
     platt_b: float
     win_s: float = 4.0
     max_windows: int = 4
+    segment: bool = False  # True: embeddings from hearsay.embed.prepare_segment/embed_segment
 
     def llr(self, emb: np.ndarray) -> np.ndarray:
         """emb: (N, n_layers, dim) or (n_layers, dim) -> Platt-calibrated, prior-neutral LLR

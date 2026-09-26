@@ -16,9 +16,11 @@ import torch
 from transformers import AutoModel
 
 from hearsay import SR
-from hearsay.audio import windows
+from hearsay.audio import trim_silence, windows
 
 REPO = Path(__file__).resolve().parents[2]
+TEST_DURATIONS = REPO / "splits" / "nsa_test_durations.csv"
+MAX_SEGMENT_S = 8.0
 
 
 def default_device() -> str:
@@ -56,3 +58,43 @@ def embed_windows(model, wins, batch: int = 16) -> np.ndarray:
 def embed_clip(model, x: np.ndarray, win_s: float = 4.0, max_windows: int = 4) -> np.ndarray:
     """(n_layers, dim) float32 for one 16 kHz mono clip."""
     return embed_windows(model, list(clip_windows(x, win_s, max_windows))).mean(axis=0)
+
+
+# --- segment mode (v2): no tiling, test-matched lengths --------------------------------------
+#
+# Fixed 4 s windows tile clips shorter than 4 s (most NSA test clips are 3.0-3.8 s) and never
+# tile training clips (5-9 s): a seam artifact present only at test time. Segment mode embeds
+# the silence-trimmed clip at its own length (capped at MAX_SEGMENT_S); training clips are
+# randomly cropped to lengths drawn from the NSA test-duration distribution.
+
+
+def test_duration_sampler(seed: int = 0):
+    """Callable returning a crop length (s) drawn from the NSA test durations."""
+    import pandas as pd
+
+    durs = pd.read_csv(TEST_DURATIONS).duration_s.to_numpy()
+    rng = np.random.default_rng(seed)
+    return lambda: float(rng.choice(durs))
+
+
+def prepare_segment(
+    x: np.ndarray, crop_s: float | None = None, seed: int | None = None,
+    max_s: float = MAX_SEGMENT_S,
+) -> np.ndarray:  # fmt: skip
+    """trim_silence -> optional random crop to `crop_s` (never pads or tiles: a shorter clip
+    stays as is) -> cap at `max_s`. Test-time scoring calls it with no crop."""
+    x = trim_silence(x)
+    if crop_s is not None and x.size > int(crop_s * SR):
+        n = int(crop_s * SR)
+        off = int(np.random.default_rng(seed).integers(0, x.size - n + 1))
+        x = x[off : off + n]
+    return np.ascontiguousarray(x[: int(max_s * SR)], dtype=np.float32)
+
+
+@torch.inference_mode()
+def embed_segment(model, x: np.ndarray) -> np.ndarray:
+    """(n_layers, dim) float32: normalized whole-segment forward, time-mean per layer."""
+    device = next(model.parameters()).device
+    t = torch.from_numpy(normalize_windows(x[None, :])).to(device)
+    hs = model(t, output_hidden_states=True).hidden_states
+    return torch.stack([h.mean(dim=1)[0] for h in hs]).float().cpu().numpy()
