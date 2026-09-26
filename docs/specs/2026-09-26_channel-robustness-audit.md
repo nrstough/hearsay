@@ -2,19 +2,19 @@
 
 | Dimension | Grade | Notes |
 |-----------|-------|-------|
-| Plan adherence | Fail | All-failed E probes still crash instead of producing “inconclusive.” |
-| Scope discipline | Excellent | Changes remain diagnostic; deviations are recorded. |
-| Test coverage | Fail | Missing regression coverage for error-only caches with no score columns. |
-| Review compliance | Fail | The adopted incomplete-probe contract remains partly unimplemented. |
-| Freeze integrity | Acceptable | Skipped: no P1/P2/P3 hashes found. |
-| Regression check | Acceptable | Saved E results and codec verdict reproduce; full-suite rerun limited by sandbox. |
-| Documentation | Acceptable | Required report, STATUS entry, disclosure and shortcut-ledger entry exist. |
-| **Overall** | **Fail** | One remaining completeness defect. |
+| Plan adherence | Excellent | Amended design implemented; deviations recorded. Reproduced λ̂, its interval, codec verdict, and all saved E readouts. |
+| Scope discipline | Excellent | Diagnostic scripts, tests, and documentation only; protected scoring and training paths unchanged. |
+| Test coverage | Acceptable | Spec records 584 passing. Independently obtained 118 targeted passes, including all 52 documentation tests; sandbox restrictions prevented complete verification. |
+| Review compliance | Excellent | Recorded findings addressed, including error-only caches returning “inconclusive.” |
+| Freeze integrity | Acceptable | Skipped: no P1/P2/P3 hashes supplied. |
+| Regression check | Acceptable | No change-induced regression identified. Changed files lint clean; repository-wide lint retains three unrelated findings. No TSV required under the explicit diagnostic disposition. |
+| Documentation | Acceptable | Required deliverables and disclosure present; minor codec-summary wording inconsistency. |
+| **Overall** | **Acceptable** | |
 
 ### Commentary
 
-1. **Plan adherence / Test coverage / Review compliance — causes Fail.** When every clip fails decoding or scoring, `run_scoring` can produce an error-only cache without score columns. Both [perturb_readout](/Users/nathanstough/Projects/hearsay/scripts/m3_probes.py:314) and [mlaad_readout](/Users/nathanstough/Projects/hearsay/scripts/m3_probes.py:377) then raise `KeyError: 'm1b_v3'`. Reproduced both cases. The latest tests retain score columns, so they miss this failure. Normalize missing columns or return an explicit empty readout; test error-only caches through readout → verdict, requiring “inconclusive.”
+1. **Documentation — downgrade to Acceptable.** The [report](/Users/nathanstough/Projects/hearsay/docs/reports/2026-09-26_channel-robustness.md:152) calls Kaiser the “closest reproduction,” although AAC + Kaiser has the smaller distance (1.045 versus 1.081). Say “no codec satisfies D5” instead. The table and gating decision are correct, so this does not change the reader’s action or warrant Fail.
 
-2. **Regression check — no failure downgrade.** Recomputed perturbation, MLAAD and verdict JSONs match the saved outputs exactly: 500 paired clips, 572 MLAAD clips, verdict “kept.” The codec calculation also reproduces “no match,” with all 34 variants containing 100 reference clips and 1,671 test rows. Finding 1 does not invalidate those recorded results.
+2. **Test coverage / Regression check — verification limited to Acceptable.** The read-only sandbox blocked `uv` cache initialization. Direct virtualenv execution yielded 118 passes, seven failures from cache/temporary-file restrictions, and one temporary-directory setup error. These are environmental failures, not demonstrated regressions; the recorded 584-pass full-suite result was not independently reproduced.
 
-3. **Test coverage / Regression check — verification limitation, not an additional defect.** The spec records 583 passing tests. This read-only sandbox blocked `uv` cache initialization; direct targeted execution produced 117 passes, seven cache-related failures and one temporary-directory error. Documentation tests independently passed **52/52**. Changed files pass Ruff; repository-wide Ruff reports only the three recorded findings in `src/hearsay/analyzer.py`.
+3. **Regression check — no additional downgrade.** Repository-wide Ruff reports the three documented findings in `src/hearsay/analyzer.py`, introduced by unrelated commit `19925a3`. Ruff passes on all four changed Python files.

@@ -149,7 +149,7 @@ The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any per
 
 ## B. Is the 7.2 kHz wall a codec?
 
-**Answer: no, not an MP3 or AAC round-trip at any tested setting. The pipeline's own Kaiser low-pass (`hearsay.handcrafted.band_limit`) remains the closest reproduction.** Source: `outputs/channel/codec_match.json`, `outputs/channel/codec_grid.csv`, `scripts/channel_codec.py`.
+**Answer: no codec satisfies the pre-declared match rule.** The nearest codec (AAC 64k at 16 kHz, then our Kaiser pass) is only 3% closer to the test files than the Kaiser low-pass alone (`hearsay.handcrafted.band_limit`). The rule needs 20% and closer hole statistics, and it is worse on deep holes. Source: `outputs/channel/codec_match.json`, `outputs/channel/codec_grid.csv`, `scripts/channel_codec.py`.
 
 **Grid.**
 - 100 inner-fold real clips (50 LJ, 50 LibriSpeech).

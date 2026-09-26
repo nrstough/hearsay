@@ -168,3 +168,10 @@ Both are tested through readout → verdict ("inconclusive") for NaN, +inf and �
 **Codex audit, round 4 (on 873c1ff): Overall Fail, on one finding.** A cache in which every clip errored has no score columns, so both readouts raised `KeyError`. `with_score_columns` now adds any missing score columns as NaN, so both readouts return empty cohorts and the verdict is "inconclusive". Tested with an error-only cache through readout → verdict. Codex again reproduced every saved result exactly. Full suite at this commit: 584 passed.
 
 **Loop status.** Every Codex round since round 1 has found a narrower hardening case in the incomplete-probe path: missing M3 → ±inf → an absent perturbation → an error-only cache. None changed a recorded number or the verdict. One final audit follows; any further edge case is recorded here as open rather than looped on.
+
+**Codex audit, round 5 (final, on 833c2e1): Overall Acceptable.** Plan adherence, Scope discipline and Review compliance Excellent; the rest Acceptable. Codex reproduced λ̂ and its interval, the codec verdict, and every saved E readout. Its one wording finding is fixed in the closing commit: the report and STATUS said Kaiser was "the closest", but AAC 64k + Kaiser is marginally closer (1.045 vs 1.081). Both now say no codec satisfies the rule. Test coverage is Acceptable only because the sandbox could not rerun the full suite (584 passed locally).
+
+**Final state.** The Claude critique is Acceptable (round 2) and the Codex audit is Acceptable (round 5). Open items:
+- the double low-pass stopband entry in `architecture.md` §11 (detector response unmeasured)
+- three stale claims in other lanes' files, relayed to oversight
+- 3 ruff findings in `src/hearsay/analyzer.py` (another lane)
