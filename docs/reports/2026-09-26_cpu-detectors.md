@@ -11,6 +11,8 @@ Sat Sep 26, 2026, 01:10–03:00. CPU only, in parallel with the main chat's GPU 
   2. **The NSA test set is low-passed at about 7.2 kHz.** 1,602 of 1,671 test files drop by a median 44 dB between the 6.5 kHz and 7.5 kHz bands. No training corpus does, not even the sponsor's own resampled LJ clips (`data/nsa/LJRealResampled`). Every feature above 7 kHz was a corpus fingerprint, and the v1/v2 handcrafted detector called about 90% of the test set synthetic. A 71-tap Kaiser low-pass (`hearsay.handcrafted.band_limit`) reproduces the roll-off within 3 dB and is now applied to every clip, train and test. **The deep detector sees the same mismatch; see Recommendations.**
 - **Handcrafted detector, holdout minDCF:** v1 (first 4 s) 0.709 → v2 (test-length crops, same as the deep detector's `prepare_segment`) 0.661 → **v3 (v2 + band match) 0.254**, EER 4.3%, AUC 0.993; the share of test files scored above 0.5 went from 90% to 42% (the prior is 30%). Two effects are entangled and separated below: LightGBM generalizes to the held-out generators far better than logistic regression, and the band match is what made LightGBM win the inner CV and what moved the test-score distribution. LibriSpeech bona fide stays the weak spot; the LJ-voice diffusion generators `grad_tts` and `pro_diff` are invisible to these features at any version.
 
+> **Follow-up (Sat 04:45):** handcrafted v4 (six new feature families, 234 columns) is in `docs/reports/2026-09-26_handcrafted-v4.md`: inner OOF minDCF 0.434, pro_diff visible, grad_tts still not, In-the-Wild P_FA 0.65%. `handcrafted.csv` below is still v3 until fusion switches.
+
 ## What was delivered
 
 | Piece | Where |
