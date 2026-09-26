@@ -85,3 +85,23 @@ def windows(x: np.ndarray, win: int, hop: int | None = None) -> np.ndarray:
     if starts[-1] + win < x.size:
         starts.append(x.size - win)
     return np.stack([x[s : s + win] for s in starts]).astype(np.float32)
+
+
+def trim_silence(x: np.ndarray, top_db: float = 35.0, frame: int = SR // 50,
+                 min_keep_s: float = 1.0) -> np.ndarray:
+    """Drop leading/trailing frames more than `top_db` below the loudest 20 ms frame.
+
+    Relative threshold, so it is level-independent. Never returns less than `min_keep_s`
+    (returns x unchanged if trimming would). Applied identically to train and test so that
+    corpus-specific silence (LibriSpeech ~0.37 s lead vs NSA test ~0.06 s) is not a shortcut.
+    """
+    n = x.size // frame
+    if n < 2:
+        return x
+    rms = np.sqrt(np.mean(x[: n * frame].reshape(n, frame) ** 2, axis=1) + 1e-12)
+    db = 20 * np.log10(rms / rms.max())
+    keep = np.where(db > -top_db)[0]
+    if keep.size == 0:
+        return x
+    y = x[keep[0] * frame : (keep[-1] + 1) * frame]
+    return y if y.size >= min_keep_s * SR else x

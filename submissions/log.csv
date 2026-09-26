@@ -1,1 +1,2 @@
 timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes
+2026-09-26T00:36:28-04:00,M0,1.0,1.0,submissions/20260926-0036_M0_constant.tsv,"minDCF=1.0 EER=0.5; constant always real (pi_synth=0.3); 1671 rows; 0 decode flags. M0 rollback; all real (4:1 FA cost, pi=0.3)"

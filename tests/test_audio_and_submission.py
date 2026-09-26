@@ -251,3 +251,17 @@ def test_sponsor_min_dcf_matches_shipped_code():
         ref = compute_mindcf(frr, far, thr, 0.5, 1, 4)[0]
         assert abs(sponsor_min_dcf(y, s, flip) - ref) < 1e-9
     assert sponsor_min_dcf(y, s, flip=False) > 0.9 > sponsor_min_dcf(y, s, flip=True)
+
+
+def test_trim_silence_is_level_independent_and_safe():
+    from hearsay.audio import trim_silence
+
+    t = np.arange(SR) / SR
+    tone = (0.5 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    x = np.concatenate([np.zeros(SR // 2, np.float32), tone, np.zeros(SR // 4, np.float32)])
+    y = trim_silence(x)
+    assert abs(y.size - SR) <= SR // 50
+    assert np.array_equal(trim_silence(x * 0.01).size, y.size)  # same cut at any level
+    assert trim_silence(np.zeros(SR, np.float32)).size == SR  # all-silent: unchanged
+    short = np.concatenate([np.zeros(SR, np.float32), tone[: SR // 4]])
+    assert trim_silence(short).size == short.size  # would drop below 1 s: unchanged
