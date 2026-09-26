@@ -1,8 +1,15 @@
 """Interpretable forensic features (brief rubric: spectral + prosody), CPU only.
 
-Per clip: load_audio -> trim_silence -> first 4 s (the same crop the SSL detector sees) ->
-RMS-normalize (level is a corpus shortcut, never a feature) -> features. Duration, peak and
-absolute level are deliberately excluded.
+Per clip: load_audio -> segment -> RMS-normalize (level is a corpus shortcut, never a
+feature) -> features. Duration, peak and absolute level are deliberately excluded.
+
+Segment (v2, the default `crop_mode="segment"`): `hearsay.embed.prepare_segment`, the exact
+trim / random-crop / 8 s cap the deep detector (M1 v2) sees, so fusion compares the two on the
+same audio. Training clips are cropped to lengths drawn from the NSA test-duration
+distribution (`crop_s`, offset drawn from `seed`); test clips are scored whole, with no crop.
+v1 (commit 6ee5aa1, `crop_mode="first4s"`) took the first 4 s after the trim; it is kept so the
+v1-vs-v2 comparison in docs/reports stays reproducible. v3 adds `band_match` (below): a
+low-pass that reproduces the NSA test set's ~7.2 kHz roll-off on every clip.
 
 Spectral: rolloff (85/95%), centroid, bandwidth, flatness, high-band energy ratios
 (>4/6/7 kHz), spectral contrast, 20 MFCC means + stds, spectral-flux stats.
@@ -19,18 +26,56 @@ from hearsay.audio import load_audio, trim_silence
 
 N_FFT = 512
 HOP = 160  # 10 ms
-CROP_S = 4.0
+CROP_S = 4.0  # v1 ("first4s") only
+CROP_MODES = ("segment", "first4s")
+
+# NSA test-set band match (docs/reports/2026-09-26_cpu-detectors.md, "Band-limit"). 1,602 of
+# the 1,671 test files carry a ~7.2 kHz low-pass (median -18 dB in the 7.25-7.5 kHz band and
+# -44 dB at 7.5-7.75 kHz, relative to 6.5 kHz) that no training corpus has, not even the
+# sponsor's own resampled LJ clips. This Kaiser FIR reproduces the roll-off (3 dB rms error
+# over four bands on training clips) and is applied to every clip, train and test alike, so
+# the 7-8 kHz band stops being a corpus fingerprint. A second pass over an already
+# band-limited test clip changes almost nothing. v3 = v2 + band match.
+BAND_MATCH = {"cutoff_hz": 7250.0, "width_hz": 600.0, "atten_db": 45.0}
+_FIR: np.ndarray | None = None
 
 
-def _crop(x: np.ndarray) -> np.ndarray:
-    x = trim_silence(x)[: int(CROP_S * SR)]
+def band_limit(x: np.ndarray) -> np.ndarray:
+    """Zero-delay linear-phase low-pass matching the NSA test set (see BAND_MATCH)."""
+    global _FIR
+    import scipy.signal as sg
+
+    if _FIR is None:
+        n, beta = sg.kaiserord(BAND_MATCH["atten_db"], BAND_MATCH["width_hz"] / (SR / 2))
+        _FIR = sg.firwin(n | 1, BAND_MATCH["cutoff_hz"], window=("kaiser", beta), fs=SR)
+        _FIR = _FIR.astype(np.float32)
+    return sg.fftconvolve(x, _FIR, mode="same").astype(np.float32)
+
+
+def _crop(
+    x: np.ndarray, crop_s: float | None = None, seed: int | None = None,
+    crop_mode: str = "segment", band_match: bool = True,
+) -> np.ndarray:  # fmt: skip
+    if band_match:
+        x = band_limit(x)
+    if crop_mode == "segment":
+        from hearsay.embed import prepare_segment  # imports torch; lazy so v1 stays light
+
+        x = prepare_segment(x, crop_s, seed)
+    elif crop_mode == "first4s":
+        x = trim_silence(x)[: int(CROP_S * SR)]
+    else:
+        raise ValueError(f"crop_mode must be one of {CROP_MODES}, got {crop_mode!r}")
     return x / (np.sqrt(np.mean(x**2)) + 1e-8) * 0.1
 
 
-def features(x: np.ndarray) -> dict[str, float]:
+def features(
+    x: np.ndarray, crop_s: float | None = None, seed: int | None = None,
+    crop_mode: str = "segment", band_match: bool = True,
+) -> dict[str, float]:  # fmt: skip
     import librosa
 
-    x = _crop(x).astype(np.float32)
+    x = _crop(x, crop_s, seed, crop_mode, band_match).astype(np.float32)
     f: dict[str, float] = {}
     s = np.abs(librosa.stft(x, n_fft=N_FFT, hop_length=HOP)) ** 2
     freqs = librosa.fft_frequencies(sr=SR, n_fft=N_FFT)
@@ -86,8 +131,11 @@ def features(x: np.ndarray) -> dict[str, float]:
     return {k: (v if np.isfinite(v) else 0.0) for k, v in f.items()}
 
 
-def features_for_path(path: str) -> dict[str, float] | None:
+def features_for_path(
+    path: str, crop_s: float | None = None, seed: int | None = None,
+    crop_mode: str = "segment", band_match: bool = True,
+) -> dict[str, float] | None:  # fmt: skip
     try:
-        return features(load_audio(path))
+        return features(load_audio(path), crop_s, seed, crop_mode, band_match)
     except Exception:  # noqa: BLE001 - one bad file becomes a missing row, reported by caller
         return None
