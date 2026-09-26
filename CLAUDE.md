@@ -133,6 +133,7 @@ Downloaded before the event to `weights/`; fill in "how used" as each is actuall
 - WavLM Large, `microsoft/wavlm-large` (Hugging Face, Microsoft): bake-off challenger. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT). _Verify before submission._
 - WavLM Base, `microsoft/wavlm-base` (Hugging Face, Microsoft): bake-off / speed spare. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT). _Verify before submission._
 - Spectra-AASIST, `lab260/Spectra-AASIST` (Hugging Face): M3 score stream (`outputs/detector_scores/spectra_aasist.csv`), run off the shelf with no training through the shared band-matched input path, as a second deep score for fusion beside the XLS-R probe. License unclear: repo header says Apache-2.0, model card text says MIT. Output index 0 = spoof, 1 = bonafide.
+- ECAPA-TDNN speaker embeddings, `speechbrain/spkrec-ecapa-voxceleb` (Hugging Face, SpeechBrain), Apache-2.0, fetched Sat Sep 26 to `weights/spkrec-ecapa-voxceleb` (89 MB): the speaker-drift detector (`hearsay.detectors.speaker_drift`, rubric technique 6), loaded from the local directory. Docker must include it.
 
 **Public datasets** (name, source, license, how used)
 Downloaded before the event to `data/`; fill in "how used" as each is actually used.
@@ -143,14 +144,13 @@ Downloaded before the event to `data/`; fill in "how used" as each is actually u
 - LibriSpeech dev-clean/dev-other/test-clean/test-other (openslr.org/12, CC BY 4.0): 5,323 multi-speaker bona fide clips; 4,000 of them in the NSA training sample.
 
 **Planned, not yet downloaded or used** (move each item up to the list above once it is actually used):
-- ECAPA-TDNN speaker embeddings (SpeechBrain), for the speaker-drift detector.
 - VCTK as a second multi-speaker bona fide source (LibriSpeech dev+test is in use; see above).
 - Full LJ Speech (keithito.com).
 - ReplayDF (optional).
 - ExifTool, for metadata forensics. _Not used: ffprobe (FFmpeg) covered the embedded fields, and the test set carries none beyond one encoder tag._
 
 **Frameworks and libraries**
-- PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, pydub, ffmpeg-python, FFmpeg.
+- PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, SpeechBrain (ECAPA speaker embeddings), librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, pydub, ffmpeg-python, FFmpeg.
 
 **What we built vs. what AI did**
 - _Fill in per component (each detector, fusion, orchestrator, Docker image) before submission._
