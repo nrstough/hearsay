@@ -23,7 +23,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-from hearsay.metrics import eer, min_cost, report
+from hearsay.metrics import cost_at, eer, min_cost, report
 from hearsay.probe import Probe, cv_groups, load_embeddings, make_clf, oof_scores
 
 REPO = Path(__file__).resolve().parents[1]
@@ -36,6 +36,7 @@ def main() -> None:
     ap.add_argument("--val", help="separate embedding set name (public-data mode)")
     ap.add_argument("--folds", type=Path, help="fold file: holdout = val, inner folds = CV")
     ap.add_argument("--max-train", type=int, help="subsample inner rows (speed)")
+    ap.add_argument("--stress", help="eval-only embedding set (e.g. In-the-Wild): never fit on")
     ap.add_argument("--c", type=float, default=1.0)
     ap.add_argument("--pi-synth", type=float, default=0.3, help="NSA prior (70/30 real/synth)")
     args = ap.parse_args()
@@ -43,7 +44,9 @@ def main() -> None:
     t0 = time.time()
     folds = None
     if args.folds:
-        X, m = load_embeddings(args.model, args.train)
+        parts = [load_embeddings(args.model, n) for n in args.train.split(",")]
+        X = np.concatenate([p[0] for p in parts])
+        m = pd.concat([p[1] for p in parts], ignore_index=True)
         f = pd.read_csv(args.folds).set_index("path")
         m = m.join(f[["group", "fold"]], on="path")
         assert m.fold.notna().all(), "embedding rows missing from the fold file"
@@ -102,6 +105,21 @@ def main() -> None:
             per_src[src] = {"n": len(b), "eer": round(eer(yy, np.r_[b, spoof_llr]), 4),
                             "min_dcf": round(min_cost(yy, np.r_[b, spoof_llr], args.pi_synth), 4)}  # fmt: skip
 
+    stress = {}
+    if args.stress:
+        Xs, ms = load_embeddings(args.model, args.stress)
+        ys = (ms.label == "spoof").to_numpy(int)
+        ss = probe.llr(Xs)
+        oof_llr = probe.platt_a * oof + probe.platt_b
+        thr = min(np.unique(oof_llr), key=lambda t: cost_at(ytr, oof_llr, t, args.pi_synth))
+        stress = {"set": args.stress, "n_bona": int((ys == 0).sum()), "n_spoof": int((ys == 1).sum()),
+                  "min_dcf": round(min_cost(ys, ss, args.pi_synth), 4), "eer": round(eer(ys, ss), 4),
+                  "inner_threshold_llr": round(float(thr), 4),
+                  "p_fa_at_inner_thr": round(float(np.mean(ss[ys == 0] >= thr)), 4),
+                  "p_miss_at_inner_thr": round(float(np.mean(ss[ys == 1] < thr)), 4),
+                  "act_dcf_at_inner_thr": round(cost_at(ys, ss, thr, args.pi_synth), 4)}  # fmt: skip
+        print("stress:", stress)
+
     stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M")
     out = REPO / "models" / f"m1_{args.model}_L{best}_{stamp}"
     meta = {
@@ -109,7 +127,7 @@ def main() -> None:
         "folds": str(args.folds) if args.folds else None,
         "layer": best, "C": args.c, "selection": "CV normalized minDCF (C_FA=4)",
         "cv_by_layer": cv, "cv_best": cv[best], "platt": [probe.platt_a, probe.platt_b],
-        **val, "val_by_generator": per_gen, "val_by_bonafide_source": per_src, "seconds": round(time.time() - t0),
+        **val, "val_by_generator": per_gen, "val_by_bonafide_source": per_src, "stress": stress, "seconds": round(time.time() - t0),
     }  # fmt: skip
     probe.save(out, meta)
     print(json.dumps({k: v for k, v in meta.items() if k != "cv_by_layer"}, indent=2))
