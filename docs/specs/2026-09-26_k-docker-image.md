@@ -2,6 +2,7 @@
 
 > Not a graded deliverable (NSA, Sat Sep 26 ~12:00); kept as reproducibility evidence.
 > The submitted TSV (Sat 12:03 onward) uses fusion_v2 (A3 w0.2 + E, M5 included); this image reproduces the earlier e_on_a rule and is kept as reproducibility evidence only.
+> Since cc6670c (Sat 12:35) the runner's default is fusion_v2, and B6 pins it. `docker/build.sh` does not stage the M5 checkpoint, so a rebuild as-is would produce an image whose runner refuses to start (no `models/m5_shipped/hashes.json`). A rebuild on the new default must first copy `models/m5_xlsr_ft_20260926-0741/model` to `docker/build/models/m5_shipped` (+627 MB).
 
 Status: P1 and P2 frozen (deep mode). Plan: `docs/reports/2026-09-26_k-docker-image-plan.md`.
 - **Worktree:** branch `main`, `~/Projects/hearsay`, shared with the main chat, the D-track chat, the M3 chat, the M5 chat and the oversight chat. Stage only K files by path; never `git add -A`; never push without Nathan.
