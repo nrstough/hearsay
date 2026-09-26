@@ -11,7 +11,8 @@ from hearsay.detectors.engineered import LEARNED, NAMES, RULE_BASED
 
 
 def test_all_five_registered_and_sorted():
-    assert NAMES == ("compression", "container", "enf", "handcrafted", "splice")
+    assert NAMES == ("compression", "container", "enf", "handcrafted", "speaker_drift", "speech_gate",
+                     "splice")  # fmt: skip
     assert set(NAMES) <= set(base.REGISTRY.names())
     assert [d.name for d in all_detectors() if d.name in NAMES] == list(NAMES)
     assert all(isinstance(base.get(n), Detector) for n in NAMES)
@@ -20,8 +21,8 @@ def test_all_five_registered_and_sorted():
 def test_rule_based_detectors_run_without_any_model():
     x = (0.1 * np.random.default_rng(0).standard_normal(2 * SR)).astype(np.float32)
     for name in RULE_BASED:
-        if name == "container":
-            continue  # needs a real file (ffprobe); covered in tests/test_container_detector.py
+        if name in ("container", "speaker_drift"):
+            continue  # need a real file (ffprobe) / the ECAPA weights; covered in their own tests
         r = safe_run(base.get(name), ClipContext.from_array(x))
         assert r.status == "ok" and r.name == name and 0.0 <= r.score <= 1.0
 
