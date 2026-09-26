@@ -446,6 +446,16 @@ def test_runner_compare_tsv(tmp_path):
     assert r["n_diff_gt_0.01"] == 1 and r["n_diff_gt_0.05"] == 0
 
 
+def test_runner_preflight_tolerance():
+    """Multithreaded x86 BLAS is not bit-reproducible run to run: agree within 1e-6, not ==."""
+    rp = _runner()
+    assert rp.preflight_consistent(0.020098520111101158, 0.020098519315586292)  # the amd64 image's 8e-10
+    assert rp.preflight_consistent(0.5, 0.5 + 1e-9) and rp.preflight_consistent(0.5, 0.5)
+    assert not rp.preflight_consistent(0.5, 0.5 + 1e-3)
+    assert not rp.preflight_consistent(float("nan"), float("nan"))
+    assert not rp.preflight_consistent(float("inf"), float("inf")) and not rp.preflight_consistent(0.5, float("nan"))
+
+
 def test_runner_require_offline_refuses_without_the_env(tmp_path, monkeypatch):
     rp = _runner()
     monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)

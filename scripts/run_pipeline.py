@@ -34,6 +34,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import os
 import sys
 import time
@@ -245,6 +246,10 @@ def open_cache(path: Path, identity: dict, fresh: bool) -> dict[str, dict]:
         why = "--fresh" if fresh else ("no header" if header is None else "identity changed: " + ", ".join(
             f"{k} {header.get(k)!r} -> {v!r}" for k, v in identity.items() if header.get(k) != v))
         aside = path.with_name(f"{path.name}.stale-{_stamp()}")
+        k = 2
+        while aside.exists():  # two moves within one second must not overwrite each other
+            aside = path.with_name(f"{path.name}.stale-{_stamp()}-{k}")
+            k += 1
         path.rename(aside)
         print(f"cache {path} not reused ({why}); moved to {aside.name}", flush=True)
         cache = {}
@@ -254,10 +259,23 @@ def open_cache(path: Path, identity: dict, fresh: bool) -> dict[str, dict]:
     return cache
 
 
+PREFLIGHT_ABS_TOL = 1e-6
+
+
+def preflight_consistent(pa: float, pb: float, abs_tol: float = PREFLIGHT_ABS_TOL) -> bool:
+    """Two preflight passes agree: both finite and within `abs_tol`. Not `==`: multithreaded
+    x86 BLAS/oneDNN is not run-to-run bit-reproducible (the amd64 image saw 8e-10 between two
+    passes on silence); the arm64 Mac happens to be exact. hearsay.submission.preflight's own
+    `a.scores == b.scores` is not used here for the same reason."""
+    return (math.isfinite(pa) and math.isfinite(pb)
+            and math.isclose(pa, pb, rel_tol=0.0, abs_tol=abs_tol))  # fmt: skip
+
+
 def preflight(models: Models, consts: FusionConstants | None, rule: str, tmp: Path,
               apply_gate: bool = True, **kw) -> dict:  # fmt: skip
-    """plan.md: silence and a chord through the whole pipeline, twice; finite and reproducible.
-    Both are non-speech, so with the gate on both must land at the default answer."""
+    """plan.md: silence and a chord through the whole pipeline, twice; finite and reproducible
+    (within PREFLIGHT_ABS_TOL). Both are non-speech, so with the gate on both must land at the
+    default answer (exact checks)."""
     tmp.mkdir(parents=True, exist_ok=True)
     t = np.arange(4 * SR) / SR
     chord = sum(0.1 * np.sin(2 * np.pi * f * t) for f in (261.6, 329.6, 392.0))
@@ -268,7 +286,7 @@ def preflight(models: Models, consts: FusionConstants | None, rule: str, tmp: Pa
         a = analyze_clip(ClipContext(tmp / name), models, consts, rule, apply_gate=apply_gate, **kw)
         b = analyze_clip(ClipContext(tmp / name), models, consts, rule, apply_gate=apply_gate, **kw)
         pa, pb = a["probability_synthetic"], b["probability_synthetic"]
-        if not (np.isfinite(pa) and pa == pb):
+        if not preflight_consistent(pa, pb):
             raise RuntimeError(f"preflight {name}: not finite or not reproducible: {pa} vs {pb}")
         if a["is_speech"]:
             raise RuntimeError(f"preflight {name}: the speech gate let a non-speech clip through")
