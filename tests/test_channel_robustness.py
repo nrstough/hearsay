@@ -442,3 +442,11 @@ def test_highband_stats_ignore_leading_and_trailing_silence():
     a, b = cc.highband_stats(x), cc.highband_stats(padded)
     for k in ("drop_7500_vs_6500", "lvl_6500", "hb_flatness_6_7k"):
         assert abs(a[k] - b[k]) < 1.0, (k, a[k], b[k])
+
+
+def test_verdict_from_checks_which_perturbations_and_rejects_booleans():
+    m = {"e_applied_share": 0.01, "n": 572}
+    wrong = {"mean_abs_d_auc": {"spectra_aasist": 0.001, "m1b_v3": 0.004}, "n_paired": 500,
+             "e_step_effect_min_dcf": {f"x{i}": 0.0 for i in range(5)}}  # fmt: skip
+    assert m3p.verdict_from(wrong, m)["verdict"] == "inconclusive"
+    assert m3p.verdict_from(_p([0.0, 0.0, True, 0.0, 0.0]), m)["verdict"] == "inconclusive"

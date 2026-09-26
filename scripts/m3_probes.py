@@ -149,7 +149,8 @@ def verdict_from(p: dict, m: dict, n_perturb: int = N_PERTURB, n_mlaad: int = N_
     """Gather every D9 input from the two probe readouts and apply m3_verdict. "inconclusive"
     when a probe is short of its cohort or any input (including any per-perturbation step
     effect) is missing or non-finite: Python's max() would otherwise skip a NaN silently."""
-    effects = list(p.get("e_step_effect_min_dcf", {}).values())
+    named = p.get("e_step_effect_min_dcf", {})
+    effects = list(named.values())
     inputs = {"m3_mean_abs_d_auc": p.get("mean_abs_d_auc", {}).get("spectra_aasist"),
               "m1b_mean_abs_d_auc": p.get("mean_abs_d_auc", {}).get("m1b_v3"),
               "mlaad_damped_share": m.get("e_applied_share"),
@@ -159,8 +160,8 @@ def verdict_from(p: dict, m: dict, n_perturb: int = N_PERTURB, n_mlaad: int = N_
         short.append(f"perturbation probe has {p.get('n_paired')} of {n_perturb} clips")
     if not (isinstance(m.get("n"), int) and m["n"] >= n_mlaad):
         short.append(f"MLAAD probe has {m.get('n')} of {n_mlaad} clips")
-    fin = [isinstance(v, (int, float)) and math.isfinite(v) for v in effects]
-    if short or not effects or not all(fin) or len(effects) != len(PERTURBATIONS):
+    fin = [isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in effects]
+    if short or not all(fin) or set(named) != set(PERTURBATIONS):
         return {"verdict": "inconclusive", "reasons": short or ["a step-effect number is missing"], "inputs": inputs}
     verdict, why = m3_verdict(inputs["m3_mean_abs_d_auc"], inputs["m1b_mean_abs_d_auc"],
                               inputs["mlaad_damped_share"], max(effects))  # fmt: skip
@@ -379,7 +380,14 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
 
     def scored(rows, kinds, name):
-        if a.readout_only:
+        if a.readout_only:  # never rewrites the identity; refuses a cache that has none or another one
+            meta = OUT / f"m3_{name}.meta.json"
+            if not meta.exists():
+                raise SystemExit(f"{meta} missing: the cache has no model identity; rescore")
+            stored = json.loads(meta.read_text())
+            if stored.get("kinds") != list(kinds) or not stored.get("models"):
+                raise SystemExit(f"{meta} does not match this probe's perturbations or has no models")
+            print(f"readout-only: cache scored by {stored['models']}", flush=True)
             return select_requested(pd.read_csv(OUT / f"m3_{name}.csv"), rows, kinds)
         return run_scoring(rows, kinds, name, a.threads)
 

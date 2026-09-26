@@ -31,7 +31,7 @@ Run spec: `docs/specs/2026-09-26_channel-robustness.md`. Plan: `docs/reports/202
 
 | Readout | Value |
 |---|---|
-| Domain classifier, grouped out-of-fold AUC | 0.84 pooled; per fold 0.68 / 0.82 / 0.70 / 0.92 (the fifth fold holds the single LJ speaker, one class, no AUC) |
+| Domain classifier, grouped out-of-fold AUC | 0.84 pooled; per fold 0.68 / 0.82 / 0.70 / 0.92 (fold 0 holds the single LJ speaker: one class, no AUC) |
 | **λ̂** (adjusted classify-and-count, TPR 0.84 / FPR 0.28) | **0.51** (95% CI 0.12–0.64) |
 | Rate-consistent variants: q from the fold models / TPR and FPR in-sample | 0.48 / 0.57 |
 | **Duration-matched** (reference clips cropped to test lengths) | **0.36** (AUC 0.81) |
@@ -78,7 +78,7 @@ The pre-declared identifiability rule passes, but only just: VCTK sits at 24.7% 
 | Trigger | Measured | Limit |
 |---|---|---|
 | (a) M3 mean \|ΔAUC\| over 4 perturbations vs M1b | 0.0008 vs 0.0041 | > 2× M1b and > 0.02 |
-| (c) unseen MLAAD spoof damped by the shipped rule | 1.2% (7 of 572) | > 5% |
+| (c) MLAAD spoof damped by the shipped rule | 1.2% (7 of 572) | > 5% |
 | (d) largest rise in fused holdout minDCF from the M3 step, any perturbation | 0.000 (it lowers minDCF in 4 of 5) | > 0.01 |
 
 **1. Perturbation probe.**
@@ -121,7 +121,7 @@ The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any per
 - **Cohort:** 572 MLAAD English spoof clips, 4 per model across 143 models, each cropped to a test length.
 - **Readout:** miss rate at each detector's own inner-OOF brief-cost threshold.
 
-| Detector | Miss rate on unseen MLAAD spoof |
+| Detector | Miss rate on MLAAD spoof |
 |---|---|
 | **M3** (MLAAD exposure unknown) | **14.9%** |
 | M1b v3 | 22.7% |
@@ -134,7 +134,7 @@ The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any per
 
 **3. Agreement (descriptive only, per the Codex plan review).** Spearman(M1b v3, M3) is 0.796 on holdout rows and 0.620 on test rows (gap 0.175, 95% CI 0.141–0.214). The two sets differ in class mix and generators, so the gap is not evidence of memorisation by itself. It says the two models disagree more on the test audio.
 
-**What remains unknown.** M3's training data is still undisclosed; the model card does not settle it (see below). Its perfect clean holdout score (AUC 1.000, minDCF 0.000) is consistent with M3 having seen DiffSSD-like data, and its best MLAAD miss rate is consistent with having seen MLAAD. The probes show that the *suppression step* is safe on these cohorts: it fires only on real clips and never raised the fused minDCF. They do not show that M3 generalises.
+**What remains unknown.** M3's training data is still undisclosed; the model card does not settle it (see below). Its perfect clean holdout score (AUC 1.000, minDCF 0.000) is consistent with M3 having seen DiffSSD-like data, and its best MLAAD miss rate is consistent with having seen MLAAD. The probes show that the *suppression step* is safe on these cohorts: it fires on no holdout spoof clip under any perturbation, damps 1.2% of MLAAD spoof, and never raised the fused minDCF. They do not show that M3 generalises.
 
 **Model card check** (`weights/Spectra-AASIST/README.md`, the local copy of `lab260/Spectra-AASIST`):
 - The card reports evaluation EERs on ASVspoof 2019 LA (0.159%), ASVspoof 2021 LA and DF, ASVspoof5, ADD2022, **In-the-Wild** and several ADD tracks.
@@ -144,7 +144,7 @@ The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any per
 **New finding for the fusion lane: additive noise is the shipped rule's weak spot.**
 - At 20 dB SNR white noise, handcrafted v5 loses almost all discrimination (AUC 0.998 → 0.640), and noise turns fakes into misses: at the inner threshold, M1b misses 88% of spoof and handcrafted 99%, with no rise in false alarms.
 - M1b's minDCF rises from 0.056 to 0.271, and the shipped rule's from 0.012 to 0.269.
-- M3 stays near-perfect (0.116), but its step never fires under noise, so it cannot help there.
+- M3 is the best of the four under noise (minDCF 0.116, AUC 0.997; P_miss 0.32 at its inner threshold), but its step never fires under noise, so it cannot help there.
 - Nothing here changes the shipped rule. It is a README "what did not work" entry and a pointer for any later robustness work. Noise-augmented training of the handcrafted features is the obvious next step, symmetric across classes.
 
 ## B. Is the 7.2 kHz wall a codec?

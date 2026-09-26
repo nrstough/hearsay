@@ -136,3 +136,12 @@ Acceptance criteria:
 10. **Provenance corrected:** the −157 dB source, the Codex-review timing, and the 0.947 run's artifact.
 11. **The duration confound is now measured:** a duration-matched sensitivity gives 0.36.
 12. **Wording and strict JSON:** fixed. The fusion lane's λ̂ line was relayed to oversight.
+
+**Claude critique, round 2 (13:50, on cec75ec): Overall Acceptable.** All 12 round-1 findings were verified closed in code, including a re-extraction check of 18 cached feature keys (maximum difference 1.4e-14), and every report and STATUS number matched the regenerated JSON. Remaining items, all fixed in the following commit:
+1. The report said the suppression step "fires only on real clips", but it damps 1.2% of MLAAD spoof. Reworded.
+2. Two table labels said "unseen MLAAD". Fixed.
+3. The report said the LJ fold was the fifth; it is fold 0. Fixed.
+4. `--readout-only` did not check the cache's identity. It now refuses a cache with no meta file or with other perturbations, and prints the scoring models.
+5. `verdict_from` checked how many step effects there were, not their names, and accepted booleans. Both are now checked, with a test.
+6. The report called M3 "near-perfect" under noise. It now says best of the four, with P_miss 0.32.
+7. Two stale claims sit in another lane's `docs/reports/2026-09-26_fusion-sweep-predeclared.md` (lines 53 and 141), and README.md:225 repeats the "fires only on real clips" claim. Those are other lanes' files, relayed through oversight.
