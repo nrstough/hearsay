@@ -97,3 +97,15 @@ CURRENT's Spearman against the shipped TSV is ≥ 0.999 on non-pinned rows. W4 r
   - H_noise is a bundle swap.
 - **Two or more pass:** ship none unless one Pareto-dominates every other passer across the six cells.
 - **In every case:** Nathan ratifies or not in one 30-minute window (19:30–20:00). No weight or threshold is changed after the table is seen. Nothing auto-ships.
+
+## Clarifications before any new number (18:25, pre-data; the WavLM export does not exist and no W4 bake-off cell has been computed)
+
+Found by the plan critique (Claude) and the Codex plan review (`docs/reports/2026-09-26_post-draft-gate-sweep-plan-review.md`). They resolve ambiguities; none changes a threshold.
+
+1. **P_wl new catches.** The rule text governs: CURRENT's misses are taken at CURRENT's **inner-OOF** brief-cost threshold, and the bar is the absolute **16**. The parenthetical reference numbers ("158 in Round 2"; "M1b 1, M5 33, M3 107") were taken at the In-the-Wild brief-cost argmin, a different threshold. At the inner-OOF threshold, CURRENT has **122** ITW misses (and 26 false alarms), and the same scale is M1b 1, M5 19, M3 79. The bar of 16 is therefore 13% of the operative miss set: stricter than the 10% described, and still below M5's 19. The report prints the miss count. The corrective-share test uses the same threshold.
+2. **The pinned block is empty in the shipped file.** No shipped `cm-score` is below 0.001 (min 0.001446); the file is value-identical to `outputs/fusion/sweep_m5_final_test.csv`'s `p`. "Non-pinned rows" is therefore all 1,671, and the Spearman and crossings use them all. A candidate whose test coverage is incomplete (fewer than 1,671 unique files) is INVALID, not scored on a subset.
+3. **T2 is expected identical at the metric, not row-identical.** Its deeper tier fires on bona fide rows: 133 inner, 34 holdout, 2 ITW. The diagnostic is spoof-only, as written. The report also prints the bona fide fire counts.
+4. **H_noise.** The CPU lane withdrew it at ~17:42. If an export appears anyway, no noise-AUC evidence has been supplied, so its diagnostic fails (as written above) and it cannot pass.
+5. **Rule 7 across row sets.** If two candidates pass, the Pareto comparison re-scores every passer on the intersection of their row sets, so the six cells compare the same rows.
+6. **Invalid inputs.** A candidate whose export fails validation is INVALID: an inverted direction (inner AUC < 0.5), duplicate paths, split or fold disagreement with `splits/nsa_folds.csv`, non-finite logits, incomplete test or ITW coverage, or a non-finite Spearman. INVALID is recorded per candidate; it never passes and never stops the other candidates from being evaluated.
+7. **Rounding in the bake-off.** Perturbation cells are rounded to 4 decimals before the Δ ≥ −0.010 comparison, as in the gate. The bootstrap percentile uses `np.percentile` (linear) on the unrounded replicate Δs.
