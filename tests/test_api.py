@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from hearsay import SR
 from hearsay import api as api_mod
+from hearsay.detectors.speech_gate import BLOCK_TOP
 from hearsay.pipeline import DETECTOR_ORDER, FusionConstants
 from test_pipeline import LOGITS, TOY, FakeModels, fake_dets
 
@@ -82,7 +83,9 @@ def test_analyze_uses_the_pipeline(client, monkeypatch, tmp_path):
     assert r.status_code == 200, r.text
     doc = r.json()
     assert doc["filename"] == "clip one.wav" and doc["duration_s"] == 2.0
-    assert doc["probability_synthetic"] == consts.fuse(LOGITS, "zmean").p
+    assert doc["probability_synthetic"] == pytest.approx(
+        BLOCK_TOP + (1 - BLOCK_TOP) * consts.fuse(LOGITS, "zmean").p
+    )  # the default-answer policy maps scored files into [0.001, 1]
     assert doc["fusion"]["rule"] == "zmean" and doc["verdict"] == "real" and doc["api_seconds"] >= 0
     assert {d["name"] for d in doc["detectors"]} >= {"speech_gate", "m1b_v3", "spectra_aasist"}
     assert fake.calls == 1
