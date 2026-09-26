@@ -4,9 +4,11 @@ scripts/train_handcrafted.py, P(synthetic) as the score, and evidence naming the
 contributing features in plain English with their distance from real speech, e.g. "pitch
 variability (IQR of log F0) 2.1 SD below real speech (toward synthetic)".
 
-Bundle (models/<prefix>_<kind>_<stamp>/model.joblib, newest stamp by default): model, features
+Bundle (models/<prefix>_<kind>_<stamp>/model.joblib, newest stamp by default): features
 (column order), kind ("logreg" | "lgbm"), feature_stats ({name: {real_mean, real_std, auc}} on
-the inner bona fide rows), crop_mode, band_match. Loaded lazily on first run. Test-time audio
+the inner bona fide rows), crop_mode, band_match, and either `model` (a scikit-learn pipeline,
+logreg) or `trees_dump` (a LightGBM booster dump run by `hearsay.trees`, so lightgbm is never
+imported at inference; see that module for why). Loaded lazily on first run. Test-time audio
 is prepared the way the training features were (never a random crop at test time).
 """
 
@@ -19,6 +21,7 @@ from typing import ClassVar
 import numpy as np
 
 from hearsay.detectors.base import ClipContext, DetectorResult
+from hearsay.trees import Trees
 
 REPO = Path(__file__).resolve().parents[3]
 MODELS = REPO / "models"
@@ -35,15 +38,24 @@ def latest_model_dir(models: Path = MODELS, prefix: str = "hc") -> Path:
     return dirs[-1]
 
 
+def predictor(bundle: dict):
+    """The object with `predict_proba` for this bundle (built once, cached on the bundle)."""
+    if "_predictor" not in bundle:
+        if bundle["kind"] == "lgbm":
+            bundle["_predictor"] = Trees(bundle["trees_dump"])
+        else:
+            bundle["_predictor"] = bundle["model"]
+    return bundle["_predictor"]
+
+
 def contributions(bundle: dict, x: np.ndarray) -> np.ndarray:
     """Per-feature contribution to the decision logit for one raw feature row."""
-    model = bundle["model"]
     if bundle["kind"] == "logreg":
+        model = bundle["model"]
         scaler = model.named_steps["standardscaler"]
         clf = model.named_steps["logisticregression"]
         return scaler.transform(x[None, :])[0] * clf.coef_[0]
-    # LightGBM: SHAP-style contributions; the last column is the bias.
-    return np.asarray(model.predict(x[None, :], pred_contrib=True), dtype=np.float64)[0, :-1]
+    return predictor(bundle).contrib(x)[0]  # path attribution over the dumped trees
 
 
 class FeatureModelDetector:
@@ -81,7 +93,7 @@ class FeatureModelDetector:
             lambda: fn(ctx.audio, crop_mode=b["crop_mode"], band_match=b.get("band_match", False)),
         )
         x = np.array([feats[c] for c in b["features"]], dtype=np.float32)
-        p = float(np.clip(b["model"].predict_proba(x[None, :])[0, 1], 1e-6, 1 - 1e-6))
+        p = float(np.clip(predictor(b).predict_proba(x[None, :])[0, 1], 1e-6, 1 - 1e-6))
         logit = float(np.log(p / (1 - p)))
         out = {c: float(feats[c]) for c in b["features"]}
         out[f"{self.prefix}_logit"] = logit

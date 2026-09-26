@@ -17,6 +17,7 @@ Sat Sep 26, 2026, 01:10–03:00. CPU only, in parallel with the main chat's GPU 
 |---|---|
 | Feature modules | `src/hearsay/handcrafted.py` (spectral + prosody, v3 prep), `src/hearsay/compression.py` (codec traces + `launder`) |
 | Contract detectors | `src/hearsay/detectors/{handcrafted,compression,container,enf,splice}.py`, shared learned wrapper `_learned.py`, registrar `engineered.py` |
+| LightGBM without lightgbm | `src/hearsay/trees.py`: numpy evaluator + path attribution over the dumped booster (exact to 1e-9 against lightgbm), because lightgbm and torch each bundle a `libomp.dylib` and loading both in one process segfaults or hangs on macOS. Bundles store `trees_dump`; nothing outside the trainer imports lightgbm (`tests/test_trees.py` pins it). |
 | Extraction | `scripts/extract_handcrafted.py`, `scripts/extract_compression.py` (crop lengths drawn exactly as `extract_embeddings.py --segment --crop test --seed 0`; verified against the main chat's shard 0) |
 | Training + export | `scripts/train_handcrafted.py` (any feature dir; writes the M4 export and `models/<prefix>_<kind>_<stamp>/`) |
 | Rule-based export | `scripts/score_detector.py` (runs a registered detector over the fold file + test manifest) |
@@ -197,6 +198,7 @@ Two things are true at once. LightGBM transfers to the held-out generators far b
 - **At risk (gitignored, not archived):** `models/hc_*`, `models/cmp_*`, `outputs/handcrafted/*_v{2,3}.csv`, `outputs/compression/*.csv`, `outputs/detector_scores/*.csv`, `outputs/inventory/container_*.csv` and `nsa_test_highband.csv`. All regenerable with the commands below (about 25 minutes of CPU on 6 workers).
 - **Owned by the main chat, untouched:** `embed.py`, `probe.py`, `submission.py`, the embedding/probe scripts, `submissions/`, `splits/nsa_folds.csv`.
 - **Open:** the deep detector band match (Recommendation 1); speaker-embedding drift (technique 6) was never started; ENF and splice scores are untested against any labeled edited or hum-bearing audio.
+- **Gotcha found late:** the first commits of this track were made while the full suite was crashing (a pipeline masked pytest's exit status); the crash was the lightgbm + torch OpenMP conflict above, fixed in the follow-up commit with `hearsay.trees`. The suite was green before the follow-up was committed.
 
 ## How to reproduce
 

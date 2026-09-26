@@ -1,15 +1,17 @@
-"""Handcrafted detector against the contract (tests/test_detector_contract.py B1-B9), using a
-tiny model bundle built here so the suite needs no gitignored models/ or data/."""
+"""Handcrafted detector against the contract (tests/test_detector_contract.py B1-B9), using
+tiny model bundles: a logistic regression fit here, and a LightGBM toy read from
+tests/fixtures/lgbm_toy.json (dumped once by a lightgbm-only process; this suite must never
+load lightgbm next to torch, see hearsay.trees). No gitignored models/ or data/ needed."""
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 
 import joblib
 import numpy as np
 import pytest
-from lightgbm import LGBMClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -51,18 +53,23 @@ def _toy_data():
 
 
 def _make_bundle(out: Path, kind: str) -> Path:
-    cols, X, y = _toy_data()
-    if kind == "logreg":
-        model = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=2000))
-    else:
-        model = LGBMClassifier(n_estimators=20, min_child_samples=4, verbose=-1, n_jobs=1)
-    model.fit(X, y)
-    stats = {c: {"real_mean": float(X[y == 0, i].mean()), "real_std": float(X[y == 0, i].std()),
-                 "auc": 0.5} for i, c in enumerate(cols)}  # fmt: skip
     d = out / f"hc_{kind}"
     d.mkdir()
-    joblib.dump({"model": model, "features": cols, "kind": kind, "feature_stats": stats,
-                 "crop_mode": "segment", "train": "toy", "folds": "toy"}, d / "model.joblib")  # fmt: skip
+    common = {"kind": kind, "crop_mode": "segment", "band_match": True, "train": "toy",
+              "folds": "toy"}  # fmt: skip
+    if kind == "logreg":
+        cols, X, y = _toy_data()
+        model = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=2000))
+        model.fit(X, y)
+        stats = {c: {"real_mean": float(X[y == 0, i].mean()),
+                     "real_std": float(X[y == 0, i].std()), "auc": 0.5}
+                 for i, c in enumerate(cols)}  # fmt: skip
+        bundle = {"model": model, "features": cols, "feature_stats": stats, **common}
+    else:
+        fx = json.loads((REPO / "tests" / "fixtures" / "lgbm_toy.json").read_text())
+        bundle = {"trees_dump": fx["dump"], "features": fx["features"],
+                  "feature_stats": fx["feature_stats"], **common}  # fmt: skip
+    joblib.dump(bundle, d / "model.joblib")
     return d
 
 

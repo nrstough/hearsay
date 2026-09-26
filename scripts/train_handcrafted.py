@@ -40,6 +40,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from hearsay.metrics import PI_SYNTH, eer, min_cost, report, sigmoid
+from hearsay.trees import Trees
 
 REPO = Path(__file__).resolve().parents[1]
 META_COLS = {"path", "label", "generator", "speaker", "utt", "source", "filename", "group",
@@ -196,9 +197,19 @@ def main() -> None:
     stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M")
     out = REPO / "models" / f"{args.model_prefix}_{best}_{stamp}"
     out.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": model, "features": feat_cols, "kind": best, "feature_stats": stats,
-                 "crop_mode": crop_mode, "band_match": band_match, "prefix": args.model_prefix,
-                 "train": args.train, "folds": str(args.folds)}, out / "model.joblib")  # fmt: skip
+    bundle = {"features": feat_cols, "kind": best, "feature_stats": stats,
+              "crop_mode": crop_mode, "band_match": band_match, "prefix": args.model_prefix,
+              "train": args.train, "folds": str(args.folds)}  # fmt: skip
+    if best == "lgbm":
+        # Store the dumped trees, not the lightgbm object: inference must not import lightgbm
+        # next to torch (hearsay.trees explains). Check the numpy evaluator reproduces lightgbm.
+        dump = model.booster_.dump_model()
+        gap = np.abs(Trees(dump).predict_proba(X[va])[:, 1] - model.predict_proba(X[va])[:, 1])
+        assert gap.max() < 1e-6, f"numpy trees disagree with lightgbm by {gap.max():.2e}"
+        bundle["trees_dump"] = dump
+    else:
+        bundle["model"] = model
+    joblib.dump(bundle, out / "model.joblib")
     scores_path = REPO / "outputs" / "detector_scores" / f"{args.out_name}.csv"
     scores_path.parent.mkdir(parents=True, exist_ok=True)
     export.to_csv(scores_path, index=False)
