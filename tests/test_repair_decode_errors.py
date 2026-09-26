@@ -187,7 +187,21 @@ def test_tolerance_is_element_wise_at_wavlm_scale():
 def test_no_tmp_file_left_after_repair(tmp_path):
     out, man = _make(tmp_path)
     rep.repair(None, out, man, n_verify=2, embed=fake_embed)
-    assert not list(out.glob("*.tmp.npz"))
+    assert not [p for p in out.iterdir() if p.name.endswith(".tmp")]
+
+
+def test_failed_rename_leaves_the_shard_untouched(tmp_path, monkeypatch):
+    out, man = _make(tmp_path)
+    before = {p.name: p.read_bytes() for p in out.glob("shard_*.npz")}
+
+    def boom(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(rep.os, "replace", boom)
+    with pytest.raises(OSError, match="disk full"):
+        rep.repair(None, out, man, n_verify=2, embed=fake_embed)
+    assert {p.name: p.read_bytes() for p in out.glob("shard_*.npz")} == before
+    assert not any(p.name.startswith("shard_") and p.name.endswith(".tmp") for p in out.iterdir())
 
 
 class _StubModel(torch.nn.Module):
@@ -258,3 +272,54 @@ def test_verify_only_fails_on_flags_crops_or_drift(tmp_path):
         return fake_embed(model, path, crop_s, seed) + np.float16(5)
 
     assert not rep.verify_set(None, out2, man2, per_shard=1, embed=drifted)["ok"]
+
+
+def test_verify_only_explicit_rows_are_really_re_embedded(tmp_path):
+    out, man = _make(tmp_path, flagged=())
+    seen = []
+
+    def spy(model, path, crop_s, seed):
+        seen.append(path)
+        return fake_embed(model, path, crop_s, seed)
+
+    res = rep.verify_set(None, out, man, per_shard=0, rows=(7,), embed=spy)
+    assert seen == ["clip_7"] and res["explicit_rows_checked"] == [7] and res["ok"]
+    with pytest.raises(AssertionError, match="nothing to re-embed"):
+        rep.verify_set(None, out, man, per_shard=0, embed=spy)
+
+
+def test_verify_only_fails_on_twin_meta_or_paths(tmp_path):
+    out, man = _make(tmp_path, flagged=())
+    tw = _twin(tmp_path, out)
+    (tw / "extract_meta.json").write_text(json.dumps({"mode": "segment", "seed": SEED0 + 1}))
+    res = rep.verify_set(None, out, man, tw, per_shard=1, embed=fake_embed)
+    assert not res["meta_equal_twin"] and not res["ok"]
+    tw2 = tmp_path / "twin2"
+    tw2.mkdir()
+    for p in tw.iterdir():
+        (tw2 / p.name).write_bytes(p.read_bytes())
+    (tw2 / "extract_meta.json").write_text((out / "extract_meta.json").read_text())
+    tm = pd.read_csv(tw2 / "manifest.csv")
+    tm.assign(path=tm.path[::-1].to_numpy()).to_csv(tw2 / "manifest.csv", index=False)
+    res = rep.verify_set(None, out, man, tw2, per_shard=1, embed=fake_embed)
+    assert res["meta_equal_twin"] and not res["paths_equal_twin"] and not res["ok"]
+
+
+def test_verify_only_fails_on_a_manifest_flag_alone(tmp_path):
+    out, man = _make(tmp_path, flagged=())
+    m = pd.read_csv(out / "manifest.csv")
+    m["flag"] = m.flag.fillna("").astype(object)  # an all-empty column reads back as float NaN
+    m.loc[3, "flag"] = "decode_error"
+    m.to_csv(out / "manifest.csv", index=False)
+    res = rep.verify_set(None, out, man, per_shard=1, embed=fake_embed)
+    assert res["decode_errors_shards"] == 0 and res["decode_errors_manifest"] == 1 and not res["ok"]
+
+
+def test_verify_only_fails_on_non_finite_embeddings(tmp_path):
+    out, man = _make(tmp_path, flagged=())
+    p = min(out.glob("shard_*.npz"))
+    z = dict(np.load(p))
+    z["emb"][1, 0, 0] = np.inf
+    np.savez(p, **z)
+    res = rep.verify_set(None, out, man, per_shard=1, embed=fake_embed)
+    assert not res["finite"] and not res["ok"]

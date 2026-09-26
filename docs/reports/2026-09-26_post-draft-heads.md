@@ -138,7 +138,8 @@ The four reference counts reproduce the Fable consult's numbers exactly (`docs/c
   - In-the-Wild: 1057, 1090, 1390, 2049, 2050, 2051, 2118, 2215, 2224, 2368, 2719.
   - ASV19: 1279, 1303, 1350, 1365, 1377, 2912, 2913, 3369, 3370, 3371.
   - Train sample: the 74 listed in the chain log.
-- `tests/test_repair_decode_errors.py` covers it (6 hermetic tests, including a counterfactual: an identity mismatch writes nothing).
+  - The train IDs come from `outputs/logs/wavlm_finish_chain.log`. The other 25 were printed by the three unlogged repair runs and recovered from the session transcript. The verify-only runs re-embedded all 99 and match the stored values exactly.
+- `tests/test_repair_decode_errors.py` covers it (22 hermetic tests after the audit rounds; each of 17 single-guard mutants of the tool fails at least one of them).
 
 **Latent hazard for other lanes.** `extract_embeddings.py` falls back to zeros on a decode failure and only flags the row. Any future extraction under memory pressure should check `manifest.csv`'s `flag` column before training, or run the repair tool.
 

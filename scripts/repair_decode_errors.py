@@ -78,8 +78,10 @@ def _check(model, embed, manifest, seed0, z, i) -> dict:
 
 
 def _savez_atomic(path: Path, z: dict) -> None:
-    tmp = path.with_name(path.stem + ".tmp.npz")
-    np.savez(tmp, **z)
+    # Named outside the shard_*.npz glob, so a crash never leaves a second copy of the rows.
+    tmp = path.with_name("." + path.name + ".tmp")
+    with open(tmp, "wb") as f:
+        np.savez(f, **z)
     os.replace(tmp, path)
 
 
@@ -171,10 +173,12 @@ def verify_set(model, out: Path, manifest: pd.DataFrame, twin: Path | None = Non
              for i in rng.choice(len(z["row"]), min(per_shard, len(z["row"])), replace=False)}  # fmt: skip
     picks |= {where[int(r)] for r in rows}
     checks = [_check(model, embed, manifest, seed0, zs[k], i) for k, i in sorted(picks)]
+    assert checks, "nothing to re-embed: raise --per-shard or pass --rows"
+    checked = {c["row"] for c in checks}
     res["n_identity_checked"] = len(checks)
     res["identity_worst_excess"] = max(c["excess"] for c in checks)
     res["identity_max_abs_diff"] = max(c["max_abs_diff"] for c in checks)
-    res["explicit_rows_checked"] = sorted(int(r) for r in rows)
+    res["explicit_rows_checked"] = sorted(int(r) for r in rows if int(r) in checked)
     res["ok"] = bool(res["decode_errors_shards"] == 0 and res["decode_errors_manifest"] == 0 and res["finite"]
                      and res["identity_worst_excess"] <= 0
                      and all(res.get(k, True) for k in ("meta_equal_twin", "paths_equal_twin", "crop_equal_twin")))  # fmt: skip

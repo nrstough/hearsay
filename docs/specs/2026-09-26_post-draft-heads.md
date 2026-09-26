@@ -92,3 +92,14 @@ The critique graded e611d1b **Fail** on Test coverage and Documentation. Fixed i
   - The report: repaired-row IDs, A5 evidence, extraction start 17:19, per-shard solo rates, the inner-OOF averse gap, and the Reading section reconciled with the gate verdict.
   - The CLAUDE.md gotcha line: 99 of 32,319 rows (0.31%), flagged rather than silent. The AI-use disclosure's WavLM entry had already been updated by other lanes (1dccb8c, cd9eb11); a heads-lane bullet was added.
 - **A10 after the fixes:** `uv run pytest -q` 770 passed, 1 skipped (working tree including other lanes' commits up to 1461c1f); `uv run ruff check .` clean.
+- **Housekeeping.** The `submissions/log.csv` row was appended in this lane but landed in the gate lane's commit cbee709, which staged the file after the append. cf11b85's message says it added the row.
+
+## Post-run notes, round 2 (post-run; Claude critique round 2: Acceptable, low items fixed)
+
+- **N1.** The atomic write's temp file is now `.shard_XXXXX.npz.tmp`, outside the `shard_*.npz` glob, so a crash cannot leave a second copy of the rows for a loader to pick up.
+- **N2.** `verify_set` now reports only the explicit rows it actually re-embedded, and refuses an empty check.
+  - Five tests were added: explicit rows really re-embedded, twin meta mismatch, twin path mismatch, a manifest-only flag, and a non-finite embedding. Plus a failed rename that leaves the original shard untouched.
+  - `tests/test_repair_decode_errors.py` now has 22 tests. The critique's 17 single-guard mutants of the tool are all caught (6 survived before).
+- **N3.** The report's test count is updated.
+- **N5.** The report states the source of the 25 recovered row IDs.
+- **N4.** The CLAUDE.md lane bullet names a Codex audit; its result is recorded below once it has run.
