@@ -93,6 +93,17 @@ The sample is 2,000 real clips from 54 speakers plus 1,000 fakes, web-sourced ce
 | **In-the-Wild minDCF** | **0.374** | 0.405 |
 | In-the-Wild P_FA at the inner threshold | **1.2%** | 5.7% |
 
+**Update ~05:40 (band-matched v3 and M3):**
+
+| Detector | NSA holdout minDCF | In-the-Wild minDCF | In-the-Wild real P_FA | Test share > 0.5 (prior ~30%) |
+|---|---|---|---|---|
+| M1 v3 (band-matched) | 0.159 | 0.380 | 0.7% | 28.9% (v2 was 39.6%) |
+| M1b v3 (band-matched, +VCTK) | 0.072 | 0.342 | 0.8% | 26.8% |
+| **M3 Spectra-AASIST** (pretrained, frozen, band-matched) | pending (~06:00) | **0.065** | **0.0%** (0 of 2,000) | 26.5% (200-clip pilot) |
+| Handcrafted v4 (234 features, LightGBM) | 0.170 | 1.00 (AUC 0.76) | 0.65% | 41% |
+
+**Spectra-AASIST's training data is undisclosed.** Its card reports 1.46% EER on In-the-Wild, and it separates our NSA inner rows perfectly (AUC 1.0). So its In-the-Wild and inner-fold numbers may be in-sample. Band matching fixed the test-distribution shift but left the M1 In-the-Wild gap unchanged. **New question: how should we weight a detector whose validation rows may be in its training data?**
+
 - **Both models are 3–5× worse on real-world audio** than on the NSA-domain holdout. The brief says the test's real audio may include smartphone, telephony and field recordings.
 - **Adding VCTK read speech did not help on In-the-Wild.** An earlier consult predicted it would.
 - Part of the gap may be the 7.2 kHz band mismatch (In-the-Wild isn't low-passed either); the re-measurement will show.
