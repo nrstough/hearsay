@@ -116,6 +116,7 @@ Keep this current through the weekend; copy into Devpost. The rules require cred
 
 **AI tools**
 - Claude Code (Anthropic): used for environment setup, writing project docs and scripts, and as a coding assistant during the event. So far:
+  - the M5 rung (Sat Sep 26, vast.ai chat): data bundle, fold-disciplined manifest, augmentation, trainer/scorer/assembler, the vast.ai launch/reaper scripts, the ablation and the report; rented A100 boxes on vast.ai (about $5 of credit) with Cloudflare R2 as the transfer store
   - the loader, the TSV writer and the metrics
   - the M1 probe pipeline
   - data pulls
@@ -131,7 +132,7 @@ Keep this current through the weekend; copy into Devpost. The rules require cred
 
 **Pretrained models / checkpoints** (name, source, license, how used)
 Downloaded before the event to `weights/`; fill in "how used" as each is actually used.
-- XLS-R 300M, `facebook/wav2vec2-xls-r-300m` (Hugging Face, Meta), Apache-2.0: core SSL front end (planned M1/M5).
+- XLS-R 300M, `facebook/wav2vec2-xls-r-300m` (Hugging Face, Meta), Apache-2.0: core SSL front end. M1: frozen, layer-7 probe. M5: the first 12 transformer layers kept frozen with a learned layer-weighted sum, attentive statistics pooling and a linear head trained on vast.ai (A100), with laundering augmentation; checkpoint on the HF Hub (private `nrs124554433/hearsay-m5-xlsr`). See `docs/reports/2026-09-26_m5-xlsr-finetune.md`.
 - WavLM Large, `microsoft/wavlm-large` (Hugging Face, Microsoft): bake-off challenger. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT). _Verify before submission._
 - WavLM Base, `microsoft/wavlm-base` (Hugging Face, Microsoft): bake-off / speed spare. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT). _Verify before submission._
 - Spectra-AASIST, `lab260/Spectra-AASIST` (Hugging Face): M3 score stream (`outputs/detector_scores/spectra_aasist.csv`), run off the shelf with no training through the shared band-matched input path, as a second deep score for fusion beside the XLS-R probe. License unclear: repo header says Apache-2.0, model card text says MIT. Output index 0 = spoof, 1 = bonafide.
@@ -139,15 +140,15 @@ Downloaded before the event to `weights/`; fill in "how used" as each is actuall
 
 **Public datasets** (name, source, license, how used)
 Downloaded before the event to `data/`; fill in "how used" as each is actually used.
-- ASVspoof 2019 LA (University of Edinburgh DataShare, doi handle 10283/3336), Open Data Commons Attribution License: training/baseline data.
+- ASVspoof 2019 LA (University of Edinburgh DataShare, doi handle 10283/3336), Open Data Commons Attribution License: public shakedown of the M1 pipeline; its train+dev bona fide (40 VCTK speakers) plus a 2.5k A01–A06 anchor are training-only extra rows for M1b and M5 (`splits/nsa_folds_plus_asv19.csv`), never scored or held out.
 - In-the-Wild (Müller et al. 2022; `mueller91/In-The-Wild` on Hugging Face), license listed as CC-BY-SA-4.0 on Hugging Face and Apache-2.0 on deepfake-total.com: held-out stress test only, never trained on.
-- MLAAD (`mueller91/MLAAD` on Hugging Face, gated, non-commercial notice): 6,390 English synthetic clips pulled during the event (30 per model across 143 models, plus 300 per model for the ElevenLabs, Gemini and Qwen3 families named on the kickoff slide). Planned training data.
+- MLAAD (`mueller91/MLAAD` on Hugging Face, gated, non-commercial notice): 6,180 unique English synthetic clips pulled during the event (30 per model across 143 models, plus 300 per model for the ElevenLabs, Gemini and Qwen3 families named on the kickoff slide; the two pulls overlap by 210). Used by M5 as training-only spoof data, capped at 12% of the spoof side per batch and ≤ 120 clips per model, with the OpenVoice / XTTS / ElevenLabs families excluded from the fold models that validate on those generators.
 - NSA HEARSAY data (provided by the sponsor during the event): 1,671-file test set, a resampled LJ Speech subset (real), DiffSSD (synthetic, Purdue), and the ASVspoof5 evaluation code for MinDCF.
-- LibriSpeech dev-clean/dev-other/test-clean/test-other (openslr.org/12, CC BY 4.0): 5,323 multi-speaker bona fide clips; 4,000 of them in the NSA training sample.
+- Full LJ Speech 1.1 (keithito.com, public domain): 13,100 clips of one speaker; 6,000 in the NSA training sample, the rest training-only extra rows for M5 (the sponsor's resampled subset is under `data/nsa/LJRealResampled`).
+- LibriSpeech dev-clean/test-clean (openslr.org/12, CC BY 4.0): 5,323 multi-speaker bona fide clips; 4,000 of them in the NSA training sample, the rest training-only extra rows for M5.
 
 **Planned, not yet downloaded or used** (move each item up to the list above once it is actually used):
 - VCTK as a second multi-speaker bona fide source (LibriSpeech dev+test is in use; see above).
-- Full LJ Speech (keithito.com).
 - ReplayDF (optional).
 - ExifTool, for metadata forensics. _Not used: ffprobe (FFmpeg) covered the embedded fields, and the test set carries none beyond one encoder tag._
 

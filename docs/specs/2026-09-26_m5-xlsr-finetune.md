@@ -191,7 +191,23 @@ git diff --stat -- src/hearsay/embed.py scripts/extract_embeddings.py scripts/tr
 - **04:05** Gate extended (main chat + oversight): beat M1 on the outer holdout **and** the pooled 5-fold OOF **and** In-the-Wild bona fide P_FA at the OOF minDCF threshold ≤ M1's (read from M1's `meta.json` stress block). The bar is the NSA-only M1 selected by its `train` field, not by timestamp; M1b is reported beside it.
 - **04:30** MLAAD probe A (`outputs/m5_probe_a.json`): MLAAD-vs-DiffSSD spoof AUC 0.90 on augmented handcrafted features; LibriSpeech 66% and VCTK 90% land on the MLAAD side → MLAAD capped at **12%** of the spoof side (config), pending the ITW read-out.
 - **04:29–04:51** Pilot #1 (A100, instance 52716242, $0.61/h): setup 9 min, codec pass 16,015 variants in 273 s (no AMR-NB encoder on the image; MP3/Opus/AAC/μ-law), then FAIL: the trainer's tree check ran stale code (code.tgz built before the `codecs`-dir exclusion patch). Reaper destroyed the box within 60 s. Fix: `scripts/cloud/push_code.sh` rebuilds code.tgz + TREE_SHA + meta and pushes them in one step. Also found and fixed: the box's rclone config needed `no_check_bucket = true` (R2 writes were 403 while reads worked); the reaper exited before any job existed and used bash-4 arrays on macOS bash 3.2.
-- **04:54** Pilot #2 launched (instance 52718897) with the codec variants pulled from R2.
+- **04:54** Pilot #2 launched (instance 52718897) with the codec variants pulled from R2. 600 steps in 7 min; fold-4 minDCF 0.81 (LR decayed to zero: a throughput run).
+- **05:10–06:40** Ablation on folds 0 and 4 (2,500 steps): NSA-only fine-tune 0.528 / 0.762; NSA+extra fine-tune 0.515 / 0.410 (replicate 0.377); **frozen backbone + NSA+extra 0.520 / 0.308** vs M1 v3 0.524 / 0.415. Decision: the frozen recipe (D5 amended: `train_top = 0`) for all six final models. Two more rentals were lost to my own config-string bug (zsh `$VAR:e` modifier emptied a base64 config; fixed with `${VAR}`), one to a stale `code.tgz` (fixed with `push_code.sh`).
+- **06:40–07:33** Finals: frozen folds 1, 2, 3 and the full model (3,000 steps) on boxes 1 and 2 (box 2 reaped after a FAIL; the full model ran on box 1). All boxes destroyed at 07:34; spend $5.09.
+- **07:41** Assembled: `outputs/detector_scores/m5_xlsr_ft.csv` (16,142 / 3,858 / 1,671), `models/m5_xlsr_ft_20260926-0741/meta.json`, checkpoint on the HF Hub (sha-verified), report `docs/reports/2026-09-26_m5-xlsr-finetune.md`.
+
+### Acceptance criteria (07:45)
+
+1. **Tests:** `uv run pytest -q` → **419 passed** (215 + the CPU chat's additions + 87 M5 tests: `tests/test_m5_{manifest,bundle,codecs,crops,model,scores}.py`, `tests/test_augment.py`, `tests/test_cloud_scripts.py`); `uv run ruff check .` clean. Every P2 row maps to a test or a runtime check; runtime checks recorded in the report: C4 shortcut gate (worst AUC 0.62), D6 realized rates (0.645–0.657), E3 direction tripwire (AUC 0.78–0.88 at step 250 on every run), G2/G3/G5 (reaper log, budget guard, no key on any box).
+2. **Pilot:** throughput measured (190 clips/s fine-tune, ~2× for frozen), loss falling, fold-4 minDCF finite, AUC > 0.5. **Not exercised:** the resume-from-R2 path (G4) — checkpoints were pushed every eval, but no run was resumed; recorded as a gap.
+3. **Outputs:** F1–F5 asserted by the assembler on the real files; F6 parity Spearman 0.9992 / median |Δ| 0.002 / max 0.28 on one clip (the max exceeds the 0.05 plan threshold on 1 of 50 clips; recorded, not hidden). **Gate result: not passed** (holdout 0.363 vs 0.159; pooled OOF 0.302 vs 0.257; ITW P_FA 0.45% vs 0.7% passes). A failed gate is a valid outcome; M5 is a stacker column.
+4. **Spend:** $5.09 of $38.37; 0 instances at the end (`teardown_check.sh`); one ledger row per rental plus the total.
+5. **Checkpoint:** `nrs124554433/hearsay-m5-xlsr` (private), re-downloaded and sha-verified against `hashes.json`.
+6. **No diff** in `src/hearsay/embed.py`, the M1 scripts, `splits/`, `submissions/` or the CPU chat's files (`git log --stat` on this chat's commits touches only M5 files, `CLAUDE.md` disclosure lines and the ledger). No MPS use: the only local model runs were CPU (`m5_score.py`, the tiny-config tests).
+
+**Docs delivered:** this spec, the plan + Codex review, the report, the ledger, the consult records, the M3 handoff, the `CLAUDE.md` disclosure lines. **Conditional items:** `docs/STATUS.md` (main chat owns; M5 line offered in the oversight report), `docs/plan.md` (ladder unchanged: M5 did not replace M1).
+
+**Review scorecards:** Claude critique: _pending_. Codex audit: _pending_.
 
 
 ## Appendix: P2 failure-mode tables (frozen 03:05; ids referenced by the plan and tests)
