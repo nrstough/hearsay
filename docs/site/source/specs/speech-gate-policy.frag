@@ -17,8 +17,8 @@
 <h3 id="policy">The default-answer policy</h3>
 <ul>
 <li>Judged files are mapped into [{{num:0.001|src/hearsay/detectors/speech_gate.py#L52}}, 1] (the determinate map, applied once).</li>
-<li>Gated files that decoded land in [1e-4, 1e-3): ordered by a weak signal (the probe's own probability when it exists), with a {{num:0.01|src/hearsay/detectors/speech_gate.py#L54}} share of hash jitter from the filename so no two files tie.</li>
-<li>Files that failed to decode, or are missing, land in [0, 1e-4), at the very bottom ({{src:src/hearsay/detectors/speech_gate.py#L132|speech_gate.py, lines 132–162}}).</li>
+<li>Gated files that decoded land below {{num:0.001|src/hearsay/detectors/speech_gate.py#L52}} (<code>BLOCK_TOP</code>) and at or above a tenth of it (<code>FAILURE_TOP</code>): ordered by a weak signal (the probe's own probability when it exists), with a {{num:0.01|src/hearsay/detectors/speech_gate.py#L54}} share of hash jitter from the filename so no two files tie.</li>
+<li>Files that failed to decode, or are missing, land below <code>FAILURE_TOP</code>, at the very bottom ({{src:src/hearsay/detectors/speech_gate.py#L132|speech_gate.py, lines 132–162}}).</li>
 <li>Only the gate's own flag gates a file; a gate error does not.</li>
 </ul>
 <h2 id="status">Status</h2>

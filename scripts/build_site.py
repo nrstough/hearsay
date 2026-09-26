@@ -73,7 +73,7 @@ NUM_ALLOW = [
     r"\bHGT\d+\b",
     r"\b[A-Za-z]\d{3,}\b",
 ]
-NUM_RE = re.compile(r"(?<![\w.,/#-])(\d+(?:\.\d+)?%|\d{1,3}(?:,\d{3})+|\d+\.\d+|\d{3,})(?![\w%]|[.,]\d)")
+NUM_RE = re.compile(r"(?<![\w.,/#-])(\d+(?:\.\d+)?e[-+]?\d+|\d+(?:\.\d+)?%|\d{1,3}(?:,\d{3})+|\d+\.\d+|\d{3,})(?![\w%]|[.,]\d)")
 
 
 class BuildError(Exception):
@@ -567,7 +567,7 @@ class Converter:
             if k not in ALLOWED_ATTRS:
                 continue
             v = (v or "").strip("\"'")
-            if k == "src" and not v.startswith("data:"):
+            if k == "src" and not v.startswith("data:image/"):
                 return None
             if k == "style":
                 props = []
@@ -609,14 +609,14 @@ class Converter:
             alt, src = m.group(1), m.group(2)
             if src.startswith("data:image/"):
                 href = src
-            elif re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", src):
+            elif re.match(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//)", src):
                 # an external or scripted image source never becomes a tag: the site is offline
                 self.warnings.append(f"external image source left as text: {src[:60]}")
                 return self._stash(esc(m.group(0)))
             else:
                 resolved = self.link(html.unescape(src))
                 href = resolved[0] if resolved else src
-                if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", href) and not href.startswith(GITHUB_BLOB):
+                if re.match(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//)", href) and not href.startswith(GITHUB_BLOB):
                     self.warnings.append(f"external image source left as text: {src[:60]}")
                     return self._stash(esc(m.group(0)))
             return self._stash(f'<img src="{attr(href)}" alt="{attr(alt)}">')
@@ -736,7 +736,7 @@ class Site:
         is not in the repository (gitignored). Records a warning for a missing target."""
         if re.match(r"^(https?:|mailto:)", href):
             return href, None
-        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", href) and not re.match(r"^[A-Za-z]:[\\/]", href):
+        if re.match(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//)", href) and not re.match(r"^[A-Za-z]:[\\/]", href):
             # javascript:, vbscript:, data: and any other scheme: never a link
             self._warn(f"unsafe link scheme left as text: {href[:60]} (from {source_rel})")
             return None
@@ -761,12 +761,11 @@ class Site:
         if target in self.corpus_set:
             url = rel_url(self.lib_url[target], page_url)
             return (url + ("#" + frag if frag else "")), None
+        if any(target.startswith(root) for root in GITIGNORED_ROOTS):
+            return None  # gitignored, whether or not this machine has the file
         abs_target = REPO / target
         if abs_target.is_file() and abs_target.suffix.lower() in (".svg", ".png", ".jpg", ".jpeg", ".gif", ".mmd"):
             return rel_url(self.copy_asset(target), page_url), None
-        for root in GITIGNORED_ROOTS:
-            if target.startswith(root) and not abs_target.exists():
-                return None
         if abs_target.is_dir():
             return GITHUB_TREE + target, "on GitHub"
         if abs_target.exists():
@@ -865,12 +864,12 @@ class Site:
             if path in self.corpus_set:
                 url = rel_url(self.lib_url[path], page.url) + ("#" + frag if frag else "")
                 where = path + (f", section {frag}" if frag else "")
+            elif any(path.startswith(r) for r in GITIGNORED_ROOTS):
+                return None, path + " (not in the repository)"
             elif (REPO / path).exists():
                 anchor = "#" + frag if frag else ""
                 url = GITHUB_BLOB + path + anchor
                 where = path + (f" line {frag[1:]}" if frag.startswith("L") else "") + " (GitHub; assumes main is public)"
-            elif any(path.startswith(r) for r in GITIGNORED_ROOTS):
-                return None, path + " (not in the repository)"
             else:
                 raise BuildError(f"citation source not found: {src} on {page.url}")
             return url, where

@@ -14,7 +14,7 @@
 <li><code>report</code> returns EER, minDCF, the actual cost at the Bayes threshold, the same at an even prior, and both sponsor-code readings; <code>by_group</code> gives per-generator and per-source readouts.</li>
 </ul>
 <h2 id="status">Status</h2>
-<p>Built in the first hours; the sponsor-code twin was verified against the shipped script within 1e-9 for both polarities (a data-gated test).</p>
+<p>Built in the first hours; the sponsor-code twin was verified against the shipped script within {{num:1e-9|tests/test_audio_and_submission.py#L252}} for both polarities (a data-gated test).</p>
 <h2 id="numbers">Numbers</h2>
 <p>Every table on this site.</p>
 <h2 id="limits">Known limits</h2>

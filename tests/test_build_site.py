@@ -228,6 +228,8 @@ def test_allowlisted_raw_html_passes_and_others_escape(bs):
     html, _ = conv(bs, text)
     assert '<span class="math inline">x</span>' in html and "<sub>2</sub>" in html
     assert "&lt;script&gt;" in html and '&lt;img src="http://e/x.png"&gt;' in html
+    raw, _ = conv(bs, '<img src="data:text/html;base64,AAAA"> <img src="data:image/gif;base64,AAAA">')
+    assert raw.count("<img") == 1 and 'alt=""' in raw and "data:text" not in re.sub(r"&lt;.*?&gt;", "", raw)
     assert 'src="data:image/png;base64,AAAA"' in html and "url(" not in html and "max-width:100%" in html
 
 
@@ -304,10 +306,11 @@ def test_markdown_image_and_link_syntax_cannot_inject(bs, tmp_path):
     site = bs.Site(tmp_path / "s", strict=False)
     def link(h):
         return site.resolve(h, "README.md", "library/readme.html")
-    html, c = conv(bs, "![pix](https://evil.example/t.png) [click](javascript:alert(1)) [d](data:text/html;base64,AAAA) [v](vbscript:x)", link=link)
+    html, c = conv(bs, "![pix](https://evil.example/t.png) [click](javascript:alert(1)) [d](data:text/html;base64,AAAA) [v](vbscript:x) ![p](//evil.example/t.png) [q](//evil.example/)", link=link)
     assert "<img" not in html and "javascript:" not in html and "data:text" not in html and "vbscript" not in html
+    assert not re.search(r"(?:src|href)=\"[^\"]*evil\.example", html)
     assert "![pix](https://evil.example/t.png)" in html and '<code title="not in the repository">click</code>' in html
-    assert sum("left as text" in w for w in site.warnings + c.warnings) == 4
+    assert sum("left as text" in w for w in site.warnings + c.warnings) == 6
     html, _ = conv(bs, "![ok](data:image/png;base64,AAAA) ![flow](docs/img/architecture-flow.svg)", link=link)
     assert html.count("<img") == 2 and 'src="data:image/png;base64,AAAA"' in html
     html, _ = conv(bs, "[win](C:/x.md)", link=link)  # a drive letter is a path, not a scheme
@@ -319,7 +322,7 @@ def test_no_external_images_or_script_hrefs_in_pages(pages):
         if rel.startswith("source/"):
             continue
         assert not re.search(r'<img[^>]+src="(?:https?:|//)', html), rel
-        assert not re.search(r'<a\b[^>]*href="\s*(?:javascript|vbscript|data):', html, re.IGNORECASE), rel
+        assert not re.search(r'<a\b[^>]*href="\s*(?:javascript:|vbscript:|data:|//)', html, re.IGNORECASE), rel
         for m in re.finditer(r"<img\b[^>]*>", html):
             assert " alt=" in m.group(0), (rel, m.group(0)[:80])
 
@@ -684,6 +687,9 @@ def test_uncited_number_is_caught(bs, tmp_path):
     problems = site.check_citations()
     flagged = {re.search(r"uncited number '([^']+)'", p).group(1) for p in problems}
     assert flagged == {"0.0065", "1,671", "27.4%", "500", "0.014", "0.228", "0.5", "2.5%"}
+    page.body = "<p>within 1e-9, in [1e-4, 1e-3), and 2.5e+3 rows</p>"
+    problems = site.check_citations()
+    assert {re.search(r"uncited number '([^']+)'", p).group(1) for p in problems} == {"1e-9", "1e-4", "1e-3", "2.5e+3"}
 
 
 def test_gitignored_citation_target_is_code_not_link(bs, tmp_path):
@@ -693,6 +699,17 @@ def test_gitignored_citation_target_is_code_not_link(bs, tmp_path):
     assert "<a " not in out and out.count("not in the repository") >= 2 and out.count("<code") == 2
     assert any("gitignored" in w for w in site.warnings)
     assert site.citations == []
+    # the same when the machine has the file (the Mac does): never a GitHub link
+    probe = bs.REPO / "outputs" / "zz-site-test-probe" / "x.csv"
+    probe.parent.mkdir(parents=True, exist_ok=True)
+    probe.write_text("a,b\n")
+    try:
+        out = site.expand("{{num:1|outputs/zz-site-test-probe/x.csv}} {{src:outputs/zz-site-test-probe/x.csv|the export}}", page)
+        assert "<a " not in out and out.count("<code") == 2 and site.citations == []
+        assert site.resolve("outputs/zz-site-test-probe/x.csv", "README.md", "library/readme.html") is None
+    finally:
+        probe.unlink()
+        probe.parent.rmdir()
 
 
 def test_missing_source_and_bad_section_fail(bs, tmp_path):
