@@ -52,6 +52,7 @@ MAX_FLATNESS = 0.5  # white noise 0.998; NSA test maximum 0.39
 BLOCK_TOP = 0.001  # gated files live in [0, BLOCK_TOP); determinate scores in [BLOCK_TOP, 1]
 FAILURE_TOP = BLOCK_TOP / 10  # decode failures / no-signal files live in [0, FAILURE_TOP)
 JITTER_WEIGHT = 0.01  # share of the block's signal range given to the hash jitter
+DEFAULT_ANSWER = BLOCK_TOP  # kept for callers (hearsay.pipeline): gated files score strictly below this
 REASONS = ("silence", "unvoiced", "tone", "static", "noise")
 
 
@@ -136,8 +137,8 @@ def apply_default_answer(fused, is_speech, *, order_by=None, keys=None, failed=N
     [FAILURE_TOP, BLOCK_TOP), ordered by `order_by` (a weak signal in [0, 1], e.g. the raw M1b
     score; `fused` when None) with a JITTER_WEIGHT share of the range given to a hash jitter of
     `keys` (paths or filenames; positions if None), so values are distinct. Gated files whose
-    signal is NaN, or flagged in `failed`, go to [0, FAILURE_TOP) by jitter alone: decode
-    failures and no-signal files sit at the very bottom."""
+    fused score or signal is NaN, or that are flagged in `failed`, go to [0, FAILURE_TOP) by
+    jitter alone: decode failures and no-signal files sit at the very bottom."""
     fused = np.asarray(fused, dtype=np.float64)
     speech = np.asarray(is_speech, dtype=bool)
     n = fused.size
@@ -147,7 +148,7 @@ def apply_default_answer(fused, is_speech, *, order_by=None, keys=None, failed=N
     if sig.size != n:
         raise ValueError("order_by must have the same length as fused")
     fail = np.zeros(n, dtype=bool) if failed is None else np.asarray(failed, dtype=bool)
-    fail = fail | ~np.isfinite(sig)
+    fail = fail | ~np.isfinite(sig) | ~np.isfinite(fused)  # a NaN fused score is a failure
     j = _jitter(keys, n)
     out = np.empty(n)
     det = np.clip(np.nan_to_num(fused, nan=0.0), 0.0, 1.0)

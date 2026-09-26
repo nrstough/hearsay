@@ -14,7 +14,7 @@ import pytest
 
 from hearsay import SR
 from hearsay.detectors.base import ClipContext, DetectorResult
-from hearsay.detectors.speech_gate import DEFAULT_ANSWER, TIE_BREAK
+from hearsay.detectors.speech_gate import BLOCK_TOP
 from hearsay.metrics import sigmoid
 from hearsay.pipeline import (
     DEEP,
@@ -202,7 +202,8 @@ def test_analyze_response_shape_and_fusion(consts):
     assert doc["filename"] == "clip.wav" and doc["duration_s"] == 3.0
     assert doc["is_speech"] is True and doc["default_answer_applied"] is False
     fo = consts.fuse(LOGITS, "stack_nonlj")
-    assert doc["probability_synthetic"] == fo.p and doc["verdict"] == "real"
+    assert doc["probability_synthetic"] == pytest.approx(BLOCK_TOP + (1 - BLOCK_TOP) * fo.p)  # determinate map
+    assert doc["verdict"] == "real"
     assert doc["fusion"]["rule"] == "stack_nonlj" and doc["fusion"]["inputs"] == fo.inputs
     assert doc["fusion"]["weights"] == consts.stack_weights and doc["fusion"]["imputed"] == []
     names = [d["name"] for d in doc["detectors"]]
@@ -253,12 +254,13 @@ def test_default_answer_applied_when_no_speech(consts):
     doc = analyze_clip(_ctx(), m, consts, rule="zmean")
     fo = consts.fuse(LOGITS, "zmean")
     assert doc["is_speech"] is False and doc["default_answer_applied"] is True
-    assert doc["probability_synthetic"] == pytest.approx(DEFAULT_ANSWER + TIE_BREAK * fo.p)
+    assert 0.0 <= doc["probability_synthetic"] < BLOCK_TOP  # pinned block, below every scored file
     assert doc["fusion"]["p_fused"] == fo.p  # the fused value is still reported
     assert doc["verdict"] == "undetermined"
     assert any("is_speech=false" in line and "policy applied" in line for line in doc["routing_log"])
     ungated = analyze_clip(_ctx(), m, consts, rule="zmean", apply_gate=False)
-    assert ungated["probability_synthetic"] == fo.p and ungated["default_answer_applied"] is False
+    assert ungated["probability_synthetic"] == fo.p  # apply_gate=False: no policy, raw fused p
+    assert ungated["default_answer_applied"] is False
     assert ungated["version"]["policy"] == "none"
 
 
@@ -291,7 +293,7 @@ def test_decode_failure_is_undetermined_with_the_default_answer(consts, tmp_path
     assert all(d["status"] == "error" for d in doc["detectors"])
     assert set(doc["fusion"]["imputed"]) == set(DETECTOR_ORDER)
     assert doc["routing_log"][0].startswith("decode:")
-    assert DEFAULT_ANSWER <= doc["probability_synthetic"] <= DEFAULT_ANSWER + TIE_BREAK
+    assert 0.0 <= doc["probability_synthetic"] < BLOCK_TOP
 
 
 def test_refuse_switches_rule_and_policy_without_models(consts):
@@ -360,9 +362,8 @@ def test_runner_resolves_template_names_by_basename_and_flags_missing(tmp_path):
 def test_runner_missing_doc_gets_the_default_answer(consts):
     rp = _runner()
     d = rp.missing_doc("gone.wav", consts, "zmean", True, 0.3, {"git_sha": "x"})
-    fo = consts.fuse({n: None for n in DETECTOR_ORDER}, "zmean")
     assert d["flag"] == "missing_file" and d["verdict"] == "undetermined" and d["detectors"] == []
-    assert d["probability_synthetic"] == pytest.approx(DEFAULT_ANSWER + TIE_BREAK * fo.p)
+    assert 0.0 <= d["probability_synthetic"] < BLOCK_TOP
     m1 = rp.missing_doc("gone.wav", None, "m1b_only", False, 0.3, {})
     assert m1["probability_synthetic"] == pytest.approx(0.3)  # M1 only, ungated: the prior-only posterior
 
@@ -387,7 +388,8 @@ def test_m1_only_is_make_probe_csv_arithmetic():
     fb = m1_only(None, 0.3)
     assert fb.p == pytest.approx(0.3) and fb.imputed == ("m1b_v3",)
     doc = analyze_clip(_ctx(), FakeModels(m1=1.5), None, scorers=("m1b_v3",))
-    assert doc["fusion"]["rule"] == "m1b_only" and doc["probability_synthetic"] == fo.p
+    assert doc["fusion"]["rule"] == "m1b_only"
+    assert doc["probability_synthetic"] == pytest.approx(BLOCK_TOP + (1 - BLOCK_TOP) * fo.p)
     assert [d["name"] for d in doc["detectors"] if d["name"] in DEEP] == ["m1b_v3"]
     assert "handcrafted" not in {d["name"] for d in doc["detectors"]}
     assert doc["routing_log"][-1].startswith("fusion: none (m1b_only")
