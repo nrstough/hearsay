@@ -141,6 +141,26 @@ def test_b3_applies_raising_is_an_error(ctx):
     assert r.status == "error" and "probe died" in r.error
 
 
+def test_b3_exception_with_broken_str_still_contained(ctx):
+    class BadStr(Exception):
+        def __str__(self):
+            raise RuntimeError("str broke")
+
+    def raise_bad(c):
+        raise BadStr
+
+    r = safe_run(Toy(run=raise_bad), ctx)
+    assert r.status == "error" and r.error == "BadStr"
+
+
+def test_from_array_rejects_multichannel_and_clips_compare():
+    with pytest.raises(ValueError):
+        ClipContext.from_array(np.zeros((2, 100), dtype=np.float32))
+    a = ClipContext.from_array(np.zeros(10, dtype=np.float32), path="x")
+    b = ClipContext.from_array(np.ones(10, dtype=np.float32), path="x")
+    assert a == b  # identity is the path; audio is excluded from comparison
+
+
 def test_b3_keyboard_interrupt_propagates(ctx):
     def interrupt(c):
         raise KeyboardInterrupt

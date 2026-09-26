@@ -137,9 +137,9 @@ Audio stays 16 kHz mono everywhere. A native-rate loader API for forensic detect
 | Sat 22:00 | Fusion frozen; leave-one-detector-out ablation on the stored out-of-fold columns; no new detectors |
 | Sun 00:00 | Docker rebuild; amd64 smoke test on 3 files; CPU vs MPS parity check on 50 files |
 | Sun 01:00–04:30 | Nathan sleeps |
-| Sun 05:00 | Final TSV, after the silence/tone/music/noise preflight and the score-direction check |
+| Sun 05:00 | Final TSV, after the silence/tone/music/noise preflight (flag any score above 0.8) and the score-direction check |
 | Sun 05:00–07:30 | README, ablation table, AI disclosure |
-| **Before 8 AM Sun** | **Final TSV DM'd by a named person** |
+| **Before 8 AM Sun** | **Final TSV DM'd by Nathan (backup: Teammate C)** |
 
 ## Cut order
 

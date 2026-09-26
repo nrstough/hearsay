@@ -170,4 +170,17 @@ cd ~/Projects/hearsay && uv run ruff check .
 
 **Not changed.** The `.py` docstrings that still say "CSV" (`embed.py`, `submission.py`, …) are left for the next code change; they are outside A1/A4 scope.
 
-**Post-commit audit.** _Pending._
+**Post-commit audit.**
+- **Claude pre-audit critique (Fable), round 1: Acceptable overall.**
+  - Freeze integrity and Regression check: Excellent. Every other dimension: Acceptable.
+  - Findings fixed:
+    - `safe_run` message building is now guarded; an exception whose `__str__` raises is contained (test added).
+    - `ClipContext.from_array` rejects non-1-D input.
+    - `ClipContext` private fields set `compare=False` (test added).
+    - The final DM sender is named.
+    - The preflight threshold of 0.8 is restored.
+    - The `CLAUDE.md` claim about what `write_submission` enforces is corrected.
+    - A "planned, not yet downloaded" disclosure stub is added.
+  - Kept as is: the external-drive path added to the handoff skill (the team's only archive location).
+- **Logged for the next submission-path change, not fixed here (out of scope):** `list_test_files` reads `--manifest` with a comma `csv.DictReader`, so the TSV template `data/nsa/HearsayScoreKey4TeamX.tsv` would fail. That change also adds the score-direction flip flag.
+- **Codex audit:** _pending._

@@ -46,17 +46,22 @@ class ClipContext:
 
     path: Path
     cache: dict[str, Any] = field(default_factory=dict)
-    _audio: np.ndarray | None = field(default=None, init=False, repr=False)
-    _audio_err: audio.DecodeError | None = field(default=None, init=False, repr=False)
-    _probe: dict | None = field(default=None, init=False, repr=False)
+    _audio: np.ndarray | None = field(default=None, init=False, repr=False, compare=False)
+    _audio_err: audio.DecodeError | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    _probe: dict | None = field(default=None, init=False, repr=False, compare=False)
 
     @classmethod
     def from_array(
         cls, x: np.ndarray, probe: dict | None = None, path: str | Path = "<array>"
     ) -> ClipContext:
-        """Build a clip from 16 kHz mono samples without ffmpeg (tests, synthetic inputs)."""
+        """Build a clip from 1-D 16 kHz mono float samples without ffmpeg (tests, synthetic
+        inputs). Integer PCM is not rescaled: pass floats in [-1, 1]."""
         ctx = cls(Path(path))
         arr = np.array(x, dtype=np.float32)
+        if arr.ndim != 1:
+            raise ValueError(f"expected 1-D mono samples, got shape {arr.shape}")
         arr.flags.writeable = False
         ctx._audio = arr
         ctx._probe = dict(probe) if probe is not None else {}
@@ -180,7 +185,11 @@ def safe_run(det: Any, ctx: ClipContext) -> DetectorResult:
             raise ValueError(f"run returned status={res.status}")
         return dataclasses.replace(res)  # re-validates, copies features
     except Exception as e:  # noqa: BLE001 - contract boundary: one bad detector must not lose a row
-        return _error(name, f"{type(e).__name__}: {e}")
+        try:
+            msg = f"{type(e).__name__}: {e}"
+        except Exception:  # noqa: BLE001 - an exception whose __str__ raises must not escape
+            msg = type(e).__name__
+        return _error(name, msg)
 
 
 class Registry:

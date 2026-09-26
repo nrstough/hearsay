@@ -62,7 +62,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
   - `hearsay.metrics` uses `C_FA = 4`, `C_miss = 1`, `π_synth = 0.3`, i.e. normalized minDCF = 9.33·P_FA + P_miss. Only score ranking matters.
   - Select everything on normalized minDCF and report EER alongside.
   - The sponsor's scoring code treats a higher score as bona fide. That's an open question with NSA; see `docs/plan.md`, "Score direction".
-  - Submit `teamName_predictions.tsv`: header `filename<TAB>cm-score`, probabilities (1.0 = synthetic), all rows in the template's order. `hearsay.submission.write_submission` enforces the format. The final file is due 8 AM Sunday.
+  - Submit `teamName_predictions.tsv`: header `filename<TAB>cm-score`, probabilities (1.0 = synthetic), all rows in the template's order. `hearsay.submission.write_submission` enforces the header, unique filenames, finite scores in [0, 1] and no-overwrite; the template's row order comes from the manifest passed to the submission scripts. The final file is due 8 AM Sunday.
 - **16 kHz mono everywhere.** Every loader resamples and downmixes at the boundary; nothing downstream sees another format.
 - **Every experiment appends a row to `submissions/log.csv`** with timestamp, rung, validation score and submission path.
   - Columns: `timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes`. `csv_path` is the historical column name for the submission path.
@@ -137,6 +137,13 @@ Downloaded before the event to `data/`; fill in "how used" as each is actually u
 - In-the-Wild (Müller et al. 2022; `mueller91/In-The-Wild` on Hugging Face), license listed as CC-BY-SA-4.0 on Hugging Face and Apache-2.0 on deepfake-total.com: held-out stress test only, never trained on.
 - MLAAD (`mueller91/MLAAD` on Hugging Face, gated, non-commercial notice): 6,390 English synthetic clips pulled during the event (30 per model across 143 models, plus 300 per model for the ElevenLabs, Gemini and Qwen3 families named on the kickoff slide). Planned training data.
 - NSA HEARSAY data (provided by the sponsor during the event): 1,671-file test set, a resampled LJ Speech subset (real), DiffSSD (synthetic, Purdue), and the ASVspoof5 evaluation code for MinDCF.
+
+**Planned, not yet downloaded or used** (move each item up to the list above once it is actually used):
+- ECAPA-TDNN speaker embeddings (SpeechBrain), for the speaker-drift detector.
+- LibriSpeech / VCTK as multi-speaker bona fide data.
+- Full LJ Speech (keithito.com).
+- ReplayDF (optional).
+- ExifTool, for metadata forensics.
 
 **Frameworks and libraries**
 - PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, pydub, ffmpeg-python, FFmpeg.
