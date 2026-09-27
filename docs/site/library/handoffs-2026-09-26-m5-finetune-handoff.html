@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: M5 XLS-R fine-tune on vast.ai (Sat Sep 26, 2026, ~01:30) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_m5-finetune-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_m5-finetune-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#data">Data</a></li><li><a href="#reuse-the-powerlifting-analyzer-vast-tooling-already-set-up-on-this-mac">Reuse the Powerlifting-Analyzer vast tooling (already set up on this Mac)</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important-tests--at-risk-artifacts">IMPORTANT: tests &amp; at-risk artifacts</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-m5-xls-r-fine-tune-on-vastai-sat-sep-26-2026-0130">Handoff: M5 XLS-R fine-tune on vast.ai (Sat Sep 26, 2026, ~01:30)</h1>
+<p><strong>Purpose of this chat:</strong> plan (through <code>/plan-review</code>), build and run <strong>M5</strong>: fine-tune XLS-R 300M on a rented vast.ai H100, trained on multiple clip lengths with laundering augmentation. Deliver a checkpoint plus holdout and test scores in the fusion format.</p>
+<p><strong>Gate:</strong> M5 must <strong>beat M1 on the outer holdout</strong>, measured by normalized minDCF at π = 0.3. If it doesn't by <strong>Sat midday</strong>, freeze M1 (the <code>docs/plan.md</code> hard gate). <strong>Ask Nathan before renting anything.</strong></p>
+<h2 id="context">Context</h2>
+<p>HEARSAY is the HackGT 13 NSA HEARSAY entry, software only. Read <code>CLAUDE.md</code>, <code>docs/plan.md</code> and <code>docs/STATUS.md</code> first.</p>
+<p><strong>Scoring</strong></p>
+<ul>
+<li>60% MinDCF: false alarm ×4, about 70% of test files real. <code>hearsay.metrics</code> uses <code>C_FA = 4</code>, <code>π_synth = 0.3</code>, i.e. 9.33·P_FA + P_miss. Only ranking matters.</li>
+<li>Output is 1.0 = synthetic. Never flip.</li>
+<li>The final TSV is due before 8 AM Sunday. The Docker image must run M5 on CPU.</li>
+</ul>
+<p><strong>Three chats run in parallel.</strong> Stay in your lane.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Chat</th><th>Owns</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Main</strong></td><td>Local GPU (MPS), M1, Spectra-AASIST, fusion, orchestrator, <strong>all TSVs and <code>submissions/</code></strong></td></tr>
+<tr><td><strong>CPU detectors</strong> (<code>docs/handoffs/2026-09-26_cpu-detectors-handoff.md</code>)</td><td>Handcrafted and engineered detectors, CPU only</td></tr>
+<tr><td><strong>This one</strong></td><td>M5 on vast.ai. <strong>Never run training on the local MPS GPU.</strong> It's busy.</td></tr>
+</tbody>
+</table></div>
+<p><strong>M1 status at handoff.</strong> The v2 run is in flight: segment mode, meaning silence-trimmed, no tiling, 8 s cap, with training crops drawn from the NSA test-duration distribution.</p>
+<ul>
+<li>Embeddings: <code>outputs/embeddings/wav2vec2-xls-r-300m/nsa_{test,train_sample}_v2</code></li>
+<li>Probe: <code>models/m1_wav2vec2-xls-r-300m_L*_*/meta.json</code></li>
+<li>Its holdout minDCF is the <strong>number M5 must beat</strong>. Read it from that <code>meta.json</code> once it exists (<code>val_min_dcf</code>, plus <code>cv_by_layer</code> showing which frozen layer works best).</li>
+</ul>
+<h2 id="data">Data</h2>
+<p><strong>Training</strong></p>
+<ul>
+<li>Sample: <code>outputs/manifests/nsa_train_sample.csv</code>, 20,000 rows: 1,000 per DiffSSD generator × 10, plus 6,000 LJ Speech real and 4,000 LibriSpeech real.</li>
+<li>Full manifest: <code>outputs/manifests/nsa_train_full.csv</code>, about 70k fakes plus 18.4k real. More is available if M5 needs it.</li>
+<li>Raw audio lives on the external drive through the symlinks <code>data/nsa/DiffSSD</code>, <code>data/ljspeech</code> and <code>data/librispeech</code>. It's 20 GB+, so <strong>don't upload it raw.</strong></li>
+</ul>
+<p><strong>Folds:</strong> <code>splits/nsa_folds.csv</code>. Never regenerate it; it's shared.</p>
+<ul>
+<li>Spoof is grouped by generator; bona fide by speaker, or by chapter for LJ.</li>
+<li><strong>Outer holdout</strong> = generators <code>playht</code> and <code>wavegrad2</code>, plus 26 bona fide groups.</li>
+<li>Inner folds are <code>0</code>–<code>4</code>.</li>
+</ul>
+<p><strong>Test:</strong> <code>data/nsa/HackGTHearsayTesting/</code>, 1,671 WAVs, 16 kHz PCM, 3.0–13.6 s (median 3.4 s). Row order comes from <code>data/nsa/HearsayScoreKey4TeamX.tsv</code>; the manifest is <code>outputs/manifests/nsa_test.csv</code>.</p>
+<p><strong>Shortcuts already neutralized, and M5 must keep them neutralized:</strong></p>
+<ul>
+<li><strong>Level:</strong> per-input zero-mean, unit-variance normalization (<code>hearsay.embed.normalize_windows</code>). XLS-R expects this anyway (<code>do_normalize: true</code>).</li>
+<li><strong>Leading silence:</strong> LibriSpeech ~0.37 s vs test ~0.06 s. Handled by <code>hearsay.audio.trim_silence</code>, applied identically to train and test.</li>
+<li><strong>Length and tiling:</strong> handled by <code>hearsay.embed.prepare_segment</code>.</li>
+<li><strong>Container:</strong> DiffSSD has MP3 and 22 kHz files; the test set is all 16 kHz WAV. Decoding everything through <code>hearsay.audio.load_audio</code> into 16 kHz before training removes this.</li>
+</ul>
+<h2 id="reuse-the-powerlifting-analyzer-vast-tooling-already-set-up-on-this-mac">Reuse the Powerlifting-Analyzer vast tooling (already set up on this Mac)</h2>
+<ul>
+<li><strong>Scripts to adapt:</strong> <code>~/Powerlifting-Analyzer/scripts/cloud/</code>
+<ul>
+<li><code>launch_robust.sh</code>: tries offers until one boots with working internet, auto-destroys bad hosts, then provisions.</li>
+<li><code>train_box_setup.sh</code>: venv plus torch cu121, verified imports.</li>
+<li><code>box_chain.sh</code>, <code>pull_and_analyze.sh</code>.</li>
+</ul></li>
+<li><strong>Skill:</strong> <code>fleet-campaign</code> covers the budget guard, pilot before fan-out, and mandatory teardown plus a ledger. Ledger example: <code>~/Powerlifting-Analyzer/docs/reports/cloud-expense-ledger.md</code>.</li>
+<li><strong>Storage:</strong> the rclone remote <code>r2:</code> (Cloudflare R2, bucket <code>pa-source</code>) works from this Mac. Creds are in <code>~/.config/cloudflare-r2-pa-source.txt</code>. <strong>Use only the prefix <code>r2:pa-source/hearsay/</code></strong>, and never touch the powerlifting prefixes.</li>
+<li><strong>vast CLI:</strong> <code>uvx vastai</code>, with the API key in <code>~/.config/vastai/vast_api_key</code>; don't print or copy it. The account's SSH key matches <code>~/.ssh/id_ed25519.pub</code>.</li>
+<li><strong>Credit $13.37 at handoff</strong>, about 6 h of H100. Tell Nathan if runs will need more; he adds credit himself.</li>
+<li><strong>Offers at ~01:20:</strong> H100 SXM <code>29019357</code> at $2.20/h (verified, Czechia, 4 Gbps down, R 99.8); <code>41555534</code> at $3.22/h. Re-search before renting:
+<code>uvx vastai search offers 'gpu_name=H100_SXM num_gpus=1 verified=true datacenter=true disk_space&gt;=100 reliability&gt;0.98 inet_down&gt;500' -o 'dph_total'</code></li>
+</ul>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li><p><strong><code>/plan-review</code> for M5</strong>, using the project copy in <code>.claude/skills/plan-review/</code>, which carries the HEARSAY standing failure modes. The time box is set at P1: about 3 h of build plus 1–3 training runs. Design points to settle:</p>
+<ul>
+<li><p><strong>Multiple clip lengths</strong></p>
+<ul>
+<li>Each batch samples a crop length from <code>hearsay.embed.test_duration_sampler</code>, with length-bucketed batches, padding and <code>attention_mask</code>.</li>
+<li>Each epoch re-crops at a random offset.</li>
+<li>Evaluate the holdout both with test-length crops (fixed seed) and on whole clips up to 8 s.</li>
+<li>Test-time is <code>prepare_segment(x)</code>, the whole clip up to 8 s, <strong>identical to M1 v2's scoring path</strong>. Optionally average several crops for clips over 8 s.</li>
+</ul></li>
+<li><p><strong>Augmentation</strong> (both classes, keeping a <strong>clean-only</strong> holdout score beside the augmented one):</p>
+<ul>
+<li>additive noise at 5–30 dB SNR</li>
+<li>codec round-trips (MP3, Opus, AAC, AMR-NB, μ-law) via ffmpeg</li>
+<li>band-limiting (3.4, 4, 7 kHz)</li>
+<li>simulated RIR/reverb</li>
+<li>random gain before normalization</li>
+</ul>
+<p>Consider precomputing augmented copies into the bundle, so the box's dataloader doesn't depend on ffmpeg.</p></li>
+<li><p><strong>Fold discipline</strong></p>
+<ul>
+<li>Train only on inner rows, never holdout rows.</li>
+<li>Fusion needs stacking features that weren't fit on themselves. Out-of-fold predictions for all 5 folds cost 5 fine-tunes, which is too expensive. The cheaper route is to train on folds 0–3, predict fold 4 and the holdout, and use fold 4 as the stacking set. State the tradeoff with the main chat.</li>
+</ul></li>
+<li><p><strong>Fine-tune scope:</strong> partial first (top N transformer layers plus head, feature encoder frozen), and full only if stable. Class-balanced sampling. Choose the checkpoint on fold 4 minDCF, never on the holdout.</p></li>
+</ul></li>
+<li><p><strong>Data bundle.</strong></p>
+<ul>
+<li>Decode each training-sample row (and the test set) with <code>hearsay.audio.load_audio</code>, which gives 16 kHz mono and uniform format. Store the full clip up to 12 s as FLAC, so crops can vary per epoch.</li>
+<li>Include a manifest with path id, label, generator, speaker, source, group and fold.</li>
+<li>Expect about 1.5–2 GB. Upload to <code>r2:pa-source/hearsay/bundle/</code>.</li>
+<li>Also bundle the code (<code>src/hearsay</code>, the training script) and pin the XLS-R revision, or ship the local weights (1.27 GB).</li>
+</ul></li>
+<li><p><strong>Pilot before fan-out</strong> (fleet-campaign). One short run of a few hundred steps to check throughput, loss and the minDCF readout. Then the real run. Checkpoint to R2 regularly, and have the box <strong>self-destruct at DONE</strong>. Record the spend in a ledger.</p></li>
+<li><p><strong>Deliver:</strong></p>
+<ul>
+<li><code>outputs/detector_scores/m5_xlsr_ft.csv</code> with columns <code>path, fold, split (stack|holdout|test), score, logit</code>.</li>
+<li><code>models/m5_*/meta.json</code> with the holdout readouts via <code>hearsay.metrics.report</code>, including <code>sponsor_code_asis</code> and <code>sponsor_code_flipped</code>, per generator and per bona fide source, clean vs augmented.</li>
+<li>The checkpoint on a private HF Hub repo or GitHub release (not git LFS; the Docker image needs it).</li>
+<li>A short report in <code>docs/reports/</code> on what worked and what didn't.</li>
+<li><strong>Do not write TSVs or touch <code>submissions/</code>.</strong> The main chat turns M5 scores into submissions.</li>
+</ul></li>
+</ol>
+<p><strong>Do not touch:</strong></p>
+<ul>
+<li><code>submissions/</code></li>
+<li><code>splits/nsa_folds.csv</code></li>
+<li>the M1 scripts: <code>scripts/extract_embeddings.py</code>, <code>train_probe.py</code>, <code>make_probe_csv.py</code></li>
+<li><code>src/hearsay/embed.py</code>: import from it, don't edit it (the main chat owns it)</li>
+<li>the CPU chat's detector files</li>
+<li>the local GPU</li>
+</ul>
+<p>Stage only your own files (<code>git add &lt;paths&gt;</code>; never <code>-A</code>). Don't push without asking Nathan.</p>
+<h2 id="important-tests--at-risk-artifacts">IMPORTANT: tests &amp; at-risk artifacts</h2>
+<ul>
+<li>Test: <code>cd ~/Projects/hearsay &amp;&amp; uv run pytest -q</code> → <strong>152 passed</strong> (at <code>3a6fed9</code>/<code>90e9f0b</code>). <code>uv run ruff check .</code> → clean. Add tests for the crop and augmentation code, e.g. deterministic crops given a seed, no tiling, and augmentation that preserves length and label.</li>
+<li><strong>In flight</strong> (main chat): v2 embeddings, then M1 training. Check with <code>pgrep -fl "extract_embeddings|train_probe"</code> and <code>ls models/</code>.</li>
+<li><strong>At risk:</strong>
+<ul>
+<li>Any vast box: data dies with the instance. Checkpoint to R2 and keep the ledger.</li>
+<li><code>outputs/</code>, <code>models/</code>: gitignored and not archived.</li>
+<li>The raw training corpora exist only on the external drive <code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/</code>, which must be mounted to build the bundle.</li>
+</ul></li>
+<li><strong>Spend:</strong> the vast account balance is tracked through <code>uvx vastai show user --raw</code> (the <code>credit</code> field). Destroy instances at DONE, and verify with <code>uvx vastai show instances</code>.</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li><strong>Local measurements (MPS):</strong> XLS-R forward is 62 ms p95 per 4 s window (fp32), so a fine-tune on the Mac would take roughly 3–4 h for 3 epochs × 20k clips, and would block the GPU. That's why we use vast.</li>
+<li><strong>The public-data frozen probe</strong> found layer 7 best on ASVspoof. Fine-tuning usually helps most by adapting the middle and upper layers.</li>
+<li><strong>The sponsor scoring code</strong> (<code>data/nsa/HackGTMinDCF/</code>) treats higher = bona fide. <code>hearsay.metrics.sponsor_min_dcf</code> reproduces it; report both directions.</li>
+<li><strong>Physical replay is not covered</strong> (no hardware); only simulated RIR is. State that in the report.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<p><code>CLAUDE.md</code> → <code>docs/plan.md</code> (Ladder, Data, Timeline, Docker, Cut order: M5 is capped at 1 run if behind) → <code>docs/STATUS.md</code> → <code>src/hearsay/embed.py</code> (<code>prepare_segment</code>, <code>normalize_windows</code>, <code>test_duration_sampler</code>) → <code>src/hearsay/metrics.py</code> → <code>scripts/make_folds.py</code> → the <code>~/Powerlifting-Analyzer/scripts/cloud/*</code> scripts and <code>fleet-campaign</code> skill → <code>.claude/skills/plan-review/SKILL.md</code> (HEARSAY standing failure modes).</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_m5-finetune-handoff.md</code> <span class="hash">3480ed7f4a2e</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

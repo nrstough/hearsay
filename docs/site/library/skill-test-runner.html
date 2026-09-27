@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/test-runner — Run and diagnose the suite · HEARSAY</title>
+<meta name="description" content="&quot;Run the project&#x27;s test suite the way the project actually runs it, then diagnose every failure down to a root cause in the source. Use when the user says &#x27;run the tests&#x27;, &#x27;run the suite&#x27;, &#x27;why is this test failing&#x27;, &#x27;check for regressions&#x27;, or asks for a pass/fail count.&quot;">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>.claude/skills/test-runner/SKILL.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#step-0--resolve-the-environment-and-the-command-never-assume">Step 0 — Resolve the environment and the command (never assume)</a></li><li><a href="#step-1--collect-before-you-run">Step 1 — Collect before you run</a></li><li><a href="#step-2--run">Step 2 — Run</a></li><li><a href="#step-3--diagnose-every-failure-at-the-source">Step 3 — Diagnose every failure at the source</a></li><li><a href="#output-format">Output format</a></li><li><a href="#rules">Rules</a></li></ul></details>
+<h1 id="test-runner--run-and-diagnose-the-suite">/test-runner — Run and diagnose the suite</h1>
+<p>Any arguments passed to this skill scope the run (a file, a marker, a keyword filter).
+With no arguments, run the full suite.</p>
+<h2 id="step-0--resolve-the-environment-and-the-command-never-assume">Step 0 — Resolve the environment and the command (never assume)</h2>
+<p>Read <code>CLAUDE.md</code> / <code>AGENTS.md</code> FIRST. A project that documents its test command has
+already encoded the traps — a wrong invocation can pick up the wrong interpreter, the
+wrong config, or a stale virtualenv, and every number you report afterwards is fiction.</p>
+<p>Resolution order for the command:</p>
+<ol>
+<li>An explicit command in <code>CLAUDE.md</code> / <code>AGENTS.md</code> (including any config-override flags
+the project says to pass).</li>
+<li>Project config — <code>package.json</code> <code>scripts.test</code>, <code>Makefile</code> <code>test</code> target,
+<code>pyproject.toml</code> / <code>pytest.ini</code> / <code>tox.ini</code>, <code>Cargo.toml</code>, <code>go.mod</code>, a <code>scripts/test*</code>
+wrapper.</li>
+<li>The ecosystem default, stated as an assumption in your report.</li>
+</ol>
+<p>Resolution order for the environment:</p>
+<ul>
+<li>Python: the project's own venv, <strong>by the exact name the project uses</strong> — a repo with
+both <code>.venv</code> and <code>venv</code> almost always has one that is broken; check the docs, don't
+guess. Verify with <code>python -V</code> before running anything.</li>
+<li>Node: the lockfile's package manager (<code>npm ci</code> / <code>pnpm</code> / <code>yarn</code>), and the <code>.nvmrc</code>
+version if present.</li>
+<li>Env vars: if the project needs shell env (API keys, paths), source the project's
+documented startup (<code>source ~/.zshrc</code> and any bootstrap script) first.</li>
+<li>Worktrees: <code>pwd</code> and <code>git branch --show-current</code> <strong>before</strong> running. A backgrounded
+command does not carry <code>cd</code> forward, so prefix each call with <code>cd &lt;worktree&gt; &amp;&amp;</code> —
+otherwise you will silently test a different branch. A test count far off the expected
+number is the tell.</li>
+</ul>
+<p>State the resolved command and interpreter in your report. If the project has <strong>no</strong> test
+command, say so explicitly rather than inventing one.</p>
+<p><strong>HEARSAY:</strong> the environment is the uv-managed <code>.venv</code> (Python 3.12, pinned in
+<code>.python-version</code>); run things with <code>uv run …</code> from the repo root. The test command is
+<code>uv run pytest</code> (config in <code>pyproject.toml</code>, tests in <code>tests/</code>; loader/submission,
+metrics, detector-contract and doc-consistency suites). If pytest ever collects nothing
+(exit code 5), report that as "no tests", not as a pass. Markers: <code>needs_data</code>, <code>needs_weights</code>, <code>slow</code>. Tests
+that need datasets or weights (gitignored, not on every teammate's laptop) must be marked
+and reported as "skipped because gated", never as passes.</p>
+<h2 id="step-1--collect-before-you-run">Step 1 — Collect before you run</h2>
+<p>Get the count first (<code>pytest --co -q</code>, <code>jest --listTests</code>, <code>go test -list</code>,
+<code>cargo test -- --list</code>). A collection error is a different bug from a test failure, and
+the count tells you immediately whether you're pointed at the right tree.</p>
+<p>Note the project's test <strong>markers/tags</strong> (slow, integration, requires-network,
+requires-model, requires-device) and which the default run includes or excludes.</p>
+<h2 id="step-2--run">Step 2 — Run</h2>
+<p>Run the resolved command. Capture full output. Don't stop at the first failure unless the
+suite is unusably slow — the failure <em>set</em> is more informative than the first element.</p>
+<p>If a single test hangs, re-run it alone with a timeout rather than letting the suite stall.</p>
+<h2 id="step-3--diagnose-every-failure-at-the-source">Step 3 — Diagnose every failure at the source</h2>
+<p>For each failure:</p>
+<ol>
+<li>Read the test — what contract does it assert?</li>
+<li>Read the source it exercises. <strong>Trace the actual code path.</strong> Do not guess from the
+assertion message.</li>
+<li>Classify:
+<ul>
+<li><strong>Real regression</strong> — the code broke the contract. Fix the code.</li>
+<li><strong>Stale test</strong> — the test pinned an old contract the project deliberately moved off.
+Only then may the test change, and you must be able to say in one sentence: "this
+test asserted X; the change intentionally moves behavior to Y." Say it in the report.</li>
+<li><strong>Environmental</strong> — missing asset/model/device/network, wrong interpreter. Say what's
+missing and how to get it; do not paper over it.</li>
+<li><strong>Flake</strong> — re-run to confirm non-determinism; report the rate, not "flaky".</li>
+</ul></li>
+<li>Give the fix at <code>file:line</code>.</li>
+</ol>
+<p><strong>Never change a test to make it pass</strong> outside the stale-test case above. If you cannot
+state the contract move in one sentence, debug the failure instead.</p>
+<h2 id="output-format">Output format</h2>
+<pre><code>| Result | Count |
+|--------|-------|
+| passed / failed / skipped / errors | … |</code></pre>
+<p>Then per failure:</p>
+<pre><code>| Test | Failure (one line) | Class | Root cause (file:line) | Fix |
+|------|--------------------|-------|------------------------|-----|</code></pre>
+<p>Always include: the exact command you ran, the interpreter/runtime version, the branch and
+worktree, and — if the project has a known-good baseline count — the delta against it.</p>
+<h2 id="rules">Rules</h2>
+<ol>
+<li>Report the real numbers, including failures. Never round a failing suite up to "passing".</li>
+<li>Root cause from the code, not the traceback text alone.</li>
+<li>Distinguish "skipped because gated" from "skipped because broken".</li>
+<li>If a pre-existing failure is unrelated to the current work, say so — and still count it.</li>
+<li>If the run was partial (scoped, or cut short), label the numbers as partial.</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>.claude/skills/test-runner/SKILL.md</code> <span class="hash">1f748a46cee0</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

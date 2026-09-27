@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 sponsor questions · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_sponsor-questions.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/reports/2026-09-26_sponsor-questions.md</code>; the markdown file is the record.</p>
+
+<h2 id="one-time-draft-review">One-time draft review</h2>
+<p><strong>Approved by Nathan, Sat Sep 26, ~08:25.</strong></p>
+<ul>
+<li><strong>Payload:</strong> <code>submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv</code>, copied to <code>~/Downloads/HEARSAY_predictions.tsv</code>. The two copies are byte-identical.</li>
+<li><strong>Rule:</strong> M1b v3 80% + handcrafted v5 20% (rank), with M3 used only for false-alarm suppression. Pre-declared in <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>.</li>
+<li><strong>Validation:</strong>
+<ul>
+<li>holdout minDCF 0.014</li>
+<li>In-the-Wild 0.260 (brief cost) / 0.267 (sponsor-code cost)</li>
+<li>test share above 0.5: 27.4%</li>
+</ul></li>
+<li><strong>Ask NSA for:</strong> minDCF, plus P_FA, P_miss and EER.</li>
+<li><strong>Pre-flipped copy:</strong> <code>..._FLIPPED_only_if_NSA_scores_inverted.tsv</code>.</li>
+</ul>
+<p><strong>Decoding the returned minDCF</strong> (per the fusion consult response):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Returned minDCF</th><th>Action</th>
+</tr></thead>
+<tbody>
+<tr><td>0.00–0.20</td><td>Ship unchanged.</td></tr>
+<tr><td>0.20–0.45</td><td>Switch to the most FA-robust candidate.</td></tr>
+<tr><td>0.45–0.90</td><td>Don't flip; fall back to M1b v3 alone.</td></tr>
+<tr><td>0.95–1.00</td><td>NSA's code is reading our scores inverted: submit the pre-flipped file.</td></tr>
+</tbody>
+</table></div>
+<p>If NSA returns EER instead, 2–5% means our direction and 95–98% means theirs.</p>
+<p><strong>Sent:</strong> Sat 12:30 by Discord DM (team Cross Exam), superseding the 08:13 payload above: <code>CrossExam_predictions.tsv</code> = <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (rule A3 w0.2 + E, sha256 <code>fb783076…</code>, <code>submissions/log.csv</code> row 12:30:37).</p>
+<p><strong>Returned (Sat, ~15:30, relayed by Nathan): minDCF 0.0733, EER 3.534%.</strong> No P_FA, P_miss, threshold, cost weighting or direction convention was given.</p>
+<ul>
+<li><strong>Decoding:</strong> 0.0733 is in the 0.00–0.20 band, so the shipped rule stays; EER 3.5% (not 96.5%) confirms 1.0 = synthetic is being read as intended. No flip, no fallback.</li>
+<li><strong>Against our proxies:</strong> holdout 0.0065, In-the-Wild 0.228; the test set sits at 11× the holdout and a third of In-the-Wild, next to M1b v3 alone on the holdout (0.072).</li>
+<li><strong>Field (draft review, Sat ~16:15):</strong> one team ahead at minDCF 0.0584 / EER 2.5%; under points = (1 − ours)/(1 − best) × 60 that is a 0.95-point gap on the 60-point detection score.</li>
+<li><strong>Status:</strong> the number is the fixed baseline for any further work before the Sunday 05:00 freeze. The follow-up consult on what to build next is <code>docs/consults/2026-09-26_post-draft-review_CONSULTATION.md</code>.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_sponsor-questions.md</code> <span class="hash">7f0d0174b465</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

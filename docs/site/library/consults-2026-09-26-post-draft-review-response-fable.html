@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Independent second opinion: a Claude Fable 5.1 agent on the post-draft consult (Sat Sep 26, 2026, 17:00–17:15 EDT) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/consults/2026-09-26_post-draft-review_RESPONSE_fable.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/consults/2026-09-26_post-draft-review_RESPONSE_fable.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#independent-opinion-after-the-draft-review-what-if-anything-moves-the-test-number">Independent opinion: after the draft review, what (if anything) moves the test number</a></li><li><a href="#1-verdict-on-the-returned-number">1. Verdict on the returned number</a></li><li><a href="#2-ranked-options-asks-24">2. Ranked options (asks 2–4)</a></li><li><a href="#3-procedures-for-the-two-maybes">3. Procedures for the two "maybe"s</a></li><li><a href="#4-time-split">4. Time split</a></li><li><a href="#5-are-you-over-engineering-should-you-stop-touching-the-file">5. Are you over-engineering; should you stop touching the file?</a></li><li><a href="#6-failure-modes-you-have-not-named">6. Failure modes you have not named</a></li></ul></details>
+<h1 id="independent-second-opinion-a-claude-fable-51-agent-on-the-post-draft-consult-sat-sep-26-2026-17001715-edt">Independent second opinion: a Claude Fable 5.1 agent on the post-draft consult (Sat Sep 26, 2026, 17:00–17:15 EDT)</h1>
+<p>Requested by Nathan as a comparison to the VeriLM memo. The agent read <code>2026-09-26_post-draft-review_CONSULTATION.md</code> and the repository (exports, reports, scripts) and was told not to read the VeriLM RESPONSE files. It ran computations on the exported logits with the sweep's own loaders; the consult chat re-verified the M5-weight and second-tier claims (see the addendum in <code>…_RESPONSE.md</code>). Verbatim below.</p>
+<hr>
+<h2 id="independent-opinion-after-the-draft-review-what-if-anything-moves-the-test-number">Independent opinion: after the draft review, what (if anything) moves the test number</h2>
+<p>Sat Sep 26, 17:00 EDT. Freeze Sun 05:00. Everything below is computed from the repo's exported logits (<code>outputs/detector_scores/*.csv</code>, In-the-Wild files, <code>outputs/channel/m3_mlaad.csv</code>) with the same loaders and cost functions as <code>scripts/fuse_sweep.py</code>; the shipped rule reproduces exactly (inner 0.1351, holdout 0.0065 [0 FA, 13 miss], ITW 0.228 [15 FA, 158 miss], averse 0.2385). I did not read the RESPONSE files.</p>
+<h2 id="1-verdict-on-the-returned-number">1. Verdict on the returned number</h2>
+<p><strong>0.0733 / EER 3.53% is in our direction (an unflipped file scores ~1.0 under the sponsor's code), and it is consistent with the profile our own rule produces everywhere else: near-zero false alarms and a miss tail. Which cost NSA applied is undeterminable, and the number cannot support any of the changes below; from here on you are optimizing proxies only. Confidence: high on direction, moderate on profile, none on cost.</strong></p>
+<p>Pushback on the premises:</p>
+<ul>
+<li><strong>The cost is not "the brief's cost" with certainty, and your own repo says so.</strong> The HackGT scorer (<code>data/nsa/HackGTMinDCF/asvspoof5/evaluation-package/calculate_metrics.py</code>) was deliberately edited from ASVspoof5's <code>Pspoof = 0.05, Cfa = 10</code> to <code>Pspoof = 0.5, Cmiss = 1, Cfa = 4</code>, and in that code <code>Cfa</code> multiplies <code>far</code> = <em>spoof accepted as bona fide</em> = fake-called-real. The kickoff notes (<code>docs/reports/2026-09-25_sponsor-questions.md</code> lines 16–18) define false alarm as real-called-synthetic, ×4. The package contains no score inversion and its keys are plain <code>bonafide</code>/<code>spoof</code>, so NSA adapted it outside the package: if they negated our scores, the 4× sits on misses (<code>P_FA + 4·P_miss</code>); if they swapped the keys, it sits on false alarms as stated. The pair (0.0733, 3.53%) fits both: brief-cost e.g. 3 FA + 25 misses; averse e.g. 5 misses + 40 FA. Per-file granularity on ~1,170/500: brief FA 0.008, miss 0.002; averse FA 0.00085, miss 0.008. Your "improve under both costs" rule is the right hedge; keep it and stop calling one of them the brief's.</li>
+<li><strong>Error profile.</strong> Under the brief cost the likeliest reading is a miss tail of 20–35 fakes with 0–4 false alarms, because that is what the rule does on every labeled set (0/13 holdout, 15/158 ITW at the brief argmin; on ITW only 1 of the 158 misses is a file the M3 step touched). The EER (59 files wrong at the equal-error point) says the middle of the ranking is soft; minDCF is scored at the low-FA end, which held up better, so misses dominate. To match the leader's 0.0584 you would need to remove ~2 FAs or ~7 misses (brief) or ~2 misses (averse).</li>
+<li><strong>The misses are not reachable from the XLS-R probe family.</strong> Of the 158 ITW misses under the shipped rule, M1b alone would flag 1 and handcrafted 2 at their inner thresholds; M5 would flag 33; M3 would flag 107. Any "more heads on the same frozen backbone" idea inherits M1b's blind spot; only a different backbone or M3 can see the tail.</li>
+<li><strong>The holdout is not a measurement of a change.</strong> It is 0 FA / 13 misses (12 wavegrad2, 1 playht) on 3,858 rows; one FA is worth 0.005. Anything below ~0.02 on it is noise. Its "11×" gap to the test is granularity, not a regime.</li>
+<li><strong>Handcrafted is not 20% of the decision.</strong> The admissible non-negative stacker fit on inner non-LJ rows gives it coefficient −0.04 (M1b 0.66, M5 0.37). On the test set its Spearman with M1b is 0.21 (holdout 0.79): it is reading the envelope shift. It earns its place as the readable column, not as score.</li>
+<li><strong>The MoE premise is backwards.</strong> M5 is the <em>weak</em> detector on short clips (holdout ≤ 4 s: M5 0.344, M1b 0.066); more M5 weight on short clips helps ITW because M5 has fewer wild-domain false alarms, not because of clip length.</li>
+</ul>
+<h2 id="2-ranked-options-asks-24">2. Ranked options (asks 2–4)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Approach</th><th>Mechanism that could move the test number</th><th>Expected test minDCF effect</th><th>Effort</th><th>Risk</th><th>Verdict</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>A3 (0.4, 0.2, 0.4) + E</strong> (M5 weight 0.2 → 0.4, same rule)</td><td>The pre-declared sweep stopped at w = 0.2 on an expectation that proved wrong; more M5 cuts wild-domain FAs. ITW 0.228 → 0.200, averse 0.239 → 0.208, holdout 0.0065 → 0.0065 [0, 13], inner 0.135 → 0.137; passes all four conditions; <strong>4 test files cross 0.5</strong>, Spearman 0.970</td><td>−0.005 ± 0.01, sign not reliable</td><td>1.5 h (edit the <code>w</code> grid in <code>fuse_sweep_m5.py</code>, <code>--write</code>, full-set runner parity ~40 min under load, TSV, log row, README numbers)</td><td>Post hoc (these numbers are now seen); M5's CPU-vs-A100 logit gap (5 rows &gt; 0.02) scales with its weight</td><td><strong>Maybe</strong> — the only candidate worth putting to Nathan</td></tr>
+<tr><td>2</td><td>WavLM Large probe on the M1b recipe (<code>extract_embeddings.py --model wavlm-large --segment --crop test</code> on nsa_train_sample, asv19_addon, itw_stress, nsa_test; <code>train_probe.py --model wavlm-large --folds splits/nsa_folds_plus_asv19.csv --stress ...</code>; then <code>fuse_sweep_m5.py --refit-m1b &lt;export&gt;</code>)</td><td>The only build that changes the backbone, hence the only one that can see the miss tail M1b cannot</td><td>0 ± 0.01</td><td>~1.5–2 h of shared CPU plus the refit sweep; finishes by ~19:30</td><td>Extraction time under load; refit seat changes the ratified stream</td><td><strong>Maybe, as a bake-off for the README; ratify only if it passes the four conditions and crosses ≤ 4 test files</strong></td></tr>
+<tr><td>3</td><td>M3 suppression threshold −3 → −1.5</td><td>Loosens the one deliberately conservative parameter. Inner 0.123, holdout 0.003 [0, 6], ITW 0.188, averse 0.233 all improve; 6 test files; MLAAD spoof below −1.5 is 2.10% vs 1.75% at −3</td><td>0 to +0.01</td><td>1 h</td><td>Evidence leans on ITW, which M3's authors evaluated on; post hoc</td><td>Skip</td></tr>
+<tr><td>4</td><td>Length-gated mixture (≤ 4 s → 0.4/0.2/0.4)</td><td>ITW 0.207, averse 0.208, holdout 0.006; 4 files</td><td>Same as #1</td><td>2 h (new pipeline branch)</td><td>Stated mechanism is wrong; dominated by #1</td><td>Skip</td></tr>
+<tr><td>5</td><td>Non-negative stacker over the three admissible logits (inner non-LJ)</td><td>Fitted weights (0.66, −0.04, 0.37); ITW 0.222 (under the 0.01 bar), holdout 0.029 (worse)</td><td>≤ 0</td><td>minutes</td><td>Fails the bar</td><td>Skip</td></tr>
+<tr><td>6</td><td>Per-detector isotonic calibration</td><td>None: the rank-ECDF is already a monotone map; minDCF is rank-only</td><td>0</td><td>—</td><td>—</td><td>Skip</td></tr>
+<tr><td>7</td><td>Cascade (M1b alone outside its ambiguous band)</td><td>Already lost the pre-declared sweep (ITW 0.355)</td><td>≤ 0</td><td>—</td><td>—</td><td>Skip</td></tr>
+<tr><td>8</td><td>Second suppression tier (&lt; −6 → ×0.25)</td><td><strong>Inert.</strong> Halving already puts every touched file (base ≤ 0.5) below every untouched &gt; 0.5 file; quartering reorders only within the suppressed set. Identical readouts on every split; 0 extra test files</td><td>0 exactly</td><td>—</td><td>—</td><td>Skip</td></tr>
+<tr><td>9</td><td>Capped Bayesian use of M3's margin / M3 promotion</td><td>The one fusion change with a large mechanism: promoting <code>m3 &gt; 6.9 &amp; base &lt; 0.5</code> recovers 76 of 158 ITW misses with 0 added FAs (ITW 0.152, averse 0.152), but the holdout shows 2 reals promoted [2, 11]; touches 10 test files (2 with M5's agreement)</td><td>brief +0.01, averse up to +0.08 if the 10 are fakes; −0.008 per real among them</td><td>1 h</td><td>Forbidden by your rule; the returned number says nothing about M3</td><td><strong>Skip.</strong> The number does not inform the rule; the rule is a documented principle worth more in the 40 non-DCF points than the expected gain</td></tr>
+<tr><td>10</td><td>Multi-layer XLS-R probe (ran it: layer-7 baseline reproduces M1b 0.2649 / 0.0717 / ITW 0.342 exactly)</td><td>mean L5–9: holdout 0.052 but ITW 0.368 and ITW P_FA 0.8% → 1.55%; concat L6–8 / L5,7,9 / L5–9: ITW 0.353 / 0.430 / 0.399</td><td>≤ 0</td><td>done</td><td>—</td><td><strong>Dead; write up</strong></td></tr>
+<tr><td>11</td><td>M5 fold-model averaging</td><td>Fold checkpoints are not on disk (<code>outputs/m5_runs/*/fold*_frozen</code> hold only run_meta/scores/log; R2 pull of 5 × 657 MB, then ~28 min CPU per model per split); fold heads have different logit scales</td><td>0</td><td>3 h+</td><td>Wall clock</td><td>Skip</td></tr>
+<tr><td>12</td><td>Attentive pooling on frozen L7 frames</td><td>Frames are not stored (embeddings are per-layer time means); M5 already is this and lost the holdout</td><td>0</td><td>3 h+</td><td>—</td><td>Skip</td></tr>
+<tr><td>13</td><td>Noise-augmented probe / noise twins for handcrafted</td><td>The test set shows no additive noise (floor p2/p10 beyond the clean end); re-extraction of both classes ≈ 1 h</td><td>0 on test</td><td>1–2 h</td><td>—</td><td>README only</td></tr>
+<tr><td>14</td><td>Delta-only handcrafted (<code>train_handcrafted.py --drop-columns</code> on existing features)</td><td>Pruning lost every time; the column carries ~0 weight</td><td>0</td><td>20 min</td><td>—</td><td>README only</td></tr>
+<tr><td>15</td><td>New handcrafted families; generator-family routing head</td><td>Inherit the envelope shift (train-vs-test AUC 0.99); routing has no minDCF mechanism</td><td>0</td><td>2 h each</td><td>—</td><td>Skip</td></tr>
+</tbody>
+</table></div>
+<p><strong>Direct verdict on the fusion layer.</strong> No change to the fusion layer can be expected to move the test minDCF beyond noise, and the reason is structural, not a matter of finding the right stacker. The three admissible streams agree on the test set (M1b–M5 Spearman 0.78; 117 files called synthetic by all four detectors, 976 real by all four); the fused ranking's uncertainty lives in ~187 files with base in (0.45, 0.65); and the ceiling for <em>any</em> reweighting of the three admissible ranks, computed by cheating (weights chosen on ITW itself, (0.3, 0.2, 0.5)), is ITW 0.186, a gain of 0.04 that costs the holdout 2 false alarms. An in-sample logistic stacker on the three logits fit <em>on</em> ITW scores 0.257, worse than the shipped rank blend. The test set is 3× easier than ITW, so the transferable share of that 0.04 is ~0.01, with 4–13 files deciding the sign. The only stream that would resolve the ambiguous band is M3, and every use of M3 beyond suppression is the one thing you have ruled out. Stackers, isotonic maps, cascades and second tiers are either inert (#8), already lost (#5, #7), or have no minDCF mechanism (#6).</p>
+<h2 id="3-procedures-for-the-two-maybes">3. Procedures for the two "maybe"s</h2>
+<p><strong>#1, the M5 weight.</strong> Add <code>w ∈ {0.3, 0.4}</code> to the grid in <code>scripts/fuse_sweep_m5.py</code> (it currently loops <code>(0.1, 0.2)</code>); run without <code>--write</code>; it prints the same four-condition decision the addendum used, CURRENT = shipped. Fold discipline is unchanged: the three ranks are against inner-OOF references, the Platt map is fit on inner OOF, nothing touches holdout, ITW or test. Acceptance, declared now and disclosed as post hoc since I have seen the numbers: replace only if all four conditions hold <strong>and</strong> averse improves <strong>and</strong> ≤ 4 test files cross 0.5 <strong>and</strong> the full-set runner parity to the new export is Spearman ≥ 0.999 with max |Δp| ≤ 1e-3. Then <code>--write</code>, new TSV, new log row, both polarities. Stop at 21:30 regardless of state; if any step is unfinished, the shipped file stands.</p>
+<p><strong>#2, WavLM Large.</strong> Four extractions with the v3 flags (<code>--segment --crop test --seed 0</code>), then <code>train_probe.py</code> with the M1b arguments and <code>--model wavlm-large</code>, then export in the standard <code>path, fold, split, score, logit</code> format with an <code>_itw_&lt;name&gt;.csv</code> on the seed-200 crops, then <code>fuse_sweep_m5.py --refit-m1b &lt;name&gt;</code>. Same four conditions; additionally the clean holdout must be within 0.03 of M1b's 0.072 (your addendum-2 floor). Pre-declared entry: the refit seat only (weight 0.6, or 0.4 if #1 ships), never a fourth column tonight. If it fails, it is a bake-off row in the README.</p>
+<h2 id="4-time-split">4. Time split</h2>
+<ul>
+<li><strong>17:00–18:30.</strong> Session A: #1 sweep (30 min) and its candidate TSV, nothing under <code>models/</code>. Session B: WavLM extraction and probe (#2). Session C: README negative results from this memo (multi-layer probe, admissible stacker, inert second tier, the M3-promotion ceiling and why it stays forbidden, the cost-direction ambiguity). Session D: copy the shipped TSV to <code>CrossExam_predictions.tsv</code> in its final location tonight, so that sleeping equals shipping.</li>
+<li><strong>18:30–19:30.</strong> Nathan decides on at most one candidate. GO: <code>--write</code>, parity, TSV, log, README numbers (1–2 h of doc churn is the real cost). NO-GO: nothing changes.</li>
+<li><strong>19:30–21:30.</strong> Documentation only. <strong>21:30: hands off.</strong></li>
+</ul>
+<p>Single highest-value change: A3 (0.4, 0.2, 0.4) + E. Expected ≤ +0.01, not reliably above zero.</p>
+<h2 id="5-are-you-over-engineering-should-you-stop-touching-the-file">5. Are you over-engineering; should you stop touching the file?</h2>
+<p>Yes, and yes. The upside of matching the leader is 0.95 of 100 points; the downside of a bad switch is at least as large; the granularity is 4–6 files whose labels you cannot know; you do not know which error the 4× lands on; and the only stream with a real mechanism is the one your principles exclude. No hedging: run #1 and #2 as bounded, documented experiments because the README grades negative results, and ship the 12:03 file unless #1 clears every gate above by 19:30 with room to spare.</p>
+<h2 id="6-failure-modes-you-have-not-named">6. Failure modes you have not named</h2>
+<ol>
+<li><strong>The 4× may be on misses.</strong> Every candidate must improve under both costs; #3 and #9 change sign between them.</li>
+<li><strong>Sleep must equal ship.</strong> The final-named file should exist before anyone sleeps, with its sha256 in the log.</li>
+<li><strong>M5 parity scales with M5's weight.</strong> Re-run the full 1,671-row parity if w changes; the 5 rows already over the 0.02 mark will widen.</li>
+<li><strong>Proxy contamination.</strong> M3's authors evaluated on ITW; any change that "passes the bar" by moving M3's threshold is validated on evidence M3 may have seen.</li>
+<li><strong>Do not listen to the crossing files to decide.</strong> Choosing a rule by inspecting the 4 test files that cross is selection on the test set, which your hard line forbids.</li>
+<li><strong>Documentation drift.</strong> A 20:00 switch invalidates every cited number in README, docs site, disclosure and <code>STATUS.md</code>; the doc-consistency test pins only constants, not results.</li>
+<li><strong>The holdout cannot see your change.</strong> Do not let a "0.0065 → 0.0060" appear anywhere as evidence.</li>
+</ol>
+<p><strong>Final call.</strong> The returned number tells you the file is right-side-up and behaves like a low-false-alarm system with a modest miss tail; it does not tell you which files are wrong, which cost was used, or anything about the one detector that could shrink the tail. Every admissible fusion change is worth at most about a percent of the score with an unknown sign, every new head on the same backbone is dead on arrival (the layer variants I ran tonight prove it), and the one build with a mechanism, a second backbone, is a bake-off for the write-up rather than a Saturday-night switch. Run the M5-weight sweep and the WavLM bake-off for the record, decide by 19:30, and otherwise stop touching the file: the 40 points that reward technique and honest documentation are where the remaining hours pay, and the shipped file is already the best-validated thing you own.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/consults/2026-09-26_post-draft-review_RESPONSE_fable.md</code> <span class="hash">7ee579d047a0</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

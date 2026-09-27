@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M1b: adding ASVspoof 2019 real speakers to the frozen XLS-R probe (Sat Sep 26, ~03:50) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m1b-asv19-bonafide.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_m1b-asv19-bonafide.md</code>; the markdown file is the record.</p>
+
+<h1 id="m1b-adding-asvspoof-2019-real-speakers-to-the-frozen-xls-r-probe-sat-sep-26-0350">M1b: adding ASVspoof 2019 real speakers to the frozen XLS-R probe (Sat Sep 26, ~03:50)</h1>
+<p><strong>Why:</strong> the M5 consult response (VeriLM, two experts) called real-speaker diversity the highest-value lever under C_FA = 4. One false alarm costs four misses, and about 11 false alarms decide the score.</p>
+<p><strong>What changed:</strong> ASVspoof 2019 LA train+dev bona fide was added to M1's training data.</p>
+<ul>
+<li>5,128 clips from <strong>40</strong> VCTK speakers. The consult's "~100 speakers" was wrong, and the consult itself flagged this.</li>
+<li>Plus 2,520 A01–A06 spoof clips (420 per attack) as a channel anchor, so "VCTK sound = real" can't become a shortcut.</li>
+<li>The extra rows went to <strong>inner folds only</strong>. The outer holdout is unchanged, so the holdout numbers compare directly.</li>
+</ul>
+<p><strong>Unchanged:</strong></p>
+<ul>
+<li>The input path: segment mode, silence trim, test-length crops, no tiling, z-normalization.</li>
+<li>The model: layer 7 (re-selected by inner CV), logistic regression.</li>
+</ul>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Folds: <code>splits/nsa_folds_plus_asv19.csv</code> (<code>scripts/extend_folds.py</code>).</li>
+<li>Models: <code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0347</code> (M1, retrained for the stress readout; same numbers as <code>…-0302</code>) and <code>…-0348</code> (M1b).</li>
+</ul>
+<p><strong>Stress set.</strong> 3,000 In-the-Wild clips: 2,000 real from 54 speakers, 1,000 spoof. <strong>Evaluation only, never trained on.</strong> The readout is minDCF, plus P_FA/P_miss at the threshold that minimizes inner-fold out-of-fold DCF.</p>
+<p>Normalized minDCF at π = 0.3, C_FA = 4:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>M1 (NSA only)</th><th>M1b (+ASV19)</th>
+</tr></thead>
+<tbody>
+<tr><td>Inner-fold CV minDCF (the selection metric; M1b's folds contain extra rows)</td><td>0.250</td><td>0.248</td></tr>
+<tr><td>Holdout minDCF</td><td>0.146</td><td>0.079</td></tr>
+<tr><td>Holdout EER / AUC</td><td>2.5% / 0.997</td><td>1.7% / 0.999</td></tr>
+<tr><td>Holdout, playht</td><td>0.032</td><td>0.033</td></tr>
+<tr><td>Holdout, wavegrad2</td><td>0.214</td><td>0.104</td></tr>
+<tr><td>Holdout, bona fide LibriSpeech</td><td>0.159</td><td>0.101</td></tr>
+<tr><td>Holdout, bona fide LJ</td><td>0.088</td><td>0.047</td></tr>
+<tr><td>Sponsor code as-is / flipped (holdout)</td><td>1.00 / 0.090</td><td>1.00 / 0.055</td></tr>
+<tr><td><strong>In-the-Wild minDCF</strong></td><td><strong>0.374</strong></td><td>0.405</td></tr>
+<tr><td>In-the-Wild EER</td><td>8.4%</td><td>9.3%</td></tr>
+<tr><td>In-the-Wild P_FA / P_miss at the inner threshold</td><td>1.2% / 27.4%</td><td>5.7% / 13.4%</td></tr>
+</tbody>
+</table></div>
+<p><strong>Reading</strong></p>
+<ul>
+<li><strong>Holdout.</strong> The holdout improves on every slice. But the gap (0.067) is inside the holdout's one-sigma noise (about 0.07–0.10 per the consult), and inner CV is a tie.</li>
+<li><strong>In-the-Wild.</strong> The rank metric gets slightly worse on In-the-Wild, and the inner-fold threshold carries over worse: P_FA rises from 1.2% to 5.7%. More VCTK read speech did <strong>not</strong> reduce false alarms on web-sourced celebrity speech, contrary to the consult's prediction.</li>
+<li><strong>The biggest finding</strong> is the size of the In-the-Wild gap: both models sit at 0.37–0.40, against 0.08–0.15 on the NSA-domain holdout. If NSA's real test audio includes "smartphone, telephony and field recordings" (per the brief), the holdout is optimistic, and robustness to real-world recording conditions matters more than the fusion choice.</li>
+</ul>
+<p><strong>Decision status:</strong> open.</p>
+<ul>
+<li>M1 remains the logged TSV.</li>
+<li>M1b is a candidate for the one-time draft review.</li>
+<li>Next levers, which the M5 fine-tune and the fusion consult should weigh:
+<ul>
+<li>augmentation that reproduces field and telephony channels on <strong>both</strong> classes</li>
+<li>more varied bona fide sources: In-the-Wild is eval-only, so look elsewhere</li>
+<li>checking whether the In-the-Wild errors are false alarms or misses by source</li>
+</ul></li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_m1b-asv19-bonafide.md</code> <span class="hash">37dfccad3c30</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

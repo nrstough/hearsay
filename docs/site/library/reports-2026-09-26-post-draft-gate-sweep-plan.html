@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: post-draft gate sweep (scripts/fusesweepv3.py) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_post-draft-gate-sweep-plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_post-draft-gate-sweep-plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#ground-truth-used-read-17201755">Ground truth used (read 17:20–17:55)</a></li><li><a href="#steps">Steps</a></li><li><a href="#risks-and-mitigations">Risks and mitigations</a></li><li><a href="#review-resolutions-1825-codex-plan-review--claude-critique-supersede-the-steps-above-where-they-differ">Review resolutions (18:25; Codex plan review + Claude critique; supersede the steps above where they differ)</a></li></ul></details>
+<h1 id="plan-post-draft-gate-sweep-scriptsfuse_sweep_v3py">Plan: post-draft gate sweep (<code>scripts/fuse_sweep_v3.py</code>)</h1>
+<p>Run spec: <code>docs/specs/2026-09-26_post-draft-gate-sweep.md</code> (design decisions D1–D13, acceptance criteria A1–A5). Manifest: <code>docs/reports/2026-09-26_post-draft-manifest.md</code> (<code>141b254</code>). Mode: standard, with one Claude critique of this plan beside the Codex plan review.</p>
+<h2 id="ground-truth-used-read-17201755">Ground truth used (read 17:20–17:55)</h2>
+<ul>
+<li><strong><code>scripts/fuse_sweep.py</code>:</strong>
+<ul>
+<li>Lines 26–51: <code>REPO</code>, <code>S</code>, <code>PI = 0.3</code>, <code>norm</code>, <code>load(name, itw)</code>. <code>load</code> maps split <code>stress</code> → <code>itw</code>, concatenates an ITW file of <code>path,logit</code>, dedups by path and indexes by the normalized path.</li>
+<li><code>brief(y,s) = min_cost(y,s,PI)</code> and <code>averse(y,s) = min_cost(y,s,0.5,c_fa=1.0,c_miss=4.0)</code>.</li>
+<li>It imports only numpy, pandas, sklearn and <code>hearsay.metrics</code>: no torch, no lightgbm.</li>
+</ul></li>
+<li><strong><code>scripts/fuse_sweep_m5.py</code>:</strong>
+<ul>
+<li>Lines 45–64: loaders, labels (<code>splits/nsa_folds.csv</code> plus <code>outputs/manifests/itw_stress.csv</code>), and the per-split intersection over m1, hc, m3, m5.</li>
+<li>Lines 66–76: <code>rank</code>, <code>lg</code>, <code>e_step</code>.</li>
+<li>Lines 93–110: <code>readout</code>.</li>
+<li>Lines 121–157: Platt and the <code>--write</code> constants shape.</li>
+<li>The module-level <code>fs</code> is loaded via importlib.</li>
+</ul></li>
+<li><strong><code>src/hearsay/metrics.py:54</code>:</strong> <code>min_cost(y, s, pi_synth, c_fa, c_miss)</code> over <code>roc_curve</code>, normalized by the default cost; <code>cost_at</code> at line 45.</li>
+<li><strong><code>models/fusion_v2/constants.json</code>:</strong>
+<ul>
+<li><code>rank_ref_inner_oof_sorted</code> for m1b_v3, handcrafted_v5, m5_xlsr_ft (16,142 each).</li>
+<li><code>weights</code> 0.6 / 0.2 / 0.2; <code>e_rule</code> (−3, 0.5, ×0.5).</li>
+<li><code>platt</code> a = 17.6928, b = −8.1515, prior_shift = log(0.3/0.7).</li>
+<li><code>m5_checkpoint</code> hashes.</li>
+</ul></li>
+<li><strong><code>outputs/channel/m3_perturb.csv</code>:</strong>
+<ul>
+<li>Columns <code>key,path,kind,label,m1b_v3,spectra_aasist,m5_xlsr_ft,handcrafted_v5,fused_base,fused,e_applied</code>, all logits.</li>
+<li><code>fused</code> = <code>FusionConstants.fuse(...).fused</code> = the post-E rank-domain score (<code>scripts/m3_probes.py:205–217</code>); <code>fused_base</code> is the pre-E base.</li>
+<li>250 bona fide + 250 spoof per kind; kinds none, mp3, noise20, speed, shift1.</li>
+</ul></li>
+<li><strong><code>outputs/manifests/itw_stress.csv</code>:</strong> <code>path,label,generator,speaker,source</code>, which provides the speaker column for the cluster bootstrap.</li>
+<li><strong>The shipped TSV:</strong> <code>filename&lt;TAB&gt;cm-score</code>, basenames like <code>HGT1013455.wav</code>, 1,671 rows; pinned rows have cm-score &lt; 0.001.</li>
+<li><strong>Test conventions:</strong> load scripts via <code>importlib.util.spec_from_file_location</code> (as in <code>tests/test_channel_robustness.py:19–23</code>). The <code>needs_data</code> marker is declared in <code>pyproject.toml:44</code>.</li>
+</ul>
+<h2 id="steps">Steps</h2>
+<h3 id="1-scriptsfuse_sweep_v3py-module-constants-and-pure-functions-d1d10-d13">1. <code>scripts/fuse_sweep_v3.py</code>: module constants and pure functions (D1–D10, D13)</h3>
+<p>Module header docstring: purpose, manifest pointer, usage (<code>uv run python scripts/fuse_sweep_v3.py [--write --ratified-by nathan --candidate NAME [--new-column-model DIR]]</code>).</p>
+<p>Imports at top: <code>argparse, hashlib, importlib.util, json, math, sys, pathlib</code>, <code>numpy</code>, <code>pandas</code>, <code>scipy.stats.spearmanr</code>, <code>sklearn.metrics.roc_auc_score</code>, <code>hearsay.metrics.min_cost, cost_at, sigmoid</code>. Load <code>fs</code> from <code>scripts/fuse_sweep.py</code> exactly as <code>fuse_sweep_m5.py:30–32</code> does. There are no torch or lightgbm imports at module level.</p>
+<p>Constants:</p>
+<pre><code class="language-python">SHIPPED_TSV = REPO / "submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv"
+SHIPPED_SHA_PREFIX = "fb783076"
+PINNED_BELOW = 0.001
+BASE_COLS = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft")   # ranked; spectra_aasist is the E-step input only
+CURRENT_W = {"m1b_v3": 0.6, "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.2}
+E_TIERS = ((-3.0, 0.5),)   # defined before CANDIDATES (Codex 1 / critique 6)
+CANDIDATES = {   # manifest order; weights accumulated in dict order
+  "T2":      {"weights": CURRENT_W, "tiers": ((-3.0, 0.5), (-6.0, 0.25)), "new": None, "test": "gate"},
+  "W4":      {"weights": {"m1b_v3": 0.4, "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.4}, "tiers": E_TIERS, "new": None, "test": "bakeoff"},
+  "P_wl":    {"weights": {"m1b_v3": 0.4, "wavlm_l": 0.2, "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.2}, "tiers": E_TIERS, "new": ("wavlm_l", None), "test": "gate"},
+  "H_noise": {"weights": {"m1b_v3": 0.6, "handcrafted_v6": 0.2, "m5_xlsr_ft": 0.2}, "tiers": E_TIERS, "new": ("handcrafted_v6", "_itw_handcrafted_v6.csv"), "test": "gate"},
+}
+EXPECTED_CURRENT = {"inner_brief": 0.1351, "holdout_brief": 0.0065, "holdout_averse": 0.0087, "itw_brief": 0.228,
+                    "itw_averse": 0.2385, "itw_pfa_at_inner_thr": 0.013, "itw_pmiss_at_inner_thr": 0.122,
+                    "holdout_argmin_FA_miss": [0, 13]}
+EXPECTED_W4 = {"inner_brief": 0.1373, "inner_averse": 0.3366, "holdout_brief": 0.0065, "holdout_averse": 0.0088,
+               "itw_brief": 0.1997, "itw_averse": 0.2075}
+GATE = {"itw_brief_gain": 0.020, "itw_averse_reg": 0.002, "inner_brief_gain": 0.010, "holdout_reg": 0.010,
+        "spearman_floor": 0.974}
+STANDING = {"itw_brief_gain": 0.01, "itw_averse_reg": 0.01, "holdout_brief_reg": 0.05, "inner_brief_reg": 0.03}
+PWL_MIN_CATCHES, CORRECTIVE_MIN = 16, 0.5
+BOOT_N, BOOT_SEED, PERTURB_REG = 2000, 0, 0.010
+CELLS = [(p, c) for p in ("inner", "holdout", "itw") for c in ("brief", "averse")]</code></pre>
+<p>Pure functions (all hermetically testable):</p>
+<ul>
+<li><code>sha_ok(path) -&gt; bool</code>.</li>
+<li><code>brief(y, s)</code> / <code>averse(y, s)</code>: thin wrappers equal to <code>min_cost(y,s,0.3)</code> / <code>min_cost(y,s,0.5,c_fa=1.0,c_miss=4.0)</code>. They do not delegate to <code>fs</code>, so the test pins the literal arguments.</li>
+<li><code>rank_vs(ref_sorted, x) = np.searchsorted(ref_sorted, x) / len(ref_sorted)</code>.</li>
+<li><code>blend(ranks: dict, weights: dict)</code>: <code>b = 0.0; for k, w in weights.items(): b = b + w * ranks[k]</code>. This is the order <code>hearsay.pipeline</code> uses.</li>
+<li><code>apply_tiers(base, m3, tiers)</code>: <code>mult = np.ones_like(base)</code>. Iterate the tiers from the least deep, <code>for thr, m in tiers: mult = np.where((m3 &lt; thr) &amp; (base &gt; 0.5), m, mult)</code>, so the deepest satisfied tier wins, and the multiplier is the total one (T2's 0.25 is the total, not 0.5 × 0.25). Return <code>base * mult</code>.</li>
+<li><code>inner_threshold(y_inner, s_inner)</code>: <code>min(np.unique(s), key=cost_at(y, s, t, 0.3))</code>, as in <code>fuse_sweep_m5.py:107</code>.</li>
+<li><code>readout(y, src, sc)</code>: the M5 readout (<code>fuse_sweep_m5.py:93–110</code>) plus <code>inner_averse</code>. It returns the six cells plus argmin, the LJ/Libri split and ITW P_FA / P_miss.</li>
+<li><code>deltas(cur, cand)</code>: <code>{cell: round(cur - cand, 4)}</code> over the six cells, using values already rounded to 4 decimals.</li>
+<li><code>gate(d: dict, spearman: float, diag_ok: bool) -&gt; dict</code>. It returns <code>{"rules": {"2a":…, "2b":…, "3a":…, "3b":…, "4a":…, "4b":…, "5_brief":…, "5_averse":…, "5_diag":…}, "doubled": bool, "verdict": "PASS"|"FAIL", "failed": [...]}</code>. Rule 6 doubles the 2a and 3a thresholds when <code>spearman &lt; 0.974</code>. Comparisons are ≥ on the rounded Δ (<code>round(x, 4) &gt;= thr - 1e-12</code> to absorb float representation). Rule 5 counts <code>d[(p, c)] &gt; 0</code> over p ∈ {inner, holdout, itw}, requiring ≥ 2 for each c.</li>
+<li><code>standing_rule(d) -&gt; dict</code> (the W4 bake-off's part 1).</li>
+<li><code>pareto_pick(passers: dict[name, dict cell→value]) -&gt; str | None</code>: none if empty; the single passer if one; otherwise the passer that is ≤ every other passer in all six cells and &lt; in at least one; else None.</li>
+<li><code>t2_fires(y, base, m3) -&gt; int</code>: <code>sum((y==1) &amp; (m3 &lt; -6) &amp; (base &gt; 0.5))</code>.</li>
+<li><code>new_catches(y_itw, cur_itw, thr_cur, col_itw, thr_col) -&gt; int</code>: CURRENT's misses are <code>(y==1) &amp; (cur &lt; thr_cur)</code>; the column catches those with <code>col &gt;= thr_col</code>.</li>
+<li><code>corrective_share(y, cur, thr_cur, r_new, r_m1b) -&gt; float</code>: errors are FAs <code>(y==0)&amp;(cur&gt;=thr)</code> and misses <code>(y==1)&amp;(cur&lt;thr)</code>. Corrected is <code>r_new &lt; r_m1b</code> on FAs and <code>r_new &gt; r_m1b</code> on misses (strict). Returns corrected / errors; 0 errors → NaN, which fails.</li>
+<li><code>cluster_bootstrap(y, s_cur, s_cand, groups, n, seed) -&gt; {"brief": p5, "averse": p5, "n": n}</code>: raises on NaN or empty groups. Unique groups; per replicate <code>rng.choice(G, G, replace=True)</code>, concatenating each drawn group's row indices (precomputed index lists). The same index array feeds both rules; Δ = cost(cur) − cost(cand) per cost; returns <code>np.percentile(Δ, 5)</code>. A replicate with a single class is skipped and counted (reported).</li>
+<li><code>test_agreement(test_paths, fused, platt, shipped_df) -&gt; {"spearman", "crossings", "n_nonpinned"}</code>:
+<ul>
+<li>Map <code>Path(p).name</code> to the shipped rows and raise on any unmatched name.</li>
+<li>Non-pinned = shipped cm-score ≥ 0.001.</li>
+<li>Candidate p = <code>0.001 + 0.999 * sigmoid(a*fused + b + prior_shift)</code>.</li>
+<li>Crossings = <code>sum((p &gt;= 0.5) != (shipped &gt;= 0.5))</code>. No file names are returned.</li>
+</ul></li>
+<li><code>fit_platt(s_inner, y_inner)</code>: class-balanced <code>LogisticRegression</code> → (a, b), as in <code>fuse_sweep_m5.py:129</code>.</li>
+<li><code>perturb_eval(df, consts, weights_by_rule)</code>: ranks from <code>consts["rank_ref_inner_oof_sorted"]</code>, E tiers, per kind × {brief, averse} per rule. It also returns <code>max |CURRENT − df.fused|</code> (the tripwire).</li>
+</ul>
+<h3 id="2-main-and-the-data-path-d2-d3-d4-d11-d12">2. <code>main()</code> and the data path (D2, D3, D4, D11, D12)</h3>
+<ol>
+<li>Parse args: <code>--write</code>, <code>--ratified-by</code>, <code>--candidate</code>, <code>--new-column-model</code>. Validate early:
+<ul>
+<li><code>--write</code> without <code>--ratified-by nathan</code> or without <code>--candidate</code> → <code>ap.error</code>.</li>
+<li><code>--candidate</code> not in <code>CANDIDATES</code> → <code>ap.error</code>.</li>
+</ul></li>
+<li><code>if not sha_ok(SHIPPED_TSV): sys.exit("shipped TSV changed …")</code>.</li>
+<li>Load the base columns with <code>fs.load</code> (m1b_v3; handcrafted_v5 plus the <code>_itw</code> file; spectra_aasist plus <code>outputs/spectra/itw_stress/scores.csv</code>; m5_xlsr_ft plus <code>_itw_m5.csv</code>), and the labels, as in <code>fuse_sweep_m5.py:48–55</code>. Attach the speaker for ITW from <code>itw_stress.csv</code>.</li>
+<li><code>build(cols: dict[name → df]) -&gt; ctx</code>, where ctx holds the per-split intersection over all given cols plus spectra, <code>y</code>, <code>src</code>, <code>spk</code>, and the rank dicts. Rank refs come from this ctx's inner-OOF rows.</li>
+<li>Base ctx → CURRENT readout → self-check against <code>EXPECTED_CURRENT</code> (exact equality of the rounded values; argmin list equality) and Spearman ≥ 0.999. On a failure, print SELF-CHECK FAIL with the diff, write the report with <code>"self_check": {…, "ok": false}</code> and every verdict <code>"INVALID"</code>, and <code>sys.exit(2)</code>.</li>
+<li>For each candidate in <code>CANDIDATES</code> order:
+<ul>
+<li><code>new=None</code> → base ctx.</li>
+<li>Otherwise, check <code>S / f"{name}.csv"</code> exists; if not, set status <code>NOT RUN</code> and continue.</li>
+<li>Otherwise, load it (ITW via its <code>_itw</code> file, or its own <code>stress</code> or <code>itw</code> split), build its ctx, and run the direction guard (<code>roc_auc_score(y_inner, logit_inner) &lt; 0.5</code> → raise ValueError naming the column).</li>
+<li>Compute CURRENT on the same ctx and the candidate score; readouts for both; deltas; test agreement for both (each with its own Platt); the diagnostic; then the gate or the bake-off.</li>
+<li>Record <code>rows</code>, and the shrink vs base: per-split counts, <code>shrunk: bool</code>.</li>
+</ul></li>
+<li>Diagnostics:
+<ul>
+<li><strong>T2:</strong> <code>t2_fires</code> on inner, holdout and itw (the base being the pre-tier blend on each ctx), plus each perturbation kind from <code>perturb_eval</code>'s base.</li>
+<li><strong>P_wl:</strong> <code>new_catches</code> on itw; <code>corrective_share</code> on inner and itw; Spearman(<code>wavlm_l</code>, <code>m1b_v3</code>) on holdout and test logits (disclosure).</li>
+<li><strong>W4:</strong> none (the bake-off instead).</li>
+</ul></li>
+<li><strong>W4 bake-off:</strong>
+<ul>
+<li><code>standing_rule(d)</code>;</li>
+<li><code>perturb_eval</code> with CURRENT and W4 weights: tripwire ≤ 1e-9, else <code>"INVALID"</code>; all 10 cells have Δ ≥ −0.010;</li>
+<li><code>cluster_bootstrap</code> on ITW: p5 &gt; 0 for both costs.</li>
+<li>Also record <code>gate(d, …)</code> for W4 for the record (expected FAIL rule 3).</li>
+<li>W4's final status is "BAKEOFF PASS" or "BAKEOFF FAIL". A W4 bake-off pass counts as a passer for rule 7.</li>
+</ul></li>
+<li>Also check T2 against the base CURRENT (six cells identical) and W4 against <code>EXPECTED_W4</code>, printed as <code>known-number check: ok/mismatch</code> (non-blocking).</li>
+<li>Decision: <code>passers = {k: six cells}</code> for verdict PASS (the gate) or BAKEOFF PASS; <code>pick = pareto_pick(passers)</code>. Print one table (a pandas DataFrame of the six cells plus Spearman, crossings, verdict per candidate, with CURRENT on the base set as the first row), then the decision line:
+<ul>
+<li><code>KEEP (no passer)</code></li>
+<li><code>RECOMMEND &lt;pick&gt;</code></li>
+<li><code>KEEP (≥2 passers, none Pareto-dominant)</code></li>
+</ul></li>
+<li>Write <code>outputs/fusion/sweep_v3_report.json</code>: manifest commit <code>141b254</code>, rows, self_check, per candidate {status, rows, readout, current_readout, deltas, test_agreement, diagnostic, gate, bakeoff, known_number_check}, passers, decision.</li>
+<li><code>--write</code> path (D12):
+<ul>
+<li>Refuse (exit) if <code>--candidate</code> is not the decided pick, or is not a passer.</li>
+<li>Refuse if <code>models/fusion_v3/constants.json</code> exists.</li>
+<li><code>from hearsay.pipeline import M5_DIR</code> imported here only.</li>
+<li>Write the <code>fusion_v2</code> shape: <code>final</code>, <code>pi_synth</code>, <code>rank_ref_inner_oof_sorted</code> over the candidate's ranked columns, <code>weights</code>, <code>e_rule</code> (plus <code>tiers</code> when there are two), <code>platt</code>, <code>determinate_map</code>, <code>how</code>, <code>m5_checkpoint</code>, <code>ratified_by</code>, <code>manifest_commit</code>.</li>
+<li>For a new column, <code>new_column_model: {"name", "dir": --new-column-model (required, must exist)}</code>.</li>
+<li>Never writes elsewhere.</li>
+</ul></li>
+</ol>
+<h3 id="3-teststest_fuse_sweep_v3py-hermetic-plus-needs_data">3. <code>tests/test_fuse_sweep_v3.py</code> (hermetic plus <code>needs_data</code>)</h3>
+<p>Load the module via importlib (as <code>tests/test_channel_robustness.py:19–23</code> does). Tests, per the run spec's inventory:</p>
+<ol>
+<li><code>test_brief_is_min_cost_pi03</code></li>
+<li><code>test_averse_is_min_cost_sponsor</code></li>
+<li><code>test_brief_weights_recover_9_33_to_1</code>: 1 FA in n_real vs 1 miss in n_spoof, at a fixed threshold via <code>cost_at</code>.</li>
+<li><code>test_brief_differs_from_averse_on_asymmetric</code></li>
+<li><code>test_rank_vs_matches_hand</code></li>
+<li><code>test_blend_order_and_weights</code></li>
+<li><code>test_manifest_weights_sum_to_one</code></li>
+<li><code>test_apply_tiers_point_cases</code> (parametrized over five cases, including exactly −3 and exactly −6, where the comparison is strict)</li>
+<li><code>test_e_tiers_equal_shipped_e_step</code>: equals <code>np.where((m3&lt;-3)&amp;(base&gt;0.5), base*0.5, base)</code> on random arrays.</li>
+<li><code>test_gate_all_pass</code></li>
+<li><code>test_gate_each_rule_fails</code> (parametrized over nine sub-rules)</li>
+<li><code>test_gate_boundary_0p020</code></li>
+<li><code>test_gate_rounding_first</code></li>
+<li><code>test_gate_inner_averse_equal_passes_worse_fails</code></li>
+<li><code>test_gate_spearman_doubles</code> (0.9739 vs 0.974; doubled thresholds apply only to 2a and 3a)</li>
+<li><code>test_standing_rule_cases</code></li>
+<li><code>test_pareto_pick</code> (parametrized: none, single, dominant, non-dominant, all-equal)</li>
+<li><code>test_t2_fires_counts_only_spoof_above_half</code></li>
+<li><code>test_new_catches_15_fails_16_passes</code></li>
+<li><code>test_corrective_share_half_fails</code>, <code>test_corrective_share_ties_do_not_count</code>, <code>test_corrective_share_no_errors_is_nan</code></li>
+<li><code>test_bootstrap_deterministic</code></li>
+<li><code>test_bootstrap_paired_and_clustered</code>: one speaker holding all the separation → the percentile reflects whole-speaker draws; the two rules share draws (a test hook returns the draws).</li>
+<li><code>test_bootstrap_missing_speaker_raises</code></li>
+<li><code>test_bakeoff_parts_fail</code> (a pure <code>bakeoff_verdict(standing, perturb_cells, p5)</code> function; parametrized over three failures plus a pass)</li>
+<li><code>test_test_agreement_excludes_pinned_and_counts_crossings</code>, <code>test_test_agreement_unmatched_raises</code></li>
+<li><code>test_direction_guard_raises_on_inverted</code></li>
+<li><code>test_missing_export_not_run</code>: build_candidate with a tmp <code>S</code> → NOT RUN.</li>
+<li><code>test_shrunk_rows_recorded</code></li>
+<li><code>test_write_refused_without_ratification</code> (subprocess <code>--write</code> → nonzero, stderr names <code>--ratified-by</code>)</li>
+<li><code>test_write_refuses_existing_target</code>: pure <code>write_constants(path, …)</code> raises FileExistsError on a tmp path.</li>
+<li><code>test_sha_mismatch_detected</code></li>
+<li><code>test_import_hygiene</code> (subprocess: import the module; assert "lightgbm" and "torch" not in <code>sys.modules</code>)</li>
+<li><code>needs_data</code> <code>test_self_check_reproduces_shipped_numbers</code>: base ctx → CURRENT readout == <code>EXPECTED_CURRENT</code>; Spearman ≥ 0.999.</li>
+<li><code>needs_data</code> <code>test_t2_identical_and_w4_known_numbers</code></li>
+<li><code>needs_data</code> <code>test_perturbation_tripwire</code>: max |recomputed − fused| ≤ 1e-9.</li>
+</ol>
+<p>For the subprocess tests to be possible, the refactor keeps <code>main()</code> light: data loading is inside <code>main</code>/<code>build</code>, not at import.</p>
+<h3 id="4-run-and-verify">4. Run and verify</h3>
+<pre><code class="language-bash">uv run pytest -q tests/test_fuse_sweep_v3.py
+uv run ruff check scripts/fuse_sweep_v3.py tests/test_fuse_sweep_v3.py
+uv run python scripts/fuse_sweep_v3.py        # A3: self-check ok, T2 identical/FAIL, W4 known numbers + gate FAIL (rule 3) + bake-off verdict, P_wl / H_noise NOT RUN
+shasum -a 256 submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv submissions/CrossExam_predictions.tsv   # both fb783076…
+git status --short models/                    # empty
+uv run pytest -q &amp;&amp; uv run ruff check .       # A2</code></pre>
+<p>The W4 bake-off result is then <strong>known before 19:15</strong>. It is recorded in the sweep report as computed; nothing about it is revisited.</p>
+<h3 id="5-docs-and-commit">5. Docs and commit</h3>
+<ul>
+<li>Run spec §Results: test counts, and the T2 / W4 outcomes from step 4.</li>
+<li><code>CLAUDE.md</code> AI-use disclosure: one bullet ("the post-draft gate lane (Sat Sep 26, 17:20–): the manifest and pre-declared gate, <code>scripts/fuse_sweep_v3.py</code>, its tests, the W4 fresh-evidence bake-off, the locked table …").</li>
+<li>Stage explicitly: <code>scripts/fuse_sweep_v3.py tests/test_fuse_sweep_v3.py docs/specs/2026-09-26_post-draft-gate-sweep.md docs/reports/2026-09-26_post-draft-gate-sweep-plan.md docs/reports/2026-09-26_post-draft-gate-sweep-plan-review.md CLAUDE.md</code>. Commit <code>feat(gate): fuse_sweep_v3 — pre-declared gate, W4 bake-off, T2 audit</code>.</li>
+<li>Post-commit: an adversarial Claude critique on the audit rubric (loop), then <code>bash .claude/review-audit.sh docs/specs/2026-09-26_post-draft-gate-sweep.md</code>.</li>
+</ul>
+<h3 id="6-at-the-wavlm-export-1915-one-run-locked-table">6. At the WavLM export (~19:15): one run, locked table</h3>
+<ul>
+<li>Confirm <code>outputs/detector_scores/wavlm_l.csv</code> exists, and record the heads chat's commit hash.</li>
+<li>Run <code>uv run python scripts/fuse_sweep_v3.py</code> <strong>once</strong>.</li>
+<li>Write <code>docs/reports/2026-09-26_post-draft-sweep.md</code> with:
+<ul>
+<li>the table from the JSON, the gate verdict per rule and candidate, and the diagnostics;</li>
+<li>the bake-off, Spearman and crossing counts, and row counts;</li>
+<li>the NOT RUN note for H_noise (CPU lane, <code>6c3e12f</code> / <code>16b0376</code>);</li>
+<li>one recommendation.</li>
+</ul></li>
+<li>Commit it, and present it to Nathan by ~19:30.</li>
+</ul>
+<h2 id="risks-and-mitigations">Risks and mitigations</h2>
+<ul>
+<li><strong>The self-check fails</strong> (for example the inner averse or the rounding differs from the M5 report). EXPECTED_CURRENT holds only the fields the M5 report actually has, and inner averse is new, so it isn't in the dict. Diagnose before reading any candidate.</li>
+<li><strong>The bootstrap is slow</strong> (2,000 × 2 rules × 2 costs × <code>roc_curve</code> on about 3,000 rows is about 8,000 calls). It should take about 20–40 s. If it is too slow, vectorize nothing and accept it: correctness over speed.</li>
+<li><strong>ITW speaker values missing or NaN.</strong> It raises. The manifest has the speaker column, so the check runs at step 4.</li>
+<li><strong>WavLM export shape differs</strong> (for example ITW under <code>stress</code> or in a separate file). <code>fs.load</code> handles <code>stress</code>. A separate <code>_itw_wavlm_l.csv</code> is picked up if present; otherwise the ITW rows must be in the export, and a missing ITW split yields an intersection of 0 → the candidate is INVALID with a message (never a silent pass).</li>
+<li><strong>The perturbation cohort's M5 logits are CPU-runner logits, while the rank references come from A100 exports.</strong> This is the same for both rules, and it is exactly what the shipped <code>fused</code> column used. The tripwire confirms the recomputation matches the runner.</li>
+<li><strong>Winner's curse and test-set peeking.</strong> No file names are printed for crossings, and no parameter is exposed on the command line except the ratification flags.</li>
+</ul>
+<h2 id="review-resolutions-1825-codex-plan-review--claude-critique-supersede-the-steps-above-where-they-differ">Review resolutions (18:25; Codex plan review + Claude critique; supersede the steps above where they differ)</h2>
+<p>Codex: <code>docs/reports/2026-09-26_post-draft-gate-sweep-plan-review.md</code> (10 findings). Claude critique: 1 blocker, 7 should-fix, 5 nits. It verified the self-check reproduces exactly (inner averse 0.2997), the perturbation tripwire holds at 1.1e-16, import hygiene holds, and ITW has 54 speakers with no NaN. The manifest clarifications were committed at <code>b877760</code> before any new number.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Finding</th><th>Resolution in the code</th>
+</tr></thead>
+<tbody>
+<tr><td>C1 / Cr6</td><td><code>E_TIERS</code> used before its definition</td><td>Moved above <code>CANDIDATES</code> (step 1).</td></tr>
+<tr><td>C2</td><td>Rule-7 Pareto compares different row sets</td><td><code>pareto_pick</code> receives passers re-scored on the intersection of all passers' row sets (<code>rescore_common(passers)</code>). Test: two passers on different rows → compared on common rows.</td></tr>
+<tr><td>C3</td><td>Fold contract not validated; <code>fs.load</code> silently dedups</td><td>New <code>validate_export(df_raw, folds)</code> runs on the raw CSV <strong>before</strong> <code>fs.load</code>. It requires unique normalized paths, finite logits, and every inner_oof / holdout row's split agreeing with <code>splits/nsa_folds.csv</code> (holdout ↔ fold <code>holdout</code>; inner_oof ↔ fold 0–4). A failure makes the candidate INVALID. Provenance: the sha256 of every input CSV goes in the report, and the heads chat's commit hash is recorded in the sweep report by hand.</td></tr>
+<tr><td>C4</td><td>Partial test coverage</td><td>Test rows must be exactly the 1,671 shipped basenames, each once. ITW rows must be the 3,000. Otherwise INVALID. Tests: a missing row, and a duplicate basename.</td></tr>
+<tr><td>C5 / Cr4</td><td>A raise aborts the locked run; NaN Spearman bypasses doubling</td><td>Each candidate is evaluated in <code>try/except (ValueError, KeyError)</code> → <code>{"status": "INVALID", "reason": …}</code>, and the loop continues. A non-finite Spearman or diagnostic → INVALID. Test: an inverted P_wl fixture → INVALID while W4 and T2 still produce results, and the report is written.</td></tr>
+<tr><td>C6</td><td><code>--write</code> not bound to the locked inputs</td><td>Non-write mode writes <code>sweep_v3_report.json</code> with an <code>inputs</code> block (sha256 of every CSV read, the shipped TSV, the fusion_v2 constants, the manifest commit). <code>--write</code> <strong>does not rewrite the report</strong>. It loads it, recomputes the input hashes and refuses on any difference. It re-runs the evaluation and refuses unless the recomputed decision equals the report's <code>decision.pick</code> and the candidate matches. It writes only <code>models/fusion_v3/constants.json</code> (refusing if it exists). For P_wl, it requires <code>--new-column-model DIR</code> whose <code>meta.json</code> exists, and records that file's sha256. A residual risk is stated: the tie between the model directory and the export is by the heads report, not by bytes.</td></tr>
+<tr><td>C7 / Cr5</td><td>H_noise diagnostic undefined</td><td>H_noise's <code>diag_ok</code> is hard-coded <code>False</code> with the reason "no noise-AUC evidence supplied (withdrawn by the CPU lane 17:42)" (manifest clarification 4). It cannot pass.</td></tr>
+<tr><td>C8</td><td>Threshold search omits "call everything real"</td><td><code>inner_threshold</code> searches <code>np.r_[np.unique(s), np.inf]</code>. The self-check still reproduces 0.013 / 0.122; if it doesn't, stop and report. Test: a constant-score column → threshold <code>inf</code>, 0 catches.</td></tr>
+<tr><td>C9</td><td><code>git status models/</code> can't see ignored files</td><td>Verification hashes <code>models/fusion_v2/constants.json</code>, the shipped TSV and <code>submissions/CrossExam_predictions.tsv</code> before and after. Write-path tests cover a failing candidate, a passing but non-picked candidate, an existing target, and successful serialization to a tmp target (a pure <code>write_constants(path, payload)</code>).</td></tr>
+<tr><td>C10</td><td>No closing step or stop behavior</td><td>New <strong>step 7</strong> below.</td></tr>
+<tr><td>Cr1</td><td>P_wl miss set: 158 vs 122</td><td>Manifest clarification 1: inner-OOF threshold (122 misses), absolute bar 16. The report prints the miss count and each column's catches (M1b, M5, M3, wavlm_l) at that threshold for scale.</td></tr>
+<tr><td>Cr2</td><td>Empty pinned block</td><td>Manifest clarification 2: all 1,671 rows.</td></tr>
+<tr><td>Cr3</td><td>T2 not row-identical</td><td>The <code>needs_data</code> T2 check compares only the six rounded cells, and it is <strong>non-blocking</strong> in the script (it prints <code>known-number check</code>). The report also carries bona fide fire counts. A3 is reworded to "T2 six cells expected identical (non-blocking)".</td></tr>
+<tr><td>Cr7</td><td>Perturbation rounding</td><td>Cells are rounded to 4 decimals before Δ ≥ −0.010; the bootstrap uses <code>np.percentile</code> linear on unrounded Δ. Both are pinned in tests.</td></tr>
+<tr><td>Cr8</td><td>Inventory items without tests</td><td>Added tests: averse 1 : 4 recovery; other candidates still evaluated after NOT RUN / INVALID; a shrunk ctx rebuilds rank refs from its own inner rows while base CURRENT is unchanged; <code>--write</code> refused for non-pass or non-pick; tripwire failure → bake-off INVALID (hermetic, via <code>bakeoff_verdict(…, tripwire=1e-6)</code>); self-check failure → every verdict INVALID with exit 2 (pure <code>finalize(self_check_ok=False, …)</code>); T2 diagnostic aggregating every split and kind; boundaries 2b (−0.002 passes, −0.0021 fails) and 4a/4b (−0.010 passes, −0.0101 fails).</td></tr>
+<tr><td>Nits</td><td>Tier order; <code>fused_base</code> column; P_wl constants vs <code>DETECTOR_ORDER</code>; D13 wording; test rows</td><td><code>apply_tiers</code> asserts the thresholds are strictly decreasing. The T2 perturbation diagnostic reads the CSV's <code>fused_base</code>, as the manifest says. P_wl's integration risk is flagged in the packet (<code>FusionConstants</code> rejects <code>wavlm_l</code> today; <code>pipeline.py:180–183</code>). The run spec's D13 wording is corrected (<code>hearsay.pipeline</code> doesn't import torch). Test coverage below 1,671 is INVALID, not disclosed-and-scored.</td></tr>
+</tbody>
+</table></div>
+<p>The test count rises from 35 to about 48.</p>
+<h3 id="7-close-out-new">7. Close-out (new)</h3>
+<ul>
+<li><strong>19:25, lock.</strong> If <code>outputs/detector_scores/wavlm_l.csv</code> is absent at 19:25, P_wl is NOT RUN, and the table is locked with T2, W4 and H_noise only. If the export lands, the one run happens immediately. If the export or the self-check fails validation, the candidate is INVALID; there is no rerun after a fix.</li>
+<li><strong>19:30–20:00, Nathan's window.</strong> He either ratifies one candidate from the packet's ratifiable set, or says KEEP. No ruling by 20:00 means KEEP.</li>
+<li><strong>KEEP:</strong>
+<ul>
+<li>Append a <code>submissions/log.csv</code> note row: KEEP, <code>submissions/CrossExam_predictions.tsv</code> final, sha256 <code>fb783076…</code> re-verified at write time, sweep report path.</li>
+<li>Message the CPU lane (for its §7) and the oversight chat.</li>
+<li>Stop.</li>
+</ul></li>
+<li><strong>Ratify:</strong>
+<ul>
+<li><code>--write --ratified-by nathan --candidate NAME</code> → <code>models/fusion_v3/constants.json</code>.</li>
+<li>Runner integration, the full 1,671-row parity, the new immutable TSV and its log row, and a new final-name copy are the <strong>integration job</strong>, owned by this lane unless Nathan assigns it elsewhere, with a hard stop at 21:30. If the job cannot finish by 21:30, the ratification lapses to KEEP, and the step-1 file stays final (log note row).</li>
+<li>Message the CPU lane, the oversight chat and the README chat.</li>
+</ul></li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_post-draft-gate-sweep-plan.md</code> <span class="hash">213eccf8d4fe</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+flowchart LR
+  W3["window · 64,600 samples ≈ 4.04 s<br/>pre-emphasis · from the prepared clip"]
+  X3["XLS-R 300M · 24 layers · 1024-d · 16 heads<br/>Spectra's own fine-tuned copy"]
+  B3["MLP bridge<br/>1024-d frames → AASIST input"]
+  E3["residual conv encoder<br/>filters 32 → 32 → 64 → 64"]
+  G3["spectral GAT + temporal GAT · dim 64<br/>graph pooling ratio 0.5"]
+  H3["4 heterogeneous stacked-graph attention branches<br/>64 → 32 · max + mean readout"]
+  O3["linear 160 → 2<br/>logits (spoof, bonafide)"]
+  S3["synth_logit = spoof − bonafide<br/>averaged over windows · exported as the logit column"]
+  W3 --> X3 --> B3 --> E3 --> G3 --> H3 --> O3 --> S3
+  classDef frozen fill:#e8eaf6,stroke:#3949ab,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class X3,B3,E3,G3,H3,O3 frozen
+  class W3,S3 flight

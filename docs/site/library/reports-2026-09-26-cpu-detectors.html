@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CPU detector track (D-track): engineered detectors and two data traps · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_cpu-detectors.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_cpu-detectors.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#summary">Summary</a></li><li><a href="#what-was-delivered">What was delivered</a></li><li><a href="#trap-1-the-container-is-the-label">Trap 1: the container is the label</a></li><li><a href="#trap-2-the-test-set-is-low-passed-at-72-khz">Trap 2: the test set is low-passed at ~7.2 kHz</a></li><li><a href="#handcrafted-spectral--prosody-detector">Handcrafted spectral + prosody detector</a></li><li><a href="#compression-forensics-detector">Compression forensics detector</a></li><li><a href="#enf-mains-hum-detector">ENF (mains hum) detector</a></li><li><a href="#splice--discontinuity-detector">Splice / discontinuity detector</a></li><li><a href="#score-export-format-what-m4-consumes">Score export format (what M4 consumes)</a></li><li><a href="#recommendations-for-the-main-chat">Recommendations for the main chat</a></li><li><a href="#what-worked--what-had-no-effect-readme-ready">What worked / what had no effect (README-ready)</a></li><li><a href="#state-for-the-next-chat">State for the next chat</a></li><li><a href="#how-to-reproduce">How to reproduce</a></li></ul></details>
+<h1 id="cpu-detector-track-d-track-engineered-detectors-and-two-data-traps">CPU detector track (D-track): engineered detectors and two data traps</h1>
+<p>Sat Sep 26, 2026, 01:10–03:00. CPU only, in parallel with the main chat's GPU work (M1 v2, TSVs). Handoff: <code>docs/handoffs/2026-09-26_cpu-detectors-handoff.md</code>. All numbers below are normalized minDCF with <code>C_FA = 4</code>, <code>π_synth = 0.3</code> (<code>hearsay.metrics</code>), on the shared fold file <code>splits/nsa_folds.csv</code> (outer holdout = generators <code>playht</code> + <code>wavegrad2</code> plus 26 bona fide groups; inner folds 0–4). Score direction: 1.0 = synthetic, never flipped.</p>
+<h2 id="summary">Summary</h2>
+<ul>
+<li><strong>Five engineered detectors</strong> build against the contract (<code>src/hearsay/detectors/</code>): <code>handcrafted</code> (spectral + prosody, learned), <code>compression</code> (codec-history traces, learned with laundering-equalized training), <code>container</code> (header facts + tag rules), <code>enf</code> (mains hum), <code>splice</code> (clicks, DC jumps). <code>import hearsay.detectors.engineered</code> registers all five. 63 new hermetic tests (toy model bundles, a dumped LightGBM fixture, ffmpeg-generated files, synthetic hum and seams); the suite is at 215 passed, ruff clean.</li>
+<li><strong>Fusion exports</strong> in the M4 format (<code>path, fold, split, score, logit</code>) are in <code>outputs/detector_scores/</code>: <code>handcrafted.csv</code> (the best version; <code>handcrafted_v1/v2/v3.csv</code> kept for the ablation), <code>compression.csv</code>, <code>container.csv</code>, <code>enf.csv</code>, <code>splice.csv</code>. Every row of the 20,000-clip training sample and the 1,671 test files is present; inner rows are out-of-fold, the scaler included. <strong>Fuse <code>handcrafted.csv</code>.</strong> <code>compression.csv</code> is exported but suspect (its section explains why); <code>container</code>, <code>enf</code> and <code>splice</code> are constant or two-valued on the test set and carry evidence and routing, not score.</li>
+<li><strong>Two traps in the data</strong>, both measured, both with a fix:
+<ol>
+<li><strong>The container is the label on the training data.</strong> LibriSpeech is FLAC 16 kHz, LJ is 22.05 kHz WAV, DiffSSD is 22.05/24/44.1 kHz WAV or MP3, and PlayHT's MP3s carry the exact FFmpeg tag (<code>encoder=Lavf58.29.100</code>) that every one of the 1,671 test files carries. A learned metadata model would identify PlayHT by its tag and then call the whole test set PlayHT. The container detector is therefore rule-based and never learned; on this test set it returns a constant 0.5 and routing facts.</li>
+<li><strong>The NSA test set is low-passed at about 7.2 kHz.</strong> 1,602 of 1,671 test files drop by a median 44 dB between the 6.5 kHz and 7.5 kHz bands. No training corpus does, not even the sponsor's own resampled LJ clips (<code>data/nsa/LJRealResampled</code>). Every feature above 7 kHz was a corpus fingerprint, and the v1/v2 handcrafted detector called about 90% of the test set synthetic. A 71-tap Kaiser low-pass (<code>hearsay.handcrafted.band_limit</code>) reproduces the roll-off within 3 dB and is now applied to every clip, train and test. <strong>The deep detector sees the same mismatch; see Recommendations.</strong></li>
+</ol></li>
+<li><strong>Handcrafted detector, holdout minDCF:</strong> v1 (first 4 s) 0.709 → v2 (test-length crops, same as the deep detector's <code>prepare_segment</code>) 0.661 → <strong>v3 (v2 + band match) 0.254</strong>, EER 4.3%, AUC 0.993; the share of test files scored above 0.5 went from 90% to 42% (the prior is 30%). Two effects are entangled and separated below: LightGBM generalizes to the held-out generators far better than logistic regression, and the band match is what made LightGBM win the inner CV and what moved the test-score distribution. LibriSpeech bona fide stays the weak spot; the LJ-voice diffusion generators <code>grad_tts</code> and <code>pro_diff</code> are invisible to these features at any version.</li>
+</ul>
+<blockquote>
+<p><strong>Follow-up (Sat 04:45):</strong> handcrafted v4 (six new feature families, 234 columns) is in <code>docs/reports/2026-09-26_handcrafted-v4.md</code>: inner OOF minDCF 0.434, pro_diff visible, grad_tts still not, In-the-Wild P_FA 0.65%. <code>handcrafted.csv</code> below is still v3 until fusion switches.</p>
+</blockquote>
+<h2 id="what-was-delivered">What was delivered</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Piece</th><th>Where</th>
+</tr></thead>
+<tbody>
+<tr><td>Feature modules</td><td><code>src/hearsay/handcrafted.py</code> (spectral + prosody, v3 prep), <code>src/hearsay/compression.py</code> (codec traces + <code>launder</code>)</td></tr>
+<tr><td>Contract detectors</td><td><code>src/hearsay/detectors/{handcrafted,compression,container,enf,splice}.py</code>, shared learned wrapper <code>_learned.py</code>, registrar <code>engineered.py</code></td></tr>
+<tr><td>LightGBM without lightgbm</td><td><code>src/hearsay/trees.py</code>: numpy evaluator + path attribution over the dumped booster (exact to 1e-9 against lightgbm), because lightgbm and torch each bundle a <code>libomp.dylib</code> and loading both in one process segfaults or hangs on macOS. Bundles store <code>trees_dump</code>; nothing outside the trainer imports lightgbm (<code>tests/test_trees.py</code> pins it).</td></tr>
+<tr><td>Extraction</td><td><code>scripts/extract_handcrafted.py</code>, <code>scripts/extract_compression.py</code> (crop lengths drawn exactly as <code>extract_embeddings.py --segment --crop test --seed 0</code>; verified against the main chat's shard 0)</td></tr>
+<tr><td>Training + export</td><td><code>scripts/train_handcrafted.py</code> (any feature dir; writes the M4 export and <code>models/&lt;prefix&gt;_&lt;kind&gt;_&lt;stamp&gt;/</code>)</td></tr>
+<tr><td>Rule-based export</td><td><code>scripts/score_detector.py</code> (runs a registered detector over the fold file + test manifest)</td></tr>
+<tr><td>Inventory</td><td><code>scripts/inventory_container.py</code> → <code>outputs/inventory/container_{nsa_test,nsa_train_sample}.csv</code>; <code>outputs/inventory/nsa_test_highband.csv</code> (per-file 6.5–8 kHz band levels)</td></tr>
+<tr><td>Tests</td><td><code>tests/test_{handcrafted,container,compression,enf,splice}_detector.py</code>, <code>tests/test_engineered_registry.py</code> (all hermetic: toy bundles, ffmpeg-generated files)</td></tr>
+<tr><td>Models (gitignored, not archived)</td><td><code>models/hc_logreg_*</code>, <code>models/cmp_*</code> with <code>meta.json</code> and <code>scores.csv</code></td></tr>
+</tbody>
+</table></div>
+<h2 id="trap-1-the-container-is-the-label">Trap 1: the container is the label</h2>
+<p><code>scripts/inventory_container.py</code> on all 1,671 test files and 300 clips per generator of the training sample (ffprobe; embedded fields only, never filesystem times or filenames).</p>
+<p><strong>Test set: one format.</strong> wav / pcm_s16le / 16,000 Hz / mono / 16-bit / one tag, <code>encoder=Lavf58.29.100</code>, for every file. The only per-file variation is the byte-rate ffprobe derives from size and duration.</p>
+<p><strong>Training sample: format = source.</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Source / generator</th><th>Container</th><th>Rate</th><th>Tag</th>
+</tr></thead>
+<tbody>
+<tr><td>LibriSpeech (real)</td><td>FLAC</td><td>16 kHz</td><td>none</td></tr>
+<tr><td>LJ Speech (real)</td><td>WAV PCM16</td><td>22.05 kHz</td><td>none</td></tr>
+<tr><td>diffgan_tts, grad_tts, openvoicev2, pro_diff, unit_speech, wavegrad2</td><td>WAV PCM16</td><td>22.05 kHz</td><td>none</td></tr>
+<tr><td>your_tts</td><td>WAV PCM16</td><td>16 kHz</td><td>none</td></tr>
+<tr><td>xtts_v2</td><td>WAV PCM16</td><td>24 kHz</td><td>none</td></tr>
+<tr><td>elevenlabs</td><td>MP3 128 kbps</td><td>44.1 kHz</td><td>none</td></tr>
+<tr><td><strong>playht</strong></td><td>MP3 ~160 kbps</td><td>24 kHz</td><td><strong><code>encoder=Lavf58.29.100</code></strong></td></tr>
+</tbody>
+</table></div>
+<p>So "16 kHz PCM with a Lavf tag" is 100% of the test set and 0% of the training set, and "Lavf tag" alone is PlayHT, the holdout generator. Any learned container model gets a perfect holdout score for the wrong reason and then collapses on the test set. The sponsor's resampled LJ clips also carry <code>Lavf58.29.100</code>, so the tag marks the sponsor's pipeline, not a class.</p>
+<p><strong>What the container detector does instead</strong> (<code>hearsay.detectors.container</code>): always runs (cheap); returns the header facts as features for routing (<code>lossy</code>, <code>is_pcm_wav</code>, <code>sample_rate</code>, <code>bits</code>, <code>n_tags</code>, <code>ffmpeg_written</code>) and a rule score that is 0.5 unless an embedded tag <em>value</em> names a speech-synthesis tool (0.9) or claims synthesis (0.75). No NSA or DiffSSD file trips either rule. Export: constant 0.5 on all 21,671 rows (minDCF 1.0, as it must be). This is the technique "leveraged" honestly: it routes (compression forensics only makes sense when the header or the signal says lossy) and it documents that the test set's container carries no class signal.</p>
+<h2 id="trap-2-the-test-set-is-low-passed-at-72-khz">Trap 2: the test set is low-passed at ~7.2 kHz</h2>
+<p>Long-term band level relative to the 1–3 kHz level, medians (dB). Computed on the silence-trimmed, level-normalized first 8 s; per-file values for the test set in <code>outputs/inventory/nsa_test_highband.csv</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Corpus</th><th>n</th><th>6.5 k</th><th>7.0 k</th><th>7.25 k</th><th>7.5 k</th><th>7.75 k</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>NSA test set</strong></td><td>1,671</td><td>−11.8</td><td>−15.5</td><td><strong>−29.5</strong></td><td><strong>−55.8</strong></td><td><strong>−62.1</strong></td></tr>
+<tr><td>LJRealResampled (sponsor's real, 16 kHz)</td><td>242</td><td>−0.5</td><td>1.5</td><td>0.5</td><td>−2.0</td><td>−5.5</td></tr>
+<tr><td>LJ Speech (ours, 22.05 → 16 kHz)</td><td>40</td><td>−2.1</td><td>2.2</td><td>1.0</td><td>−2.1</td><td>−5.6</td></tr>
+<tr><td>LibriSpeech (native 16 kHz)</td><td>40</td><td>−13.3</td><td>−17.8</td><td>−19.3</td><td>−19.6</td><td>−18.8</td></tr>
+<tr><td>DiffSSD elevenlabs / playht / your_tts / xtts_v2</td><td>25 each</td><td>−13 … −8</td><td>−18 … −9</td><td>−20 … −10</td><td>−23 … −12</td><td>−25 … −15</td></tr>
+<tr><td>DiffSSD grad_tts / wavegrad2</td><td>25 each</td><td>−2 … −4</td><td>2 … 0</td><td>3 … 0</td><td>−2</td><td>−5 … −4</td></tr>
+</tbody>
+</table></div>
+<p>Reading: between 6.5 and 7.5 kHz the test set falls 44 dB (5th–95th percentile of the per-file drop: −52 to −25 dB). Nothing on the training side falls more than about 10 dB over the same span. 69 test files (4%) do not show the wall; see below. The roll-off starts near 7.0 kHz and reaches −50 dB by 7.75 kHz, which is what a resampler or a wideband speech-codec front end with a ~7.2 kHz cutoff leaves behind (a plain FFmpeg resample, as in LJRealResampled, cuts at ~7.8 kHz, and that is not it).</p>
+<p><strong>Why it matters.</strong> <code>hf_ratio_7k_*</code>, <code>rolloff95_*</code>, <code>bandwidth</code>, <code>centroid</code>, <code>flatness</code>, the upper MFCCs and the 7–8 kHz spectral-contrast band all differ between every training clip and every test clip for a reason that has nothing to do with synthesis. A model trained on our data sees test clips as "unlike any real clip I saw" and extrapolates. The v2 handcrafted detector put 90% of the test set above 0.5; with a 70% real test set that is a false-alarm rate of at least 86% at that threshold.</p>
+<p><strong>Fix: match the training audio to the test set</strong> (the plan's rule for level and silence, applied to bandwidth). A grid over Kaiser low-pass designs on 60 training clips against the test-set medians (error measured relative to the 6.5 kHz band):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Design</th><th>7.0 k</th><th>7.25 k</th><th>7.5 k</th><th>7.75 k</th><th>rms error</th>
+</tr></thead>
+<tbody>
+<tr><td>target (test set)</td><td>−3.7</td><td>−17.7</td><td>−44.0</td><td>−50.3</td><td></td></tr>
+<tr><td><strong>Kaiser, cutoff 7250 Hz, 600 Hz transition, 45 dB (71 taps)</strong></td><td>−0.2</td><td>−13.2</td><td>−46.4</td><td>−52.2</td><td><strong>3.3 dB</strong></td></tr>
+<tr><td>Kaiser 7200 / 700 / 45 dB</td><td>−1.7</td><td>−15.5</td><td>−49.5</td><td>−54.6</td><td>3.8</td></tr>
+<tr><td>brick-wall FIR (1025 taps, 7200 / 500)</td><td>−0.4</td><td>−54.6</td><td>−67.8</td><td>−68.0</td><td>23.8</td></tr>
+<tr><td>soxr HQ 16 → 22.05 → 16 kHz</td><td>0</td><td>1.3</td><td>−10.5</td><td>−60.0</td><td>20.0</td></tr>
+<tr><td>LAME MP3 48 kbps at 16 kHz</td><td>2.1</td><td>−39.7</td><td>−67.1</td><td>−67.8</td><td>18.4</td></tr>
+</tbody>
+</table></div>
+<p><code>hearsay.handcrafted.band_limit</code> is the first row, applied zero-delay (<code>fftconvolve</code>, <code>mode="same"</code>) to every clip before trimming and cropping, for training and test alike. On a test clip a second pass changes the waveform by 0.4% rms. <code>BAND_MATCH</code> records the design; the model bundle records <code>band_match=True</code> so the contract detector prepares test audio identically.</p>
+<p><strong>The 69 files without the wall</strong> are not a different pipeline. Their 7.75 kHz band is still −58 dB (median); the cutoff just sits nearer 7.5 kHz (7.5 kHz band −27 dB against −56 dB for the rest). Three are band-limited well below 6.5 kHz (telephony-like) and three are genuinely full-band to 8 kHz. Band matching everything is therefore right for 1,665 of 1,671 files, and the compression detector's <code>bw_hz</code> flags the six (after band matching, 981 test files read 7,250 Hz, 670 read 7,500 Hz, 12 read 8,000 Hz, 8 sit at 5–7 kHz).</p>
+<h2 id="handcrafted-spectral--prosody-detector">Handcrafted spectral + prosody detector</h2>
+<p><strong>Features</strong> (75, <code>hearsay.handcrafted.features</code>): high-band energy ratios (&gt; 4/6/7 kHz, mean and std), 85%/95% roll-off, centroid, bandwidth, flatness, 6-band spectral contrast, spectral flux, 20 MFCC means + stds; YIN pitch (median, IQR and std of log F0, slope std), voiced fraction, loudness dynamics, quiet-frame level, pause fraction and count, zero-crossing rate. Duration, peak and absolute level are excluded (they are corpus shortcuts: peak alone has AUC 0.66 train-vs-test). Cost 0.63 s per clip, YIN dominated; 20,000 clips take 8 minutes on 6 workers.</p>
+<p><strong>Preparation, three versions.</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>Trim</th><th>Segment</th><th>Band match</th>
+</tr></thead>
+<tbody>
+<tr><td>v1 (<code>crop_mode="first4s"</code>)</td><td>yes</td><td>first 4 s</td><td>no</td></tr>
+<tr><td>v2 (<code>crop_mode="segment"</code>)</td><td>yes</td><td><code>hearsay.embed.prepare_segment</code>: random crop to a length drawn from the NSA test durations, seed <code>0 + row</code>, 8 s cap; test clips whole</td><td>no</td></tr>
+<tr><td>v3</td><td>yes</td><td>as v2</td><td><code>band_limit</code> on every clip</td></tr>
+</tbody>
+</table></div>
+<p>v2's crop lengths and offsets are drawn exactly as <code>scripts/extract_embeddings.py --segment --crop test --seed 0</code> draws them (<code>test_duration_sampler(0)</code>, one draw per manifest row in order; checked against the first five of the main chat's <code>nsa_train_sample_v2</code> shard: identical to 6 decimals), so the handcrafted and deep detectors are fused on the same audio.</p>
+<p><strong>Models.</strong> Standardized class-balanced logistic regression (C = 0.1) and LightGBM (300 trees, 31 leaves), each scored by out-of-fold minDCF on the predefined inner folds; the better one is refit on all inner rows and read out once on the outer holdout. Selection is by inner CV only. Logistic regression won the CV for v1 and v2; LightGBM won it for v3.</p>
+<p><strong>Results.</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>Selected by CV</th><th>CV minDCF (logreg / lgbm)</th><th>Holdout minDCF</th><th>Holdout EER</th><th>Holdout AUC</th><th>π = 0.5</th><th>Sponsor code, flipped</th><th>Test: mean score</th><th>Test: share &gt; 0.5</th>
+</tr></thead>
+<tbody>
+<tr><td>v1</td><td>logreg</td><td>0.615 / 0.708</td><td>0.709</td><td>12.0%</td><td>0.945</td><td>0.494</td><td>0.385</td><td>0.85</td><td>88%</td></tr>
+<tr><td>v2</td><td>logreg</td><td>0.615 / 0.707</td><td>0.661</td><td>10.8%</td><td>0.951</td><td>0.471</td><td>0.363</td><td>0.87</td><td>90%</td></tr>
+<tr><td><strong>v3</strong></td><td><strong>lgbm</strong></td><td>0.640 / <strong>0.614</strong></td><td><strong>0.254</strong></td><td><strong>4.3%</strong></td><td><strong>0.993</strong></td><td>0.168</td><td>0.127</td><td>0.43</td><td><strong>42%</strong></td></tr>
+</tbody>
+</table></div>
+<p>Sponsor code as shipped (higher = bona fide, unflipped) reads 1.0 for every version, as expected for a 1.0 = synthetic detector; that is the score-direction tripwire, not a model property.</p>
+<p><strong>Untangling the v3 jump</strong> (every cell: model refit on all inner rows, read out on the holdout; the CV-selected cells are the ones above):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Version × model</th><th>Holdout minDCF</th><th>EER</th><th>AUC</th><th>playht</th><th>wavegrad2</th><th>LibriSpeech</th><th>LJ</th><th>Test share &gt; 0.5</th>
+</tr></thead>
+<tbody>
+<tr><td>v2 logreg (selected)</td><td>0.661</td><td>10.8%</td><td>0.951</td><td>0.67</td><td>0.65</td><td>0.84</td><td>0.38</td><td>90%</td></tr>
+<tr><td>v2 lgbm</td><td>0.374</td><td>5.9%</td><td>0.986</td><td>0.33</td><td>0.42</td><td>0.46</td><td>0.08</td><td>68%</td></tr>
+<tr><td>v3 logreg</td><td>0.687</td><td>12.1%</td><td>0.948</td><td>0.63</td><td>0.73</td><td>0.83</td><td>0.37</td><td>83%</td></tr>
+<tr><td><strong>v3 lgbm (selected)</strong></td><td><strong>0.254</strong></td><td><strong>4.3%</strong></td><td><strong>0.993</strong></td><td>0.25</td><td>0.26</td><td>0.32</td><td>0.10</td><td><strong>42%</strong></td></tr>
+</tbody>
+</table></div>
+<p>Two things are true at once. LightGBM transfers to the held-out generators far better than logistic regression at either version (0.37 vs 0.66 on v2), while the inner CV, pooled over folds that hold out the three generators these features cannot see at all, preferred logistic regression until v3. And the band match is a real gain on top: for LightGBM it takes the holdout from 0.374 to 0.254 and, more importantly for the test set, it moves the share of test files above 0.5 from 68% to 42%; for logistic regression it does not help the holdout but still pulls the test share from 90% to 83%. The selection rule stayed inner-CV-only throughout (the holdout was read once per version), so v3 lgbm is a legitimate pick, and the disagreement between inner CV and outer holdout is itself worth knowing for fusion: inner-OOF scores understate what this detector does on generators it can see.</p>
+<p><strong>Per generator and per bona fide source</strong> (v3 lgbm; inner rows are out-of-fold, holdout rows from the final model; v2 logreg in parentheses):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Generator (inner OOF)</th><th>minDCF</th><th></th><th>Holdout</th><th>minDCF</th>
+</tr></thead>
+<tbody>
+<tr><td>unit_speech</td><td>0.25 (0.30)</td><td></td><td>playht</td><td>0.25 (0.67)</td></tr>
+<tr><td>diffgan_tts</td><td>0.27 (0.22)</td><td></td><td>wavegrad2</td><td>0.26 (0.65)</td></tr>
+<tr><td>your_tts</td><td>0.32 (0.66)</td><td></td><td></td><td></td></tr>
+<tr><td>xtts_v2</td><td>0.47 (0.43)</td><td></td><td><strong>Bona fide source</strong></td><td></td></tr>
+<tr><td>openvoicev2</td><td>0.53 (0.17)</td><td></td><td>LJ Speech (holdout chapters)</td><td>0.10 (0.38)</td></tr>
+<tr><td>elevenlabs</td><td>0.80 (0.98)</td><td></td><td>LibriSpeech (holdout speakers)</td><td>0.32 (0.84)</td></tr>
+<tr><td>pro_diff</td><td>1.00 (0.81)</td><td></td><td></td><td></td></tr>
+<tr><td>grad_tts</td><td>1.00 (1.00)</td><td></td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<p><strong>What separated the classes</strong> (single-feature AUC on inner rows, v3; &lt; 0.5 means lower on synthetic): spectral contrast in the top band (<code>contrast4_mean</code> 0.26) and bottom band (<code>contrast0_mean</code> 0.30), the frame-to-frame variability of the upper MFCCs (<code>mfcc16–19_std</code> 0.28–0.35: synthetic spectra are steadier), pitch variability (<code>f0_iqr_log</code> 0.29, <code>f0_std_log</code> 0.35: synthetic voices are flatter), spectral flux (0.32), and, once the dead band was removed, spectral flatness (<code>flatness_std</code> 0.67, <code>flatness_mean</code> 0.64: synthetic speech is noisier between harmonics) plus a few MFCC means (<code>mfcc13_mean</code> 0.66, <code>mfcc5/6_mean</code> 0.63). Nothing in the prosody block beyond pitch variability mattered: pause fraction/count, voiced fraction, loudness dynamics and zero-crossing rate all sit within 0.05 of chance.</p>
+<p><strong>What had no effect or hurt.</strong> The first-4-s crop (v1 → v2 gained 0.05 holdout minDCF from length parity alone). Anything above 7 kHz (Trap 2). Logistic regression on these features (it never transferred to the held-out generators). The prosody block beyond pitch variability.</p>
+<p><strong>Honest reading.</strong> On the two held-out generators the v3 detector is respectable (minDCF 0.25, EER 4%), but three of the eight inner generators (grad_tts, pro_diff at 1.0; elevenlabs at 0.80) are invisible to it, and exactly those are the modern zero-shot and diffusion systems the test set is likeliest to contain. Treat the holdout number as "what it does on generators it can see", not as an estimate for the test set. Its value is (a) the rubric's spectral and prosody techniques with readable evidence per file, (b) a fusion column whose information differs from XLS-R's, and (c) the two traps above, which it exposed.</p>
+<h2 id="compression-forensics-detector">Compression forensics detector</h2>
+<p><strong>Features</strong> (19, <code>hearsay.compression.features</code>, one STFT, about 10 ms per clip): effective bandwidth (the highest 250 Hz band still within 40 dB of the 1–3 kHz level), four band levels between 4 and 8 kHz relative to 1–3 kHz, high-band tilt; and, in 3–7 kHz (below the band-match cutoff, which empties 7.25–8 kHz for every clip), deep holes (cells more than 75 dB below the clip peak) and local holes (cells more than 30 dB below the frame's band median), each as fraction, frame-to-frame flicker, persistence and runs per frame; floor depth (2nd and 10th percentile), valley depth; the 0.3–3 kHz floor; the whole-clip floor.</p>
+<p><strong>Laundering-equalized training.</strong> A random half of the training rows of <em>both</em> classes (10,171 of 20,000, drawn per row from <code>default_rng(seed + row)</code> and recorded in the <code>cmp_launder</code> column) were re-encoded with ffmpeg through MP3 (libmp3lame, three times in four) or AAC at 24–128 kbps and 16 / 22.05 / 44.1 kHz, then decoded back to 16 kHz before feature extraction. In DiffSSD only ElevenLabs and PlayHT are MP3 and every real clip is lossless, so without this step "lossy = fake" <em>is</em> the model and the holdout (PlayHT) would reward it.</p>
+<p><strong>Does it see codec history?</strong> Yes. A class-agnostic logistic regression on the same 19 features, trained to tell laundered from clean: inner OOF AUC 0.90, holdout AUC 0.94 (0.94 on real, 0.95 on fake). Sensitivity by round-trip on the holdout, as mean P(laundered): MP3 24–48 kbps 0.92–0.99, MP3 64 kbps 0.78, AAC 24 kbps 0.97, AAC 32–64 kbps 0.54–0.63, MP3/AAC 96–128 kbps 0.39–0.56, clean 0.16. Strongest cues: whole-clip floor depth (AUC 0.15: laundered clips have a shallower floor after level normalization), valley depth (0.73) and the local-hole fraction, flicker and runs (0.69–0.70). Applied to <em>unlaundered</em> training rows it also lights up <code>openvoicev2</code> (0.78: that vocoder's output has codec-like holes) and, weakly, native 128 kbps ElevenLabs MP3s (0.33).</p>
+<p><strong>Does it see the class?</strong> Barely, once codec history is equalized. Inner CV minDCF: logistic regression 1.00 (no better than "always real"), LightGBM 0.93 (EER 25%). Holdout: minDCF 0.90, EER 20%, AUC 0.89; on clean holdout rows 0.85, on laundered ones 0.91; playht 0.81, wavegrad2 0.97; LJ 0.64, LibriSpeech 0.91. Single-feature AUCs sit within 0.16 of chance (valley depth 0.34, local holes 0.35, deep-hole runs 0.64). Test set: mean score 0.72 and <strong>81% of files above 0.5</strong>, the "everything looks synthetic" signature the handcrafted detector had before the band match.</p>
+<p><strong>What the test set looks like under this lens.</strong> The laundering detector scores the test set at a mean P(laundered) of 0.62, with 72% of files above 0.5 (10th–90th percentile 0.34–0.85). Together with the 7.2 kHz wall this says the sponsor's pipeline passed the clips through a lossy or wideband-speech codec stage. On this test set, codec traces are pipeline, not class. <strong>Recommendation: keep <code>compression.csv</code> out of fusion unless the leave-one-out ablation shows a gain; keep the detector for routing and evidence</strong> (bandwidth, hole fraction, the laundering reading), which is what the rubric's technique asks for.</p>
+<h2 id="enf-mains-hum-detector">ENF (mains hum) detector</h2>
+<p><code>hearsay.detectors.enf</code>, rule-based, never learned. 2 s Hann windows (0.49 Hz bins, quadratic peak interpolation) at a 0.5 s hop on the trimmed clip capped at 8 s; for each of 50 and 60 Hz, track the strongest bin within ±1 Hz per frame and its SNR against the ±2–8 Hz neighbourhood. Present = median SNR ≥ 12 dB in ≥ 60% of frames. Stable = tracked-frequency std ≤ 0.25 Hz and range ≤ 0.5 Hz. Scores are deliberately mild: stable hum 0.4 (a genuine electrical recording environment), discontinuous hum 0.6 (a fabricated or spliced background), none 0.5. The training corpora (studio, audiobook, TTS) carry no hum, so the rule cannot be validated on labels and a strong swing would be "confidently wrong on a subpopulation".</p>
+<p><strong>Inventory.</strong> Test set: hum present in 24 of 1,671 files (15 at 50 Hz, 9 at 60 Hz; median SNR 14.7 dB, max 29.9 dB), stable in 16. Training sample: corpus-driven, not class-driven. A stable hum is present in 36% of LJ Speech clips (Linda Johnson's home studio) and 21% of LibriSpeech clips, in under 0.5% of nine DiffSSD generators, and, tellingly, <code>grad_tts</code> (trained on LJ) reproduces a 50/60 Hz component in 19% of its clips that is stable in only 1.6% of them, which is exactly the "discontinuous hum" rule firing on a vocoder that learned the hum but not the grid. As a score it cannot move minDCF alone (three discrete values; inner and holdout minDCF 1.0), and a fusion column would learn "hum = LJ = real" from training, a corpus artifact that fires on 1% of the test set. Keep it as evidence and a routing fact, not a fusion column.</p>
+<h2 id="splice--discontinuity-detector">Splice / discontinuity detector</h2>
+<p><code>hearsay.detectors.splice</code>, rule-based. (1) Clicks: a sample-to-sample step more than 15× the RMS of the steps in the surrounding 20 ms (the sample itself excluded, so a plosive burst does not count) and more than 15% of full scale. (2) DC-offset jumps: adjacent 100 ms window means differing by more than 2% of full scale and more than 6× the clip's typical window-to-window drift. (3) Background-floor variability (range of a 0.4 s running-minimum level tracker), reported as a feature only: in the 1 h box it could not be separated from ordinary pauses (a pause exposes the room floor; a speech-only stretch does not). Score 0.6 when a click or DC jump is found, else 0.5. The sponsor said no clip is partially synthetic, so a seam is evidence of editing, not of synthesis.</p>
+<p><strong>Inventory.</strong> Test set: 58 of 1,671 files (3.5%) show a seam, 16 by click and 44 by DC jump. On the training sample the seams are synthesis and codec artifacts rather than edits: single-sample clicks in 27% of <code>wavegrad2</code> clips and 14% of <code>diffgan_tts</code>; DC jumps in 13% of <code>unit_speech</code>, 12% of <code>playht</code> and 9% of <code>elevenlabs</code>, but also in 9% of LibriSpeech; against 0.7% of LJ Speech and 0.1% of <code>pro_diff</code>. Inner and holdout minDCF 1.0 (a two-valued score). The floor-range feature behaves as feared (median 28 dB on the test set, 33–99 dB on training, driven by pauses). Value: per-file evidence and a vocoder-artifact observation worth a line in the README; not a fusion column.</p>
+<h2 id="score-export-format-what-m4-consumes">Score export format (what M4 consumes)</h2>
+<p><code>outputs/detector_scores/&lt;name&gt;.csv</code>, columns <code>path, fold, split, score, logit</code>.</p>
+<ul>
+<li><code>split</code> ∈ {<code>inner_oof</code>, <code>holdout</code>, <code>test</code>}; <code>fold</code> is the fold-file value (<code>0</code>–<code>4</code>, <code>holdout</code>) or <code>test</code>.</li>
+<li>Learned detectors: inner rows are out-of-fold predictions from the predefined folds (every learned piece, the scaler included, fit fold-locally); holdout rows come from the model fit on all inner rows; test rows from the same model on <code>outputs/manifests/nsa_test.csv</code>, keyed by path in manifest order. <code>score</code> = P(synthetic), <code>logit</code> = log(score / (1 − score)) with score clipped to [1e-6, 1 − 1e-6].</li>
+<li>Rule-based detectors (<code>scripts/score_detector.py</code>): nothing is fitted, so all rows carry the detector's plain output; the same three splits are used for uniformity. A row whose result is not <code>ok</code> has NaN score/logit (fusion imputes it and sets the missing indicator). A <code>&lt;name&gt;_results.csv</code> beside it keeps status, evidence and features per row for the explanation report.</li>
+<li>All exports cover the same 21,671 paths (20,000 training + 1,671 test); paths are unique.</li>
+</ul>
+<h2 id="recommendations-for-the-main-chat">Recommendations for the main chat</h2>
+<ol>
+<li><strong>Band-match the deep detector's training audio.</strong> XLS-R sees the raw waveform; the 7.2 kHz wall is in every test clip and in no training clip. The cheapest fix is one line in <code>hearsay.embed.prepare_segment</code> (or in the extraction loop): <code>x = hearsay.handcrafted.band_limit(x)</code> before the trim, for training <em>and</em> test. Re-extract <code>nsa_train_sample_v2</code> and <code>nsa_test_v2</code> and compare the holdout minDCF and, more importantly, the test-score distribution (share of test files above 0.5 should move toward 30%). This is the single most likely cause of a draft-review surprise.</li>
+<li><strong>Route on bandwidth.</strong> The <code>compression</code> detector's <code>bw_hz</code> feature (and the per-file inventory) identifies the 69 test files without the wall and any telephony-band files; the orchestrator can log them and fusion can report minDCF on that subpopulation separately.</li>
+<li><strong>Fusion ablation.</strong> Use <code>handcrafted_v2.csv</code> vs <code>handcrafted_v3.csv</code> (same rows) to see what band matching does inside fusion, not only alone. Expect <code>container.csv</code> to contribute nothing (constant); keep it for the routing log and the documentation. Treat <code>compression.csv</code> as suspect: it calls 81% of the test set synthetic, and the test set reads as laundered throughout, so drop it unless leave-one-out shows a gain. <code>enf.csv</code> and <code>splice.csv</code> are near-constant on the test set; their training-side signal is corpus and vocoder artifacts.</li>
+<li><strong>Do not learn anything from the container.</strong> If the orchestrator ever adds container fields to fusion, Trap 1 applies.</li>
+</ol>
+<h2 id="what-worked--what-had-no-effect-readme-ready">What worked / what had no effect (README-ready)</h2>
+<p><strong>Worked</strong></p>
+<ul>
+<li>Matching training audio to the test set's ~7.2 kHz low-pass (<code>band_limit</code>): the largest single gain of the track, and the difference between a detector that calls 90% of the test set synthetic and one that calls 42%.</li>
+<li>Length parity with the deep detector (random crops to test-duration lengths; no first-4-s crop): +0.05 holdout minDCF on its own.</li>
+<li>Gradient-boosted trees over the 75 handcrafted features (LightGBM): they transfer to unseen generators; logistic regression on the same features does not.</li>
+<li>Spectral contrast, upper-MFCC frame-to-frame variability, pitch variability and spectral flatness as the interpretable cues (synthetic speech: flatter pitch, steadier spectra, noisier between harmonics).</li>
+<li>Treating the container as routing information, not evidence, and measuring why.</li>
+<li>Laundering-equalized training for compression forensics (a random half of <em>both</em> classes re-encoded through MP3/AAC), so the detector cannot learn "MP3 = ElevenLabs/PlayHT".</li>
+</ul>
+<p><strong>No effect or hurt</strong></p>
+<ul>
+<li>Every feature above 7 kHz before band matching (a corpus fingerprint, not a class cue).</li>
+<li>Any learned use of container fields (perfect on training, meaningless on the test set).</li>
+<li>Prosody beyond pitch variability: pause statistics, voiced fraction, loudness dynamics, zero-crossing rate all sit at chance on this data.</li>
+<li>Logistic regression as the handcrafted classifier.</li>
+<li>ENF and splice as <em>scores</em>: no training corpus carries mains hum or edits, so their scores are mild by design and their value is evidence and routing.</li>
+<li>The handcrafted features on diffusion TTS in LJ's voice (<code>grad_tts</code>, <code>pro_diff</code>) and on ElevenLabs: invisible at every version. Only the deep detector can cover those.</li>
+</ul>
+<h2 id="state-for-the-next-chat">State for the next chat</h2>
+<ul>
+<li><strong>Tracked:</strong> everything under <code>src/</code>, <code>scripts/</code>, <code>tests/</code> listed above, this report, the CLAUDE.md disclosure lines and the <code>docs/STATUS.md</code> rows. Nothing pushed.</li>
+<li><strong>At risk (gitignored, not archived):</strong> <code>models/hc_*</code>, <code>models/cmp_*</code>, <code>outputs/handcrafted/*_v{2,3}.csv</code>, <code>outputs/compression/*.csv</code>, <code>outputs/detector_scores/*.csv</code>, <code>outputs/inventory/container_*.csv</code> and <code>nsa_test_highband.csv</code>. All regenerable with the commands below (about 25 minutes of CPU on 6 workers).</li>
+<li><strong>Owned by the main chat, untouched:</strong> <code>embed.py</code>, <code>probe.py</code>, <code>submission.py</code>, the embedding/probe scripts, <code>submissions/</code>, <code>splits/nsa_folds.csv</code>.</li>
+<li><strong>Open:</strong> the deep detector band match (Recommendation 1); speaker-embedding drift (technique 6) was never started; ENF and splice scores are untested against any labeled edited or hum-bearing audio.</li>
+<li><strong>Gotcha found late:</strong> the first commits of this track were made while the full suite was crashing (a pipeline masked pytest's exit status); the crash was the lightgbm + torch OpenMP conflict above, fixed in the follow-up commit with <code>hearsay.trees</code>. The suite was green before the follow-up was committed.</li>
+</ul>
+<h2 id="how-to-reproduce">How to reproduce</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync                      # external drive mounted
+uv run python scripts/inventory_container.py --manifest outputs/manifests/nsa_test.csv --name nsa_test
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_test.csv --name nsa_test_v3 --workers 6
+uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_train_sample.csv --name nsa_train_sample_v3 --crop test --seed 0 --workers 6
+uv run python scripts/train_handcrafted.py --train nsa_train_sample_v3 --folds splits/nsa_folds.csv --test nsa_test_v3 --out-name handcrafted
+uv run python scripts/extract_compression.py --manifest outputs/manifests/nsa_test.csv --name nsa_test --workers 6
+uv run python scripts/extract_compression.py --manifest outputs/manifests/nsa_train_sample.csv --name nsa_train_sample --crop test --seed 0 --launder-frac 0.5 --workers 6
+uv run python scripts/train_handcrafted.py --train nsa_train_sample --folds splits/nsa_folds.csv --test nsa_test --features-dir outputs/compression --model-prefix cmp --rung "D-track (compression forensics)" --out-name compression
+for d in container enf splice; do uv run python scripts/score_detector.py --detector $d --workers 6; done
+uv run pytest -q &amp;&amp; uv run ruff check .</code></pre>
+<p><code>--no-band-match</code> and <code>--crop-mode first4s</code> reproduce v2 and v1.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_cpu-detectors.md</code> <span class="hash">31a66d317d4a</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fusion sweep: pre-declared candidates and selection rule (written before any result, Sat Sep 26 ~08:15) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_fusion-sweep-predeclared.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#candidates">Candidates</a></li><li><a href="#readouts-for-every-candidate">Readouts, for every candidate</a></li><li><a href="#selection-rule-fixed-now">Selection rule (fixed now)</a></li><li><a href="#results-appended-after-the-run-0813-the-rule-above-was-not-changed">Results (appended after the run, ~08:13; the rule above was not changed)</a></li><li><a href="#addendum-m5-candidates-pre-declared-before-any-run-sat-0835-requested-by-nathan-via-the-oversight-chat">Addendum: M5 candidates, pre-declared before any run (Sat ~08:35, requested by Nathan via the oversight chat)</a></li><li><a href="#addendum-2-a-refit-m1b-column-pre-declared-before-it-exists-m4-fusion-chat-sat-1250">Addendum 2: a refit M1b column, pre-declared before it exists (M4 fusion chat, Sat 12:50)</a></li></ul></details>
+<h1 id="fusion-sweep-pre-declared-candidates-and-selection-rule-written-before-any-result-sat-sep-26-0815">Fusion sweep: pre-declared candidates and selection rule (written before any result, Sat Sep 26 ~08:15)</h1>
+<p>Per the fusion consult response (<code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>).</p>
+<h2 id="candidates">Candidates</h2>
+<p>Written before running:</p>
+<ul>
+<li><strong>A. α-sweep (rank domain).</strong> score = (1 − α)·rank(M1b v3) + α·rank(handcrafted v5), for α ∈ {0, 0.1, 0.2, 0.3, 0.4, 0.5}. Ranks are each file's ECDF position against that detector's own inner OOF distribution.</li>
+<li><strong>B. min rule and max rule</strong> over the two ranks.</li>
+<li><strong>C. Cascade.</strong> M1b rank everywhere, except in the ambiguous middle band (M1b rank between the inner 40th and 90th percentiles), where it is replaced by the mean of the M1b and handcrafted ranks.</li>
+<li><strong>D. Non-negative stacker shrunk toward equal weights</strong>, over z(M1b) and z(handcrafted). Fit on inner OOF with LJ bona fide excluded; weights clipped at ≥ 0, then 50/50 shrinkage toward equal.</li>
+<li><strong>E. M3 as false-alarm suppression only</strong>, applied on top of the winner of A–D. Where M3's margin is below −3 ("strongly bona fide") and the base rank is above 0.5, the base rank is multiplied by 0.5. M3 is never used to raise a score, and nothing is fitted on M3.</li>
+</ul>
+<h2 id="readouts-for-every-candidate">Readouts, for every candidate</h2>
+<ul>
+<li><strong>Inner OOF minDCF</strong>, brief cost (π_synth = 0.3, C_FA = 4).</li>
+<li><strong>Holdout minDCF</strong> under both costs, plus the raw (#FA, #miss) at each candidate's holdout argmin threshold.</li>
+<li><strong>Per real source:</strong> LJ and LibriSpeech.</li>
+<li><strong>In-the-Wild minDCF</strong> under both costs:
+<ul>
+<li>brief cost: 9.33·P_FA + P_miss</li>
+<li>miss-averse cost (the sponsor code's semantics): P_FA + 4·P_miss at π 0.5</li>
+</ul></li>
+<li><strong>In-the-Wild P_FA and P_miss</strong> at the inner-OOF threshold.</li>
+</ul>
+<h2 id="selection-rule-fixed-now">Selection rule (fixed now)</h2>
+<ol>
+<li><strong>Admissible:</strong> inner OOF within 0.03 of the best candidate's inner OOF, <strong>and</strong> In-the-Wild miss-averse minDCF ≤ 0.45.</li>
+<li><strong>Among admissible candidates</strong>, pick the lowest In-the-Wild brief-cost minDCF. Ties within 0.01 go to the smaller α, meaning more M1b.</li>
+<li><strong>Apply E only if</strong> it lowers In-the-Wild brief-cost minDCF by ≥ 0.01 <strong>and</strong> does not raise holdout or inner OOF by more than 0.01.</li>
+<li><strong>No iteration after the results.</strong> If nothing is admissible, ship M1b v3 alone.</li>
+</ol>
+<h2 id="results-appended-after-the-run-0813-the-rule-above-was-not-changed">Results (appended after the run, ~08:13; the rule above was not changed)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Candidate</th><th>Inner (brief)</th><th>Holdout (brief)</th><th>Holdout (averse)</th><th>Holdout argmin [#FA, #miss]</th><th>ITW brief</th><th>ITW averse</th><th>ITW P_FA / P_miss at inner threshold</th>
+</tr></thead>
+<tbody>
+<tr><td>A α 0.0 (M1b alone)</td><td>0.301</td><td>0.072</td><td>0.057</td><td>[8, 63]</td><td>0.343</td><td>0.296</td><td>0.8% / 27.8%</td></tr>
+<tr><td>A α 0.1</td><td>0.260</td><td>0.044</td><td>0.034</td><td>[5, 37]</td><td>0.319</td><td>0.285</td><td>0.65% / 28.6%</td></tr>
+<tr><td><strong>A α 0.2</strong></td><td>0.236</td><td>0.030</td><td>0.029</td><td>[3, 30]</td><td>0.322</td><td>0.280</td><td>0.45% / 36.0%</td></tr>
+<tr><td>A α 0.3</td><td>0.230</td><td>0.021</td><td>0.023</td><td>[0, 41]</td><td>0.322</td><td>0.280</td><td>0.25% / 39.5%</td></tr>
+<tr><td>A α 0.4</td><td>0.232</td><td>0.015</td><td>0.020</td><td>[1, 19]</td><td>0.339</td><td>0.276</td><td>0.25% / 45.0%</td></tr>
+<tr><td>A α 0.5</td><td>0.241</td><td>0.016</td><td>0.019</td><td>[1, 21]</td><td>0.356</td><td>0.299</td><td>0.2% / 52.8%</td></tr>
+<tr><td>B min</td><td>0.285</td><td>0.029</td><td>0.032</td><td>[2, 38]</td><td>0.495</td><td>0.308</td><td>0.2% / 76.5%</td></tr>
+<tr><td>B max</td><td>0.285</td><td>0.079</td><td>0.044</td><td>[4, 118]</td><td>0.459</td><td>0.498</td><td>0.3% / 46.9%</td></tr>
+<tr><td>C cascade</td><td>0.239</td><td>0.016</td><td>0.019</td><td>[1, 21]</td><td>0.355</td><td>0.296</td><td>0.2% / 52.6%</td></tr>
+<tr><td>D non-neg shrunk</td><td>0.230</td><td>0.025</td><td>0.020</td><td>[0, 49]</td><td>0.324</td><td>0.280</td><td>0.4% / 36.9%</td></tr>
+<tr><td><strong>E on α 0.2 (FINAL)</strong></td><td>0.140</td><td>0.014</td><td>0.009</td><td>[1, 18]</td><td><strong>0.260</strong></td><td><strong>0.267</strong></td><td>1.4% / 14.8%</td></tr>
+</tbody>
+</table></div>
+<p><strong>Admissible:</strong> α 0.2–0.5, C and D. The lowest ITW brief-cost score is α 0.2 and α 0.3, tied at 0.322 with D at 0.324 inside the 0.01 band. The tie goes to the smaller α, so the winner is <strong>α 0.2</strong>, inside the consult's predicted 0.2–0.3.</p>
+<p><strong>E (M3 as false-alarm suppression only)</strong> lowers ITW brief from 0.322 to 0.260 and does not raise the holdout or inner scores, so it is applied. <strong>FINAL = E on α 0.2.</strong></p>
+<p><strong>Caveat.</strong> E's inner, holdout and ITW gains all involve M3, whose training data is undisclosed. E can only move a file toward "real", so if M3 is wrong about a file, the cost is a miss (weight 1), never a false alarm.</p>
+<p><strong>Caveats added 13:10 (channel-robustness lane, relayed by the oversight chat).</strong> (1) The M3 leakage probes returned KEEP for the suppression step: M3's margins are the most stable under perturbation (mean |ΔAUC| 0.0008), though its rank order is the least stable of the three deep models (clean-vs-perturbed Spearman under noise: M3 0.875, M1b 0.913, M5 0.939); it fires on no holdout fake under any perturbation (it damps 1.2% of MLAAD fakes, 7 of 572) and never raised fused minDCF, and it had the lowest MLAAD miss rate; the suppression step itself is safe. (2) <strong>The rule is not noise-robust:</strong> 20 dB additive white noise collapses handcrafted v5 (AUC 0.998 → 0.64) and takes the shipped rule's holdout from 0.012 to 0.269 while M3 holds; the test set shows no additive noise, no rule change was proposed, and symmetric noise augmentation is future work.</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Primary: <code>submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv</code></li>
+<li>Flipped (use only if NSA's feedback decodes as their code's polarity): <code>..._FLIPPED_only_if_NSA_scores_inverted.tsv</code></li>
+<li>Constants for the runner: <code>models/fusion_v1/constants.json</code></li>
+<li>Speech gate: 0 of 1,671 test files gated. Determinate scores sit in [0.001, 1].</li>
+</ul>
+<h2 id="addendum-m5-candidates-pre-declared-before-any-run-sat-0835-requested-by-nathan-via-the-oversight-chat">Addendum: M5 candidates, pre-declared before any run (Sat ~08:35, requested by Nathan via the oversight chat)</h2>
+<p>M5 = <code>outputs/detector_scores/m5_xlsr_ft.csv</code>. It is the frozen-backbone, head-only arm; its inner rows are out-of-fold. Its In-the-Wild scores are the 2,000 real clips already scored plus the 1,000 spoof clips scored now with <code>scripts/m5_score.py</code>, using the same seed-200 crops.</p>
+<p><strong>F: M5 as a second false-alarm suppressor, on top of the shipped E-on-A-α0.2 rule.</strong></p>
+<ul>
+<li>Order: after the M3 step. If <code>m5_logit &lt; t_F</code> and <code>base &gt; 0.5</code>, then <code>base *= 0.5</code>. M5 never promotes a file toward synthetic.</li>
+<li>Threshold: <code>t_F</code> is fixed from inner OOF only, before the holdout or In-the-Wild is looked at. It is the M5 logit value below which <strong>1% of inner spoof rows</strong> fall, so the suppression can fire wrongly on at most ~1% of known fakes.</li>
+<li>Why that reading: the request said "~1% inner-real coverage", which is ambiguous. A threshold that fires on only 1% of <em>real</em> rows would almost never act, so this is the conservative interpretation that keeps the step meaningful. The fraction of inner real rows it covers is reported alongside.</li>
+</ul>
+<p><strong>A3: three-way rank blend</strong> with weights (0.8 − w, 0.2, w) for (M1b, handcrafted, M5).</p>
+<ul>
+<li>w ∈ {0.1, 0.2}, each run <strong>without</strong> and <strong>with</strong> the M3 suppression step (same E rule as before), so four variants.</li>
+</ul>
+<p><strong>Readouts:</strong> identical to the 08:13 sweep.</p>
+<p><strong>Decision rule (fixed now).</strong> The current rule (E on A α 0.2) is replaced by a candidate only if <strong>all</strong> of these hold:</p>
+<ol>
+<li>In-the-Wild brief-cost minDCF improves by ≥ 0.01.</li>
+<li>In-the-Wild miss-averse minDCF gets worse by no more than 0.01.</li>
+<li>Holdout brief-cost gets worse by no more than 0.05 (inside the holdout's noise band).</li>
+<li>Inner OOF gets worse by no more than 0.03.</li>
+</ol>
+<p>If several candidates qualify, the one with the best In-the-Wild brief-cost wins. If none qualifies, the rule stays frozen and the negative result is recorded here. Any change needs Nathan's ratification before it ships.</p>
+<p><strong>Expectation, stated in advance:</strong> F may buy a little on In-the-Wild false alarms. A3 will probably lose on the holdout's short clips and LibriSpeech real.</p>
+<h3 id="addendum-results-appended-after-the-runs-0915-the-rule-was-not-changed">Addendum results (appended after the runs, ~09:15; the rule was not changed)</h3>
+<p><strong>Deviation from the addendum, disclosed.</strong> The addendum said M5's In-the-Wild spoofs would be scored "using the same seed-200 crops". <code>scripts/m5_score.py</code> has no crop option, so the first run scored all 3,000 M5 In-the-Wild clips whole, capped at 8 s, while the other detectors saw seed-200 test-length crops. The run was then repeated <strong>crop-fair</strong>: the identical <code>prepare_segment(x, crop_s, 200 + row)</code> crops were written to WAV and scored with <code>m5_score.py</code>. Both runs are reported. <strong>The crop-fair run is the decision input.</strong></p>
+<p><strong><code>t_F</code></strong> = −3.90 (1% of inner spoof rows fall below it; it covers 41.8% of inner real rows).</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Candidate</th><th>Inner (brief)</th><th>Holdout (brief)</th><th>Holdout (averse)</th><th>Holdout [#FA, #miss]</th><th>ITW brief (whole-clip M5 → crop-fair)</th><th>ITW averse (whole-clip → crop-fair)</th><th>ITW P_FA / P_miss at inner threshold (crop-fair)</th>
+</tr></thead>
+<tbody>
+<tr><td>CURRENT: E on A α 0.2</td><td>0.140</td><td>0.014</td><td>0.009</td><td>[1, 18]</td><td>0.260 → 0.260</td><td>0.267 → 0.267</td><td>1.4% / 14.8%</td></tr>
+<tr><td>F: M5 suppression</td><td>0.136</td><td>0.014</td><td>0.009</td><td>[1, 18]</td><td>0.258 → 0.258</td><td>0.267 → 0.268</td><td>1.4% / 14.4%</td></tr>
+<tr><td>A3 w 0.1</td><td>0.222</td><td>0.022</td><td>0.027</td><td>[1, 33]</td><td>0.282 → 0.290</td><td>0.264 → 0.265</td><td>0.4% / 33.3%</td></tr>
+<tr><td>A3 w 0.1 + E</td><td>0.136</td><td>0.0095</td><td>0.009</td><td>[0, 19]</td><td>0.241 → 0.244</td><td>0.251 → 0.252</td><td>1.45% / 13.0%</td></tr>
+<tr><td>A3 w 0.2</td><td>0.213</td><td>0.020</td><td>0.025</td><td>[1, 30]</td><td>0.266 → 0.274</td><td>0.246 → 0.251</td><td>0.3% / 32.4%</td></tr>
+<tr><td><strong>A3 w 0.2 + E</strong></td><td><strong>0.135</strong></td><td><strong>0.0065</strong></td><td>0.009</td><td>[0, 13]</td><td>0.215 → <strong>0.228</strong></td><td>0.234 → <strong>0.239</strong></td><td>1.3% / 12.2%</td></tr>
+</tbody>
+</table></div>
+<p><strong>Decision under the pre-declared rule:</strong> A3 w 0.1 + E and A3 w 0.2 + E both qualify; the winner is <strong>A3 w 0.2 + E</strong>. The weights are 0.6 M1b v3 + 0.2 handcrafted v5 + 0.2 M5 in rank space, followed by the M3 false-alarm suppression step. F does not qualify: its ITW gain of 0.003 is under the 0.01 bar.</p>
+<p><strong>The advance expectation was wrong.</strong> A3 was expected to lose on the holdout's short clips and LibriSpeech real, but with the M3 step it improved both (LibriSpeech 0.0186 → 0.0065).</p>
+<p><strong>Effect on the test set</strong> (current rule vs candidate): Spearman 0.974, and only <strong>3 of 1,671 files</strong> cross 0.5.</p>
+<p><strong>Status: SHIPPED (Nathan, 12:20: GO A3; the draft went to NSA at 12:03 as <code>CrossExam_predictions.tsv</code> = the 09:14 our-direction file below; runner default switched 12:35). Until 12:20: candidate, pending ratification.</strong></p>
+<ul>
+<li>TSVs, both polarities, are logged: <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_*.tsv</code>.</li>
+<li>Runner constants: <code>models/fusion_v2_candidate/constants.json</code> (moved at 10:45 to <code>outputs/fusion/fusion_v2_candidate/constants.json</code>, the record; the runner's file is <code>models/fusion_v2/constants.json</code>, see the 10:45 note below).</li>
+<li>Shipping it would require the pipeline and Docker to add the M5 scorer: a 657 MB checkpoint from the HF Hub, about 0.2 s per clip on CPU. <em>(10:45: the pipeline half is done, see below; the image half waits for the switch.)</em></li>
+</ul>
+<p><strong>Nathan's decision (09:25): positive result, not shipped pending draft review.</strong></p>
+<ul>
+<li>E on A α 0.2 stays frozen, and it is the file sent for the draft review.</li>
+<li>A3 w 0.2 + E is revisited only if NSA's draft-review number decodes to our direction and there is time left before 22:00.</li>
+<li>The candidate artifacts stay where they are. No pipeline changes. <em>(Superseded at ~10:20 by the note below: Nathan approved building the runner side now, gated, so the switch is one line if the number comes back in our direction.)</em></li>
+<li>Reaction branches are in <code>docs/reports/2026-09-26_draft-review-branches.md</code>.</li>
+</ul>
+<p><strong>Runner side built, not switched (M4 fusion chat, 10:45; run spec <code>docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md</code>).</strong> Nathan (~10:20, "build now, switch later"): make the revisit a one-line switch without changing anything that ships. Done:</p>
+<ul>
+<li><code>scripts/fuse_sweep_m5.py --write</code> (the flag now exists; without it nothing under <code>models/</code> is written) wrote <code>models/fusion_v2/constants.json</code>: weights 0.6 / 0.2 / 0.2, the three inner-OOF rank references, the same M3 step, the Platt map, a <code>how</code> line, and the M5 checkpoint's hashes (<code>m5_xlsr_ft_20260926-0741/model</code>). Against the 09:14 candidate file: weights and references identical, Platt a and b identical to the last digit (delta 0.0). The candidate constants moved to <code>outputs/fusion/fusion_v2_candidate/</code> so <code>docker/build.sh</code> stops staging them.</li>
+<li>The runner and the API execute it with <code>--fusion models/fusion_v2/constants.json</code> (M5 loads and runs only under a file that weights it; a checkpoint whose hashes differ from the file's is refused before anything is scored). Exports through the new file reproduce both 09:14 candidate TSVs on all 1,671 rows to 7e-16; live from audio on 50 template files: Spearman 1.0, max abs diff 2.6e-4 (the known CPU-vs-A100 M5 gap), 0 scorer errors. Full-set numbers in <code>docs/reports/2026-09-26_runner-docker.md</code> (v3).</li>
+<li><strong>Unchanged at 10:45:</strong> the default rule, every TSV under <code>submissions/</code>, the draft-review payload, the Docker image. <strong>Switched at 12:35 (Nathan: GO A3 at 12:20 via the oversight chat, "switch" typed in the M4 chat at 12:35; NSA had said at ~12:00 that the image is not required):</strong> the runner's default is <code>models/fusion_v2/constants.json</code>; <code>fusion_v1</code> stays loadable via <code>--fusion</code> as the fallback; the draft went out at 12:03 as the 09:14 A3 file; the full-set live run's parity to it is Spearman 1.0 and max abs diff 9.3e-4 on all 1,671 rows, both polarities (evidence under <code>outputs/runner/v2_full/</code>; the per-row M5-logit deviation on 5 rows was accepted by Nathan with the switch). The image stays on <code>e_on_a</code> as evidence; no rebuild.</li>
+</ul>
+<h2 id="addendum-2-a-refit-m1b-column-pre-declared-before-it-exists-m4-fusion-chat-sat-1250">Addendum 2: a refit M1b column, pre-declared before it exists (M4 fusion chat, Sat 12:50)</h2>
+<p><strong>Why now.</strong> The channel-robustness lane measured λ̂ = 0.947 (CI 0.93–0.98): the test set reads as codec-processed audio, like In-the-Wild, not like the clean holdout. If that lane finds the codec and Nathan approves a symmetric refit of M1b (both classes round-tripped, per consult item 8), a new column may arrive around 16:00. This rule is written before that column exists and is not changed after.</p>
+<p><strong>What the candidate is.</strong> Exactly one: <strong>R1 = the shipped rule with the refit column in M1b's place.</strong> Rank space, weights 0.6 (refit M1b) / 0.2 (handcrafted v5) / 0.2 (M5), the same M3 false-alarm suppression (margin &lt; −3 and base &gt; 0.5 → ×0.5), the same Platt map fit on inner OOF. No weight re-sweep, no second candidate, no iteration: the refit changes one detector, so the question is only whether that detector's column is better in the same seat.</p>
+<p><strong>What the column must be, or the sweep is not run.</strong></p>
+<ul>
+<li><code>outputs/detector_scores/&lt;name&gt;.csv</code> in the standard export format (<code>path, fold, split, score, logit</code>; 21,671 rows; inner OOF from the same fold file, holdout scored once by a model that never saw it) plus its In-the-Wild rows on the <strong>seed-200 crops</strong> (as split <code>stress</code> in the same file or <code>_itw_&lt;name&gt;.csv</code>), because the M5 whole-clip deviation this morning showed why.</li>
+<li>A report that states the augmentation was applied to <strong>both</strong> classes and shows the <strong>clean-only</strong> holdout score beside the augmented one (the model rule); a refit whose clean-only holdout is worse than M1b v3's 0.072 by more than 0.03 is not admitted whatever its In-the-Wild number says.</li>
+<li>The probe directory that produced it, so the runner can be pointed at it (<code>--probe</code>) and the constants can record its identity the way <code>fusion_v2</code> records the M5 checkpoint.</li>
+</ul>
+<p><strong>Readouts.</strong> Identical to the M5 addendum, on identical row sets, CURRENT = the shipped A3 w0.2 + E computed from <code>m1b_v3</code>.</p>
+<p><strong>Decision rule (fixed now).</strong> R1 replaces the shipped rule only if all four hold, the same four as the M5 addendum: (1) In-the-Wild brief-cost minDCF improves by ≥ 0.01; (2) In-the-Wild miss-averse minDCF gets worse by no more than 0.01; (3) holdout brief-cost gets worse by no more than 0.05; (4) inner OOF gets worse by no more than 0.03. If R1 qualifies, it is put to Nathan with the three costs (a new probe in the runner, the constants' probe identity, the freeze clock); nothing ships without his word. If it does not qualify, the negative result is recorded here and the shipped rule stays.</p>
+<p><strong>Mechanics.</strong> <code>uv run python scripts/fuse_sweep_m5.py --refit-m1b &lt;name&gt; [--refit-itw &lt;path&gt;]</code> prints the table and the decision and writes <code>outputs/fusion/sweep_refit_report.json</code>; <code>--write</code> is refused in that mode (a refit's constants need the probe identity, built only on ratification). Self-check recorded below: with <code>--refit-m1b m1b_v3</code> every R1 readout equals CURRENT and the decision is KEEP.</p>
+<p><strong>Expectation, stated in advance.</strong> A symmetric codec refit should help In-the-Wild false alarms (the wild-like regime λ̂ points at) and cost a little on the clean holdout; the clean-only floor above is what keeps that trade honest.</p>
+<p><strong>Outcome (13:05, oversight chat relaying the channel lane): not exercised.</strong> The codec search found no match (the 7.2 kHz wall is best reproduced by our own Kaiser low-pass; the closest MP3/AAC variant was 3% closer where the rule needed 20%), so the refit did not run and no column arrived; this rule stands as pre-declared and unexercised. The λ̂ = 0.947 headline in "Why now" was withdrawn by its lane (its dominant feature read the stopband); the final reading is <strong>indeterminate</strong> (0.51 with CI 0.12–0.64; 0.36 duration-matched; 0.48–0.57 across rate-consistent variants; 10 of 21 channel features put the test set outside the holdout–In-the-Wild span, so it is its own recording population rather than a blend of the two). The rule choice does not depend on it: fusion_v2 beats v1 on both the holdout and In-the-Wild.</p>
+<p><em>Self-check result (12:58):</em> <code>--refit-m1b m1b_v3</code> on identical row sets (16,142 / 3,858 / 1,671 / 3,000): R1 equals CURRENT on every readout (inner 0.1351, holdout 0.0065 / 0.0087, ITW brief 0.228, averse 0.2385, P_FA/P_miss 1.3% / 12.2%), decision KEEP, nothing written under <code>models/</code>; <code>outputs/fusion/sweep_refit_report.json</code>.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code> <span class="hash">a2f03d4ff932</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

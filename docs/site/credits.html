@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Credits and AI use · HEARSAY</title>
+<meta name="description" content="Who built what in HEARSAY: the team&#x27;s decisions, what the AI assistants wrote, the pretrained models and datasets with their licences, and the frameworks used.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="story" data-search-index="search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The story</a>
+<ul><li><a href="index.html">Home</a></li><li><a href="how-it-decides.html">How it decides</a></li><li><a href="metric.html">The metric and the default answer</a></li><li><a href="what-worked.html">What worked and what did not</a></li><li><a href="detectors.html">The ten detectors</a></li><li><a href="validation.html">Validation</a></li><li><a href="reproduce.html">Reproduce it</a></li><li><a href="credits.html" aria-current="page">Credits and AI use</a></li><li><a href="glossary.html">Glossary</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The story</p>
+<h1>Credits and AI use</h1>
+<p class="lead">We used AI coding assistants heavily, and we say so plainly. The team decided what to build and why; Claude Code built it under our direction; Codex reviewed plans and audited finished rungs; two strategy questions went to an outside multi-model review. Nothing on the scoring path calls a hosted model.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#ai-use">AI use, in short</a></li><li><a href="#models">Pretrained models</a></li><li><a href="#datasets">Datasets</a></li><li><a href="#frameworks">Frameworks and tools</a></li><li><a href="#team">The team</a></li></ul></nav>
+<h2 id="ai-use">AI use, in short</h2>
+<ul>
+<li><strong>Claude Code (Anthropic)</strong> wrote most of the code and documents under our direction, in parallel sessions per rung: loader, metrics, fold file, the M1 probe, the engineered detectors, M3 scoring, the M5 cloud pipeline, the fusion sweep, the runner, the API, the Docker image, the documentation, and this site and its generator. We chose the approach, set the gates and selection rules, reviewed results and made every ship decision.</li>
+<li><strong>OpenAI Codex (Codex CLI)</strong> reviewed plans and audited finished rungs through our plan-review workflow.</li>
+<li><strong>Outside consults.</strong> Two strategy questions, one on M5's extra data and one on fusion, went to an outside multi-model review (VeriLM; the fusion memo was answered by Claude and Gemini with a synthesis). The prompts and answers are saved in the repository, and we record which advice we adopted and which we ignored: see the <a href="library/index.html#consults">consult records</a>.</li>
+<li><strong>No AI on the scoring path.</strong> No LLM or hosted API runs at inference; the runner loads every model from local files, and the Docker image runs with networking off.</li>
+</ul>
+<p>The full disclosure, including which components each tool touched and what we built versus what the AI wrote, component by component, is kept current in <a class="srclink" href="library/claude-md.html#ai-use-disclosure" title="CLAUDE.md, section ai-use-disclosure">CLAUDE.md, "AI use disclosure"</a>; the README's summary is at <a class="srclink" href="library/readme.html#ai-use-and-credits" title="README.md, section ai-use-and-credits">"AI use and credits"</a>.</p>
+<h2 id="models">Pretrained models</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th>Source</th><th>Licence</th><th>How we used it</th></tr></thead>
+<tbody>
+<tr><td>XLS-R 300M, <code>facebook/wav2vec2-xls-r-300m</code></td><td>Hugging Face (Meta)</td><td>Apache-2.0</td><td>Frozen backbone for M1/M1b (layer 7) and M5 (first 12 layers); both are fused</td></tr>
+<tr><td>Spectra-AASIST, <code>lab260/Spectra-AASIST</code></td><td>Hugging Face</td><td>unclear: repo header says Apache-2.0, model card says MIT</td><td>M3, scored off the shelf, false-alarm suppression only</td></tr>
+<tr><td>ECAPA-TDNN, <code>speechbrain/spkrec-ecapa-voxceleb</code></td><td>Hugging Face (SpeechBrain)</td><td>Apache-2.0</td><td>Speaker-drift evidence</td></tr>
+<tr><td>WavLM Large / Base, <code>microsoft/wavlm-large</code>, <code>microsoft/wavlm-base</code></td><td>Hugging Face (Microsoft)</td><td>no licence on the card; released through Microsoft's unilm repo (MIT)</td><td>Downloaded as bake-off challengers; never run</td></tr>
+</tbody></table></div>
+<h2 id="datasets">Datasets</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Dataset</th><th>Source</th><th>Licence</th><th>How we used it</th></tr></thead>
+<tbody>
+<tr><td>NSA HEARSAY data: test set, resampled LJ subset, DiffSSD, ASVspoof5 scoring code</td><td>NSA, provided during the event</td><td>event terms</td><td>Test set; training sample and fold file; metric reference</td></tr>
+<tr><td>LJ Speech <span class="num" data-src="README.md#datasets">1.1</span><a class="src" href="library/readme.html#datasets" title="Source: README.md, section datasets"><span class="sr">source: README.md, section datasets</span></a></td><td>keithito.com</td><td>public domain</td><td>Real speech (one speaker); training</td></tr>
+<tr><td>LibriSpeech dev-clean / test-clean</td><td>openslr.org/12</td><td>CC BY <span class="num" data-src="README.md#datasets">4.0</span><a class="src" href="library/readme.html#datasets" title="Source: README.md, section datasets"><span class="sr">source: README.md, section datasets</span></a></td><td>Real speech (multi-speaker); training</td></tr>
+<tr><td>ASVspoof 2019 LA</td><td>University of Edinburgh DataShare</td><td>ODC Attribution</td><td>Public shakedown of M1; 40 VCTK real speakers and an A01–A06 anchor as training-only rows for M1b and M5</td></tr>
+<tr><td>In-the-Wild (Müller et al. 2022), <code>mueller91/In-The-Wild</code></td><td>Hugging Face</td><td>CC-BY-SA-4.0 on Hugging Face; Apache-2.0 on deepfake-total.com</td><td>Stress test only; never trained on</td></tr>
+<tr><td>MLAAD, <code>mueller91/MLAAD</code></td><td>Hugging Face (gated)</td><td>non-commercial notice</td><td><span class="num" data-src="README.md#datasets">6,180</span><a class="src" href="library/readme.html#datasets" title="Source: README.md, section datasets"><span class="sr">source: README.md, section datasets</span></a> fake clips from <span class="num" data-src="README.md#datasets">143</span><a class="src" href="library/readme.html#datasets" title="Source: README.md, section datasets"><span class="sr">source: README.md, section datasets</span></a> TTS models, training-only for M5</td></tr>
+</tbody></table></div>
+<p><a class="srclink" href="library/readme.html#pretrained-models" title="README.md, section pretrained-models">Source: the README's models table</a> and <a class="srclink" href="library/readme.html#datasets" title="README.md, section datasets">datasets table</a>.</p>
+<h2 id="frameworks">Frameworks and tools</h2>
+<p>PyTorch and torchaudio (BSD), Hugging Face transformers and huggingface_hub (Apache-2.0), SpeechBrain (Apache-2.0), librosa (ISC), soundfile (BSD-3-Clause), NumPy, SciPy, scikit-learn and pandas (BSD-3-Clause), LightGBM (MIT, training only), pydub (MIT), ffmpeg-python (Apache-2.0), FFmpeg (LGPL/GPL), FastAPI (MIT) and uvicorn (BSD-3-Clause) for the local API, pytest and ruff for tests and lint, uv for environments, Docker with Colima for the image, vast.ai A100s and Cloudflare R2 for the M5 runs. This site: a standard-library Python generator, Mermaid (MIT) rendered once to SVG, and no runtime dependency. <a class="srclink" href="library/readme.html#frameworks-and-tools" title="README.md, section frameworks-and-tools">Source: the README.</a></p>
+<h2 id="team">The team</h2>
+<p><strong>Created by Nathan, Hrushi &amp; Tharakesh.</strong> Team Cross Exam at HackGT 13. Nathan (@nrstough) owned the deep detectors, the fold file, fusion, the orchestrator and the TSV; teammates owned the engineered detectors and the Docker image; Hrushi built the demo frontend against the pipeline's JSON contract. The component-by-component table of who decided what and what the AI wrote is in <a class="srclink" href="library/claude-md.html#ai-use-disclosure" title="CLAUDE.md, section ai-use-disclosure">CLAUDE.md</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="reproduce.html">← Reproduce it</a><a class="next" rel="next" href="glossary.html">Glossary →</a></nav>
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/site/source/pages/credits.frag</code> <span class="hash">5ed708d05197</span>, <code>README.md</code> <span class="hash">937c075556d3</span>, <code>CLAUDE.md</code> <span class="hash">e7bf425534d7</span>. The markdown is the record. <a href="about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

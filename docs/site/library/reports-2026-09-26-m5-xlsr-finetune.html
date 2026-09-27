@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M5: XLS-R 300M fine-tune on vast.ai (Sat Sep 26, 2026) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m5-xlsr-finetune.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-m5-is">What M5 is</a></li><li><a href="#gate">Gate</a></li><li><a href="#results">Results</a></li><li><a href="#what-worked-what-didnt">What worked, what didn't</a></li><li><a href="#artifacts">Artifacts</a></li></ul></details>
+<h1 id="m5-xls-r-300m-fine-tune-on-vastai-sat-sep-26-2026">M5: XLS-R 300M fine-tune on vast.ai (Sat Sep 26, 2026)</h1>
+<p><em>Status: done (Sat Sep 26, 07:45). Gate: <strong>not passed</strong> (holdout and pooled OOF worse than M1; In-the-Wild real-speech false alarms better). M5 ships as a fusion column, not as the primary deep detector.</em></p>
+<p>Run spec: <code>docs/specs/2026-09-26_m5-xlsr-finetune.md</code>. Plan: <code>docs/reports/2026-09-26_m5-xlsr-finetune-plan.md</code>. Consult: <code>docs/consults/2026-09-26_m5-extra-data-finetune_RESPONSE.md</code>.</p>
+<h2 id="what-m5-is">What M5 is</h2>
+<p>The shipped model keeps the first 12 of XLS-R 300M's 24 transformer layers <strong>frozen</strong> (CNN feature encoder frozen too) and trains only a small head on top: a learned softmax-weighted sum over the 13 hidden states (weights peak at layers 5–6), masked attentive statistics pooling (mean + std, 128-d bottleneck) and a linear output; 136k trainable parameters. <strong>Caveat (Codex audit):</strong> in the shipped checkpoint the backbone's final encoder LayerNorm (2,048 params) and <code>masked_spec_embed</code> (1,024) were also trainable, a gap in the freezing code fixed afterwards (<code>train_top = 0</code> now freezes every backbone parameter, with a test); the effect is a per-channel affine on the last layer's output, not a change to the representation. Trained with BCE (label smoothing 0.05), AdamW at 5e-4, 8% warmup + cosine, bf16 on an A100, 3,000 steps × 32 crops (fold models 2,500). Output: a logit that increases with synthetic likelihood; score = sigmoid(logit). The full fine-tune (all 12 kept layers at LR 1e-5 with layer-wise decay 0.85) was the plan's default; the ablation below replaced it.</p>
+<p><strong>Input path:</strong> <code>load_audio</code> (16 kHz mono) → <code>trim_silence</code> → <code>hearsay.handcrafted.band_limit</code> (the 7.25 kHz Kaiser low-pass matching the NSA test set's wall) → cap at 8 s → per-input zero-mean/unit-variance normalization; no tiling, no repeat padding. Bundle clips are trimmed at build time and band-limited once at train time, and the raw/Docker scorer (<code>scripts/m5_score.py</code>, <code>hearsay.m5_data.deploy_transform</code>) applies the same order, so it reproduces the exported scores (parity below). M1's <code>prepare_segment</code> band-limits before trimming; the two differ by at most one 20 ms trim frame at the clip edges (pinned by a test).</p>
+<p><strong>Training data</strong> (<code>outputs/manifests/m5_manifest.csv</code>, bundle <code>m5_bundle/v1</code>, 44,850 rows after the drop rules; 5.3 GB FLAC):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Scope</th><th>Rows</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>core (fold file)</td><td>20,000</td><td>10 DiffSSD generators, LJ Speech, LibriSpeech; holdout = playht + wavegrad2 + 26 bona fide groups</td></tr>
+<tr><td>extra_nsa</td><td>15,083</td><td>rest of <code>nsa_train_full</code>, inheriting the fold of their group; extra spoof capped at 1,000 per generator; holdout-group rows dropped</td></tr>
+<tr><td>extra_asv19</td><td>2,496 bona fide + 1,092 spoof</td><td>from the main chat's <code>splits/nsa_folds_plus_asv19.csv</code> (40 VCTK speakers, A01–A06 anchor); ≥ 2.0 s after trim, spoof duration-matched to bona fide</td></tr>
+<tr><td>extra_mlaad</td><td>6,180 spoof</td><td>143 TTS models; ≤ 120 clips per model per training set; excluded per fold family (OpenVoice → fold 1, XTTS → fold 2, ElevenLabs → fold 4)</td></tr>
+</tbody>
+</table></div>
+<p>Extras are training-only: never scored, never in the holdout. Batch mix (constant): label-balanced; real 25/35/40 LJ/LibriSpeech/ASV19; spoof <strong>78/12/10</strong> DiffSSD/MLAAD/ASV19 (the consult's 62/28/10 was the starting point; MLAAD was cut to 12% after the corpus probe, <code>outputs/m5_probe_a.json</code>).</p>
+<p><strong>Crops:</strong> one crop length per batch, 70% drawn from the NSA test durations and 30% uniform 3–14 s, re-cropped every epoch; shorter clips used whole with zero padding + attention mask.</p>
+<p><strong>Augmentation</strong> (both classes, class-blind by construction, p = 0.65, realized rates logged per source × label): additive white/pink noise 5–30 dB SNR, telephony band-limits (3.4, 4 kHz), synthetic reverb (RT60 0.2–0.8 s), gain + hard clipping, RawBoost's convolutive algorithm (p 0.25), trim-threshold jitter, and precomputed codec round-trips (MP3, Opus, AAC, AMR-NB, μ-law; made on the box for a seeded 30% of training clips and every holdout clip). Physical replay is <strong>not</strong> covered (no hardware; simulated reverb only).</p>
+<p><strong>Fold discipline:</strong> five fold models produce out-of-fold scores for the 16,142 inner rows; one full model (all inner folds) scores the 3,858 holdout rows and the 1,671 test files. A fold model never trains on its validation fold, on any holdout row, or on extra generators from its validation families. Selection is wall-clock fixed (steps set by the pilot's throughput); no checkpoint is picked on a validation fold. <strong>Two caveats:</strong> the fold-0 and fold-4 models in the export are the same runs whose numbers chose the frozen recipe over the fine-tune (06:40), so those 6,267 <code>inner_oof</code> rows and the pooled-OOF gate reading carry recipe-selection bias in M5's favour; and the fold models ran 2,500 steps while the full model ran 3,000 (more data), a deviation from the spec's "same E".</p>
+<h2 id="gate">Gate</h2>
+<p>Rule (main chat + oversight + consult): M5 replaces M1 as the primary deep detector only if it beats M1 on the outer holdout <strong>and</strong> on the pooled 5-fold OOF, <strong>and</strong> its In-the-Wild real-speech false-alarm rate at the OOF minDCF threshold is not worse than M1's. A holdout gap under ~0.15 minDCF is within noise (σ ≈ 0.07–0.10 with two held-out generators). Either way M5's scores go to the fusion stacker as their own column.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>M1 v3 (bar, <code>models/m1_…_0518</code>)</th><th>M5 (frozen, <code>models/m5_xlsr_ft_20260926-0741</code>)</th><th>clause</th>
+</tr></thead>
+<tbody>
+<tr><td>outer-holdout minDCF (π = 0.3)</td><td><strong>0.159</strong> (EER 2.9%)</td><td>0.363 (EER 6.0%)</td><td>fail (−0.20, beyond the ±0.10 noise)</td></tr>
+<tr><td>pooled 5-fold OOF minDCF</td><td><strong>0.257</strong> (EER 6.9%)</td><td>0.302 (EER 11.0%)</td><td>fail</td></tr>
+<tr><td>In-the-Wild bona fide P_FA at the OOF minDCF threshold</td><td>0.7%</td><td><strong>0.45%</strong> (2,000 clips)</td><td>pass</td></tr>
+</tbody>
+</table></div>
+<p>M1b v3 (NSA + ASV19 bona fide, <code>…_0521</code>) for the fusion decision: holdout 0.072, ITW P_FA 0.8%. <strong>Verdict: keep M1 as the primary deep detector; M5 goes into the stacker as its own column</strong> (<code>outputs/detector_scores/m5_xlsr_ft.csv</code>, 16,142 <code>inner_oof</code> + 3,858 <code>holdout</code> + 1,671 <code>test</code> rows, all finite, 1.0 = synthetic).</p>
+<h2 id="results">Results</h2>
+<h3 id="pilot-and-ablation-inner-folds-out-of-fold-8-s-deployment-transform-π--03">Pilot and ablation (inner folds, out-of-fold, 8 s deployment transform, π = 0.3)</h3>
+<p>M1 per-fold OOF recomputed from its saved embeddings (<code>outputs/m5_runs/m1_v{2,3}_oof_by_fold.json</code>); M5 rows from the run logs under <code>outputs/m5_runs/</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fold (held-out generators)</th><th>M1 v3 (bar)</th><th>fine-tune, NSA-only</th><th>fine-tune, NSA+extra</th><th><strong>frozen backbone, NSA+extra</strong></th>
+</tr></thead>
+<tbody>
+<tr><td>0: grad_tts + unit_speech</td><td>0.524</td><td>0.528 (EER 20.0%)</td><td>0.515 (EER 21.0%)</td><td><strong>0.520 (EER 17.9%)</strong></td></tr>
+<tr><td>4: elevenlabs</td><td>0.415</td><td>0.762 (EER 19.1%)</td><td>0.410 / 0.377 (two seeds; EER 8.8 / 8.2%)</td><td><strong>0.308 (EER 5.9%)</strong></td></tr>
+</tbody>
+</table></div>
+<p>All M5 rows: 2,500 steps × 32 crops, augmentation p = 0.65, MLAAD 12% of the spoof side. <strong>Final fold models (frozen recipe, 2,500 steps), out-of-fold, vs M1 v3:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fold</th><th>held-out generators</th><th>M1 v3</th><th>M5 frozen</th>
+</tr></thead>
+<tbody>
+<tr><td>0</td><td>grad_tts, unit_speech</td><td>0.524</td><td>0.520</td></tr>
+<tr><td>1</td><td>diffgan_tts, openvoicev2</td><td>0.090</td><td>0.263</td></tr>
+<tr><td>2</td><td>pro_diff, xtts_v2</td><td>0.016</td><td>0.026</td></tr>
+<tr><td>3</td><td>your_tts</td><td>0.000</td><td>0.000</td></tr>
+<tr><td>4</td><td>elevenlabs</td><td>0.415</td><td>0.308</td></tr>
+<tr><td><strong>pooled (16,142 rows)</strong></td><td></td><td><strong>0.257</strong> (EER 6.9%)</td><td><strong>0.302</strong> (EER 11.0%)</td></tr>
+</tbody>
+</table></div>
+<p>M5 wins the hardest fold (ElevenLabs) and ties three, but loses fold 1 (diffgan_tts + openvoicev2) by 0.17, and the pooled 5-fold OOF, which is one of the three gate clauses, comes out worse than M1 (0.302 vs 0.257). Pooling also penalizes M5 slightly because its five fold models are separately trained heads with their own logit scales, whereas the metric is computed on the concatenation; the per-fold numbers are the fairer comparison.</p>
+<p>"Fine-tune" = all 12 kept layers trainable at LR 1e-5 (LLRD 0.85); "frozen" = the same 12-layer XLS-R with only the learned layer-weighted sum, attentive statistics pooling and head trained. Seed-to-seed noise on a fold ≈ ±0.03.</p>
+<p><strong>Decision (06:40): the frozen-backbone recipe for all six final models.</strong> It wins fold 4 by ~0.08 (≈3× the seed noise) over the fine-tune and by 0.11 over M1, ties on fold 0, runs twice as fast (12 min per fold model), and its learned layer weights peak at layers 5–6, consistent with M1's layer-7 optimum. The full fine-tune's failure mode is the classic one: training loss near the label-smoothing floor on the seen generators, poor transfer to the unseen commercial one.</p>
+<ul>
+<li><strong>Pilot</strong> (fold 4, 600 steps, LR decayed to zero): 0.81; throughput ~190 clips/s at 3.4 s crops on an A100 40 GB, 2,500 steps ≈ 16–20 min including evals and checkpoint pushes.</li>
+<li><strong>The extra pools are the difference on the unseen commercial generator</strong>: ASV19 bona fide (40 VCTK speakers) + the 2.5k A01–A06 anchor + MLAAD at 12% of the spoof side take fold 4 from 0.76 to 0.41. NSA-only fine-tuning fits the seen generators (training loss near the label-smoothing floor) and does not transfer.</li>
+<li>Realized augmentation rates per source × label: 0.646–0.655 in every cell (class-blind confirmed). Trivial-feature AUCs on the realized training stream (1,920 items after sampling, crop, augmentation and band-limit; <code>outputs/m5_runs/stream_shortcut.json</code>): pooled duration 0.6881, peak 0.5585, RMS 0.5429, leading silence 0.5083; worst per source 0.7333 (DiffSSD duration: long spoofs are cropped to the batch length while short real clips are used whole, so realized length carries a mild cue; the attention mask exposes it). All under the 0.85 gate.</li>
+<li>The top-3-layers recipe (LR 5e-6) was cancelled once the frozen result came in; not measured.</li>
+</ul>
+<h3 id="full-model-on-the-outer-holdout-3858-rows-playht--wavegrad2--26-bona-fide-groups">Full model on the outer holdout (3,858 rows; playht + wavegrad2 + 26 bona fide groups)</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Readout</th><th>minDCF</th><th>EER</th>
+</tr></thead>
+<tbody>
+<tr><td>clean, whole clip ≤ 8 s (the fusion export)</td><td><strong>0.363</strong></td><td>6.0%</td></tr>
+<tr><td>whole clip ≤ 14 s (diagnostic)</td><td>0.359</td><td></td></tr>
+<tr><td>test-length crops, 3.0–13.6 s drawn from the test distribution (diagnostic)</td><td>0.516</td><td>8.9%</td></tr>
+<tr><td>augmented slice, one op per clip (diagnostic)</td><td>0.465</td><td>8.3%</td></tr>
+<tr><td>per op: gain + clip / band-limit / RawBoost-conv / reverb / noise</td><td>0.30 / 0.37 / 0.42 / 0.48 / 0.57</td><td></td></tr>
+<tr><td><strong>transcoded</strong> (one codec per clip, all 3,858; <code>outputs/m5_runs/codec_readout.json</code>)</td><td><strong>0.328</strong> vs 0.363 clean on the same rows</td><td>6.3%</td></tr>
+<tr><td>per codec, transcoded vs clean on its rows: μ-law 8 kHz / Opus 20 kbps / MP3 48 kbps / AAC 40 kbps</td><td>0.22 vs 0.29 / 0.27 vs 0.32 / 0.36 vs 0.41 / 0.37 vs 0.37</td><td></td></tr>
+<tr><td>per generator: playht / wavegrad2 (each vs all bona fide)</td><td>0.051 / 0.578</td><td>1.1% / 7.9%</td></tr>
+<tr><td>per bona fide source: LJ Speech / LibriSpeech (each vs all spoof)</td><td>0.167 / 0.425</td><td>3.8% / 8.8%</td></tr>
+<tr><td>per length bucket: ≤ 4 s / 4–6 s / &gt; 6 s</td><td>0.595 / 0.342 / 0.286</td><td>9.0 / 6.2 / 5.7%</td></tr>
+<tr><td>minDCF at π = 0.5</td><td>0.267</td><td></td></tr>
+<tr><td>sponsor code as-is / flipped</td><td>1.000 / 0.179</td><td></td></tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>Where M5 loses to M1:</strong> wavegrad2 (0.58 vs M1's 0.21 per-generator) and LibriSpeech real speech (0.43 vs 0.16). playht is easy for both.</li>
+<li><strong>Short clips are the weak spot:</strong> ≤ 4 s clips score 0.60 vs 0.29 above 6 s; the test set's median is 3.4 s. The frozen head was trained on test-length crops, but the attentive pooling has less to work with on short inputs.</li>
+<li><strong>Additive noise is the hardest laundering</strong> (0.57 on the noise slice); gain/clipping and band-limiting barely move the score, and <strong>transcoding does not hurt</strong> (0.33 vs 0.36 clean): the codec variants were in training, and MP3/Opus/AAC/μ-law strip the same high band the test set lacks. AMR-NB was not available on the box's ffmpeg, so narrowband telephony is represented by μ-law at 8 kHz only.</li>
+<li>Score–duration coupling on bona fide: Spearman(score, log duration) = −0.12 (mild; longer real clips look slightly more real).</li>
+<li>Test set: mean score 0.29, 25.8% above 0.5 (M1 v3: 28.9%), consistent with the ~30% synthetic prior; the same direction as M1 (<code>sponsor_code_asis</code> = 1.0 for every detector because the sponsor's code treats high as bona fide).</li>
+</ul>
+<h3 id="runs-throughput-spend">Runs, throughput, spend</h3>
+<ul>
+<li>A100 SXM4/PCIe on vast.ai at $0.61–0.81/h, image <code>pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime</code>; box setup 8–9 min (apt, pip, 5.3 GB bundle pull at 6 Gbps, XLS-R from the HF Hub, tree-sha check); codec pass 16,015 variants in 273 s on 16 cores.</li>
+<li>Fine-tune: ~190 clips/s at 3.4 s crops; 2,500 steps ≈ 16–20 min with evals and checkpoint pushes. Frozen recipe: 2,500 steps ≈ 12 min; the full model 3,000 steps ≈ 13 min plus 7 min of holdout/test scoring.</li>
+<li>12 instances over the day (six never booted and were destroyed by the launcher within 10 min each; two chains failed on my own config-string bugs; one resume-probe attempt failed on a tree-sha mismatch, see below); <strong>total spend $5.42</strong> ($38.37 → $32.95 credit; $5.09 through the final models, $0.33 for the two resume probes) (<code>docs/reports/cloud-expense-ledger.md</code>).</li>
+<li>CPU inference (Docker path, <code>scripts/m5_score.py</code>): 0.19–0.25 s per clip on the M3 Pro; 1,671 test clips ≈ 6 min. Parity over 50 test clips (<code>outputs/m5_runs/parity_f6.json</code>): same input (bundled FLAC), Mac CPU vs A100: max |Δlogit| 0.00445, Spearman 1.0; raw WAV vs bundled FLAC, both on CPU: max 0.01117, median 0.0; combined: max 0.012, Spearman 0.9999. The first parity run showed a 0.28 outlier because the CPU scorer band-limited before trimming (M1's order) while the exports trimmed first; the scorer now uses the exported order (commit after the 07:50 critique).</li>
+<li>Checkpoint: private HF Hub repo <code>nrs124554433/hearsay-m5-xlsr</code> (backbone 657 MB safetensors + head + <code>hashes.json</code>), re-downloaded and sha-verified. Provenance: the base weights were fetched from the Hub by the box without a revision pin, but the Hub repo's newest commit is 2022-08-10 (<code>outputs/m5_runs/weights_provenance.json</code>), so the download was necessarily revision <code>1a640f32</code>, whose <code>pytorch_model.bin</code> LFS sha256 <code>d5e49057…</code> equals the Mac's local copy; the pin and per-file sha check now run on every box.</li>
+</ul>
+<h2 id="what-worked-what-didnt">What worked, what didn't</h2>
+<p><strong>Worked</strong></p>
+<ul>
+<li>The extra real speech. ASV19's 40 VCTK speakers (plus the 2.5k anchor) and the MLAAD slice took the ElevenLabs fold from 0.76 to 0.41 for the fine-tune; the consult's "real-side diversity beats spoof volume" call held.</li>
+<li>Freezing the backbone. With only the layer-weighted sum, attentive-stats pooling and head trained, fold 4 went to 0.31 (M1: 0.41) and In-the-Wild false alarms fell below M1's (0.45% vs 0.7%); the learned layer weights peaked at layers 5–6, matching M1's layer-7 optimum. The full fine-tune fit the seen generators (loss at the label-smoothing floor) and transferred worse.</li>
+<li>Class-blind augmentation by construction: realized rates 0.645–0.657 in every source × label cell, logged per run.</li>
+<li>The guards: sha-pinned fold file, tree-sha'd bundle, hash-gated checkpoint, fold-family exclusions, shortcut gate on each model's own training rows (worst trivial-feature AUC 0.62), a Mac-side reaper so the vast API key never left the Mac, and a budget guard. Every failure was caught by one of them.</li>
+</ul>
+<p><strong>Didn't</strong></p>
+<ul>
+<li>M5 does not beat M1 on the outer holdout (0.36 vs 0.16) or the pooled OOF (0.30 vs 0.26). It loses on wavegrad2 and on LibriSpeech real speech and on clips under 4 s; it wins the unseen commercial generator (ElevenLabs) and In-the-Wild real speech. That profile is a useful second column for the stacker, not a replacement.</li>
+<li>fold 1 (diffgan_tts + openvoicev2): 0.26 vs M1's 0.09. Not diagnosed within the time box; the MLAAD OpenVoiceV2 family is excluded from that fold's training, so it is not a leak in either direction.</li>
+<li>Operational: six vast hosts never booted (each destroyed by the launcher within 10 min), one run failed on a stale <code>code.tgz</code> (fixed with <code>push_code.sh</code>), and two full-model jobs failed because zsh's <code>$VAR:e</code> modifier emptied a base64 config string (fixed with <code>${VAR}</code>; documented in <code>swap_chain.sh</code>). The resume-from-R2 path was exercised on a box after the audit (300 steps → checkpoint to R2 → local checkpoint deleted → resumed at 300 from R2 → 600; <code>outputs/m5_runs/resume_probe/</code>). The chain, reaper and NEXT-jobs mechanism otherwise ran three boxes unattended.</li>
+<li>Not covered: physical replay (simulated reverb only), AMR-NB (the box's ffmpeg had no encoder; MP3/Opus/AAC/μ-law were used), the top-3-layers recipe (cancelled), and the seed-noise study beyond the one fold-4 replicate (0.41 vs 0.38).</li>
+</ul>
+<p><strong>If there were another hour:</strong> train the frozen head longer on short crops only (the ≤ 4 s bucket), or stack M5 with M1 on the fold file and read the holdout of the pair, which the main chat's fusion will do anyway.</p>
+<h2 id="artifacts">Artifacts</h2>
+<ul>
+<li>Scores: <code>outputs/detector_scores/m5_xlsr_ft.csv</code> (path, fold, split ∈ {inner_oof, holdout, test}, score, logit).</li>
+<li>Model + readouts: <code>models/m5_xlsr_ft_20260926-0741/{meta.json, model/, scores.csv}</code>; checkpoint on the HF Hub: private <code>nrs124554433/hearsay-m5-xlsr</code> (commit 77dbf281). MLAAD probe: <code>outputs/m5_probe_a.json</code>; parity: <code>outputs/m5_runs/parity_f6.json</code>; M1 per-fold OOF: <code>outputs/m5_runs/m1_v{2,3}_oof_by_fold.json</code>; ITW scores: <code>outputs/m5_runs/itw_bonafide_m5.csv</code>.</li>
+<li>Bundle: <code>r2:pa-source/hearsay/bundle/v1</code> (tree sha in <code>bundle_meta.json</code>); runs: <code>r2:pa-source/hearsay/runs/</code>.</li>
+<li>Spend: <code>docs/reports/cloud-expense-ledger.md</code>.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code> <span class="hash">b25ca2289f08</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

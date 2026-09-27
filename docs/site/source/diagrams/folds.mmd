@@ -1,0 +1,24 @@
+%% How the data is split: by generator and by speaker, never by clip.
+%% cites: docs/architecture.md#8-validation-and-selection, README.md#validation
+flowchart TB
+  FF["fold file · 20,000 training rows<br/>fakes grouped by generator · real speech by speaker"]
+  subgraph inner["five inner folds · 16,142 rows · each holds out whole generators"]
+    f0["fold 0 · grad_tts, unit_speech"]
+    f1["fold 1 · diffgan_tts, openvoicev2"]
+    f2["fold 2 · pro_diff, xtts_v2"]
+    f3["fold 3 · your_tts"]
+    f4["fold 4 · elevenlabs"]
+  end
+  HO["outer holdout · 3,858 rows<br/>playht + wavegrad2 + 26 real-speech groups<br/>read once per model, never selected on"]
+  ST["stress sets · never trained on<br/>In-the-Wild: 2,000 real, 1,000 fake"]
+  TE["NSA test set · 1,671 files · unlabeled<br/>only the share above 0.5 is watched"]
+  FF --> inner
+  FF --> HO
+  inner -->|"every learned piece fit fold-locally:<br/>scalers, Platt maps, fusion weights"| OOF["out-of-fold scores<br/>the only selection signal"]
+  HO --> HC["holdout readout"]
+  ST --> SR["false-alarm readout on<br/>unfamiliar real speech"]
+  TE --> TC["the TSV"]
+  classDef data fill:#e9eff6,stroke:#005493,color:#101a2b
+  classDef never fill:#fff3d1,stroke:#c37530,color:#101a2b
+  class FF,f0,f1,f2,f3,f4,OOF data
+  class HO,ST,TE never

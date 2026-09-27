@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The metric and the default answer · HEARSAY</title>
+<meta name="description" content="What minDCF is, why a false alarm costs 9.33 misses, why only ranking matters, why the operating threshold sits near 0.9, and why undecidable files are pinned to the real end under both readings of the score.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="story" data-search-index="search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The story</a>
+<ul><li><a href="index.html">Home</a></li><li><a href="how-it-decides.html">How it decides</a></li><li><a href="metric.html" aria-current="page">The metric and the default answer</a></li><li><a href="what-worked.html">What worked and what did not</a></li><li><a href="detectors.html">The ten detectors</a></li><li><a href="validation.html">Validation</a></li><li><a href="reproduce.html">Reproduce it</a></li><li><a href="credits.html">Credits and AI use</a></li><li><a href="glossary.html">Glossary</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The story</p>
+<h1>The metric, and what to answer when you cannot tell</h1>
+<p class="lead">Sixty percent of the grade is one number: the normalized minimum detection cost on the sponsor's test set. Under it, calling a real recording synthetic costs about nine times as much as letting a fake through, and only the order of our scores matters. Those two facts explain most of what this system does, including where it puts the files it cannot judge.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#cost-title">The cost function we are judged on</a></li><li><a href="#explore">Try it</a></li><li><a href="#where-it-comes-from">Where the weights come from</a></li><li><a href="#ranking">Why only ranking matters</a></li><li><a href="#threshold">Why the operating threshold sits far above the midpoint</a></li><li><a href="#two-readings">Two readings of the same score</a></li><li><a href="#default-answer">The default answer: the pinned block</a></li><li><a href="#decoding">Reading the draft review</a></li></ul></nav>
+<!-- scan:off --><section class="cost-panel" aria-labelledby="cost-title">
+<h2 id="cost-title">The cost function we are judged on</h2>
+<p class="cost-formula" aria-label="normalized minimum detection cost">
+<span class="cost-lhs">minDCF</span> <span class="cost-eq">=</span>
+<span class="cost-term cost-fa"><span class="cost-w">9.33</span> <span class="cost-var">×</span> <span class="cost-var">P<sub>FA</sub></span></span>
+<span class="cost-plus">+</span>
+<span class="cost-term cost-miss"><span class="cost-w">1</span> <span class="cost-var">×</span> <span class="cost-var">P<sub>miss</sub></span></span>
+</p>
+<p class="cost-read">One real file called synthetic costs as much as <strong>9.33 missed fakes</strong>.
+That single ratio shaped every decision in this system.</p>
+<dl class="cost-legend">
+<dt>P<sub>FA</sub></dt><dd>false-alarm rate: the share of real files scored above the threshold</dd>
+<dt>P<sub>miss</sub></dt><dd>miss rate: the share of synthetic files scored below it</dd>
+<dt>min</dt><dd>the best threshold is chosen by the scorer, so only the ranking of scores matters</dd>
+</dl>
+<p class="cost-derive">Built from the sponsor's weights <span class="num" data-src="src/hearsay/metrics.py#L29">C<sub>FA</sub> = 4</span>, C<sub>miss</sub> = 1 and a prior of <span class="num" data-src="src/hearsay/metrics.py#L29">0.3</span> synthetic
+(about 0.7 of files are real): cost = 4 · P<sub>FA</sub> · 0.7 + 1 · P<sub>miss</sub> · 0.3 = 2.8 · P<sub>FA</sub> + 0.3 · P<sub>miss</sub>,
+divided by the best constant decision, 0.3, so that 1.0 means "no better than always saying real" and 0.0 is perfect.
+<a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L29" title="Source: src/hearsay/metrics.py lines 29-31 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py lines 29-31 (GitHub; assumes main is public)</span></a></p>
+</section><!-- scan:on -->
+<h2 id="explore">Try it</h2>
+<!-- scan:off --><div class="cost-explorer" data-expr="(4*pfa*(1-0.3) + 1*pmiss*0.3) / 0.3">
+<p>Move the two rates and watch the cost. The arithmetic is exactly the site's formula: <code>(4*pfa*(1-0.3) + 1*pmiss*0.3) / 0.3</code> with <code>pfa</code> and <code>pmiss</code> as fractions.</p>
+<div class="cost-controls">
+<label>False-alarm rate P<sub>FA</sub> <output id="pfa-out">5%</output>
+<input type="range" id="pfa" min="0" max="100" value="5" step="1" aria-describedby="pfa-out"></label>
+<label>Miss rate P<sub>miss</sub> <output id="pmiss-out">20%</output>
+<input type="range" id="pmiss" min="0" max="100" value="20" step="1" aria-describedby="pmiss-out"></label>
+</div>
+<p class="cost-result" aria-live="polite">Normalized cost: <output id="cost-out">—</output>
+<span class="cost-note">(1.0 would be the constant "always real" answer)</span></p>
+<noscript><p>Enable JavaScript for the live readout; the formula above is the whole computation.</p></noscript>
+</div><!-- scan:on -->
+<h2 id="where-it-comes-from">Where the weights come from</h2>
+<p>The sponsor's instructions set the analyst's scenario: a <span class="term" tabindex="0" data-term="false alarm" aria-describedby="tip-1">false alarm<span class="tip-body" role="tooltip" id="tip-1">A real recording that the system calls synthetic. P_FA is the share of real files scored above the threshold. This is the expensive mistake under the sponsor's cost.</span></span> (a real recording flagged as synthetic) costs <span class="num" data-src="CLAUDE.md#conventions">4×</span><a class="src" href="library/claude-md.html#conventions" title="Source: CLAUDE.md, section conventions"><span class="sr">source: CLAUDE.md, section conventions</span></a> a <span class="term" tabindex="0" data-term="miss" aria-describedby="tip-2">miss<span class="tip-body" role="tooltip" id="tip-2">A synthetic recording that the system calls real. P_miss is the share of synthetic files scored below the threshold. The cheap mistake, relatively speaking.</span></span>, and about <span class="num" data-src="CLAUDE.md#conventions">70%</span><a class="src" href="library/claude-md.html#conventions" title="Source: CLAUDE.md, section conventions"><span class="sr">source: CLAUDE.md, section conventions</span></a> of the test files are real. Our metric module encodes exactly that: <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L29" title="src/hearsay/metrics.py line 29 (GitHub; assumes main is public)">C_FA = 4, C_miss = 1, π_synth = 0.3</a>, and the normalized cost is <a class="srclink" href="library/claude-md.html#conventions" title="CLAUDE.md, section conventions">9.33·P_FA + P_miss</a>. The scorer sweeps every threshold and keeps the smallest cost, so the number is the best the ranking could do with a perfect threshold.</p>
+<figure class="diagram"><img class="diagram-img diagram-light" src="img/diagrams/cost-light.svg" alt="The two ways to be wrong: a real file above the threshold is a false alarm and counts 9.33; a synthetic file below it is a miss and counts 1." width="865" height="193"><img class="diagram-img diagram-dark" src="img/diagrams/cost-dark.svg" alt="" aria-hidden="true" width="865" height="193"><figcaption>The two ways to be wrong: a real file above the threshold is a false alarm and counts 9.33; a synthetic file below it is a miss and counts 1. <a class="fullsize" href="img/diagrams/cost-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>%% The two ways to be wrong, and what each one costs under the normalized cost.
+%% cites: CLAUDE.md#conventions, README.md#results-at-a-glance
+flowchart LR
+  R["a real file"] --&gt; RA["scored above&lt;br/&gt;the threshold"] --&gt; FA["false alarm&lt;br/&gt;counts 9.33"]
+  S["a synthetic file"] --&gt; SB["scored below&lt;br/&gt;the threshold"] --&gt; MI["miss&lt;br/&gt;counts 1"]
+  FA --&gt; C["minDCF = 9.33 · P_FA + P_miss&lt;br/&gt;the scorer picks the threshold that minimizes it,&lt;br/&gt;so only the ranking of scores matters"]
+  MI --&gt; C
+  classDef real fill:#e9eff6,stroke:#005493,color:#101a2b
+  classDef fake fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef bad fill:#fff3d1,stroke:#c37530,color:#101a2b
+  classDef plain fill:#ffffff,stroke:#d6deea,color:#101a2b
+  class R real
+  class S fake
+  class FA,MI bad
+  class RA,SB plain
+</code></pre></details></figure>
+<h2 id="ranking">Why only ranking matters</h2>
+<p>Because the scorer chooses the threshold, any monotone rescaling of our scores changes nothing: a <span class="term" tabindex="0" data-term="Platt map" aria-describedby="tip-3">Platt map<span class="tip-body" role="tooltip" id="tip-3">A one-dimensional logistic fit that turns a raw decision value into a probability. It is monotone, so it changes the numbers a reader sees without changing the ranking the metric scores.</span></span>, a z-score, or the cut at <span class="num" data-src="README.md#validation">0.5</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> all leave <span class="term" tabindex="0" data-term="minDCF" aria-describedby="tip-4">minDCF<span class="tip-body" role="tooltip" id="tip-4">Minimum detection cost function. The scorer sweeps every possible threshold over our scores and reports the lowest cost it finds, with a false alarm weighted far more than a miss and the whole thing scaled so that 1.0 equals the best constant answer and 0.0 is perfect. Because the threshold is chosen by the scorer, only the order of our scores matters.</span></span> exactly where it was. That is why fusion works in ranks, why the <span class="term" tabindex="0" data-term="test share" aria-describedby="tip-5">test share<span class="tip-body" role="tooltip" id="tip-5">The fraction of the test files scored above 0.5, watched against the roughly 30% synthetic the brief states. A smoke alarm for a broken model, never a selection signal, because any monotone rescaling changes it without changing minDCF.</span></span> above <span class="num" data-src="README.md#validation">0.5</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> is a smoke alarm and never a selection signal, and why every rule was chosen on minDCF with <span class="term" tabindex="0" data-term="EER" aria-describedby="tip-6">EER<span class="tip-body" role="tooltip" id="tip-6">Equal error rate: the point on the threshold sweep where the false-alarm rate equals the miss rate. Reported alongside minDCF, never selected on.</span></span> only reported. <a class="srclink" href="library/readme.html#validation" title="README.md, section validation">Source: the README's validation section.</a></p>
+<h2 id="threshold">Why the operating threshold sits far above the midpoint</h2>
+<p>With a false alarm that expensive, calling a file synthetic only pays when the evidence is strong. On a calibrated probability scale the <span class="term" tabindex="0" data-term="Bayes threshold" aria-describedby="tip-7">Bayes threshold<span class="tip-body" role="tooltip" id="tip-7">The score at which calling a file synthetic starts to pay under the cost weights and the prior. With a false alarm this expensive it sits far above 0.5 on the probability scale, which is why "above 0.5" is not the decision rule.</span></span> sits near <span class="num" data-src="docs/consults/2026-09-26_fusion-strategy_RESPONSE.md#what-to-ignore-and-why">0.903</span><a class="src" href="library/consults-2026-09-26-fusion-strategy-response.html#what-to-ignore-and-why" title="Source: docs/consults/2026-09-26_fusion-strategy_RESPONSE.md, section what-to-ignore-and-why"><span class="sr">source: docs/consults/2026-09-26_fusion-strategy_RESPONSE.md, section what-to-ignore-and-why</span></a> under the brief's cost, not at <span class="num" data-src="docs/consults/2026-09-26_fusion-strategy_RESPONSE.md#what-to-ignore-and-why">0.5</span><a class="src" href="library/consults-2026-09-26-fusion-strategy-response.html#what-to-ignore-and-why" title="Source: docs/consults/2026-09-26_fusion-strategy_RESPONSE.md, section what-to-ignore-and-why"><span class="sr">source: docs/consults/2026-09-26_fusion-strategy_RESPONSE.md, section what-to-ignore-and-why</span></a>. That figure is the cut on a prior-neutral likelihood ratio read as a probability. The probability the TSV carries already includes the prior, and its Bayes cut is <span class="num" data-src="src/hearsay/metrics.py#L69">0.8</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L69" title="Source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)</span></a>; our metric module's decision logit subtracts the cost term as well, so on it a fixed <span class="num" data-src="src/hearsay/metrics.py#L69">50%</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L69" title="Source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py line 69 (GitHub; assumes main is public)</span></a> cut is the Bayes decision. Every intuition anchored on "above <span class="num" data-src="docs/consults/2026-09-26_fusion-strategy_RESPONSE.md#what-to-ignore-and-why">0.5</span><a class="src" href="library/consults-2026-09-26-fusion-strategy-response.html#what-to-ignore-and-why" title="Source: docs/consults/2026-09-26_fusion-strategy_RESPONSE.md, section what-to-ignore-and-why"><span class="sr">source: docs/consults/2026-09-26_fusion-strategy_RESPONSE.md, section what-to-ignore-and-why</span></a> means fake" is off by an order of magnitude in likelihood ratio. This is also why the share of test files above <span class="num" data-src="README.md#validation">0.5</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> sitting near the stated prior is reassuring but not a score.</p>
+<h2 id="two-readings">Two readings of the same score</h2>
+<p>The instructions say <span class="num" data-src="README.md#the-fusion-rule">1.0</span><a class="src" href="library/readme.html#the-fusion-rule" title="Source: README.md, section the-fusion-rule"><span class="sr">source: README.md, section the-fusion-rule</span></a> = synthetic. The sponsor's shipped scoring code (ASVspoof5's) treats a higher score as bona fide, the opposite. We follow the instructions and never flip; every model logs its cost under the sponsor's code both ways, and a pre-flipped twin of the draft TSV exists in case NSA's feedback shows they grade inverted. <a class="srclink" href="library/readme.html#the-fusion-rule" title="README.md, section the-fusion-rule">Source: "Score direction" in the README.</a> The second reading also moves the heavy weight: the sponsor code's cost is <a class="srclink" href="library/reports-2026-09-26-fusion-sweep-predeclared.html#readouts-for-every-candidate" title="docs/reports/2026-09-26_fusion-sweep-predeclared.md, section readouts-for-every-candidate">P_FA + 4·P_miss at π 0.5</a>, with the 4× on a missed fake. So every readout on this site names its cost: the brief's, or the sponsor code's.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Shipped rule</th><th>In-the-Wild, brief cost (<a class="srclink" href="library/claude-md.html#conventions" title="CLAUDE.md, section conventions">9.33·P_FA + P_miss</a>)</th><th>In-the-Wild, sponsor-code cost (<a class="srclink" href="library/reports-2026-09-26-fusion-sweep-predeclared.html#readouts-for-every-candidate" title="docs/reports/2026-09-26_fusion-sweep-predeclared.md, section readouts-for-every-candidate">P_FA + 4·P_miss</a>)</th></tr></thead>
+<tbody><tr><td><a class="srclink" href="library/readme.html#numbers" title="README.md, section numbers">A3 w 0.2 + E</a></td><td><span class="num" data-src="README.md#numbers">0.228</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td><td><span class="num" data-src="README.md#numbers">0.239</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td></tr></tbody>
+</table></div>
+<h2 id="default-answer">The default answer: the pinned block</h2>
+<p>The brief warns that real clips may be perturbed, that fakes are laundered, and that a naive detector will be fooled. It leaves one question to the team: what do you answer when you cannot tell? Silence, music, static, a file that fails to decode. Our first deep probe scored pure silence at <span class="num" data-src="README.md#orchestration-what-routing-changes">0.99</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> synthetic, which under this cost would be the most expensive possible mistake if the file were real.</p>
+<p>The answer is placement, not a value. Every file we could judge gets a score in [<span class="num" data-src="README.md#orchestration-what-routing-changes">0.001</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>, 1]. Undecidable files get scores in [0, <span class="num" data-src="README.md#orchestration-what-routing-changes">0.001</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>): strictly below all of them, at the real end, ordered inside the block by the weak M1b signal plus a hash of the filename so no two share a value, with decode failures at the very bottom. <a class="srclink" href="library/readme.html#orchestration-what-routing-changes" title="README.md, section orchestration-what-routing-changes">Source: "The abstention path".</a></p>
+<figure class="diagram"><img class="diagram-img diagram-light" src="img/diagrams/score-line-light.svg" alt="The score line: synthetic at the top, every judged file in [0.001, 1], the pinned block below 0.001 at the real end." width="268" height="600"><img class="diagram-img diagram-dark" src="img/diagrams/score-line-dark.svg" alt="" aria-hidden="true" width="268" height="600"><figcaption>The score line: synthetic at the top, every judged file in [0.001, 1], the pinned block below 0.001 at the real end. <a class="fullsize" href="img/diagrams/score-line-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>%% The score line, synthetic at the top, with the pinned block at the bottom.
+%% cites: README.md#orchestration-what-routing-changes, README.md#how-it-decides
+flowchart TB
+  T["1.0 · synthetic"]
+  T --&gt; D["every file we could judge&lt;br/&gt;scores in [0.001, 1]&lt;br/&gt;ranked by the fused probability"]
+  D --&gt; E["0.001 · the floor of every judged file"]
+  E --&gt; B["the pinned block · [0, 0.001)&lt;br/&gt;no speech to judge, or the decode failed&lt;br/&gt;ordered by the weak M1b signal + a filename hash"]
+  B --&gt; Z["0.0 · real · decode failures at the very bottom"]
+  classDef top fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef mid fill:#e9eff6,stroke:#005493,color:#101a2b
+  classDef block fill:#fff3d1,stroke:#c37530,color:#101a2b
+  class T top
+  class D,E mid
+  class B,Z block
+</code></pre></details></figure>
+<h3 id="both-readings">Right under both readings of the score</h3>
+<p>The block is the one hedge that does not depend on which way NSA's code reads our scores. Let q be the fraction of truly synthetic files inside the block. Placing the block at the bottom is optimal under the brief's cost when q is below <span class="num" data-src="README.md#orchestration-what-routing-changes">80%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>, and under the scoring code's inverted cost when q is above <span class="num" data-src="README.md#orchestration-what-routing-changes">9.7%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>. Undecidable files should sit near the <span class="num" data-src="README.md#orchestration-what-routing-changes">30%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> base rate, which leaves roughly a 3× margin on each side. <a class="srclink" href="library/consults-2026-09-26-fusion-strategy-response.html#what-to-do-adopted" title="docs/consults/2026-09-26_fusion-strategy_RESPONSE.md, section what-to-do-adopted">Source: consult item 5.</a></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Reading of the score</th><th>Where the expensive error sits</th><th>Bottom placement is optimal when</th><th>Expected q for undecidable files</th></tr></thead>
+<tbody>
+<tr><td>The brief (<span class="num" data-src="README.md#the-fusion-rule">1.0</span><a class="src" href="library/readme.html#the-fusion-rule" title="Source: README.md, section the-fusion-rule"><span class="sr">source: README.md, section the-fusion-rule</span></a> = synthetic, false alarm ×4)</td><td>a real file ranked high</td><td>q &lt; <span class="num" data-src="README.md#orchestration-what-routing-changes">80%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a></td><td rowspan="2">near the <span class="num" data-src="README.md#orchestration-what-routing-changes">30%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> prior</td></tr>
+<tr><td>The sponsor's code (higher = bona fide, missed fake ×4)</td><td>a fake file ranked high</td><td>q &gt; <span class="num" data-src="README.md#orchestration-what-routing-changes">9.7%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a></td></tr>
+</tbody></table></div>
+<p>No test file is gated today, so the block costs nothing on the current ranking. It only protects against a silent or musical file being scored as synthetic, which our deep models do on their own.</p>
+<h2 id="decoding">Reading the draft review</h2>
+<p>NSA scored one early submission per team. We sent the exact artifact we ship and decided in advance what each returned number would mean. NSA returned minDCF and EER. <a class="srclink" href="library/readme.html#validation" title="README.md, section validation">Source: the README's decoding table and result.</a></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Returned minDCF</th><th>What it means</th><th>What we do</th></tr></thead>
+<tbody>
+<tr><td><span class="num" data-src="README.md#validation">0.00</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a>–<span class="num" data-src="README.md#validation">0.20</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a></td><td>our direction; the test set behaves like our holdout</td><td>ship unchanged</td></tr>
+<tr><td><span class="num" data-src="README.md#validation">0.20</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a>–<span class="num" data-src="README.md#validation">0.45</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a></td><td>our direction; the test set is more like In-the-Wild</td><td>switch to the most false-alarm-robust candidate</td></tr>
+<tr><td><span class="num" data-src="README.md#validation">0.45</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a>–<span class="num" data-src="README.md#validation">0.90</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a></td><td>ambiguous</td><td>don't flip; fall back to M1b alone</td></tr>
+<tr><td><span class="num" data-src="README.md#validation">0.95</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a>–<span class="num" data-src="README.md#validation">1.00</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a></td><td>NSA's code reads our scores inverted</td><td>ship the pre-flipped twin</td></tr>
+</tbody></table></div>
+<p class="callout">NSA returned minDCF <span class="num" data-src="README.md#validation">0.0733</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> and EER <span class="num" data-src="README.md#validation">3.534%</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a>. The minDCF fell in the pre-declared <span class="num" data-src="README.md#validation">0.00–0.20</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> band: our score direction was right, and we kept the submitted rule unchanged.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="how-it-decides.html">← How it decides</a><a class="next" rel="next" href="what-worked.html">What worked and what did not →</a></nav>
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/site/source/pages/metric.frag</code> <span class="hash">1963e2bf0108</span>, <code>README.md</code> <span class="hash">937c075556d3</span>, <code>CLAUDE.md</code> <span class="hash">e7bf425534d7</span>, <code>src/hearsay/metrics.py</code> <span class="hash">cb9b3e220c1c</span>, <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code> <span class="hash">333d30182eca</span>, <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code> <span class="hash">a2f03d4ff932</span>. The markdown is the record. <a href="about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

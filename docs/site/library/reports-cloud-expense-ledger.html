@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud expense ledger (HEARSAY) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/cloud-expense-ledger.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/cloud-expense-ledger.md</code>; the markdown file is the record.</p>
+
+<h1 id="cloud-expense-ledger-hearsay">Cloud expense ledger (HEARSAY)</h1>
+<p>Every rental appends a row here (<code>scripts/cloud/launch.sh</code>), the reaper appends the destroy,
+and <code>scripts/cloud/teardown_check.sh</code> appends the credit left. Balance: <code>uvx vastai show user --raw</code>.</p>
+<h2 id="payments-in">Payments in</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Date</th><th>Vendor</th><th>Method</th><th>Amount</th>
+</tr></thead>
+<tbody>
+<tr><td>before Sep 26</td><td>vast.ai</td><td>card</td><td>credit $13.37 at handoff (01:30)</td></tr>
+</tbody>
+</table></div>
+<h2 id="charges">Charges</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Date</th><th>Vendor</th><th>Instance / item</th><th>Role</th><th>GPU</th><th>Storage</th><th>Bandwidth</th><th>Total</th><th></th>
+</tr></thead>
+<tbody>
+<tr><td>2026-09-26 04:13</td><td>vast.ai</td><td>52714961 (31632908)</td><td>pilot attempt</td><td>A100 SXM4 $0.67</td><td></td><td></td><td>stuck in loading 10 min, destroyed by the launcher</td><td></td></tr>
+<tr><td>2026-09-26 04:26</td><td>vast.ai</td><td>52721239 (50894989)</td><td>abl_extra attempt</td><td>A100 SXM4 $0.61</td><td></td><td></td><td>stuck in loading, destroyed by the launcher</td><td></td></tr>
+<tr><td>2026-09-26 04:29</td><td>vast.ai</td><td>52716242 (50894989)</td><td>pilot</td><td>0.611111111111111 A100 SXM4</td><td></td><td></td><td>est 1.5 h</td><td></td></tr>
+<tr><td>2026-09-26 04:51</td><td>vast.ai</td><td>52716242</td><td>pilot</td><td>destroyed (failed: FAIL fold4_nsa_extra)</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>2026-09-26 04:54</td><td>vast.ai</td><td>52718897 (50894989)</td><td>pilot</td><td>0.611111111111111 A100 SXM4</td><td></td><td></td><td>est 1.0 h</td><td></td></tr>
+<tr><td>2026-09-26 05:47</td><td>vast.ai</td><td>52725429 (51341862)</td><td>abl_extra</td><td>0.7055555555555555 A100 SXM4</td><td></td><td></td><td>est 1.5 h</td><td></td></tr>
+<tr><td>2026-09-26 06:00</td><td>vast.ai</td><td>52726831 (24559409)</td><td>abl_cons</td><td>0.811111111111111 A100 PCIE</td><td></td><td></td><td>est 1.2 h</td><td></td></tr>
+<tr><td>2026-09-26 06:39</td><td>vast.ai</td><td>52726831</td><td>abl_cons</td><td>destroyed (failed: FAIL full_frozen)</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>2026-09-26 06:55</td><td>vast.ai</td><td>52725429</td><td>abl_extra</td><td>destroyed (failed: FAIL full_frozen)</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>2026-09-26 07:34</td><td>vast.ai</td><td>52718897</td><td>pilot (pilot #2, ablation NSA-only, replicate, frozen folds 1-2, full model)</td><td>destroyed by teardown_check after DONE</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>2026-09-26 07:34</td><td>vast.ai</td><td>teardown check</td><td></td><td></td><td></td><td></td><td>credit left $33.28</td><td></td></tr>
+<tr><td>2026-09-26 07:35</td><td>vast.ai</td><td>M5 total through the finals (10 instances: 6 never booted, pilot x2, ablation x2, conservative x1)</td><td>all runs</td><td>A100 SXM4/PCIe $0.61–0.81/h</td><td>included</td><td>included</td><td><strong>$5.09</strong> (credit $38.37 → $33.28)</td><td></td></tr>
+<tr><td>2026-09-26 08:33</td><td>vast.ai</td><td>52718897</td><td>pilot</td><td>destroyed (stalled 60m at 'WAITING 0')</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>2026-09-26 08:34</td><td>vast.ai</td><td>52746167 (50894989)</td><td>resume_probe</td><td>0.611111111111111 A100 SXM4</td><td></td><td></td><td>est 0.6 h</td><td></td></tr>
+<tr><td>2026-09-26 08:38</td><td>vast.ai</td><td>52746167</td><td>resume_probe</td><td>destroyed (failed: FAIL setup)</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>2026-09-26 08:42</td><td>vast.ai</td><td>52747172 (50894989)</td><td>resume_probe</td><td>0.611111111111111 A100 SXM4</td><td></td><td></td><td>est 0.6 h</td><td></td></tr>
+<tr><td>2026-09-26 08:57</td><td>vast.ai</td><td>teardown check</td><td></td><td></td><td></td><td></td><td>credit left $32.95</td><td></td></tr>
+<tr><td>2026-09-26 05:13</td><td>vast.ai</td><td>52722912 (41367916)</td><td>abl_extra attempt</td><td>A100</td><td></td><td></td><td>stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs)</td><td></td></tr>
+<tr><td>2026-09-26 05:30</td><td>vast.ai</td><td>52724147</td><td>abl_extra attempt</td><td>A100</td><td></td><td></td><td>stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs)</td><td></td></tr>
+<tr><td>2026-09-26 05:40</td><td>vast.ai</td><td>52724249</td><td>abl_cons attempt</td><td>A100</td><td></td><td></td><td>stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs)</td><td></td></tr>
+<tr><td>2026-09-26 05:45</td><td>vast.ai</td><td>52725556 (51341862)</td><td>abl_cons attempt</td><td>A100</td><td></td><td></td><td>stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs)</td><td></td></tr>
+<tr><td>2026-09-26 08:57</td><td>vast.ai</td><td>M5 resume probes (52746167 failed setup, 52747172 DONE)</td><td>G4 evidence</td><td>A100 SXM4 $0.61/h</td><td></td><td></td><td>$0.33 (credit $33.28 → $32.95)</td><td></td></tr>
+</tbody>
+</table></div>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/cloud-expense-ledger.md</code> <span class="hash">23e58b8ffeb4</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

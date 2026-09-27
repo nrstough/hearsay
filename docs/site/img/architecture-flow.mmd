@@ -1,0 +1,68 @@
+flowchart TB
+  F["audio file<br/>any container or codec"]
+  P["probe_audio<br/>format, codec, rate, tags"]
+  L["load_audio<br/>FFmpeg to 16 kHz mono float32<br/>decoded once"]
+  C["ClipContext<br/>read-only audio, probe facts<br/>per-clip memo cache"]
+  O["Runner, static routing<br/>every detector runs; routing log per file<br/>from container, bandwidth, hum, seams, speech gate"]
+  M1["M1<br/>frozen XLS-R layer 7<br/>+ logistic probe"]
+  M3["M3<br/>Spectra-AASIST<br/>off-the-shelf score stream"]
+  M5["M5<br/>frozen-head model, gate not passed<br/>exported column; live under fusion_v2 only (not shipped)"]
+  HC["handcrafted<br/>75 spectral + prosody<br/>features to trees"]
+  CP["compression<br/>19 codec-trace<br/>features to trees"]
+  CT["container<br/>header facts<br/>tag rules"]
+  EN["enf<br/>50 and 60 Hz<br/>hum stability"]
+  SP["splice<br/>clicks, DC jumps"]
+  SD["speaker drift<br/>ECAPA windows, evidence only"]
+  R["DetectorResult per detector<br/>score 0 to 1 with 1 = synthetic<br/>evidence sentence, features, status"]
+  FU["Fusion, frozen 08:13<br/>rank blend 0.8 M1b + 0.2 handcrafted<br/>M3 suppresses false alarms only; Platt at 0.3"]
+  TSV["teamName_predictions.tsv<br/>write_submission validates<br/>never overwrites"]
+  LOG["submissions/log.csv<br/>rung, holdout minDCF, EER, notes"]
+  EXP["explanation JSON per file<br/>every detector's evidence, fusion inputs<br/>routing log"]
+
+  F --> P
+  F --> L
+  P --> C
+  L --> C
+  C --> O
+  O --> M1
+  O --> M3
+  O --> HC
+  O --> CP
+  O --> CT
+  O --> EN
+  O --> SP
+  O --> SD
+  M1 --> R
+  M3 --> R
+  M5 -.-> FU
+  HC --> R
+  CP --> R
+  CT --> R
+  EN --> R
+  SP --> R
+  SD --> R
+  R --> FU
+  FU --> TSV
+  FU --> LOG
+  FU --> EXP
+
+  subgraph deep["Deep detectors"]
+    M1
+    M3
+    M5
+  end
+  subgraph eng["Engineered detectors, CPU only"]
+    HC
+    CP
+    CT
+    EN
+    SP
+    SD
+  end
+
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  classDef planned fill:#f1f3f4,stroke:#5f6368,color:#111,stroke-dasharray:5
+  class F,P,L,C,O,M1,HC,CP,CT,EN,SP,SD,R,FU,TSV,LOG,EXP built
+  class M3 built
+  class M5 flight

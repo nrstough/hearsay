@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · HEARSAY</title>
+<meta name="description" content="HEARSAY, the Cross Exam entry to the NSA HEARSAY audio authentication challenge at HackGT 13: what it is, how well it does, and how it decides.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="editorial.css">
+<link rel="stylesheet" href="deck.css">
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="story" data-search-index="search-index.js" class="home">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The story</a>
+<ul><li><a href="index.html" aria-current="page">Home</a></li><li><a href="how-it-decides.html">How it decides</a></li><li><a href="metric.html">The metric and the default answer</a></li><li><a href="what-worked.html">What worked and what did not</a></li><li><a href="detectors.html">The ten detectors</a></li><li><a href="validation.html">Validation</a></li><li><a href="reproduce.html">Reproduce it</a></li><li><a href="credits.html">Credits and AI use</a></li><li><a href="glossary.html">Glossary</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<div class="deck" id="deck">
+<a class="deck-home" href="#slide-1" aria-label="Back to first slide"><span aria-hidden="true">⌂</span></a>
+
+<section class="deck-slide deck-cover" id="slide-1" aria-labelledby="deck-title">
+  <div class="deck-cover-copy">
+    <p class="deck-overline">CROSS EXAM / HACKGT 13</p>
+    <h1 id="deck-title">HEARSAY</h1>
+    <p class="deck-cover-subtitle">Is this voice real?</p>
+  </div>
+  <div class="deck-cover-meta">
+    <div><span>CHALLENGE</span><strong>NSA HEARSAY</strong></div>
+    <div><span>CREATED BY</span><strong>Nathan, Hrushi &amp; Tharakesh</strong></div>
+    <div><span>DELIVERABLE</span><strong>Audio authentication</strong></div>
+  </div>
+</section>
+
+<nav class="deck-slide deck-agenda" id="slide-2" aria-label="Deck agenda">
+  <p class="deck-label">AGENDA</p>
+  <ol>
+    <li><a href="#slide-3"><span>01</span>OVERVIEW</a></li>
+    <li><a href="#slide-5"><span>02</span>APPROACH &amp; SCOPE</a></li>
+    <li><a href="#slide-6"><span>03</span>RESULTS</a></li>
+    <li><a href="#slide-9"><span>04</span>DETECTORS</a></li>
+    <li><a href="#slide-11"><span>05</span>WHAT WE LEARNED</a></li>
+    <li><a href="#slide-13"><span>06</span>NEXT STEPS</a></li>
+  </ol>
+</nav>
+
+<section class="deck-slide deck-overview" id="slide-3" aria-labelledby="slide-3-title">
+  <div class="deck-overview-text">
+    <h2 id="slide-3-title">PROJECT<br>OVERVIEW</h2>
+    <div class="deck-overview-bottom">
+      <div><p class="deck-label">PROBLEM</p><p>A convincing synthetic voice can sound real. Calling real speech synthetic is the expensive error in this challenge.</p></div>
+      <div><p class="deck-label">SOLUTION</p><p>One decode path, ten forensic detectors, a fixed router, and an explained probability for every file.</p></div>
+      <div class="deck-overview-metrics"><p class="deck-label">MEASURED RESULTS</p><p><a href="library/readme.html#results-at-a-glance">0.0065 holdout</a> · <a href="library/readme.html#results-at-a-glance">0.228 In-the-Wild</a> normalized minDCF.</p></div>
+    </div>
+  </div>
+  <img class="deck-overview-image" src="img/deck/organic-02.jpg" alt="" loading="lazy">
+</section>
+
+<section class="deck-slide deck-statement" id="slide-4" aria-labelledby="slide-4-title">
+  <div class="deck-statement-main">
+    <p class="deck-label">PROJECT OVERVIEW</p>
+    <h2 id="slide-4-title">Give HEARSAY an audio file. It returns a score, the evidence behind it, and a record of how the decision was made.</h2>
+  </div>
+  <div class="deck-statement-bottom">
+    <div><p class="deck-label">THE OUTPUT</p><p>A submission TSV and one explanation JSON per file.</p></div>
+    <div><p class="deck-label">THE PRINCIPLE</p><p>Every detector runs; the router decides which findings may affect the score.</p></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-scope" id="slide-5" aria-labelledby="slide-5-title">
+  <div class="deck-scope-copy">
+    <h2 id="slide-5-title">SCOPE</h2>
+    <div><p class="deck-label">CORE SYSTEM</p><ul><li>Decode audio once to a shared format</li><li>Run ten detectors behind one contract</li><li>Fuse M1b, handcrafted, and M5 by rank</li><li>Let Spectra only lower a likely false alarm</li><li>Write a score and evidence report</li></ul></div>
+    <div><p class="deck-label">OUT OF SCOPE</p><ul><li>No hardware signal or device attestation</li><li>No hosted model on the scoring path</li><li>No retraining during inference</li></ul></div>
+  </div>
+  <div class="deck-scope-art"><div class="deck-scope-frame"><p>THE SHIPPED PIPELINE</p><img src="img/diagrams/pipeline-light.svg" alt="Diagram of the HEARSAY audio-to-score pipeline" loading="lazy"><a href="how-it-decides.html">Read the full method ↗</a></div></div>
+</section>
+
+<section class="deck-slide deck-impact" id="slide-6" aria-labelledby="slide-6-title">
+  <div class="deck-impact-heading"><h2 id="slide-6-title">IMPACT<br>VS EFFORT</h2><p>Each technique had to earn its place in the shipped rule.</p></div>
+  <div class="deck-impact-chart" aria-label="Four decisions by impact and effort">
+    <div class="deck-impact-axis-y"><span>Low</span><strong>Impact</strong><span>High</span></div>
+    <div class="deck-impact-grid">
+      <div><strong>Spectra as a one-way vote</strong><p>Lowered the holdout cost from <a href="library/readme.html#orchestration-what-routing-changes">0.0200 to 0.0065</a>.</p></div>
+      <div><strong>M5 as a minority vote</strong><p>Cut the previous fusion holdout from <a href="library/readme.html#results-at-a-glance">0.014 to 0.0065</a>.</p></div>
+      <div><strong>Speech gate</strong><p>Protects undecidable audio; no NSA test file was gated.</p></div>
+      <div><strong>Extra real-speech corpus</strong><p>Planned, then set aside when it could not fit the event time box.</p></div>
+    </div>
+    <div class="deck-impact-axis-x"><span>Low</span><strong>Effort</strong><span>High</span></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-technical" id="slide-7" aria-labelledby="slide-7-title">
+  <h2 id="slide-7-title">TECHNICAL APPROACH</h2>
+  <div class="deck-technical-columns">
+    <div><p class="deck-label">MODEL STACK</p><ul><li>XLS-R layer-7 probe (M1b)</li><li>Handcrafted spectral and prosody model</li><li>Fine-tuned XLS-R head (M5)</li><li>Spectra-AASIST as a suppressor</li></ul></div>
+    <div><p class="deck-label">ARCHITECTURE PRINCIPLES</p><ol><li>Decode once for consistent inputs</li><li>Run every detector and route by role</li><li>Fuse ranks, then calibrate</li><li>Keep inference local and explainable</li></ol></div>
+  </div>
+  <div class="deck-technical-image" role="img" aria-label="Abstract translucent organic forms"></div>
+</section>
+
+<section class="deck-slide deck-milestones" id="slide-8" aria-labelledby="slide-8-title">
+  <h2 id="slide-8-title">MILESTONES</h2>
+  <div class="deck-milestone-grid">
+    <div><p class="deck-label">PHASE 01</p><h3>FOUNDATIONS &amp; DETECTORS</h3><ul><li>Common audio loader and detector contract</li><li>Fold file and the XLS-R probe</li><li>Engineered forensic techniques</li></ul><div class="deck-deliverable">Comparable detector scores and evidence</div></div>
+    <div><p class="deck-label">PHASE 02</p><h3>ROUTING &amp; FUSION</h3><ul><li>Pre-declared selection rule</li><li>Rank blend and Spectra suppression</li><li>Holdout and In-the-Wild validation</li></ul><div class="deck-deliverable">An auditable shipped rule</div></div>
+    <div><p class="deck-label">PHASE 03</p><h3>SUBMISSION &amp; REVIEW</h3><ul><li>Run the full test set</li><li>Write the TSV and explanation JSON</li><li>Check parity and document limits</li></ul><div class="deck-deliverable">Reproducible output and documentation</div></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-detectors" id="slide-9" aria-labelledby="slide-9-title">
+  <h2 id="slide-9-title">DETECTORS</h2>
+  <div class="deck-detector-grid">
+    <a href="detectors.html"><span class="deck-detector-art art-1"></span><span>M1b <small>Primary probe</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-2"></span><span>Handcrafted <small>Spectral evidence</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-3"></span><span>M5 <small>Fine-tuned head</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-4"></span><span>Spectra <small>One-way suppressor</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-5"></span><span>Speech gate <small>Default-answer policy</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-6"></span><span>Forensics <small>Evidence-only signals</small></span></a>
+  </div>
+</section>
+
+<section class="deck-slide deck-working" id="slide-10" aria-labelledby="slide-10-title">
+  <div class="deck-working-image" role="img" aria-label="Abstract translucent organic forms"></div>
+  <div class="deck-working-copy"><h2 id="slide-10-title">WAYS OF WORKING</h2><div class="deck-working-columns">
+    <div><p class="deck-label">DECISION RULE</p><p>We wrote the fusion selection rule before viewing results and applied it once. Rejected ideas stay in the record.</p></div>
+    <div><p class="deck-label">AUDIT TRAIL</p><p>Each file keeps detector reasons and a routing log. Sources, tests, and known limits are linked throughout the docs.</p></div>
+  </div></div>
+</section>
+
+<section class="deck-slide deck-lessons" id="slide-11" aria-labelledby="slide-11-title">
+  <div class="deck-lessons-heading"><div><p class="deck-label">THE LESSONS / 01–04</p><h2 id="slide-11-title">WHAT WE LEARNED</h2></div><span>01 / 02</span></div>
+  <ol class="deck-lessons-list">
+    <li><span class="deck-lesson-number">01</span><div><h3>Our test data lied to us, five times.</h3><p>Real and fake clips differed in volume, silence at the start, length, file format, and a filter cutoff at 7.2 kHz. A model could “win” on any of those without hearing the voice. We found each one and removed it. Next time we check for this on day one.</p></div></li>
+    <li><span class="deck-lesson-number">02</span><div><h3>Good scores at home don't mean good scores in the wild.</h3><p>Our best models scored around 0.1 on our own held-out data and around 0.4 on real-world recordings. The fusion rule that looked best at home was the worst in the wild. We only avoided shipping it because we wrote down the selection rule before seeing the numbers.</p></div></li>
+    <li><span class="deck-lesson-number">03</span><div><h3>Fix the data before adding more of it.</h3><p>Adding 40 real speakers made things worse until we matched our training audio to the test set's filter. Then the same speakers made things better.</p></div></li>
+    <li><span class="deck-lesson-number">04</span><div><h3>One false alarm costs 9 misses. Design for that.</h3><p>This one number shaped everything: a detector that can only lower a score, a model tuned for fewer false alarms, and unreadable files pinned to the bottom of the list.</p></div></li>
+  </ol>
+  <a class="deck-lessons-link" href="what-worked.html">Explore the evidence ↗</a>
+</section>
+
+<section class="deck-slide deck-lessons" id="slide-12" aria-labelledby="slide-12-title">
+  <div class="deck-lessons-heading"><div><p class="deck-label">THE LESSONS / 05–08</p><h2 id="slide-12-title">WHAT WE LEARNED</h2></div><span>02 / 02</span></div>
+  <ol class="deck-lessons-list" start="5">
+    <li><span class="deck-lesson-number">05</span><div><h3>Half our detectors don't vote, and that's fine.</h3><p>Five of ten detectors turned out to detect the recording setup, not the voice. Mains hum means “recorded at home”. Compression means “went through a pipeline”. Those detectors now explain the answer instead of setting it.</p></div></li>
+    <li><span class="deck-lesson-number">06</span><div><h3>A weak model can still help.</h3><p>Our fine-tuned model lost to the simple one on every test. But it makes different mistakes, so giving it a small vote cut errors in half.</p></div></li>
+    <li><span class="deck-lesson-number">07</span><div><h3>If you can't check a model, limit what it can do.</h3><p>Spectra-AASIST scored perfectly on our data, but nobody knows what it was trained on. So it can only say “this is real”, never “this is fake”.</p></div></li>
+    <li><span class="deck-lesson-number">08</span><div><h3>Test for weaknesses before you freeze.</h3><p>We found that background noise breaks the shipped model after it was too late to fix.</p></div></li>
+  </ol>
+  <a class="deck-lessons-link" href="what-worked.html">Explore the evidence ↗</a>
+</section>
+
+<section class="deck-slide deck-next" id="slide-13" aria-labelledby="slide-13-title">
+  <div class="deck-next-banner"><h2 id="slide-13-title">NEXT STEPS</h2></div>
+  <div class="deck-next-content">
+    <div><p class="deck-label">READ THE WORK</p><ol><li><a href="how-it-decides.html">Walk through the decision path</a></li><li><a href="validation.html">Inspect validation and limits</a></li><li><a href="detectors.html">Explore all ten detectors</a></li><li><a href="reproduce.html">Reproduce the submitted output</a></li></ol></div>
+    <div><p class="deck-label">NSA READOUT</p><div class="deck-next-note"><strong>0.0733 minDCF</strong><p>NSA returned 3.534% EER for the exact file we ship. The result fell in our pre-declared 0.00–0.20 band, so we kept the rule unchanged.</p><a href="validation.html#draft-review">Read the validation record ↗</a></div></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-close" id="slide-14" aria-labelledby="slide-14-title">
+  <div class="deck-close-info"><p>Continue into the complete HEARSAY documentation.</p><p class="deck-close-credit">Created by Nathan, Hrushi &amp; Tharakesh.</p><a href="#full-docs">Open the full record ↗</a><a href="library/index.html">Browse the library ↗</a></div>
+  <h2 id="slide-14-title">THANK YOU.</h2>
+</section>
+</div>
+
+
+<details class="deck-appendix" id="full-docs" open><summary>Full documentation and sources</summary><nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#verdict">The numbers</a></li><li><a href="#cost-title">The cost function we are judged on</a></li><li><a href="#how-it-decides">How it decides, in one picture</a></li><li><a href="#results">Results at a glance</a></li><li><a href="#read-next">Where to go next</a></li></ul></nav><section class="record-sheet record-numbers" aria-labelledby="verdict">
+<h2 id="verdict">The numbers</h2>
+<p>All figures are normalized <span class="term" tabindex="0" data-term="minDCF" aria-describedby="tip-1">minDCF<span class="tip-body" role="tooltip" id="tip-1">Minimum detection cost function. The scorer sweeps every possible threshold over our scores and reports the lowest cost it finds, with a false alarm weighted far more than a miss and the whole thing scaled so that 1.0 equals the best constant answer and 0.0 is perfect. Because the threshold is chosen by the scorer, only the order of our scores matters.</span></span> (lower is better). The rule was chosen by a <span class="term" tabindex="0" data-term="pre-declared" aria-describedby="tip-2">pre-declared<span class="tip-body" role="tooltip" id="tip-2">Written down before any result was looked at: the candidates, the readouts, and the rule that picks a winner. Once the rule has been applied there is no second try.</span></span> selection rule, applied once; the <span class="term" tabindex="0" data-term="out-of-fold" aria-describedby="tip-3">out-of-fold<span class="tip-body" role="tooltip" id="tip-3">A score a model gives to a training row it never saw: the training data is split into folds, and each row is scored by the model fitted on the other folds. Every selection decision in this project uses out-of-fold scores.</span></span> figure is the training-side readout, the <span class="term" tabindex="0" data-term="holdout" aria-describedby="tip-4">holdout<span class="tip-body" role="tooltip" id="tip-4">A slice of the training data that no model was ever fitted, tuned or selected on: two generators and a set of real-speech groups. Each model reads it once. With only two held-out generators it is noisy, so small differences on it are not evidence.</span></span> and <span class="term" tabindex="0" data-term="In-the-Wild" aria-describedby="tip-5">In-the-Wild<span class="tip-body" role="tooltip" id="tip-5">A public set of web-sourced real and fake speech, used only as a stress test for false alarms on unfamiliar real voices. Nothing was ever trained on it.</span></span> figures were each read once after the choice.</p>
+<div class="verdict-row">
+<div class="stat"><span class="label">Outer holdout</span><span class="value"><span class="num" data-src="README.md#results-at-a-glance">0.0065</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></span><span class="note">two unseen generators and 26 unseen real-speech groups</span></div>
+<div class="stat"><span class="label">In-the-Wild, brief cost</span><span class="value"><span class="num" data-src="README.md#results-at-a-glance">0.228</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></span><span class="note">web-sourced speech we never trained on; <span class="num" data-src="README.md#numbers">0.239</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> under the <span class="term" tabindex="0" data-term="sponsor code" aria-describedby="tip-6">sponsor code's<span class="tip-body" role="tooltip" id="tip-6">The evaluation script the sponsor shipped. It reads a higher score as real, the opposite of the instructions, and puts the heavier weight on a missed fake. We report every result under both readings and never flip our scores.</span></span> cost</span></div>
+<div class="stat"><span class="label">Inner out-of-fold</span><span class="value"><span class="num" data-src="README.md#results-at-a-glance">0.135</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></span><span class="note">pooled over the five inner folds</span></div>
+<div class="stat"><span class="label">NSA test set, draft review</span><span class="value"><span class="num" data-src="README.md#validation">0.0733</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a></span><span class="note">returned minDCF; EER <span class="num" data-src="README.md#validation">3.534%</span><a class="src" href="library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> on the submitted file</span></div>
+</div>
+</section>
+<!-- scan:off --><section class="cost-panel" aria-labelledby="cost-title">
+<h2 id="cost-title">The cost function we are judged on</h2>
+<p class="cost-formula" aria-label="normalized minimum detection cost">
+<span class="cost-lhs">minDCF</span> <span class="cost-eq">=</span>
+<span class="cost-term cost-fa"><span class="cost-w">9.33</span> <span class="cost-var">×</span> <span class="cost-var">P<sub>FA</sub></span></span>
+<span class="cost-plus">+</span>
+<span class="cost-term cost-miss"><span class="cost-w">1</span> <span class="cost-var">×</span> <span class="cost-var">P<sub>miss</sub></span></span>
+</p>
+<p class="cost-read">One real file called synthetic costs as much as <strong>9.33 missed fakes</strong>.
+That single ratio shaped every decision in this system.</p>
+<dl class="cost-legend">
+<dt>P<sub>FA</sub></dt><dd>false-alarm rate: the share of real files scored above the threshold</dd>
+<dt>P<sub>miss</sub></dt><dd>miss rate: the share of synthetic files scored below it</dd>
+<dt>min</dt><dd>the best threshold is chosen by the scorer, so only the ranking of scores matters</dd>
+</dl>
+<p class="cost-derive">Built from the sponsor's weights <span class="num" data-src="src/hearsay/metrics.py#L29">C<sub>FA</sub> = 4</span>, C<sub>miss</sub> = 1 and a prior of <span class="num" data-src="src/hearsay/metrics.py#L29">0.3</span> synthetic
+(about 0.7 of files are real): cost = 4 · P<sub>FA</sub> · 0.7 + 1 · P<sub>miss</sub> · 0.3 = 2.8 · P<sub>FA</sub> + 0.3 · P<sub>miss</sub>,
+divided by the best constant decision, 0.3, so that 1.0 means "no better than always saying real" and 0.0 is perfect.
+<a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/metrics.py#L29" title="Source: src/hearsay/metrics.py lines 29-31 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/metrics.py lines 29-31 (GitHub; assumes main is public)</span></a></p>
+</section><!-- scan:on -->
+<section class="record-sheet record-method" aria-labelledby="how-it-decides">
+<h2 id="how-it-decides">How it decides, in one picture</h2>
+<p>One decode path, ten detectors behind one contract, a router that tells each result what it may do, and a fusion rule that reads only ranks: <a class="srclink" href="library/readme.html#how-it-decides" title="README.md, section how-it-decides">0.6 × rank(M1b) + 0.2 × rank(handcrafted) + 0.2 × rank(M5)</a>, then <span class="term" tabindex="0" data-term="Spectra-AASIST" aria-describedby="tip-7">Spectra-AASIST<span class="tip-body" role="tooltip" id="tip-7">An off-the-shelf anti-spoofing model run without any training. It is the strongest detector on every set we hold, but its training data is undisclosed, so it is allowed only to lower scores, never to raise them.</span></span> allowed only to pull a file toward real, then a <span class="term" tabindex="0" data-term="Platt map" aria-describedby="tip-8">Platt map<span class="tip-body" role="tooltip" id="tip-8">A one-dimensional logistic fit that turns a raw decision value into a probability. It is monotone, so it changes the numbers a reader sees without changing the ranking the metric scores.</span></span>, with undecidable files in the <span class="term" tabindex="0" data-term="pinned block" aria-describedby="tip-9">pinned block<span class="tip-body" role="tooltip" id="tip-9">Files the system cannot judge (no speech, or a failed decode) are placed strictly below every judged file, at the real end of the ranking, in a deterministic order. Under the sponsor's cost, an uncertain file belongs there.</span></span> at the real end. The full walk-through, with a real test file, is on <a href="how-it-decides.html">How it decides</a>.</p>
+<figure class="diagram"><img class="diagram-img diagram-light" src="img/diagrams/pipeline-light.svg" alt="The shipped pipeline: decode once, route, ten detectors, three fused by rank, Spectra as a one-way vote, Platt map, pinned block, TSV and explanation JSON." width="1027" height="1256"><img class="diagram-img diagram-dark" src="img/diagrams/pipeline-dark.svg" alt="" aria-hidden="true" width="1027" height="1256"><figcaption>The shipped pipeline: decode once, route, ten detectors, three fused by rank, Spectra as a one-way vote, Platt map, pinned block, TSV and explanation JSON. <a class="fullsize" href="img/diagrams/pipeline-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>%% The shipped pipeline, one file at a time. Numbers cited below.
+%% cites: README.md#how-it-decides, README.md#orchestration-what-routing-changes, README.md#the-eight-forensic-techniques
+flowchart TB
+  F["audio file · any container or codec"] --&gt; L["probe the header, then decode once&lt;br/&gt;FFmpeg → 16 kHz mono float32"]
+  L --&gt; C["ClipContext&lt;br/&gt;read-only audio + header facts + a per-clip cache"]
+  C --&gt; R["router: fixed rules on measured facts&lt;br/&gt;every detector runs; each result is told what it may do"]
+  R --&gt; FD["fused by rank&lt;br/&gt;XLS-R probe M1b · 0.6&lt;br/&gt;handcrafted spectral + prosody · 0.2&lt;br/&gt;M5 fine-tuned head · 0.2"]
+  R --&gt; SD["suppression only&lt;br/&gt;Spectra-AASIST · can only halve a high score"]
+  R --&gt; ED["evidence and routing, never scored&lt;br/&gt;compression · ENF hum · splice&lt;br/&gt;speaker drift · container"]
+  R --&gt; G["speech gate&lt;br/&gt;is there speech to judge?"]
+  FD --&gt; FU["base = 0.6 · rank(M1b) + 0.2 · rank(handcrafted) + 0.2 · rank(M5)"]
+  FU --&gt; S["Spectra step: margin below −3 and base above 0.5 → halve"]
+  SD --&gt; S
+  S --&gt; PL["Platt map → probability&lt;br/&gt;judged files score in [0.001, 1]"]
+  G --&gt;|"no speech, or the decode failed"| PB["pinned block · below 0.001&lt;br/&gt;at the real end of the ranking"]
+  PL --&gt; T["CrossExam_predictions.tsv"]
+  PB --&gt; T
+  ED --&gt; X["explanation JSON per file&lt;br/&gt;every detector's sentence + the routing log"]
+  PL --&gt; X
+  classDef fusedC fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef suppC fill:#fff3d1,stroke:#c37530,color:#101a2b
+  classDef evC fill:#ffffff,stroke:#c37530,color:#101a2b,stroke-dasharray:4
+  classDef gateC fill:#e9eff6,stroke:#005493,color:#101a2b
+  class FD,FU fusedC
+  class SD,S suppC
+  class ED,X evC
+  class G,PB gateC
+</code></pre></details></figure>
+</section>
+<section class="record-sheet record-results" aria-labelledby="results">
+<h2 id="results">Results at a glance</h2>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>Inner OOF</th><th>Holdout</th><th>In-the-Wild, brief cost</th><th>In-the-Wild, sponsor-code cost</th></tr></thead>
+<tbody>
+<tr><td><strong>Shipped rule</strong> (<a class="srclink" href="library/readme.html#numbers" title="README.md, section numbers">A3 w 0.2 + E</a>: M1b, handcrafted and M5 by rank, Spectra suppression)</td><td><span class="num" data-src="README.md#results-at-a-glance">0.135</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.0065</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.228</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#numbers">0.239</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td></tr>
+<tr><td>Previous rule (E on α <span class="num" data-src="README.md#results-at-a-glance">0.2</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a>, no M5), the fallback</td><td><span class="num" data-src="README.md#results-at-a-glance">0.140</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.014</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.260</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#numbers">0.267</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td></tr>
+<tr><td><span class="term" tabindex="0" data-term="M1b" aria-describedby="tip-10">M1b<span class="tip-body" role="tooltip" id="tip-10">Our primary detector: a frozen XLS-R with a small logistic classifier on one hidden layer. M1b is the version whose training folds also include a set of extra real speakers.</span></span> alone, the best single detector we trained</td><td><span class="num" data-src="README.md#results-at-a-glance">0.301</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.072</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#results-at-a-glance">0.343</span><a class="src" href="library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a></td><td><span class="num" data-src="README.md#numbers">0.296</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a></td></tr>
+<tr><td><span class="term" tabindex="0" data-term="Spectra-AASIST" aria-describedby="tip-11">Spectra-AASIST<span class="tip-body" role="tooltip" id="tip-11">An off-the-shelf anti-spoofing model run without any training. It is the strongest detector on every set we hold, but its training data is undisclosed, so it is allowed only to lower scores, never to raise them.</span></span> off the shelf, a <span class="term" tabindex="0" data-term="suppression" aria-describedby="tip-12">suppressor<span class="tip-body" role="tooltip" id="tip-12">The one-way role given to Spectra-AASIST: when it is confident a voice is real and the fused rank is high, the rank is halved. It can never raise a score, so if it is wrong the cost is a miss, never a false alarm.</span></span> only</td><td colspan="2">not fused: its training data is undisclosed, so no row of ours is provably out-of-sample for it</td><td colspan="2"><span class="num" data-src="README.md#numbers">0.065</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a>, possibly in-sample for the same reason</td></tr>
+</tbody></table></div>
+<p>The test set has <span class="num" data-src="README.md#numbers">1,671</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> files. The shipped rule scores <span class="num" data-src="README.md#numbers">27.4%</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> of them above <span class="num" data-src="README.md#numbers">0.5</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> against the roughly <span class="num" data-src="README.md#numbers">30%</span><a class="src" href="library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> synthetic the brief states (the orchestration ablation, a different readout, reports <span class="num" data-src="README.md#orchestration-what-routing-changes">27.5%</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>); the <span class="term" tabindex="0" data-term="speech gate" aria-describedby="tip-13">speech gate<span class="tip-body" role="tooltip" id="tip-13">Five cheap cues that decide whether a file contains speech at all (not silent, some voiced frames, pitch that moves, loudness that moves, not spectrally flat). A file that fails goes to the pinned block instead of fusion.</span></span> abstains on <span class="num" data-src="README.md#the-eight-forensic-techniques">0 of 1,671</span><a class="src" href="library/readme.html#the-eight-forensic-techniques" title="Source: README.md, section the-eight-forensic-techniques"><span class="sr">source: README.md, section the-eight-forensic-techniques</span></a>. Turning the <span class="term" tabindex="0" data-term="router" aria-describedby="tip-14">router<span class="tip-body" role="tooltip" id="tip-14">The fixed rules that decide what each detector's result is allowed to do for a given file: fused into the score, allowed only to lower it, or recorded as evidence. Every decision is written to a per-file routing log.</span></span> off moves the holdout from <span class="num" data-src="README.md#orchestration-what-routing-changes">0.0065</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> to <span class="num" data-src="README.md#orchestration-what-routing-changes">0.0200</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> and In-the-Wild from <span class="num" data-src="README.md#orchestration-what-routing-changes">0.229</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> to <span class="num" data-src="README.md#orchestration-what-routing-changes">0.274</span><a class="src" href="library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a>.</p>
+</section>
+<section class="record-sheet record-links" aria-labelledby="read-next">
+<h2 id="read-next">Where to go next</h2>
+<ul class="cards">
+<li class="card"><h3><a href="how-it-decides.html">How it decides</a></h3><p>The pipeline, the router and the fusion arithmetic, on a real test file with its evidence sentences.</p></li>
+<li class="card"><h3><a href="metric.html">The metric and the default answer</a></h3><p>What minDCF is, why a false alarm costs so much, why only ranking matters, and where the undecidable files go.</p></li>
+<li class="card"><h3><a href="what-worked.html">What worked and what did not</a></h3><p>The honest log: every shortcut found, every idea rejected, with its number and its mechanism.</p></li>
+<li class="card"><h3><a href="detectors.html">The ten detectors</a></h3><p>One card each, mapped to the sponsor's rubric, with its role, its numbers and one real evidence sentence.</p></li>
+<li class="card"><h3><a href="validation.html">Validation</a></h3><p>Folds by generator and speaker, the pre-declared sweeps, and the decoding table for the draft review.</p></li>
+<li class="card"><h3><a href="specs/index.html">Systems and subsystems</a></h3><p>One spec page per part of the system, every parameter cited to the line that sets it.</p></li>
+<li class="card"><h3><a href="library/index.html">The library</a></h3><p>Every document in the repository, rendered: reports, run specs, audits, handoffs, consult records.</p></li>
+<li class="card"><h3><a href="reproduce.html">Reproduce it</a></h3><p>The commands, verbatim, and where every artifact lives.</p></li>
+</ul>
+</section>
+</details>
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="next" rel="next" href="how-it-decides.html">How it decides →</a></nav>
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/site/source/pages/index.frag</code> <span class="hash">d976546b6cd4</span>, <code>README.md</code> <span class="hash">937c075556d3</span>. The markdown is the record. <a href="about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

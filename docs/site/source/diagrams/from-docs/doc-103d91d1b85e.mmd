@@ -1,0 +1,17 @@
+flowchart LR
+  A["load_audio<br/>16 kHz mono"] --> B["band_limit<br/>Kaiser 71 taps · 7.25 kHz · 45 dB"] --> T["trim_silence<br/>35 dB relative"] --> D["train: random crop to a test-duration length<br/>test: whole clip, 8 s cap"] --> N["RMS-normalize to 0.1"]
+  N --> S["STFT · n_fft 512 · hop 160<br/>32 ms frames every 10 ms"]
+  N --> Y["YIN pitch · 60 – 400 Hz<br/>voiced mask"]
+  S --> F75["75 handcrafted features<br/>64 spectral · 11 prosody"]
+  Y --> F75
+  S --> V4["v4 families, opt-in via --families<br/>lfcc 60 · phase 12 · cqcc · modulation · breath"]
+  F75 --> TR["training only: LightGBM vs logistic<br/>300 trees · 31 leaves · min_child 40<br/>winner chosen by inner out-of-fold minDCF"]
+  V4 --> TR
+  TR --> DU["bundle: dumped trees + feature stats<br/>models/hc_lgbm_stamp/model.joblib"]
+  DU --> NP["hearsay.trees · numpy evaluator<br/>P(synthetic) + per-feature path contributions"]
+  NP --> EV["evidence sentence<br/>top-3 features in SD from real speech"]
+  NP --> EX["outputs/detector_scores/handcrafted.csv<br/>path · fold · split · score · logit"]
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class A,B,T,D,N,S,Y,F75,TR,DU,NP,EV,EX built
+  class V4 flight

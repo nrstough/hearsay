@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: M4 fusion (Sat Sep 26, 2026, ~09:10) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_m4-fusion-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_m4-fusion-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-m4-fusion-sat-sep-26-2026-0910">Handoff: M4 fusion (Sat Sep 26, 2026, ~09:10)</h1>
+<p><strong>Purpose of this chat:</strong> own the fusion rule from now to the 22:00 freeze and the Sunday 05:00 final TSV. Three jobs, in order: (1) get Nathan's decision on the M5 sweep result, which by the pre-declared rule replaces the frozen rule; (2) decode NSA's draft-review number when it arrives and act on the decoding table; (3) produce the final TSV, its preflight and its direction check. Every change to what ships is ratified by Nathan; this chat proposes and executes, it does not decide.</p>
+<p>Read first: <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code> (the rule, the sweep, the M5 addendum), <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code> (why the rule is shaped this way; items 1–6 are adopted), <code>models/fusion_v1/constants.json</code> (the <code>how</code> field is the rule in one line), then <code>outputs/fusion/sweep_m5_report.json</code>.</p>
+<h2 id="context">Context</h2>
+<p><strong>The shipped rule, <code>e_on_a</code>, frozen 08:13.</strong> Rank each of M1b v3 and handcrafted v5 against its own inner-OOF logits (ECDF); <code>base = 0.8·rank_m1b + 0.2·rank_hc</code>; if Spectra-AASIST's margin is below −3 and <code>base</code> is above 0.5, <code>base *= 0.5</code> (M3 suppresses false alarms, never promotes); Platt map at the 0.3 prior into [0.001, 1]; files that are not speech or fail to decode sit in a pinned block below 0.001. Readout: inner 0.140, holdout 0.014, In-the-Wild 0.260 brief / 0.267 miss-averse. Chosen by a selection rule written before the results; the candidates, rule and results are all in the pre-declared report and were not changed after the run.</p>
+<p><strong>The draft-review payload</strong> is <code>submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv</code>, copied to <code>~/Downloads/HEARSAY_predictions.tsv</code> and approved by Nathan. A pre-flipped twin sits beside it. Nathan DMs it to NSA by 14:00 and asks for P_FA, P_miss and EER along with minDCF.</p>
+<p><strong>The runner and the Docker image implement <code>e_on_a</code>.</strong> <code>hearsay.pipeline.FusionConstants.fuse</code> reads the arithmetic from the constants file (no fitting at inference); <code>scripts/run_pipeline.py</code> reproduces the 08:13 TSV from exported logits to 4e-16 on all 1,671 rows. The image <code>hearsay:20260926-0753</code> predates the rule and is being rebuilt on runner v2 (commit <code>9614c18</code>) by the Docker chat. Any rule change means: new constants file, a pipeline change if the inputs change, a 22-minute Mac rerun, a Docker rebuild (~8 min) and the 50-file parity check again.</p>
+<p><strong>The M5 sweep has run and the frozen rule lost.</strong> <code>scripts/fuse_sweep_m5.py</code> (08:58, uncommitted, main chat's file) evaluated the two pre-declared M5 candidates against the current rule on identical row sets (16,142 inner, 3,858 holdout, 3,000 In-the-Wild; verified). From <code>outputs/fusion/sweep_m5_report.json</code>:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Candidate</th><th>Inner</th><th>Holdout brief</th><th>Holdout averse</th><th>Holdout [#FA, #miss]</th><th>LibriSpeech real</th><th>ITW brief</th><th>ITW averse</th><th>ITW P_FA / P_miss at inner thr</th>
+</tr></thead>
+<tbody>
+<tr><td>CURRENT E on A α0.2</td><td>0.1395</td><td>0.014</td><td>0.0088</td><td>[1, 18]</td><td>0.0186</td><td>0.2603</td><td>0.267</td><td>1.4% / 14.8%</td></tr>
+<tr><td>F: M5 as second suppressor</td><td>0.1364</td><td>0.014</td><td>0.0088</td><td>[1, 18]</td><td>0.0186</td><td>0.2577</td><td>0.267</td><td>1.35% / 14.4%</td></tr>
+<tr><td>A3 w0.1 (no M3 step)</td><td>0.2222</td><td>0.0215</td><td>0.0272</td><td>[1, 33]</td><td>0.0261</td><td>0.282</td><td>0.2635</td><td>0.35% / 33.3%</td></tr>
+<tr><td>A3 w0.1 + E</td><td>0.1364</td><td>0.0095</td><td>0.0092</td><td>[0, 19]</td><td>0.0095</td><td>0.2407</td><td>0.251</td><td>1.4% / 13.0%</td></tr>
+<tr><td>A3 w0.2 (no M3 step)</td><td>0.2128</td><td>0.020</td><td>0.0249</td><td>[1, 30]</td><td>0.0246</td><td>0.266</td><td>0.246</td><td>0.25% / 32.6%</td></tr>
+<tr><td><strong>A3 w0.2 + E</strong></td><td><strong>0.1351</strong></td><td><strong>0.0065</strong></td><td><strong>0.0087</strong></td><td><strong>[0, 13]</strong></td><td><strong>0.0065</strong></td><td><strong>0.2147</strong></td><td><strong>0.234</strong></td><td>1.2% / 12.1%</td></tr>
+</tbody>
+</table></div>
+<p>A3 w0.2 + E is ranks (0.6 M1b, 0.2 handcrafted, 0.2 M5) with the same M3 suppression. It clears all four pre-declared conditions (ITW brief −0.046 against a required −0.01; the other three improve rather than degrade) and is the report's <code>winner</code>. F improves ITW brief by only 0.0026 and does not qualify. The M5 suppression threshold <code>t_F</code> = −3.90 covered 41.8% of inner real rows, so F was not a dead rule; it just adds nothing on top of M3.</p>
+<p><strong>That table was the whole-clip run; the crop-fair run supersedes it (main chat, 09:15).</strong> The addendum promised M5's In-the-Wild scores on "the same seed-200 crops" as the other columns. <code>scripts/m5_score.py</code> has no crop option, so the first run scored all 3,000 M5 ITW rows whole, capped at 8 s, while M1b, handcrafted and M3 saw test-length crops. The main chat disclosed the deviation, wrote the identical <code>prepare_segment(x, crop_s, 200 + row)</code> crops to WAV, re-scored M5 and re-ran the sweep. Crop-fair, A3 w0.2 + E moves to ITW brief <strong>0.228</strong> (from 0.215 whole-clip; current 0.260) and ITW averse <strong>0.239</strong> (from 0.234; current 0.267); inner and holdout are unchanged. It still clears all four conditions (ITW brief −0.032 against a required −0.01). F stays under the bar. Both runs are recorded in the addendum. Verified by the oversight chat at 09:15: the candidate TSVs have 1,671 rows in template order, scores in [0.0014, 0.9996], no NaN; Spearman 0.974 against the current TSV; 3 of 1,671 files cross 0.5; share above 0.5 is 27.4% either way.</p>
+<p>Candidate artifacts, none shipped: <code>models/fusion_v2_candidate/constants.json</code> (weights 0.6 / 0.2 / 0.2 in rank space, the same M3 <code>e_rule</code>, Platt, the map applied once; its <code>status</code> field says CANDIDATE), <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_{our_direction,FLIPPED_only_if_NSA_scores_inverted}.tsv</code>, and two log rows marked "pending ratification".</p>
+<p><strong>Main chat's recommendation (09:15):</strong> ratify A3 for the FINAL only if the Docker chat can add the M5 scorer and re-verify smoke and parity comfortably before 22:00; the metric gain is real but modest and the test ranking barely moves, so Docker risk is the deciding factor. Otherwise keep <code>e_on_a</code> frozen. The draft review stays the approved <code>e_on_a</code> file either way. <strong>Docker chat's estimate (09:20):</strong> about 45 min wall-clock after the runner commit with the M5 scorer lands, 1 h with one retry (staging line and test 10 min; rebuild with cached deps 5–8 min, +0.63 GB layer; smoke 5; 50-file parity 5–6 min at ~5.5 s/file under Rosetta; PCM 1; spec and commit 10). Fits the 20 GB VM disk only with one image tag kept. Memory: M5 cannot share M1b's backbone (fine-tuned, hash-checked weights of its own, 12 layers), so resident memory goes from 3.3 GiB to about 4.2 GiB in a 5.8 GiB VM; fits for a scoring run alone, with little headroom; Colima can be restarted at 8 GB in two minutes without a rebuild. Its own state: the runner-v2 rebuild failed at 08:4x on VM disk (three 7.5 GB tags under the 20 GB cap; fix is deleting the superseded tag first) and is being restarted now; the full in-image run was stopped at 664/1,671 and is not resumed. So the pipeline change (1–2 h, this lane) is the long pole, not the image.</p>
+<p><strong>Nathan's decision (09:25): keep <code>e_on_a</code> frozen</strong> pending the draft review; ~10:20: "build now, switch later" (the runner gained the fusion_v2 path, 8316e50, default unchanged). <strong>Superseded at ~12:05: GO A3.</strong> Two facts from NSA in person changed the cost side: the Docker image is not required (the deliverable is the TSV + README), and the draft review returns minDCF only. With no image to rebuild, the pre-declared rule's verdict stood at zero cost, so Nathan ratified A3 w0.2 + E as the shipped rule and the draft went out as that file: <code>CrossExam_predictions.tsv</code> = <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (sha256 <code>fb783076…</code>, log row 12:03). Follow-ups in flight: runner default → <code>models/fusion_v2/constants.json</code>; branches doc re-pointed at the A3 files (0.00–0.45 → A3; 0.45–0.90 → Branch C; 0.95–1.00 → A3 FLIPPED); README switch lines; constants status CANDIDATE → SHIPPED. The M5-logit parity mark (5 rows ≤ 0.035 logit, ≤ 9e-4 probability, rank order identical) is accepted. <code>e_on_a</code> remains the documented fallback and what the evidence image reproduces. The addendum says a change needs his ratification, and adopting A3 has costs the sweep does not price:</p>
+<ul>
+<li>M5 is not a pipeline scorer today. <code>hearsay.pipeline.DETECTOR_ORDER</code> is <code>("m1b_v3", "handcrafted_v5", "spectra_aasist")</code> and <code>RANKED</code> is the two-detector tuple. Adding M5 means a new scorer in <code>pipeline.py</code> around <code>hearsay.m5_model.load_m5</code> / <code>score_batch</code> with the deploy transform from <code>hearsay.m5_data</code> (trim, cap 8 s, normalize; the exported order is trim then band-limit), a three-way <code>RANKED</code>, a <code>fusion_v2/constants.json</code> with M5's inner-OOF rank reference, and tests in <code>tests/test_pipeline.py</code>. The pipeline is frozen at <code>9614c18</code>; the Docker chat rebuilds on every change and must be told first.</li>
+<li>The image grows by the M5 model (<code>models/m5_xlsr_ft_20260926-0741/model</code>, 631 MB) and M5 loads the first 12 XLS-R layers where M1b truncates at 7; ~0.2 s per clip on the Mac, several times that under Rosetta.</li>
+<li>M5's known weak spots are the test set's shape: clips ≤ 4 s score 0.60 alone (test median 3.4 s), LibriSpeech real 0.43 alone. Inside the blend those slices improved (LibriSpeech real 0.0186 → 0.0065, holdout misses 18 → 13), which is the argument for it, but the holdout is eight in-family generators and the 0.014 → 0.0065 move is inside the resolution floor the consult warned about. The In-the-Wild gain (0.260 → 0.215) is the real evidence, and ITW is 3,000 clips scored once, never trained on.</li>
+<li>Under the sponsor code's inverted cost (miss-averse column) A3 + E also improves (0.267 → 0.234), so the change is not a bet on the direction.</li>
+<li>Timeline: pipeline change 1–2 h, Mac rerun 22 min, rebuild and parity ~30 min. Feasible before 22:00 if started by early afternoon; not feasible after the draft-review number arrives if that number itself forces a change.</li>
+</ul>
+<p>A defensible middle path, if Nathan wants the gain without the rebuild risk: ship A3 + E as the TSV (computed from the exports, exactly as the 08:13 TSV was) and keep the Docker image on <code>e_on_a</code>, with the difference disclosed in the README. That trades a parity claim ("the image reproduces the TSV") for minDCF. Say so plainly to Nathan; do not choose for him.</p>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>main</code> in <code>~/Projects/hearsay</code>, shared by several chats. Fusion files (<code>scripts/fuse.py</code>, <code>fuse_sweep.py</code>, <code>fuse_sweep_m5.py</code>, <code>models/fusion_v*</code>, <code>submissions/</code>) belong to this lane. <code>scripts/fuse_sweep_m5.py</code> is uncommitted; commit it with the addendum results before anything else. Stage by path; never <code>git add -A</code>. The main chat pushes; ask Nathan before pushing.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync</code></pre>
+<p>Re-run the frozen sweep (reads the exports, ~1 min; <code>--write</code> re-emits the winner's TSVs in both polarities and the constants):</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python scripts/fuse_sweep.py</code></pre>
+<p>Re-run the M5 sweep (reads <code>outputs/detector_scores/{m1b_v3,handcrafted_v5,m5_xlsr_ft}.csv</code>, <code>_itw_*.csv</code>, <code>outputs/spectra/itw_stress/scores.csv</code>):</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python scripts/fuse_sweep_m5.py</code></pre>
+<p>Reproduce a TSV live from audio with the runner (22 min on the Mac; resumable):</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python scripts/run_pipeline.py --data data/nsa/HackGTHearsayTesting --out outputs/runner/&lt;name&gt; --template data/nsa/HearsayScoreKey4TeamX.tsv</code></pre>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li><strong>Finish and commit the M5 sweep</strong>: the crop-fair M5 ITW re-score, the re-run of <code>scripts/fuse_sweep_m5.py</code>, and both result tables (whole-clip and crop-fair) appended under the addendum in <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>, with the deviation named and the verdict in one sentence ("qualifies on crop-fair ITW; awaiting ratification" or "does not qualify; rule stays frozen"). A pre-declared rule whose result is not recorded next to it is worth nothing. Do not start step 2 from the whole-clip table.</li>
+<li><strong>Put the decision to Nathan</strong> in five lines: the table row for A3 w0.2 + E against CURRENT, the four conditions met, the three costs (pipeline change, image size and rebuild, M5's short-clip weakness), and the middle path. Ask for one of: ratify and rebuild; ratify TSV-only; keep frozen. Record the answer in the addendum.</li>
+<li><strong>If ratified (either form):</strong> <code>uv run python scripts/fuse_sweep_m5.py --write</code> (add the flag if it does not exist yet, mirroring <code>fuse_sweep.py</code>) to emit <code>models/fusion_v2/constants.json</code> and both polarity TSVs under a new timestamp, and append the log row. The TSV must have 1,671 rows in the template's order, determinate scores in [0.001, 1], the pinned block below, and min score reported in the notes. If the runner is to follow, message the Docker chat before touching <code>pipeline.py</code>.
+<em>Done, runner side (10:45, this chat; commit <code>8316e50</code>, run spec <code>docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md</code>): <code>--write</code> exists and wrote <code>models/fusion_v2/constants.json</code> (with <code>how</code> and the M5 checkpoint hashes); <code>RANKED</code> is gone (<code>FusionConstants.ranked</code> / <code>rank_weights</code> from the file; a v1 file still loads bit-identically); <code>hearsay.pipeline.Models</code> loads M5 (<code>--m5</code>, <code>load_m5</code>) only under a file that weights it, <code>check_m5_identity</code> refuses another checkpoint; <code>DETECTOR_ORDER</code> is the four-column canonical order and a run's scorers are the file's own. <code>models/fusion_v2_candidate</code> moved to <code>outputs/fusion/fusion_v2_candidate/</code>. Not done, by design: the default is still <code>fusion_v1</code>, no TSV pair was promoted, no rebuild. The switch = one line (<code>DEFAULT_CONSTANTS_PATH</code>), <code>--write --tsv</code> (to add), the Docker <code>m5_shipped</code> staging and B6 pin, README. The candidate path in Context, the <code>RANKED</code> sentence under the costs, and the <code>RANKED, DETECTOR_ORDER</code> pointer under Pointers describe the state before this.</em></li>
+<li><strong>The draft-review branches are pre-computed</strong> (main chat, 09:28; <code>docs/reports/2026-09-26_draft-review-branches.md</code>, verified by the oversight chat). Every band maps to a logged TSV: 0.00–0.20 and 0.20–0.45 → the 08:13 <code>e_on_a</code> file unchanged (it already has the lowest ITW brief-cost minDCF of the ratified rules, so "switch to the most FA-robust" is a no-op); 0.45–0.90 → <code>submissions/20260926-0928_BRANCH_C_M1b_alone_our_direction.tsv</code>; 0.95–1.00 → the 08:13 <code>FLIPPED</code> file. If EER comes back instead: 2–5% is our direction, 95–98% theirs. The runner already has <code>--flip</code> (commit <code>9614c18</code>), so an inversion verdict changes only which TSV is sent. When the number arrives: decode, copy the file, tell Nathan which branch fired and why, append a log row noting the decode.</li>
+<li><strong>Watch the channel-robustness chat's 16:00 report.</strong> If it ships a symmetric codec refit of M1b or handcrafted, the exports change, and both sweeps must be re-run from scratch under the same pre-declared rules; the rank references in the constants are tied to the exports they were built from.</li>
+<li><strong>Freeze at 22:00.</strong> After it, only a decode of NSA's number or a broken TSV reopens the rule. Sunday 05:00: final TSV, <code>preflight</code> (row count, order, header, range, no NaN, min score), direction check against the log, hand to Nathan.</li>
+</ol>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test: <code>uv run pytest -q tests/test_pipeline.py tests/test_api.py</code> → passes at <code>9614c18</code> (part of the 444-test suite). These pin the rule's arithmetic, the pinned-block placement and the <code>[0.001, 1]</code> map; run them after any constants or pipeline change.</li>
+<li>Test: <code>uv run pytest -q tests/test_docs_consistency.py</code> → 52 passed; run after editing the report, STATUS or README (no prior but 0.3, no bare "CSV").</li>
+<li>Reproduction number: <code>scripts/fuse_sweep.py</code> must print inner 0.1395 / holdout 0.014 / ITW brief 0.2603 for E on A α0.2; <code>fuse_sweep_m5.py</code> must print the table above. If either drifts, an export changed underneath you; find out which before doing anything else.</li>
+<li>No test covers <code>fuse_sweep.py</code> or <code>fuse_sweep_m5.py</code> directly; the reproduction numbers above are the test.</li>
+<li>At-risk, NOT archived, all regenerable but slowly: <code>outputs/detector_scores/*.csv</code> (the fused columns' exports: <code>m1b_v3</code> 3.3 MB, <code>handcrafted_v5</code>, <code>spectra_aasist</code>, <code>m5_xlsr_ft</code>, and the <code>_itw_*</code> ITW columns; M1b's export needs the 22-min embedding run, M5's needs the 631 MB model, Spectra's the weights). <code>outputs/spectra/itw_stress/scores.csv</code>. <code>outputs/fusion/sweep_report.json</code>, <code>sweep_m5_report.json</code>, <code>sweep_final_test.csv</code>. <code>models/fusion_v1/constants.json</code> and <code>models/m5_xlsr_ft_20260926-0741/</code> (gitignored; the M5 checkpoint also lives on the private HF Hub repo <code>nrs124554433/hearsay-m5-xlsr</code>). Nothing under <code>outputs/</code> or <code>models/</code> is committed; copy to the external drive only if it has room (it was at 100% this morning; check <code>df -h</code> first) and never delete, move.</li>
+<li>In flight, other lanes: Docker chat rebuilding on runner v2 and resuming the full in-image run under <code>outputs/docker/k-full/</code> (664 of 1,671 at 09:07); channel-robustness chat (report 16:00); README chat (20:00). The oversight chat relays; message it rather than the lanes directly for anything cross-lane.</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>Score direction: 1.0 = synthetic, never flipped unless NSA's number decodes to 0.95–1.00. The pinned block is the one hedge that is right under both conventions (consult item 5).</li>
+<li><strong>In the FLIPPED file the pinned block stays at the minimum. This is intended; do not "fix" it</strong> (asked by the Docker chat at 09:40, answered from consult item 5 and the 0.95–1.00 row of the decoding table). The block sits where the 4× error is avoided, not at "the real end": under the brief the bottom reads as real and false alarms cost 4×; under the inverted code the bottom reads as spoof and misses cost 4×. Optimal at the bottom for block spoof rate q &lt; 0.80 (brief) and q &gt; 0.097 (inverted); gated files sit near q ≈ 0.3. The runner's <code>--flip</code> does this already (<code>pipeline.py:531</code>), and the Docker smoke asserts reversal on determinate rows with identical gating in both files.</li>
+<li>The equal-weight rules (zmean, rankmean) are dead: they double In-the-Wild misses. The 06:02 <code>stack_nonlj</code> TSV had Spectra inside a fitted stacker, which is forbidden (undisclosed training data). Any rule that fits on M3 is out regardless of its numbers.</li>
+<li>"Test share above 0.5" is not a selection signal (monotone maps cannot change minDCF); 27.4% of the test set is above 0.5 under the frozen rule, 458 files, as a smoke alarm only.</li>
+<li>The holdout is optimistic (eight in-family generators); In-the-Wild under both costs is what the selection rule keys on, and it is 2,000 real + 1,000 spoof clips scored once.</li>
+<li>The consult's three M3 leakage probes (perturbation sensitivity, holdout-vs-test Spearman drop, MLAAD spoof through M3) sit with the channel-robustness chat; M3 stays suppression-only whatever they say.</li>
+<li>λ̂ (the test set's wild-domain weight; crossover 0.32) is also the channel chat's; if it comes back high, the FA-robust branch of the decoding table matters more.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<ul>
+<li><code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>: candidates, rule, results, M5 addendum.</li>
+<li><code>outputs/fusion/sweep_m5_report.json</code>: the M5 result, <code>t_F</code>, qualifying list, winner.</li>
+<li><code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>: adopted items and the decoding table; verbatim memo beside it (500 KB; the copy in <code>~/Downloads</code> is byte-identical).</li>
+<li><code>src/hearsay/pipeline.py</code>: <code>FusionConstants</code> (lines ~180–270) and <code>fusion_block</code>; <code>RANKED</code>, <code>DETECTOR_ORDER</code> at the top.</li>
+<li><code>scripts/m5_score.py</code>, <code>src/hearsay/m5_model.py</code>, <code>src/hearsay/m5_data.py</code>: the M5 CPU path, if M5 joins the pipeline; parity vs A100 max |Δlogit| 0.012 (<code>outputs/m5_runs/parity_f6.json</code>).</li>
+<li><code>docs/reports/2026-09-26_m5-xlsr-finetune.md</code>: M5's slices (short clips, LibriSpeech real, codecs).</li>
+<li><code>submissions/log.csv</code>: every TSV with its numbers; the source of truth on numbers.</li>
+<li><code>docs/handoffs/2026-09-26_oversight-handoff.md</code>: the lanes, their addresses and the day's deadlines.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_m4-fusion-handoff.md</code> <span class="hash">ffb59b5186d0</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

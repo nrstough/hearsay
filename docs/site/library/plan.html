@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HEARSAY: The Plan (software only) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#the-one-paragraph-version">The one-paragraph version</a></li><li><a href="#scoring-and-deliverables">Scoring and deliverables</a></li><li><a href="#architecture">Architecture</a></li><li><a href="#forensic-techniques">Forensic techniques</a></li><li><a href="#ladder">Ladder</a></li><li><a href="#data">Data</a></li><li><a href="#timeline">Timeline</a></li><li><a href="#cut-order">Cut order</a></li><li><a href="#docker">Docker</a></li><li><a href="#risks">Risks</a></li><li><a href="#rules-that-never-move">Rules that never move</a></li></ul></details>
+<h1 id="hearsay-the-plan-software-only">HEARSAY: The Plan (software only)</h1>
+<p>Rewritten Fri Sep 25, ~23:30 → Sat Sep 26, 00:30, after the NSA brief (<code>docs/nsa-challenge.md</code>), the NSA instructions (<code>data/nsa/HEARSAY_HackGT2026_Instructions.pdf</code>), the scoring code (<code>data/nsa/HackGTMinDCF/</code>) and the kickoff notes (<code>docs/reports/2026-09-25_sponsor-questions.md</code>). Run spec: <code>docs/specs/2026-09-25_software-only-rescope.md</code>. The earlier device-and-demo plan is historical (cut).</p>
+<h2 id="the-one-paragraph-version">The one-paragraph version</h2>
+<p>HEARSAY is a software-only, multi-detector audio authentication system.</p>
+<ul>
+<li>For every file, a rule-based orchestrator chooses which forensic detectors to run.</li>
+<li>Each detector returns a score and a plain-English reason.</li>
+<li>A logistic stacker fuses the scores into one probability that the clip is synthetic.</li>
+<li>The output is <code>teamName_predictions.tsv</code> plus a per-file explanation report.</li>
+<li>Everything ships as a Docker image that runs offline on the test set, with a README written in our own words.</li>
+</ul>
+<p>A frozen and then fine-tuned XLS-R carries the detection score. The engineered detectors carry the diversity and explainability points. We always have a valid TSV.</p>
+<h2 id="scoring-and-deliverables">Scoring and deliverables</h2>
+<p><strong>Judging</strong></p>
+<ul>
+<li><strong>60% MinDCF.</strong>
+<ul>
+<li>Points = (1 − ours)/(1 − best) × 60.</li>
+<li>False alarms (real called synthetic) cost 4× a miss. About 70% of test files are real.</li>
+<li>Our metric (<code>hearsay.metrics</code>): <code>C_FA = 4</code>, <code>C_miss = 1</code>, <code>π_synth = 0.3</code>, i.e. normalized minDCF = 9.33·P_FA + P_miss.</li>
+</ul></li>
+<li><strong>20% creativity, quality, innovation and depth.</strong> The brief itemizes forensic diversity; see the techniques section below.</li>
+<li><strong>20% GitHub documentation.</strong> Approach, architecture, how to run, and what worked and what didn't, "in your own words".</li>
+</ul>
+<p><strong>Deliverables</strong></p>
+<ul>
+<li><code>teamName_predictions.tsv</code>.
+<ul>
+<li>Header <code>filename&lt;TAB&gt;cm-score</code>; filename with extension; probability 0.0–1.0, 1.0 = synthetic.</li>
+<li>All 1,671 rows, in the template's order (<code>data/nsa/HearsayScoreKey4TeamX.tsv</code>).</li>
+<li>Sent by Discord DM.</li>
+</ul></li>
+<li>A Docker image that runs inference on the test set.</li>
+<li>The README.</li>
+<li>The optional one-time draft review, which we use on purpose.</li>
+<li><strong>Final DM by 8 AM Sunday.</strong></li>
+</ul>
+<p><strong>Score direction is an open blocker.</strong> The sponsor's evaluation code (ASVspoof5 <code>compute_det_curve</code>, unmodified) treats a <em>higher</em> cm-score as <strong>bona fide</strong>, the opposite of the instructions. Fed as-is, a good detector with 1.0 = synthetic scores minDCF 1.0, the worst possible; the same scores flipped score about 0.32. The code also uses <code>Pspoof = 0.5, Cmiss = 1, Cfa = 4</code> with Cfa on <em>accepted spoofs</em>.</p>
+<ul>
+<li><strong>Decision (Nathan, Sat Sep 26): submit 1.0 = synthetic, never flip.</strong> The mismatch is the sponsor's to handle; if a strong model scores near 1.0 in the draft review, raise it with NSA.</li>
+<li>The draft review is the tripwire: a strong model scoring near 1.0 means the direction is flipped.</li>
+</ul>
+<p><strong>Metric readings.</strong> Every candidate is logged under four readings, plus EER:</p>
+<ul>
+<li>π_synth 0.3 (primary)</li>
+<li>π = 0.5</li>
+<li>the slide-literal form</li>
+<li>the sponsor code as shipped (π = 0.5; Cfa on accepted spoofs, i.e. P_FA + 4·P_miss after a flip)</li>
+</ul>
+<p>A choice that flips between readings is flagged.</p>
+<h2 id="architecture">Architecture</h2>
+<ol>
+<li><strong>Ingest.</strong> <code>hearsay.audio.probe_audio</code> (container facts) and <code>load_audio</code> (16 kHz mono float32, one FFmpeg path; never denoised or loudness-normalized).</li>
+<li><strong>Orchestrator.</strong> Rule-based routing on container, codec, sample rate, duration and early findings. It records why each detector ran or was skipped. This is where the orchestration bonus comes from; no LLM sits on the scoring path.</li>
+<li><strong>Detectors.</strong> Each follows the contract in <code>src/hearsay/detectors/base.py</code>: a <code>DetectorResult</code> with a score in [0, 1] that increases with synthetic likelihood, non-empty evidence, flat numeric features, and a status. <code>safe_run</code> never loses a row.</li>
+<li><strong>Fusion.</strong>
+<ul>
+<li>L2 logistic stacking, with one column per detector: <code>logit(clip(score, 1e-4, 1 − 1e-4))</code> when <code>status == "ok"</code>, else missing, imputed with the fold-local train mean, plus a <code>&lt;name&gt;.missing</code> indicator.</li>
+<li>Columns are sorted by detector name. The 0.5 placeholder on skipped or errored results is never used as a score.</li>
+<li>If every detector is missing for a clip, it gets the constant prior-decision score and a flag.</li>
+<li>Per-source minDCF is reported, so a detector that only works on one corpus is visible.</li>
+</ul></li>
+<li><strong>Outputs.</strong> The TSV, plus an explanation report per file: top contributing detectors (coefficient × standardized value) and their evidence strings.</li>
+</ol>
+<h2 id="forensic-techniques">Forensic techniques</h2>
+<p>One entry per category in the brief's rubric.</p>
+<p><strong>Test set facts, from the inventory.</strong> All 1,671 files are WAV, 16-bit PCM, 16 kHz mono, 3.0–13.6 s (median 3.4 s), with almost no leading silence and peaks near full scale. The container carries no class signal, so file-level detectors must look inside the audio.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Technique</th><th>Method</th><th>Owner</th><th>Time box</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td>Container / metadata forensics</td><td>ffprobe/ExifTool header fields, encoder tags, codec chain, WAV header quirks. Embedded tags only; never filesystem MAC times or filenames, which git, Docker and unzip rewrite. Low expected signal on this test set; documented either way.</td><td>Teammate A</td><td>1.5 h</td></tr>
+<tr><td>2</td><td>Spectral / frequency-domain analysis</td><td>High-frequency roll-off and band-limiting, spectral flatness, vocoder harmonic regularity, LFCC statistics</td><td>Teammate B</td><td>2 h</td></tr>
+<tr><td>3</td><td>Prosody &amp; phonetics</td><td>Pause and breath statistics, pitch-contour variability and monotonicity, speaking-rate regularity</td><td>Teammate B</td><td>2 h</td></tr>
+<tr><td>4</td><td>Acoustic environment (ENF)</td><td>Mains-hum trace at 50/60 Hz harmonics, and its consistency</td><td>Teammate C</td><td>1 h (first cut)</td></tr>
+<tr><td>5</td><td>Compression forensics</td><td>Double-encoding and transcoding traces (quantization and spectral-hole patterns)</td><td>Teammate A</td><td>1.5 h</td></tr>
+<tr><td>6</td><td>Speaker-embedding consistency</td><td>ECAPA speaker embeddings on sliding windows; drift across the clip</td><td>Teammate C</td><td>1.5 h</td></tr>
+<tr><td>7</td><td>Deep-learning anti-spoofing</td><td>Frozen XLS-R probe (M1), Spectra-AASIST (M3), fine-tuned XLS-R (M5)</td><td>Nathan</td><td>see ladder</td></tr>
+<tr><td>8</td><td>Splice / discontinuity</td><td>Phase breaks, DC-offset jumps, background seams</td><td>Teammate C</td><td>1 h</td></tr>
+<tr><td>+</td><td>Agentic orchestration bonus</td><td>Rule-based router, and a routing log in the explanation report</td><td>Nathan</td><td>1 h</td></tr>
+</tbody>
+</table></div>
+<p>Audio stays 16 kHz mono everywhere. A native-rate loader API for forensic detectors is a separate follow-up change, with its own review and conversion tests, and it matters little here because the test set is already 16 kHz.</p>
+<h2 id="ladder">Ladder</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Rung</th><th>Deliverable</th><th>Owner</th><th>Time box</th><th>Gate</th>
+</tr></thead>
+<tbody>
+<tr><td>M0</td><td>Loader, TSV writer, constant rollback TSV (all "real"), inventory, fold file</td><td>Nathan</td><td>1 h from data</td><td>Never cut</td></tr>
+<tr><td>M1</td><td>Frozen XLS-R probe on NSA training data → first learned TSV</td><td>Nathan</td><td>2 h</td><td>Before the draft review</td></tr>
+<tr><td>D-track</td><td>Engineered detectors 1–6 and 8 against the contract, with out-of-fold scores on the fold file</td><td>Teammates A/B/C</td><td>per the techniques table</td><td>Sat 19:00</td></tr>
+<tr><td>M3</td><td>Spectra-AASIST as a second deep detector</td><td>Nathan</td><td>45 min</td><td>Drop on friction</td></tr>
+<tr><td>M5</td><td>XLS-R fine-tune on the H100, with laundering augmentation</td><td>Nathan</td><td>1–3 runs</td><td>Must beat M1 on the outer holdout</td></tr>
+<tr><td>M4</td><td>Fusion, orchestrator and explanation report</td><td>Nathan</td><td>3 h</td><td>Fusion frozen Sat 22:00</td></tr>
+<tr><td>K</td><td>Docker image (CPU inference on the test set)</td><td>Teammate C from Sat morning</td><td>3 h plus rebuild</td><td>First amd64 image Sat 14:00</td></tr>
+<tr><td>DOC</td><td>README in our own words, experiment log, ablation table</td><td>All</td><td>ongoing, final Sun 05:00–07:30</td><td>Never cut</td></tr>
+</tbody>
+</table></div>
+<h2 id="data">Data</h2>
+<p><strong>Training data</strong></p>
+<ul>
+<li><strong>NSA training data:</strong> LJ Speech (real; a single speaker, Linda Johnson; 242 resampled clips in <code>data/nsa/LJRealResampled</code>, plus the full set on the HexLabs environment) and DiffSSD (synthetic; ElevenLabs and diffusion TTS; downloading).</li>
+<li><strong>Public data:</strong>
+<ul>
+<li>MLAAD English, 6,390 clips.</li>
+<li>A multi-speaker bona fide source (LibriSpeech/VCTK), not yet downloaded. Without it, "LJ's voice = real" is a shortcut the test set will punish.</li>
+<li>ASVspoof 2019 as a baseline only.</li>
+<li>In-the-Wild as a stress test only; never trained on.</li>
+</ul></li>
+</ul>
+<p><strong>Shortcuts found in the inventory.</strong></p>
+<ul>
+<li>LJ clips run 4–10 s (median 7.1 s) with peaks around 0.54; test clips run 3–13.6 s (median 3.4 s) with peaks near 1.0.</li>
+<li>Training clips are cropped to 3–5 s and level-matched to the test peak distribution, for both classes alike.</li>
+<li>Duration, peak and silence are checked per class every time data is added.</li>
+</ul>
+<p><strong>Fold file</strong> (<code>splits/nsa_folds.csv</code>), published within 1 h of the training data being usable:</p>
+<ul>
+<li>The group key is the connected components linking clips that share a generator, a speaker or a near-duplicate hash. Folds therefore hold out whole generators and whole speakers at once.</li>
+<li>The builder states which of those links actually exist in the labels.</li>
+<li>An untouched outer holdout (about 20% of groups), plus 5 inner folds.</li>
+<li>At least 30 clips per class in every fold, and class-balanced training.</li>
+<li>Every learned piece is fitted fold-locally: detectors, layer choice, calibration, imputation, scaler, fusion. Stacking features are inner-fold out-of-fold predictions. Fusion is scored once on the outer holdout, and that number is the logged <code>validation_score</code>.</li>
+</ul>
+<p><strong>Augmentation</strong>, applied to both classes: codec and telephony round-trips, noise, RIR and replay simulation, band-limiting, random ffmpeg transcodes.</p>
+<p><strong>Leakage.</strong> Hash-dedupe NSA data against every public set (<code>scripts/hash_audio.py</code>).</p>
+<p><strong>Weights still needed.</strong> ECAPA (speaker drift, and inside Docker).</p>
+<h2 id="timeline">Timeline</h2>
+<p><strong>Moving gates</strong> shift with the data:</p>
+<ul>
+<li>T0 (training data usable) + 1 h: inventory, fold file, constant TSV.</li>
+<li>T0 + 3 h: M1 NSA TSV.</li>
+</ul>
+<p><strong>Hard cutoffs never move:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>When</th><th>What</th>
+</tr></thead>
+<tbody>
+<tr><td>Sat 02:00–06:00</td><td>Nathan sleeps</td></tr>
+<tr><td>Sat 09:00</td><td>H100 run 1, pending Nathan's approval (spend cap about $75)</td></tr>
+<tr><td>Sat 12:00</td><td>If there's still no NSA training data: cut ENF and splice; the draft review uses the public-data M1 TSV</td></tr>
+<tr><td>Sat 14:00</td><td>Draft TSV sent for the one-time review; first amd64 Docker image (M1 payload)</td></tr>
+<tr><td>Sat 19:00</td><td>Teammate detectors pass the contract tests and deliver out-of-fold scores on the fold file</td></tr>
+<tr><td>Sat 22:00</td><td>Fusion frozen; leave-one-detector-out ablation on the stored out-of-fold columns; no new detectors</td></tr>
+<tr><td>Sun 00:00</td><td>Docker rebuild; amd64 smoke test on 3 files; CPU vs MPS parity check on 50 files</td></tr>
+<tr><td>Sun 01:00–04:30</td><td>Nathan sleeps</td></tr>
+<tr><td>Sun 05:00</td><td>Final TSV, after the silence/tone/music/noise preflight (flag any score above 0.8) and the score-direction check</td></tr>
+<tr><td>Sun 05:00–07:30</td><td>README, ablation table, AI disclosure</td></tr>
+<tr><td><strong>Before 8 AM Sun</strong></td><td><strong>Final TSV DM'd by Nathan (backup: Teammate C)</strong></td></tr>
+</tbody>
+</table></div>
+<h2 id="cut-order">Cut order</h2>
+<p>Cut in this order: ENF → splice → speaker drift → M5 reduced to one run → orchestrator reduced to static routing → fusion reduced to a mean.</p>
+<p>Never cut: a valid TSV at all times; generator- and speaker-grouped validation; the deep SSL detector; the Docker image; the README.</p>
+<h2 id="docker">Docker</h2>
+<ul>
+<li><strong>Base and install.</strong> <code>python:3.12-slim-bookworm</code> plus apt ffmpeg.
+<ul>
+<li>CPU torch 2.14.0 and torchaudio 2.11.0 come from the PyTorch CPU index; the lockfile's CUDA wheels are skipped with <code>--no-install-package</code>.</li>
+<li>Keep the editable install.</li>
+</ul></li>
+<li><strong>Offline.</strong> <code>HF_HUB_OFFLINE=1</code> and <code>TRANSFORMERS_OFFLINE=1</code>.</li>
+<li><strong>Weights.</strong>
+<ul>
+<li>XLS-R and Spectra-AASIST (both are needed), plus the probe's joblib.</li>
+<li>The fine-tuned checkpoint goes on the HF Hub or a GitHub release, not git LFS.</li>
+<li><code>.dockerignore</code> excludes the WavLM weights, <code>.venv</code>, <code>data/</code>, <code>outputs/</code> and <code>.cache</code>.</li>
+</ul></li>
+<li><strong>Runtime.</strong>
+<ul>
+<li>One model loaded at a time.</li>
+<li>A resumable per-file cache, and a new output file per run.</li>
+<li>Tested with <code>--network none</code>.</li>
+</ul></li>
+</ul>
+<h2 id="risks">Risks</h2>
+<p><strong>High</strong></p>
+<ul>
+<li><strong>Score direction and the scoring code.</strong> Covered in Scoring and deliverables above: flip flag plus the draft-review tripwire.</li>
+<li><strong>Nathan is the critical path.</strong> Docker goes to a teammate; the teammates' detectors enter only through the contract and the fold file.</li>
+<li><strong>Stacking leakage.</strong> Nested folds; out-of-fold predictions only.</li>
+<li><strong>Shortcuts.</strong> LJ single speaker, duration, peak level, silence, and container fields (checked for AUC &gt; 0.85). Report minDCF with and without each suspect detector.</li>
+<li><strong>Docker on judges' machines.</strong> Image size, amd64, CPU runtime, memory.</li>
+</ul>
+<p><strong>Medium</strong></p>
+<ul>
+<li><strong>Routing shift between train and test.</strong> Compute every cheap detector on training data; gates must be rank-neutral.</li>
+<li><strong>Missing grouping keys.</strong> Fall back to embedding-based speaker clustering.</li>
+<li><strong>Proxy public data is confounded by corpus.</strong></li>
+<li><strong>Physical replay is not covered.</strong> No hardware; only simulated RIR, plus an optional ReplayDF subset.</li>
+</ul>
+<h2 id="rules-that-never-move">Rules that never move</h2>
+<ul>
+<li>Always have a valid TSV. Never overwrite a submitted one. Log every TSV in <code>submissions/log.csv</code> with its outer-holdout minDCF (EER in notes).</li>
+<li>Validate by generator and speaker, never by clip. Never train on In-the-Wild or on the validation split, including scalers, calibration and stacking folds.</li>
+<li>Keep a clean-only validation score beside any augmented one.</li>
+<li>Never denoise or loudness-normalize test audio. Level-match <em>training</em> data to the test distribution instead.</li>
+<li>Submit calibrated probabilities, never saturated 0/1. Never be confidently wrong on a whole subpopulation (silence, a noise type, a speaker).</li>
+<li>Before every TSV: silence/tone/music/noise preflight, score-direction check on known clips, schema, row order against the template, no duplicate filenames.</li>
+<li>Fine-tune on the H100 only. Ask before renting; cap spend at about $75.</li>
+<li>Time-box every rung. When the box runs out, stop and report. Freeze Sunday morning.</li>
+<li>The scoring path runs offline: no hosted API and no LLM. Secrets live in <code>.env</code> only.</li>
+<li>Credit every model and dataset. The README is written in our own words, with AI use disclosed.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/plan.md</code> <span class="hash">e635a1c8ef50</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

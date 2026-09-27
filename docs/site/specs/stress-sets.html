@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The stress sets · HEARSAY</title>
+<meta name="description" content="Two public sets that nothing was selected on: In-the-Wild, web-sourced real and fake speech that no model ever trained on, for false alarms on unfamiliar voices">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html" aria-current="page">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">Systems and subsystems</p>
+<h1>The stress sets</h1>
+<p class="lead">Two public sets that nothing was selected on: In-the-Wild, web-sourced real and fake speech that no model ever trained on, for false alarms on unfamiliar voices; and MLAAD, synthetic speech from many generators, as training-only data for M5 and a miss-rate readout for the others.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Parameters and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>Our training real speech is all clean read speech, so a model can look excellent on the holdout and still call ordinary phone or web audio synthetic. In-the-Wild is the check for that, read for every model and never trained on. It is also where the equal-weight fusion fell apart and where the pre-declared rules did their selecting. MLAAD answers a different question: how often a detector misses a generator it has never seen.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: the sets' clips, prepared exactly like training rows (band match, trim, a seeded test-length crop). Out: minDCF under both cost readings and the false-alarm rate at each model's own inner-fold threshold; for MLAAD, the miss rate at that threshold.</p>
+<h2 id="where">Where it lives</h2>
+<p>Each detector's export carries its stress rows; the sweeps read them (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/fuse_sweep.py" title="scripts/fuse_sweep.py (GitHub; assumes main is public)">fuse_sweep.py</a>, <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/fuse_sweep_m5.py" title="scripts/fuse_sweep_m5.py (GitHub; assumes main is public)">fuse_sweep_m5.py</a>); the M3 probes score MLAAD (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/scripts/m3_probes.py" title="scripts/m3_probes.py (GitHub; assumes main is public)">m3_probes.py</a>). The M5 data module refuses In-the-Wild paths in any training manifest.</p>
+<h2 id="params">Parameters and where each is set</h2>
+<ul>
+<li><strong>In-the-Wild:</strong> <span class="num" data-src="README.md#validation">3,000</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> clips, <span class="num" data-src="README.md#validation">2,000</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> real from 54 speakers and <span class="num" data-src="README.md#validation">1,000</span><a class="src" href="../library/readme.html#validation" title="Source: README.md, section validation"><span class="sr">source: README.md, section validation</span></a> fake; evaluation only (<a class="srclink" href="../library/readme.html#validation" title="README.md, section validation">README</a>). Crops use a fixed stress seed, and the M5 addendum was re-run "crop-fair" after its first run scored whole clips.</li>
+<li><strong><span class="term" tabindex="0" data-term="MLAAD" aria-describedby="tip-1">MLAAD<span class="tip-body" role="tooltip" id="tip-1">A public multi-generator synthetic-speech set. Its English clips were training-only data for the M5 model and a miss-rate readout on unseen generators for the others.</span></span>:</strong> <span class="num" data-src="README.md#datasets">6,180</span><a class="src" href="../library/readme.html#datasets" title="Source: README.md, section datasets"><span class="sr">source: README.md, section datasets</span></a> English clips from <span class="num" data-src="README.md#datasets">143</span><a class="src" href="../library/readme.html#datasets" title="Source: README.md, section datasets"><span class="sr">source: README.md, section datasets</span></a> models pulled during the event; for M5 a training-only spoof source capped at <span class="num" data-src="CLAUDE.md#ai-use-disclosure">12%</span><a class="src" href="../library/claude-md.html#ai-use-disclosure" title="Source: CLAUDE.md, section ai-use-disclosure"><span class="sr">source: CLAUDE.md, section ai-use-disclosure</span></a> of the spoof side per batch and <span class="num" data-src="CLAUDE.md#ai-use-disclosure">120</span><a class="src" href="../library/claude-md.html#ai-use-disclosure" title="Source: CLAUDE.md, section ai-use-disclosure"><span class="sr">source: CLAUDE.md, section ai-use-disclosure</span></a> clips per model, with the generator families that validate on a fold excluded from that fold's model; for the leakage probes, <span class="num" data-src="README.md#what-did-not-work">572</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> clips, four per model.</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>In use since M1; both cost readings reported from the fusion sweep on.</p>
+<h2 id="numbers">Numbers</h2>
+<p>Every XLS-R probe sits at <span class="num" data-src="README.md#what-did-not-work">0.34–0.41</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> on In-the-Wild against <span class="num" data-src="README.md#what-did-not-work">0.07–0.16</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> on the holdout, and the handcrafted model reaches <span class="num" data-src="README.md#what-did-not-work">1.00</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> there. The shipped rule: <span class="num" data-src="README.md#results-at-a-glance">0.228</span><a class="src" href="../library/readme.html#results-at-a-glance" title="Source: README.md, section results-at-a-glance"><span class="sr">source: README.md, section results-at-a-glance</span></a> under the brief's cost, <span class="num" data-src="README.md#numbers">0.239</span><a class="src" href="../library/readme.html#numbers" title="Source: README.md, section numbers"><span class="sr">source: README.md, section numbers</span></a> under the sponsor code's. On MLAAD, the miss rates: Spectra <span class="num" data-src="README.md#what-did-not-work">14.9%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a>, M1b <span class="num" data-src="README.md#what-did-not-work">22.7%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a>, M5 <span class="num" data-src="README.md#what-did-not-work">28.7%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> (it trained on MLAAD), handcrafted <span class="num" data-src="README.md#what-did-not-work">56%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a>.</p>
+<h2 id="limits">Known limits</h2>
+<p>In-the-Wild stands in for "wild"; telephony and physical replay are not represented. Spectra-AASIST's authors evaluated on In-the-Wild, so its number there cannot be trusted. The λ̂ estimate says the test set is partly wild (<span class="num" data-src="README.md#what-did-not-work">0.51</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a>, with a wide interval), so neither validation set represents it alone.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_m5_manifest.py</code> refuses In-the-Wild paths in a training manifest; <code>tests/test_channel_robustness.py</code> pins the MLAAD miss-rate readout's threshold search and the perturbation probes; <code>tests/test_spectra.py</code> pins the stress-seed crops.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/readme.html#validation" title="README.md, section validation">README, "Validation"</a>; <a class="srclink" href="../library/readme.html#datasets" title="README.md, section datasets">README, "Datasets"</a>; <a class="srclink" href="../library/reports-2026-09-26-channel-robustness.html" title="docs/reports/2026-09-26_channel-robustness.md">the channel-robustness report</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="folds.html">← The fold file</a><a class="next" rel="next" href="inventories-shortcuts.html">Inventories and the shortcut ledger →</a></nav>
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/site/source/specs/stress-sets.frag</code> <span class="hash">c6318d53e4fd</span>, <code>README.md</code> <span class="hash">937c075556d3</span>, <code>CLAUDE.md</code> <span class="hash">e7bf425534d7</span>, <code>docs/reports/2026-09-26_channel-robustness.md</code> <span class="hash">03f8bbd67b08</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

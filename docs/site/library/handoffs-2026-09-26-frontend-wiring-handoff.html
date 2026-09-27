@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: wiring the frontend to HEARSAY, with the fusion section (Sat Sep 26, 2026, ~09:20) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_frontend-wiring-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_frontend-wiring-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#the-fusion-section-what-the-json-says-and-what-the-ui-should-show">The fusion section: what the JSON says and what the UI should show</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#boundaries">Boundaries</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-wiring-the-frontend-to-hearsay-with-the-fusion-section-sat-sep-26-2026-0920">Handoff: wiring the frontend to HEARSAY, with the fusion section (Sat Sep 26, 2026, ~09:20)</h1>
+<p><strong>Purpose of this chat:</strong> build Hrushi's UI against the live <code>hearsay.api</code> and the per-file JSON it returns, and make the <strong>fusion section</strong> of each result page show, in plain words, how the score was made: which detectors were ranked, with what weights, whether Spectra-AASIST pulled the file toward real, and where the final probability landed. Everything the UI shows must come from the pipeline's JSON; the UI never computes a score.</p>
+<p>Read first: <code>docs/handoffs/2026-09-26_frontend-contract.md</code> (the JSON contract, v0), then this file. Skim <code>docs/architecture.md</code> for the picture and <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code> for why the rule is what it is.</p>
+<h2 id="context">Context</h2>
+<ul>
+<li>The backend is done. <code>hearsay.api</code> (FastAPI, <code>src/hearsay/api.py</code>) serves <code>POST /analyze</code> (multipart upload → one <code>AnalyzeResponse</code>), <code>GET /results/{filename}</code> (a precomputed response from a runner output directory), <code>GET /results</code> (list) and <code>GET /health</code>. It wraps the same <code>hearsay.pipeline.analyze_clip</code> the Docker image runs, so what the UI shows is what NSA gets.</li>
+<li>The shipped fusion rule changed at ~12:05 Sat: it is now <strong>A3 w0.2 + E</strong> (<code>models/fusion_v2/constants.json</code>: ranks 0.6 M1b v3 + 0.2 handcrafted v5 + 0.2 M5, then the Spectra false-alarm step). <code>e_on_a</code> (<code>fusion_v1</code>) is the previous rule and fallback. The runner's default is being switched to fusion_v2; until then pass <code>--fusion models/fusion_v2/constants.json</code> (the API reads <code>HEARSAY_FUSION=models/fusion_v2/constants.json</code>).</li>
+<li><strong>Use the dump at <code>outputs/runner/v2_full/results/&lt;filename&gt;.json</code></strong> (all 1,671 files, shipped rule, our direction, 0 rows differing from the submitted TSV). The older <code>outputs/runner/full_20260926/</code> dump is the rejected <code>zmean</code> rule: layout only, never a demo. Step 2 below is therefore already done unless the rule changes again.</li>
+<li><strong>Read <code>docs/handoffs/2026-09-26_frontend-contract.md</code>, section "Rewire note", before touching the committed app:</strong> the app at the repo root currently scores with <code>src/hearsay/analyzer.py</code>, a toy re-implementation that is not the pipeline, and its copilot answers with canned text. Both must be rewired to the real API or the dump before anyone demos it.</li>
+<li>No web framework code exists for the UI yet. Nothing under <code>web/</code>.</li>
+</ul>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>main</code> in <code>~/Projects/hearsay</code>, shared by several parallel Claude chats. Other lanes commit their own files and the main chat pushes. Uncommitted files belong to whichever lane is editing them; do not touch them.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync</code></pre>
+<p>Start the API (models load on the first request; ~15 s, then 1.5–4 s per file on CPU):</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; HEARSAY_RESULTS=outputs/runner/full_20260926 uv run uvicorn hearsay.api:app --port 8000</code></pre>
+<p>Check it:</p>
+<pre><code class="language-bash">curl -s localhost:8000/health</code></pre>
+<pre><code class="language-bash">curl -s localhost:8000/results/HGT1013455.wav | python3 -m json.tool | head -60</code></pre>
+<p>Environment variables the API reads (all optional): <code>HEARSAY_RESULTS</code> (runner output dir for <code>GET /results</code>), <code>HEARSAY_RULE</code> (default <code>e_on_a</code>), <code>HEARSAY_FUSION</code> (a constants file; default <code>models/fusion_v1/constants.json</code>), <code>HEARSAY_DETECTORS</code> (default <code>m1b,spectra,handcrafted</code>), <code>HEARSAY_POLICY</code> (default <code>speech_gate</code>).</p>
+<p><strong>CORS: there is none.</strong> A browser app on its own dev port cannot call <code>localhost:8000</code> directly. Do not add CORS to <code>api.py</code>; it is runner code and the Docker lane rebuilds on every change. Proxy instead. Vite example, <code>web/vite.config.ts</code>:</p>
+<pre><code class="language-ts">export default defineConfig({
+  server: { proxy: { "/analyze": "http://localhost:8000", "/results": "http://localhost:8000", "/health": "http://localhost:8000" } },
+});</code></pre>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li><strong>Scaffold <code>web/</code></strong> with whatever stack Hrushi prefers (Vite + React is the obvious one). Put the dev-server proxy in first so <code>fetch("/results/HGT1013455.wav")</code> works on day one. Commit a package lockfile; nothing else in the repo is JavaScript.</li>
+<li><strong>Regenerate the results dump under the shipped rule.</strong> About 22 minutes on the Mac (0.78 s/file). Run it while the Docker chat is not doing a full in-image run, since both want the CPU:
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python scripts/run_pipeline.py --data data/nsa/HackGTHearsayTesting --out outputs/runner/full_e_on_a --template data/nsa/HearsayScoreKey4TeamX.tsv</code></pre>
+<p>Then point the API at it: <code>HEARSAY_RESULTS=outputs/runner/full_e_on_a</code>. Verify one file's <code>fusion.rule</code> says <code>e_on_a</code> and <code>version.git_sha</code> is current. The runner is resumable; a second invocation with the same <code>--out</code> continues.</p></li>
+<li><strong>Copy the regenerated <code>results/</code> into the UI's fixtures</strong> (e.g. <code>web/fixtures/results/</code>) so the UI works without the API running. <code>outputs/</code> is gitignored; the fixtures copy is not, and 1,671 JSONs are ~10 MB, which is fine to commit once. Do not commit the zmean dump.</li>
+<li><strong>Build the result page.</strong> Sections, in order: verdict + probability; the fusion section (below); the detector table (name, role, status, score, evidence sentence, seconds); the routing log as a list; the version block folded away.</li>
+<li><strong>Build the upload flow</strong> against <code>POST /analyze</code> (field name <code>file</code>, any audio format FFmpeg reads; 16 kHz mono is enforced inside). Show a spinner for 2–4 s. The response is the same shape as <code>GET /results</code>.</li>
+<li>Ask Nathan before pushing. Stage with <code>git add web/</code>, never <code>git add -A</code>.</li>
+</ol>
+<h2 id="the-fusion-section-what-the-json-says-and-what-the-ui-should-show">The fusion section: what the JSON says and what the UI should show</h2>
+<p>The rule, in one sentence: <strong>rank M1b v3 and the handcrafted detector against their own training distributions, blend 80/20, and if Spectra-AASIST is confident the voice is real, halve the blended rank; then map to a probability.</strong> Spectra never pushes a file toward synthetic.</p>
+<p><code>response.fusion</code> for <code>e_on_a</code>:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Field</th><th>Meaning</th><th>Show as</th>
+</tr></thead>
+<tbody>
+<tr><td><code>rule</code></td><td><code>"e_on_a"</code></td><td>"Rule: 80% XLS-R probe, 20% handcrafted, Spectra as false-alarm check" (constant text keyed on the rule)</td></tr>
+<tr><td><code>inputs</code></td><td>raw logit of each of <code>m1b_v3</code>, <code>handcrafted_v5</code>, <code>spectra_aasist</code>; <code>null</code> when a scorer failed</td><td>the raw number, small, with a "higher = more synthetic" note (for <code>spectra_aasist</code> the value is the model's margin: negative = real)</td></tr>
+<tr><td><code>terms</code></td><td>for <code>e_on_a</code>: the rank (0–1) of <code>m1b_v3</code> and <code>handcrafted_v5</code>. Missing scorers get 0.5</td><td>two bars, 0–1: "where this file sits among the training clips that detector saw"</td></tr>
+<tr><td><code>weights</code></td><td><code>{"m1b_v3": 0.8, "handcrafted_v5": 0.2, "spectra_aasist": 0.0}</code></td><td>the 80/20 split; Spectra's 0 weight is worth showing with the words "suppression only"</td></tr>
+<tr><td><code>detail.base</code></td><td>the blended rank before Spectra: <code>0.8·rank_m1b + 0.2·rank_hc</code></td><td>one bar, labelled "blended rank"</td></tr>
+<tr><td><code>detail.e_applied</code></td><td><code>true</code> when Spectra's margin was below −3 <strong>and</strong> <code>base</code> was above 0.5, so <code>base</code> was halved</td><td>a badge: "Spectra pulled this toward real (margin −4.2)" when true; omit when false. Never invent the converse: Spectra cannot pull toward synthetic</td></tr>
+<tr><td><code>detail.e_rule</code></td><td>the thresholds <code>{"m3_logit_below": -3, "base_rank_above": 0.5, "multiply_by": 0.5}</code></td><td>tooltip on the badge</td></tr>
+<tr><td><code>fused</code></td><td><code>base</code>, or <code>base × 0.5</code> if suppression applied</td><td>the number behind <code>p_fused</code></td></tr>
+<tr><td><code>p_fused</code></td><td>the probability after the Platt map, in [0.001, 1]</td><td>this is <code>probability_synthetic</code> unless the gate fired</td></tr>
+<tr><td><code>imputed</code></td><td>list of scorers that failed and were replaced by the inner-fold median (0.5 rank) or, for Spectra, skipped</td><td>a warning chip per name: "detector unavailable, neutral value used"</td></tr>
+<tr><td><code>block_top</code>, <code>failure_top</code></td><td>the ceilings of the pinned block (files that are not speech or failed to decode sit below <code>block_top</code>; decode failures below <code>failure_top</code>)</td><td>only needed to explain a tiny score on an <code>undetermined</code> file</td></tr>
+</tbody>
+</table></div>
+<p>Top-level fields that frame the section: <code>probability_synthetic</code> (what the TSV carries), <code>verdict</code> (<code>synthetic</code> ≥ 0.5, <code>real</code> below, <code>undetermined</code> when not speech or decode failed), <code>is_speech</code>, <code>default_answer_applied</code> (true means the file was pinned below every determinate score, and the fusion numbers are informational only). The routing log's last line is a ready-made sentence for the section footer, e.g. <code>fusion: e_on_a over m1b_v3, handcrafted_v5; M3 margin −7.07, no suppression (M3 never promotes)</code>.</p>
+<p>Things the UI must not do: recompute <code>probability_synthetic</code> from <code>inputs</code>; show <code>weights</code> as if Spectra had a share of the score; describe the 0.5 verdict cut as the operating point (NSA's cost puts the real threshold near 0.9; say "more likely synthetic than not" rather than "flagged").</p>
+<p>Wording that is safe to hardcode for the roles in <code>detectors[].role</code>: <code>fused</code> "enters the score"; <code>evidence</code> "shown, never scored" (compression, ENF, splice, speaker drift); <code>routing</code> "decides what runs" (container); <code>gate</code> "decides whether the file is scoreable at all" (speech gate).</p>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test (backend, hermetic): <code>uv run pytest -q tests/test_api.py tests/test_pipeline.py</code> → all pass at <code>9614c18</code> (part of the 444-test suite). Run it if anything about the API's responses looks off; do not edit these files.</li>
+<li>Test (docs): <code>uv run pytest -q tests/test_docs_consistency.py</code> → 52 passed. Run after editing any doc under <code>docs/</code> or the README.</li>
+<li>There are <strong>no frontend tests</strong> yet. Add at least a fixture-shape test (every fixture JSON has <code>fusion.rule == "e_on_a"</code> and <code>contract == "v0"</code>) so a stale dump cannot sneak into a demo.</li>
+<li>At-risk: <code>outputs/runner/full_20260926/</code> (the zmean dump; regenerable, NOT archived, and fine to lose once step 2 is done).</li>
+<li>At-risk: <code>outputs/runner/full_e_on_a/</code> once created (regenerable in 22 min; copy <code>results/</code> into <code>web/fixtures/</code> and commit, which is the archive).</li>
+<li>In flight, other lanes: the Docker chat's full in-image run under <code>outputs/docker/k-full/</code> (competes for CPU; check with <code>ls outputs/docker/k-full/results | wc -l</code>), the main chat's M5 fusion candidates (<code>scripts/fuse_sweep_m5.py</code>; if a candidate is ratified the constants file and the rule name may change before the 22:00 freeze, and the dump would need regenerating again, so keep the fixture copy step cheap and scripted).</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>Score direction: 1.0 = synthetic everywhere in the JSON and the TSV. Never flip in the UI. The pre-flipped TSV exists for one contingency and is not the UI's business.</li>
+<li>Expected numbers on the test set under <code>e_on_a</code>: 27.4% of files above 0.5 (458 of 1,671, from the 08:13 TSV); determinate scores in [0.001, 1]; 0 of 1,671 files gated; <code>e_applied</code> true on a minority of files (Spectra's margin is below −3 on most real speech but <code>base</code> is above 0.5 on few of those).</li>
+<li>Timings: engineered detectors ~0.3 s per file after warm-up; M1b ~1–3 s; Spectra ~0.5 s. The first request pays the model load.</li>
+<li>The frontend contract's sample JSON predates the shipped rule: its <code>fusion</code> block shows <code>stack_nonlj</code> weights and lacks <code>terms</code>, <code>detail</code>, <code>block_top</code>, <code>failure_top</code>. The table above is authoritative for <code>e_on_a</code>.</li>
+<li>Container evidence is constant on this test set (all 1,671 files are FFmpeg-written 16 kHz WAV); do not design the routing display around it being interesting.</li>
+</ul>
+<h2 id="boundaries">Boundaries</h2>
+<ul>
+<li>The UI lives in <code>web/</code> only. Never edit <code>src/hearsay/</code>, <code>scripts/</code>, <code>docker/</code>, <code>tests/</code> or <code>models/</code>; owners are listed in <code>docs/code-map.md</code>. If the API needs something (CORS, a new field), ask the oversight chat, which relays to the runner's owner.</li>
+<li>No hosted model on the scoring path. A language model may reword evidence text in the UI; every number comes from the JSON.</li>
+<li>Stage only <code>web/</code> (<code>git add web/</code>); never <code>git add -A</code>; do not push without asking Nathan.</li>
+<li>The TSV, the Docker image and the README are the graded deliverables. The UI must not pull Nathan or the Docker owner off them before Sunday 08:00.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<ul>
+<li><code>docs/handoffs/2026-09-26_frontend-contract.md</code>: the JSON contract and the detector-role rules.</li>
+<li><code>src/hearsay/api.py</code>: the three endpoints, ~170 lines, readable in five minutes.</li>
+<li><code>src/hearsay/pipeline.py</code>: <code>FusionConstants.fuse</code> (the rule's arithmetic) and <code>fusion_block</code> (what lands in the JSON).</li>
+<li><code>models/fusion_v1/constants.json</code>: the frozen constants; <code>how</code> is a one-line description of the rule.</li>
+<li><code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>: the sweep that chose the rule, with the numbers.</li>
+<li><code>docs/reports/2026-09-26_worked-examples.md</code>: eight test files walked through by hand; good copy for an "examples" page.</li>
+<li><code>docs/architecture.md</code> and <code>docs/img/architecture-flow.svg</code>: the diagram to reuse on the landing page.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_frontend-wiring-handoff.md</code> <span class="hash">49499462d044</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

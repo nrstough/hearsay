@@ -1,0 +1,147 @@
+<div class="deck" id="deck">
+<a class="deck-home" href="#slide-1" aria-label="Back to first slide"><span aria-hidden="true">⌂</span></a>
+
+<section class="deck-slide deck-cover" id="slide-1" aria-labelledby="deck-title">
+  <div class="deck-cover-copy">
+    <p class="deck-overline">CROSS EXAM / HACKGT 13</p>
+    <h1 id="deck-title">HEARSAY</h1>
+    <p class="deck-cover-subtitle">Is this voice real?</p>
+  </div>
+  <div class="deck-cover-meta">
+    <div><span>CHALLENGE</span><strong>NSA HEARSAY</strong></div>
+    <div><span>CREATED BY</span><strong>Nathan, Hrushi &amp; Tharakesh</strong></div>
+    <div><span>DELIVERABLE</span><strong>Audio authentication</strong></div>
+  </div>
+</section>
+
+<nav class="deck-slide deck-agenda" id="slide-2" aria-label="Deck agenda">
+  <p class="deck-label">AGENDA</p>
+  <ol>
+    <li><a href="#slide-3"><span>01</span>OVERVIEW</a></li>
+    <li><a href="#slide-5"><span>02</span>APPROACH &amp; SCOPE</a></li>
+    <li><a href="#slide-6"><span>03</span>RESULTS</a></li>
+    <li><a href="#slide-9"><span>04</span>DETECTORS</a></li>
+    <li><a href="#slide-11"><span>05</span>WHAT WE LEARNED</a></li>
+    <li><a href="#slide-13"><span>06</span>NEXT STEPS</a></li>
+  </ol>
+</nav>
+
+<section class="deck-slide deck-overview" id="slide-3" aria-labelledby="slide-3-title">
+  <div class="deck-overview-text">
+    <h2 id="slide-3-title">PROJECT<br>OVERVIEW</h2>
+    <div class="deck-overview-bottom">
+      <div><p class="deck-label">PROBLEM</p><p>A convincing synthetic voice can sound real. Calling real speech synthetic is the expensive error in this challenge.</p></div>
+      <div><p class="deck-label">SOLUTION</p><p>One decode path, ten forensic detectors, a fixed router, and an explained probability for every file.</p></div>
+      <div class="deck-overview-metrics"><p class="deck-label">MEASURED RESULTS</p><p><a href="library/readme.html#results-at-a-glance">0.0065 holdout</a> · <a href="library/readme.html#results-at-a-glance">0.228 In-the-Wild</a> normalized minDCF.</p></div>
+    </div>
+  </div>
+  <img class="deck-overview-image" src="img/deck/organic-02.jpg" alt="" loading="lazy">
+</section>
+
+<section class="deck-slide deck-statement" id="slide-4" aria-labelledby="slide-4-title">
+  <div class="deck-statement-main">
+    <p class="deck-label">PROJECT OVERVIEW</p>
+    <h2 id="slide-4-title">Give HEARSAY an audio file. It returns a score, the evidence behind it, and a record of how the decision was made.</h2>
+  </div>
+  <div class="deck-statement-bottom">
+    <div><p class="deck-label">THE OUTPUT</p><p>A submission TSV and one explanation JSON per file.</p></div>
+    <div><p class="deck-label">THE PRINCIPLE</p><p>Every detector runs; the router decides which findings may affect the score.</p></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-scope" id="slide-5" aria-labelledby="slide-5-title">
+  <div class="deck-scope-copy">
+    <h2 id="slide-5-title">SCOPE</h2>
+    <div><p class="deck-label">CORE SYSTEM</p><ul><li>Decode audio once to a shared format</li><li>Run ten detectors behind one contract</li><li>Fuse M1b, handcrafted, and M5 by rank</li><li>Let Spectra only lower a likely false alarm</li><li>Write a score and evidence report</li></ul></div>
+    <div><p class="deck-label">OUT OF SCOPE</p><ul><li>No hardware signal or device attestation</li><li>No hosted model on the scoring path</li><li>No retraining during inference</li></ul></div>
+  </div>
+  <div class="deck-scope-art"><div class="deck-scope-frame"><p>THE SHIPPED PIPELINE</p><img src="img/diagrams/pipeline-light.svg" alt="Diagram of the HEARSAY audio-to-score pipeline" loading="lazy"><a href="how-it-decides.html">Read the full method ↗</a></div></div>
+</section>
+
+<section class="deck-slide deck-impact" id="slide-6" aria-labelledby="slide-6-title">
+  <div class="deck-impact-heading"><h2 id="slide-6-title">IMPACT<br>VS EFFORT</h2><p>Each technique had to earn its place in the shipped rule.</p></div>
+  <div class="deck-impact-chart" aria-label="Four decisions by impact and effort">
+    <div class="deck-impact-axis-y"><span>Low</span><strong>Impact</strong><span>High</span></div>
+    <div class="deck-impact-grid">
+      <div><strong>Spectra as a one-way vote</strong><p>Lowered the holdout cost from <a href="library/readme.html#orchestration-what-routing-changes">0.0200 to 0.0065</a>.</p></div>
+      <div><strong>M5 as a minority vote</strong><p>Cut the previous fusion holdout from <a href="library/readme.html#results-at-a-glance">0.014 to 0.0065</a>.</p></div>
+      <div><strong>Speech gate</strong><p>Protects undecidable audio; no NSA test file was gated.</p></div>
+      <div><strong>Extra real-speech corpus</strong><p>Planned, then set aside when it could not fit the event time box.</p></div>
+    </div>
+    <div class="deck-impact-axis-x"><span>Low</span><strong>Effort</strong><span>High</span></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-technical" id="slide-7" aria-labelledby="slide-7-title">
+  <h2 id="slide-7-title">TECHNICAL APPROACH</h2>
+  <div class="deck-technical-columns">
+    <div><p class="deck-label">MODEL STACK</p><ul><li>XLS-R layer-7 probe (M1b)</li><li>Handcrafted spectral and prosody model</li><li>Fine-tuned XLS-R head (M5)</li><li>Spectra-AASIST as a suppressor</li></ul></div>
+    <div><p class="deck-label">ARCHITECTURE PRINCIPLES</p><ol><li>Decode once for consistent inputs</li><li>Run every detector and route by role</li><li>Fuse ranks, then calibrate</li><li>Keep inference local and explainable</li></ol></div>
+  </div>
+  <div class="deck-technical-image" role="img" aria-label="Abstract translucent organic forms"></div>
+</section>
+
+<section class="deck-slide deck-milestones" id="slide-8" aria-labelledby="slide-8-title">
+  <h2 id="slide-8-title">MILESTONES</h2>
+  <div class="deck-milestone-grid">
+    <div><p class="deck-label">PHASE 01</p><h3>FOUNDATIONS &amp; DETECTORS</h3><ul><li>Common audio loader and detector contract</li><li>Fold file and the XLS-R probe</li><li>Engineered forensic techniques</li></ul><div class="deck-deliverable">Comparable detector scores and evidence</div></div>
+    <div><p class="deck-label">PHASE 02</p><h3>ROUTING &amp; FUSION</h3><ul><li>Pre-declared selection rule</li><li>Rank blend and Spectra suppression</li><li>Holdout and In-the-Wild validation</li></ul><div class="deck-deliverable">An auditable shipped rule</div></div>
+    <div><p class="deck-label">PHASE 03</p><h3>SUBMISSION &amp; REVIEW</h3><ul><li>Run the full test set</li><li>Write the TSV and explanation JSON</li><li>Check parity and document limits</li></ul><div class="deck-deliverable">Reproducible output and documentation</div></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-detectors" id="slide-9" aria-labelledby="slide-9-title">
+  <h2 id="slide-9-title">DETECTORS</h2>
+  <div class="deck-detector-grid">
+    <a href="detectors.html"><span class="deck-detector-art art-1"></span><span>M1b <small>Primary probe</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-2"></span><span>Handcrafted <small>Spectral evidence</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-3"></span><span>M5 <small>Fine-tuned head</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-4"></span><span>Spectra <small>One-way suppressor</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-5"></span><span>Speech gate <small>Default-answer policy</small></span></a>
+    <a href="detectors.html"><span class="deck-detector-art art-6"></span><span>Forensics <small>Evidence-only signals</small></span></a>
+  </div>
+</section>
+
+<section class="deck-slide deck-working" id="slide-10" aria-labelledby="slide-10-title">
+  <div class="deck-working-image" role="img" aria-label="Abstract translucent organic forms"></div>
+  <div class="deck-working-copy"><h2 id="slide-10-title">WAYS OF WORKING</h2><div class="deck-working-columns">
+    <div><p class="deck-label">DECISION RULE</p><p>We wrote the fusion selection rule before viewing results and applied it once. Rejected ideas stay in the record.</p></div>
+    <div><p class="deck-label">AUDIT TRAIL</p><p>Each file keeps detector reasons and a routing log. Sources, tests, and known limits are linked throughout the docs.</p></div>
+  </div></div>
+</section>
+
+<section class="deck-slide deck-lessons" id="slide-11" aria-labelledby="slide-11-title">
+  <div class="deck-lessons-heading"><div><p class="deck-label">THE LESSONS / 01–04</p><h2 id="slide-11-title">WHAT WE LEARNED</h2></div><span>01 / 02</span></div>
+  <ol class="deck-lessons-list">
+    <li><span class="deck-lesson-number">01</span><div><h3>Our test data lied to us, five times.</h3><p>Real and fake clips differed in volume, silence at the start, length, file format, and a filter cutoff at 7.2 kHz. A model could “win” on any of those without hearing the voice. We found each one and removed it. Next time we check for this on day one.</p></div></li>
+    <li><span class="deck-lesson-number">02</span><div><h3>Good scores at home don't mean good scores in the wild.</h3><p>Our best models scored around 0.1 on our own held-out data and around 0.4 on real-world recordings. The fusion rule that looked best at home was the worst in the wild. We only avoided shipping it because we wrote down the selection rule before seeing the numbers.</p></div></li>
+    <li><span class="deck-lesson-number">03</span><div><h3>Fix the data before adding more of it.</h3><p>Adding 40 real speakers made things worse until we matched our training audio to the test set's filter. Then the same speakers made things better.</p></div></li>
+    <li><span class="deck-lesson-number">04</span><div><h3>One false alarm costs 9 misses. Design for that.</h3><p>This one number shaped everything: a detector that can only lower a score, a model tuned for fewer false alarms, and unreadable files pinned to the bottom of the list.</p></div></li>
+  </ol>
+  <a class="deck-lessons-link" href="what-worked.html">Explore the evidence ↗</a>
+</section>
+
+<section class="deck-slide deck-lessons" id="slide-12" aria-labelledby="slide-12-title">
+  <div class="deck-lessons-heading"><div><p class="deck-label">THE LESSONS / 05–08</p><h2 id="slide-12-title">WHAT WE LEARNED</h2></div><span>02 / 02</span></div>
+  <ol class="deck-lessons-list" start="5">
+    <li><span class="deck-lesson-number">05</span><div><h3>Half our detectors don't vote, and that's fine.</h3><p>Five of ten detectors turned out to detect the recording setup, not the voice. Mains hum means “recorded at home”. Compression means “went through a pipeline”. Those detectors now explain the answer instead of setting it.</p></div></li>
+    <li><span class="deck-lesson-number">06</span><div><h3>A weak model can still help.</h3><p>Our fine-tuned model lost to the simple one on every test. But it makes different mistakes, so giving it a small vote cut errors in half.</p></div></li>
+    <li><span class="deck-lesson-number">07</span><div><h3>If you can't check a model, limit what it can do.</h3><p>Spectra-AASIST scored perfectly on our data, but nobody knows what it was trained on. So it can only say “this is real”, never “this is fake”.</p></div></li>
+    <li><span class="deck-lesson-number">08</span><div><h3>Test for weaknesses before you freeze.</h3><p>We found that background noise breaks the shipped model after it was too late to fix.</p></div></li>
+  </ol>
+  <a class="deck-lessons-link" href="what-worked.html">Explore the evidence ↗</a>
+</section>
+
+<section class="deck-slide deck-next" id="slide-13" aria-labelledby="slide-13-title">
+  <div class="deck-next-banner"><h2 id="slide-13-title">NEXT STEPS</h2></div>
+  <div class="deck-next-content">
+    <div><p class="deck-label">READ THE WORK</p><ol><li><a href="how-it-decides.html">Walk through the decision path</a></li><li><a href="validation.html">Inspect validation and limits</a></li><li><a href="detectors.html">Explore all ten detectors</a></li><li><a href="reproduce.html">Reproduce the submitted output</a></li></ol></div>
+    <div><p class="deck-label">NSA READOUT</p><div class="deck-next-note"><strong>0.0733 minDCF</strong><p>NSA returned 3.534% EER for the exact file we ship. The result fell in our pre-declared 0.00–0.20 band, so we kept the rule unchanged.</p><a href="validation.html#draft-review">Read the validation record ↗</a></div></div>
+  </div>
+</section>
+
+<section class="deck-slide deck-close" id="slide-14" aria-labelledby="slide-14-title">
+  <div class="deck-close-info"><p>Continue into the complete HEARSAY documentation.</p><p class="deck-close-credit">Created by Nathan, Hrushi &amp; Tharakesh.</p><a href="#full-docs">Open the full record ↗</a><a href="library/index.html">Browse the library ↗</a></div>
+  <h2 id="slide-14-title">THANK YOU.</h2>
+</section>
+</div>

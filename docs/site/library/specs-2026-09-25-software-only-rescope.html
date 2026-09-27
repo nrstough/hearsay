@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run spec: software-only rescope (Fri Sep 25, 2026, ~23:00) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-25_software-only-rescope.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/specs/2026-09-25_software-only-rescope.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#problem">Problem</a></li><li><a href="#solution">Solution</a></li><li><a href="#acceptance-criteria">Acceptance criteria</a></li><li><a href="#test-commands">Test commands</a></li><li><a href="#standing-failure-modes-project-plan-review-skill">Standing failure modes (project plan-review skill)</a></li><li><a href="#results-execution-sat-sep-26-0010">Results (execution, Sat Sep 26 ~00:10)</a></li></ul></details>
+<h1 id="run-spec-software-only-rescope-fri-sep-25-2026-2300">Run spec: software-only rescope (Fri Sep 25, 2026, ~23:00)</h1>
+<p>Status: P1 and P2 frozen (deep mode). Plan: <code>docs/reports/2026-09-25_software-only-rescope-plan.md</code>.
+Branch <code>main</code>, worktree <code>~/Projects/hearsay</code>. Time box: about 1 h (planning and docs, plus one small contract module).</p>
+<h2 id="problem">Problem</h2>
+<p>The working plan (<code>docs/plan.md</code>, written 1:30 pm Fri) is built around a hardware demo (pan-tilt listening head, mic array, replay capture, live tracker) driven by essentially one detector. The NSA brief (<code>docs/nsa-challenge.md</code>, received ~22:40) and the kickoff notes (<code>docs/reports/2026-09-25_sponsor-questions.md</code>) grade something else:</p>
+<ul>
+<li><strong>60% detection performance.</strong> MinDCF with false alarms (real called synthetic) weighted 4×; 70/30 real/synthetic said aloud (slide reads ~50/50).</li>
+<li><strong>20% forensic diversity.</strong> "Points for each distinct technique your system actually leverages": container/metadata, spectral, prosody/phonetics, acoustic environment (ENF), compression forensics, speaker-embedding consistency, deep-learning anti-spoofing, splice/discontinuity, plus an <strong>agentic orchestration bonus</strong>.</li>
+<li><strong>20% documentation and presentation.</strong> Includes "can the algorithm explain why a clip is synthetic/real".</li>
+<li><strong>Required deliverables.</strong> GitHub repo with README (approach, architecture, run instructions), a <strong>Docker image</strong> that runs inference on the test set, and <code>teamName_predictions.tsv</code> (<code>filename&lt;TAB&gt;cm-score</code>, filename with extension, probability 0–1, 1.0 = synthetic).</li>
+<li><strong>Test data may include</strong> bona fide audio over studio, smartphone, telephony and field channels; zero-shot TTS; voice conversion; replay; scene manipulation; laundered fakes (transcoding, band-limiting, noise); spoofed metadata. Clips are at least 2 s and English.</li>
+</ul>
+<p>The team decided (Nathan, Fri ~23:00) to drop all hardware. The three teammates now work on feature engineering.</p>
+<h2 id="solution">Solution</h2>
+<h3 id="d1-scope-software-only">D1. Scope: software only</h3>
+<p>Cut: the listening head, pan-tilt, servos, mic array, direction finding, tracker, head driver, laser, LED, gauge, puck, docks, enclosure, live demo, replay-capture session, the four-stage hardware data contract, and the "grandma device" requirements. Keep the offline detector and everything that produces, explains, and packages its output.</p>
+<h3 id="d2-architecture">D2. Architecture</h3>
+<p>One pipeline per file:</p>
+<ol>
+<li><strong>Ingest.</strong> <code>hearsay.audio.probe_audio</code> (container/codec facts) plus <code>load_audio</code> (16 kHz mono float32).</li>
+<li><strong>Orchestrator.</strong> Rule-based: chooses which detectors run from container, codec, sample rate, duration, and early findings; records why. This earns the orchestration bonus without an LLM on the scoring path.</li>
+<li><strong>Detectors.</strong> Each emits a <code>DetectorResult</code> (D3).</li>
+<li><strong>Fusion.</strong> Regularized logistic stacking on grouped-CV out-of-fold detector outputs. Missing or skipped detectors are imputed, with a missing-indicator feature.</li>
+<li><strong>Outputs.</strong> The TSV, plus a per-file explanation report: top contributing detectors and their evidence strings.</li>
+</ol>
+<h3 id="d3-detector-contract-srchearsaydetectorsbasepy-the-only-code-in-this-change">D3. Detector contract (<code>src/hearsay/detectors/base.py</code>; the only code in this change)</h3>
+<ul>
+<li><strong><code>ClipContext</code>.</strong> Path, decoded 16 kHz mono audio, probe metadata. Audio is decoded lazily and at most once.</li>
+<li><strong><code>DetectorResult</code>.</strong>
+<ul>
+<li><code>name</code>: str</li>
+<li><code>score</code>: float, finite, in [0, 1], <strong>increasing with synthetic likelihood</strong></li>
+<li><code>evidence</code>: non-empty str</li>
+<li><code>features</code>: flat <code>dict[str, float]</code> of finite numbers, for fusion</li>
+<li><code>status</code>: <code>"ok" | "skipped" | "error"</code></li>
+<li><code>error</code>: str or None</li>
+</ul></li>
+<li><strong><code>Detector</code> protocol.</strong>
+<ul>
+<li><code>name</code>: str</li>
+<li><code>applies(ctx) -&gt; bool</code></li>
+<li><code>run(ctx) -&gt; DetectorResult</code></li>
+</ul></li>
+<li><strong><code>safe_run(detector, ctx)</code>.</strong>
+<ul>
+<li>Not applicable: returns <code>status="skipped"</code> without calling <code>run</code>.</li>
+<li>Exception or contract violation: returns <code>status="error"</code> with a neutral score of 0.5, empty features, and the error message.</li>
+<li>Never raises, so a file never loses its row.</li>
+</ul></li>
+<li><strong>Registry.</strong> <code>register(detector)</code>, <code>get(name)</code>, <code>all_detectors()</code>. A duplicate name raises.</li>
+<li><strong>Validation.</strong> Enforced in <code>DetectorResult.__post_init__</code>. Violations raise <code>ValueError</code>, which <code>safe_run</code> catches and turns into <code>status="error"</code>. Values are never clipped silently.</li>
+</ul>
+<h3 id="d4-ladder-replaces-m0m6">D4. Ladder (replaces M0–M6)</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Rung</th><th>Deliverable</th><th>Owner</th>
+</tr></thead>
+<tbody>
+<tr><td>M0</td><td>Loader + TSV writer + constant rollback (built; needs NSA data)</td><td>Nathan</td></tr>
+<tr><td>M1</td><td>Frozen XLS-R probe on NSA train → first learned TSV (built on public data)</td><td>Nathan</td></tr>
+<tr><td>D-track</td><td>Engineered-feature detectors against the D3 contract: metadata/container, spectral, prosody, compression, speaker drift, splice, ENF</td><td>Teammates</td></tr>
+<tr><td>M3</td><td>Spectra-AASIST as a second deep detector (wrapper built)</td><td>Nathan</td></tr>
+<tr><td>M5</td><td>XLS-R fine-tune on the H100 (codec, telephony, noise, replay, band-limit augmentation)</td><td>Nathan</td></tr>
+<tr><td>M4</td><td>Fusion + orchestrator + explanation report</td><td>Nathan</td></tr>
+<tr><td>K</td><td>Docker image (CPU inference on the test set)</td><td>Nathan + one teammate</td></tr>
+<tr><td>DOC</td><td>README "in our own words", what worked / what didn't, experiment log</td><td>All</td></tr>
+</tbody>
+</table></div>
+<h3 id="d5-metric">D5. Metric</h3>
+<p>Normalized MinDCF with C_FA = 4, C_miss = 1, π_synth = 0.3 (= 9.33·P_FA + P_miss), from <code>hearsay.metrics</code>. Every selection decision uses it; EER is reported alongside.</p>
+<h3 id="d6-data">D6. Data</h3>
+<ul>
+<li>NSA train is primary, split generator- and speaker-disjoint where the labels allow.</li>
+<li>Public: MLAAD English (6,390 clips pulled), plus a multi-speaker bona fide source (new; LibriSpeech/VCTK suggested by the brief).</li>
+<li>ASVspoof 2019 is baseline only; In-the-Wild is a stress test only.</li>
+<li>Augmentation targets the brief's attack list: codec/telephony, noise, room/replay, band-limiting, transcoding.</li>
+</ul>
+<h3 id="d7-timeline">D7. Timeline</h3>
+<p>Now through 8 AM Sunday, with the Docker and README time boxes on Saturday and the one-time draft review on Saturday.</p>
+<h3 id="d8-cut-order-and-never-cut-set">D8. Cut order and never-cut set</h3>
+<ul>
+<li><strong>Never cut:</strong> a valid TSV at all times; generator- and speaker-grouped validation; the deep SSL detector; Docker; README.</li>
+<li><strong>Cut order:</strong> ENF → splice → speaker drift → M5 to one run → orchestrator back to run-all (static routing) → fusion to mean.</li>
+</ul>
+<h3 id="d9-docs">D9. Docs</h3>
+<ul>
+<li><code>docs/plan.md</code> is rewritten.</li>
+<li><code>CLAUDE.md</code> is updated: purpose, ownership, detector contract instead of the data contract, ladder, rules.</li>
+<li><code>README.md</code> is updated.</li>
+<li>The HEARSAY section of the project plan-review skill and the Codex rubrics are rewritten for software-only.</li>
+<li>Historical docs get a banner only.</li>
+</ul>
+<h3 id="d10-consistency-tripwire">D10. Consistency tripwire</h3>
+<p><code>tests/test_docs_consistency.py</code> pins the doc–code agreements listed below (A1–A5) so they can't drift silently.</p>
+<h3 id="plan-review-amendments-to-d3-critique--codex-see-plan-c1c17-x1x10">Plan-review amendments to D3 (critique + Codex; see plan C1–C17, X1–X10)</h3>
+<ul>
+<li><code>features</code> is a plain <code>dict</code> copy, with <code>field(default_factory=dict)</code>.</li>
+<li><code>__hash__ = None</code> is set explicitly.</li>
+<li><code>safe_run</code> resolves the detector name inside its one <code>try</code> and falls back to <code>"&lt;ClassName&gt;"</code>.</li>
+<li><code>safe_run</code> re-validates the returned result via <code>dataclasses.replace</code>.</li>
+<li>A result from <code>run()</code> whose status isn't <code>ok</code> becomes <code>error</code>.</li>
+<li>The registry rejects names that aren't non-empty str.</li>
+<li><strong>Fusion input convention:</strong> one column per detector, <code>logit(clip(score, 1e-4, 1-1e-4))</code> when <code>status == "ok"</code>, else missing plus a missing indicator.</li>
+<li>Native-rate audio is deferred to a separate change; "16 kHz mono everywhere" stands.</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<p><strong>Docs (<code>tests/test_docs_consistency.py</code> unless noted)</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Criterion</th>
+</tr></thead>
+<tbody>
+<tr><td>A1</td><td>No hardware term in the living docs (<code>CLAUDE.md</code>, <code>README.md</code>, <code>docs/plan.md</code>, <code>.claude/skills/*/SKILL.md</code>, <code>.claude/codex-*.md</code>) except on lines that explicitly mark it as cut</td></tr>
+<tr><td>A2</td><td><code>docs/plan.md</code> names all 8 techniques, the orchestration bonus, Docker, README, TSV, MinDCF, and 8 AM</td></tr>
+<tr><td>A3</td><td><code>hearsay.metrics.C_FA == 4</code>, <code>PI_SYNTH == 0.3</code>, and <code>CLAUDE.md</code> and <code>docs/plan.md</code> state the same values</td></tr>
+<tr><td>A4</td><td>No submission "CSV" wording in living docs (allowlist: <code>log.csv</code>, <code>.csv</code> manifest/sidecar paths, historical docs)</td></tr>
+<tr><td>A5</td><td><code>docs/plan.md</code> lists the never-cut set from D8</td></tr>
+<tr><td>A6</td><td>Timeline feasible, including a Docker slot before 8 AM Sunday (manual plus Codex plan review)</td></tr>
+<tr><td>A7</td><td><code>docs/scoping.md</code>, <code>docs/master-doc.md</code>: diff is a banner line only; <code>docs/handoffs/2026-09-25_first-two-hours-handoff.md</code> is unchanged (git diff check)</td></tr>
+<tr><td>A8</td><td>The plan-review skill's standing failure modes are rewritten for software-only (covered by A1 on skill files)</td></tr>
+</tbody>
+</table></div>
+<p><strong>Contract (<code>tests/test_detector_contract.py</code>)</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Criterion</th>
+</tr></thead>
+<tbody>
+<tr><td>B1</td><td>Non-finite or out-of-range score raises <code>ValueError</code> in <code>DetectorResult</code>; never clipped</td></tr>
+<tr><td>B2</td><td>Score-direction convention documented; a toy detector scores a synthetic-marked fixture above a real-marked one</td></tr>
+<tr><td>B3</td><td><code>safe_run</code> turns an exception into <code>status="error"</code>, score 0.5, message kept; counterfactual: calling <code>run</code> directly raises</td></tr>
+<tr><td>B4</td><td>Empty or whitespace evidence rejected</td></tr>
+<tr><td>B5</td><td>Non-flat, non-numeric, or non-finite feature values rejected</td></tr>
+<tr><td>B6</td><td>Duplicate registry name raises</td></tr>
+<tr><td>B7</td><td>Same clip scored twice gives an identical result</td></tr>
+<tr><td>B8</td><td><code>applies()</code> false gives <code>status="skipped"</code> and <code>run</code> is not called</td></tr>
+<tr><td>B9</td><td><code>safe_run</code> never raises for a bad detector name (property raises, <code>None</code>, <code>""</code>); the registry rejects bad names; <code>hash(result)</code> raises <code>TypeError</code>; post-construction feature mutation is caught by <code>safe_run</code> re-validation; a non-<code>ok</code> status from <code>run</code> becomes <code>error</code></td></tr>
+</tbody>
+</table></div>
+<p><strong>Also:</strong> MP4 audio container added to the loader format test (standing failure mode 5). All previously passing tests still pass; ruff clean.</p>
+<h2 id="test-commands">Test commands</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run pytest -q</code></pre>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run ruff check .</code></pre>
+<h2 id="standing-failure-modes-project-plan-review-skill">Standing failure modes (project plan-review skill)</h2>
+<ol>
+<li><strong>Live replay:</strong> replaced by replay/laundering in the NSA test set, handled in the plan via augmentation plus a validation slice. No test in this change.</li>
+<li><strong>Generator overfit:</strong> grouped validation stays in the never-cut set (A5).</li>
+<li><strong>Class imbalance:</strong> π = 0.3 is pinned (A3).</li>
+<li><strong>Metric:</strong> MinDCF is known and pinned (A3).</li>
+<li><strong>Loader formats:</strong> MP4 fixture added.</li>
+</ol>
+<h2 id="results-execution-sat-sep-26-0010">Results (execution, Sat Sep 26 ~00:10)</h2>
+<p><strong>Tests.</strong> <code>uv run pytest -q</code> → 145 passed; <code>uv run ruff check .</code> clean.</p>
+<ul>
+<li>Contract: 57 parametrized cases in <code>tests/test_detector_contract.py</code>, covering B1–B9.</li>
+<li>Docs: 52 in <code>tests/test_docs_consistency.py</code>, covering A1–A5, A7 and A8. A counterfactual check confirmed the A1 and A4 regexes flag the pre-rescope versions of <code>plan.md</code> (15/15 hits), <code>CLAUDE.md</code> (6/5), <code>p3</code> (0/3) and <code>codex-review-prompt</code> (1/2).</li>
+<li>Loader: an MP4 case added to the format test.</li>
+</ul>
+<p><strong>A6 (timeline feasibility).</strong> Reviewed by the Fable critique (C10) and Codex (X10). Sleep blocks, moving gates versus hard cutoffs, a no-data fallback at Sat 12:00, and an amd64 Docker image by Sat 14:00 are all in <code>docs/plan.md</code>.</p>
+<p><strong>TSV (Codex X6).</strong> No scoring or writer code changed. The NSA test set arrived during execution, but no NSA-trained model exists yet, so a real learned TSV is blocked on training data (DiffSSD still downloading). A smoke run of <code>scripts/make_probe_csv.py</code> on 4 scratch files wrote a valid TSV; it was deleted and the log row reverted, so no non-NSA submission was logged.</p>
+<p><strong>Deviations from the plan.</strong> New facts arrived during execution (NSA instructions PDF, test set, scoring code, inventory):</p>
+<ul>
+<li><code>docs/plan.md</code> now records:
+<ul>
+<li>the score-direction blocker: the sponsor's ASVspoof5 code treats higher = bona fide, and an unmodified run gives minDCF 1.0 for a good detector submitted as 1.0 = synthetic</li>
+<li>a fourth metric reading (the sponsor code as shipped)</li>
+<li>LJ Speech + DiffSSD as the NSA training data</li>
+<li>the test-set inventory: all WAV, 16-bit PCM, 16 kHz mono, 3.0–13.6 s, peaks near full scale</li>
+<li>duration and peak-level shortcuts against LJ</li>
+</ul></li>
+<li>The "one-flag flip in <code>write_submission</code>" is planned for the next change; it is <strong>not</strong> implemented here.</li>
+</ul>
+<p><strong>Hygiene (conditional; C11).</strong></p>
+<ul>
+<li><code>.env.example</code> ("live demo path" → "scoring path").</li>
+<li><code>.gitignore</code> comment (CSVs → TSVs).</li>
+<li><code>docs/reports/2026-09-25_sponsor-questions.md</code>: three dated correction notes (π_synth 0.5 → 0.3; the sponsor code's cost model).</li>
+<li><code>validate-training-data</code> SKILL line 20 (generic "parquet/CSV" → "parquet or .csv tables") to satisfy A4 over all living docs.</li>
+</ul>
+<p><strong>Not changed.</strong> The <code>.py</code> docstrings that still say "CSV" (<code>embed.py</code>, <code>submission.py</code>, …) are left for the next code change; they are outside A1/A4 scope.</p>
+<p><strong>Post-commit audit.</strong></p>
+<ul>
+<li><strong>Claude pre-audit critique (Fable), round 1: Acceptable overall.</strong>
+<ul>
+<li>Freeze integrity and Regression check: Excellent. Every other dimension: Acceptable.</li>
+<li>Findings fixed:
+<ul>
+<li><code>safe_run</code> message building is now guarded; an exception whose <code>__str__</code> raises is contained (test added).</li>
+<li><code>ClipContext.from_array</code> rejects non-1-D input.</li>
+<li><code>ClipContext</code> private fields set <code>compare=False</code> (test added).</li>
+<li>The final DM sender is named.</li>
+<li>The preflight threshold of 0.8 is restored.</li>
+<li>The <code>CLAUDE.md</code> claim about what <code>write_submission</code> enforces is corrected.</li>
+<li>A "planned, not yet downloaded" disclosure stub is added.</li>
+</ul></li>
+<li>Kept as is: the external-drive path added to the handoff skill (the team's only archive location).</li>
+</ul></li>
+<li><strong>Logged for the next submission-path change, not fixed here (out of scope):</strong> <code>list_test_files</code> reads <code>--manifest</code> with a comma <code>csv.DictReader</code>, so the TSV template <code>data/nsa/HearsayScoreKey4TeamX.tsv</code> would fail. That change also adds the score-direction flip flag.</li>
+<li><strong>Codex audit</strong> (<code>docs/specs/2026-09-25_software-only-rescope-audit.md</code>), on commit c1567c8: <strong>Acceptable overall.</strong>
+<ul>
+<li>Excellent: Plan adherence, Scope discipline, Review compliance.</li>
+<li>Acceptable: Test coverage, Regression check, Documentation.</li>
+<li>Freeze integrity: not graded (no P1/P2 hashes).</li>
+<li>Codex's sandbox couldn't initialize the uv cache, so it ran 109 of the tests directly: lint clean, all passed.</li>
+<li>Documentation finding: the recorded test counts predated the final fixes; corrected below.</li>
+</ul></li>
+<li><strong>Final verification</strong> (after c1567c8): <code>uv run pytest -q</code> → <strong>147 passed</strong>, of which <strong>59</strong> are in <code>tests/test_detector_contract.py</code>; <code>uv run ruff check .</code> clean.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-25_software-only-rescope.md</code> <span class="hash">7b0be3ae7e7f</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

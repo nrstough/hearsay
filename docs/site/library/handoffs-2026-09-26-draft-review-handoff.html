@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: the test-set TSV, the draft review and the final submission (Sat Sep 26, 2026, ~10:00) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_draft-review-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_draft-review-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#the-file-to-send">The file to send</a></li><li><a href="#when-the-number-comes-back">When the number comes back</a></li><li><a href="#sunday-before-0800">Sunday, before 08:00</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-the-test-set-tsv-the-draft-review-and-the-final-submission-sat-sep-26-2026-1000">Handoff: the test-set TSV, the draft review and the final submission (Sat Sep 26, 2026, ~10:00)</h1>
+<p><strong>Purpose of this chat:</strong> own the one file NSA grades. Send the draft for the one-time review, decode the number that comes back, pick the final TSV by the pre-declared table, run the preflight, and hand Nathan the file to DM before Sunday 08:00. This chat copies and checks files; it does not change the fusion rule (that is the M4 lane, <code>docs/handoffs/2026-09-26_m4-fusion-handoff.md</code>) and it never overwrites a submitted TSV.</p>
+<p>Read first: <code>docs/reports/2026-09-26_draft-review-branches.md</code> (the decoding table with a file per band), then the "Score direction" part of <code>docs/plan.md</code>, then this file.</p>
+<h2 id="context">Context</h2>
+<ul>
+<li><strong>What NSA grades (60% of the score):</strong> minDCF on 1,671 unlabeled test WAVs, false alarms costing 4× a miss, about 70% real. Only the ranking of our scores matters; any monotone rescaling changes nothing.</li>
+<li><strong>What we know about our error:</strong> holdout 0.014 (two unseen generators + 26 unseen real speakers), In-the-Wild 0.260 (3,000 real-world clips, never trained on), inner 0.140. The test number is unknown; NSA provided no labels. The draft review is the only labeled measurement we will ever get on the test set: one file, one time, one number back.</li>
+<li><strong>The draft is the shipped rule, not an experiment.</strong> Since ~12:05 that rule is <strong>A3 w0.2 + E</strong> (ratified by Nathan once NSA said the image is not required): rank blend 0.6·M1b v3 + 0.2·handcrafted v5 + 0.2·M5, Spectra-AASIST used only to suppress false alarms, Platt at the 0.3 prior into [0.001, 1], non-speech and decode failures pinned below 0.001. Constants <code>models/fusion_v2/constants.json</code>; the runner reproduces the file live from audio at Spearman 1.0 / max 9.3e-4 on all 1,671 rows. The previous rule <code>e_on_a</code> (fusion_v1) is the fallback; the evidence image <code>hearsay:20260926-0916</code> reproduces that one.</li>
+<li><strong>Score direction:</strong> we submit 1.0 = synthetic, as the brief says. NSA's scoring code is ASVspoof5 code that treats a higher score as bona fide. The draft's returned number tells us which one they actually use; the decoding table below turns that number into an action. The pinned block stays at the bottom in both polarities, by design (consult item 5): that is where the 4× error is avoided under either reading.</li>
+<li><strong>The M5 candidate (A3 w0.2 + E)</strong> beat the frozen rule on every readout but is shelved until the draft number is back; artifacts under <code>submissions/20260926-0914_*CANDIDATE*</code>, <code>outputs/fusion/fusion_v2_candidate/</code> and the runner's <code>models/fusion_v2/constants.json</code>. The runner can already execute it (8316e50, opt-in via <code>--fusion</code>; default and the draft file unchanged, reproduced to 1.1e-16), so reopening it is Nathan's call and, now that the Docker image is not required (NSA, Sat ~12:00), costs nothing but a file copy and a README line. Nathan is deciding at ~12:15 whether the draft itself goes out as A3.</li>
+</ul>
+<h2 id="the-file-to-send">The file to send</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th></th>
+</tr></thead>
+<tbody>
+<tr><td>Logged file</td><td><code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (A3 w0.2 + E; supersedes the 08:13 <code>e_on_a</code> file, which stays logged as the fallback)</td></tr>
+<tr><td>sha256 (first 16)</td><td><code>fb7830762691d04d</code></td></tr>
+<tr><td>Copy in Downloads</td><td><code>~/Downloads/CrossExam_predictions.tsv</code>, verified byte-identical at 12:03 (the earlier <code>e_on_a</code> copy is beside it as <code>CrossExam_predictions_e_on_a_superseded.tsv</code>; do not send that one)</td></tr>
+<tr><td>Rows</td><td>1,671 + header, in the template's order (<code>data/nsa/HearsayScoreKey4TeamX.tsv</code>)</td></tr>
+<tr><td>Header</td><td><code>filename&lt;TAB&gt;cm-score</code></td></tr>
+<tr><td>Range</td><td>min 0.0014, max 0.9996, no NaN, 0 files gated</td></tr>
+<tr><td>Share ≥ 0.5</td><td>27.3%; a smoke alarm, not a selection signal</td></tr>
+</tbody>
+</table></div>
+<p><strong>Team name: Cross Exam.</strong> The file goes out as <strong><code>CrossExam_predictions.tsv</code></strong> (the brief's pattern is <code>teamName_predictions.tsv</code>). Made at 11:20: <code>~/Downloads/CrossExam_predictions.tsv</code>, byte-identical to the logged 08:13 file (sha256 <code>096f3f0c9e3cfa9a…</code>), checker output <code>OK rows 1671 min 0.0012 max 0.9997 share&gt;=0.5 0.274</code>. The runner and the image take the name as <code>--team CrossExam</code> / <code>HEARSAY_TEAM=CrossExam</code> (their default is <code>HEARSAY</code>, which is wrong for the deliverable).</p>
+<p><strong>How to send:</strong> as a DM in the NSA × HexLabs Discord channel (kickoff notes, <code>docs/reports/2026-09-25_sponsor-questions.md</code>). Say it is the optional draft for review. <strong>NSA returns minDCF only</strong> (confirmed Sat ~11:50): no EER, P_FA or P_miss, so the decoding table below is the whole decoder. Its weak spot is the 0.45–0.90 band, which one number cannot resolve; if the number lands there, ask NSA directly whether they run <code>calculate_metrics.py</code> as shipped (higher = bona fide) or invert first, and do not flip on a guess.</p>
+<p><strong>Before the DM, re-check the exact bytes that leave the machine:</strong></p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; cmp ~/Downloads/HEARSAY_predictions.tsv submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv &amp;&amp; echo IDENTICAL</code></pre>
+<h2 id="when-the-number-comes-back">When the number comes back</h2>
+<p>Copy the file for the band, rename it to <code>&lt;TeamName&gt;_predictions.tsv</code>, run the check below, append one log row that records the decode, tell the M4 lane and the Docker lane which branch fired, and hand the file to Nathan. Every branch is already a logged TSV; nothing is computed under time pressure.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>NSA's minDCF</th><th>Meaning</th><th>Final TSV</th><th>Then</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>0.00–0.20</strong></td><td>our direction; test behaves like our holdout</td><td>the A3 file, unchanged</td><td>remaining hours to README and diversity</td></tr>
+<tr><td><strong>0.20–0.45</strong></td><td>our direction; test is wild-like</td><td>the A3 file, unchanged (it has the best In-the-Wild score under both costs of every rule we have)</td><td>the channel-robustness report (16:00) becomes the lever</td></tr>
+<tr><td><strong>0.45–0.90</strong></td><td>ambiguous; do not flip</td><td><code>submissions/20260926-0928_BRANCH_C_M1b_alone_our_direction.tsv</code> (sha <code>4ae685ff9824543d1</code>)</td><td>ask NSA the direction question directly before doing anything else; note the rule in the README</td></tr>
+<tr><td><strong>0.95–1.00</strong></td><td>NSA's code reads our scores inverted</td><td><code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_FLIPPED_only_if_NSA_scores_inverted.tsv</code></td><td>raise it with NSA at the booth or on Discord (their own document says 1.0 = synthetic); the runner's <code>--flip</code> produces this file</td></tr>
+</tbody>
+</table></div>
+<p>If only EER comes back: 2–5% → first row; 95–98% → last row. If a number lands on a boundary or NSA sends something else (a rank, a plot, "looks fine"), do not guess: post it to Nathan and the M4 lane verbatim and ask NSA for minDCF and EER.</p>
+<p><strong>Reject any temptation to re-tune on the returned number.</strong> It is one number on 1,671 files; the table was fixed before it existed so that it cannot be argued with afterwards.</p>
+<h2 id="sunday-before-0800">Sunday, before 08:00</h2>
+<ol>
+<li>Take the final file from the table (or the ratified A3 file if Nathan reopened it and the M4 lane shipped it).</li>
+<li>Run the check:
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python - &lt;&lt;'EOF'
+import pandas as pd, sys
+f = sys.argv[1] if len(sys.argv) &gt; 1 else "submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv"
+t = pd.read_csv("data/nsa/HearsayScoreKey4TeamX.tsv", sep="\t")
+d = pd.read_csv(f, sep="\t")
+assert list(d.columns) == ["filename", "cm-score"], d.columns
+assert len(d) == 1671 and list(d.filename) == list(t.filename), "row count or order"
+s = d["cm-score"]
+assert s.notna().all() and (s &gt;= 0).all() and (s &lt;= 1).all(), "range"
+print("OK", f, "min %.4f max %.4f share&gt;=0.5 %.3f" % (s.min(), s.max(), (s &gt;= 0.5).mean()))
+EOF</code></pre></li>
+<li>Direction check: the file's share ≥ 0.5 should be near 0.27 in our direction and near 0.73 flipped. If that does not match the branch you chose, stop.</li>
+<li>Rename the copy to <code>CrossExam_predictions.tsv</code>; <code>cmp</code> it against the logged file; Nathan DMs it with the repo link (the Docker image is optional evidence, not a deliverable).</li>
+<li>Append a log row (<code>submissions/log.csv</code>: <code>timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes</code>) saying "FINAL, sent HH:MM, sha …, branch …".</li>
+</ol>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>main</code> in <code>~/Projects/hearsay</code>, shared by several chats. This lane owns nothing in <code>src/</code> or <code>scripts/</code>; it writes <code>submissions/log.csv</code> rows and this doc. <code>submissions/*.tsv</code> are gitignored; only <code>log.csv</code> is tracked. Stage by path; never <code>git add -A</code> (the repo root now carries a Next.js tree from the frontend push). Ask Nathan before pushing.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync</code></pre>
+<p>Nothing else is needed for this lane. Regenerating any TSV from audio is the M4 lane's job (<code>scripts/run_pipeline.py</code>, 22 min), never this lane's.</p>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test: <code>uv run pytest -q tests/test_audio_and_submission.py</code> (or <code>uv run pytest -q -k submission</code>) → 42 passed at 28d26fe; the writer enforces header, unique filenames, finite [0, 1], no overwrite.</li>
+<li>Test: <code>uv run pytest -q tests/test_docs_consistency.py</code> → 52 passed; run after editing any doc.</li>
+<li>Check: the pandas snippet above on whichever file is about to leave the machine; expected <code>OK … min 0.0012 max 0.9997 share&gt;=0.5 0.274</code> for the draft.</li>
+<li>At-risk: <code>submissions/*.tsv</code> (gitignored). Archived to <code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/submissions/</code> (13 files at 09:55). The external drive is at 100%; TSVs are 57 KB each, so the archive is safe, but check <code>df -h</code> before writing anything larger there. <code>~/Downloads/HEARSAY_predictions.tsv</code> is a convenience copy, not the record.</li>
+<li>At-risk: <code>submissions/log.csv</code> is tracked; every send gets a row, and the row is the source of truth on numbers when docs disagree.</li>
+<li>In flight: the M4 lane (branches done; idle until the number), Docker (image verified; not required, lane stood down), channel robustness (report 16:00; a symmetric refit would change the exports and the M4 lane would re-run both sweeps, producing new logged TSVs that this table would then need to point at), README (20:00).</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>minDCF is a ranking metric; a 0.5 cut is not the operating point (the brief's Bayes threshold is near 0.9). Do not describe "flagged" files by the 0.5 share.</li>
+<li>Points from the 60% weight are relative: (1 − ours) / (1 − best team) × 60. At 0.014 against a best of 0.01, ~59.8; at 0.26 against 0.05, ~46.7.</li>
+<li>Under NSA's inverted code the 4× lands on misses instead of false alarms; the frozen rule was also checked under that cost (0.267 In-the-Wild) so the choice does not depend on the direction.</li>
+<li>The test set has a uniform 7.2 kHz cutoff and one FFmpeg encoder tag on every file, which reads as one curated re-encode pipeline rather than field audio; the consult's prior is therefore the 0.00–0.20 band, but that is a guess until the number arrives.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<ul>
+<li><code>docs/reports/2026-09-26_draft-review-branches.md</code>: the table, with a file per band.</li>
+<li><code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>, items 4 and 5: why the table looks like this and why the block stays at the bottom.</li>
+<li><code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>: how the frozen rule was chosen; M5 addendum.</li>
+<li><code>docs/handoffs/2026-09-26_m4-fusion-handoff.md</code>: the fusion lane, including the shelved A3 candidate.</li>
+<li><code>docs/nsa-challenge.md</code> lines 186–200: the file format; <code>docs/reports/2026-09-25_sponsor-questions.md</code>: the Discord DM channel and the kickoff answers.</li>
+<li><code>submissions/log.csv</code>: every TSV ever written, with its numbers.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_draft-review-handoff.md</code> <span class="hash">e1682ab7cc25</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

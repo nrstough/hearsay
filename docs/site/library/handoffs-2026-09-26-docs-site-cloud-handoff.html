@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff — docs-site lane, continued in a Claude Code cloud session (Sat Sep 26, 2026, ~13:35) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_docs-site-cloud-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_docs-site-cloud-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff--docs-site-lane-continued-in-a-claude-code-cloud-session-sat-sep-26-2026-1335">Handoff — docs-site lane, continued in a Claude Code cloud session (Sat Sep 26, 2026, ~13:35)</h1>
+<p><strong>Purpose of this chat:</strong> continue the docs-site lane from where the Mac session stopped: run <code>/plan-review</code> on <code>docs/handoffs/2026-09-26_docs-site-handoff.md</code> (the full brief; read it first, it is the spec) and then build the site under <code>docs/site/</code>. The Mac session got as far as Phase 0/1 reading; nothing was written.</p>
+<h2 id="context">Context</h2>
+<ul>
+<li>The brief is <code>docs/handoffs/2026-09-26_docs-site-handoff.md</code> (committed, on <code>origin/main</code> at <code>41141db</code>). Everything below is what the Mac session learned on top of it.</li>
+<li><strong>Phase 0 conventions, resolved</strong> (state them in P1): run specs <code>docs/specs/</code>, plan files <code>docs/reports/YYYY-MM-DD_&lt;slug&gt;-plan.md</code>, no feature-spec layer (CLAUDE.md: "No feature-spec layer"), super docs <code>README.md</code> + <code>docs/architecture.md</code> + <code>docs/STATUS.md</code> (this lane may <strong>not</strong> edit them; route changes to the oversight chat), bug log none (skip the historical-bug sweep and say so), full test command <code>uv run pytest -q</code>, lint <code>uv run ruff check .</code>, Codex scripts <code>.claude/review-plan.sh</code> / <code>.claude/review-audit.sh</code>.</li>
+<li><strong>Codex is not available in the cloud</strong> (the CLI and its login live on the Mac). CLAUDE.md's rule applies: "without it, the plan-review Claude critique is the gate." So in Phase 3c run a Claude critique agent against <code>.claude/codex-review-prompt.md</code> instead of the script, and in Phase 4 run the Claude critique loop against <code>.claude/codex-audit-prompt.md</code> and record in the run spec that the Codex pass is pending on the Mac. Do not fake a Codex output.</li>
+<li><strong>Source docs already read on the Mac</strong> (re-read in the cloud; they are the numbers' source): <code>README.md</code> (397 lines; sections: How it decides, Results at a glance, Approach and architecture, Validation, What worked, What did not work, Numbers, Reproduce it, Repository layout, AI use and credits), <code>docs/architecture.md</code> (five Mermaid blocks: XLS-R/M1/M5, Spectra-AASIST, engineered detectors, validation, fusion; plus <code>docs/img/architecture-flow.{mmd,svg}</code>), <code>docs/STATUS.md</code>, <code>docs/reports/2026-09-26_worked-examples.md</code> (eight files; file 3 <code>HGT3739624.wav</code> is the one where M3 suppression fired; file 4 <code>HGT1046947.wav</code> is the README's end-to-end trace under the shipped rule), <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>, <code>docs/reports/2026-09-26_draft-review-branches.md</code>, <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>, <code>docs/nsa-challenge.md</code>.</li>
+<li><strong>Facts checked on the Mac:</strong> <code>docs/site/</code> does not exist yet; <code>markdown</code> is not installed (<code>uv run python -c "import markdown"</code> fails), so a generator must be standard library only; Mermaid from jsDelivr is the allowed live renderer, <code>docs/img/architecture-flow.svg</code> (33 KB) is the offline fallback for the main flow; <code>.gitignore</code> does not touch <code>docs/</code>; ruff <code>src = ["src", "tests"]</code>, line length 100.</li>
+<li><strong>Numbers the Home page must carry, checked against the README:</strong> shipped rule <code>A3 w 0.2 + E</code> inner 0.135 / holdout 0.0065 / In-the-Wild 0.228 (brief cost) and 0.239 (sponsor-code cost); previous rule <code>E on α 0.2</code> 0.140 / 0.014 / 0.260 / 0.267; M1b v3 alone 0.301 / 0.072 / 0.343; Spectra ITW 0.065; test share above 0.5 = 27.4% for the shipped rule (the README's Numbers table; the orchestration-ablation table says 27.5% for "router on", which is a different readout, so cite each to its own table); 1,671 files, 0 gated; NSA's returned draft minDCF still pending. Router on vs off (README, Orchestration): holdout 0.0065 vs 0.0200, In-the-Wild 0.229 vs 0.274. Where the brief and the README differ, the README wins.</li>
+<li><strong>Recent, since the brief was written:</strong> the channel-robustness lane finished (Sat 13:20): λ̂ = 0.51 (CI 0.12–0.64), the codec hunt was negative (the 7.2 kHz wall is a resampling low-pass, not MP3/AAC), M3 suppression kept (most perturbation-stable detector, lowest miss rate on MLAAD), new weak spot: 20 dB white noise takes the shipped rule to 0.27 holdout. Its report is <code>docs/reports/2026-09-26_channel-robustness.md</code>; part of it is still uncommitted on the Mac (see at-risk), so the cloud checkout may have an older version. Copy only what the committed text says.</li>
+</ul>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p>The Mac session was on <code>main</code> in <code>~/Projects/hearsay</code>, 1 commit ahead of origin (<code>73f6a5b</code>, another lane's channel-robustness commit) with 7 uncommitted files from other lanes (<code>CLAUDE.md</code>, <code>docs/STATUS.md</code>, the channel-robustness report and spec, the M5 audit spec, <code>scripts/m3_probes.py</code>, <code>tests/test_channel_robustness.py</code>). None of those belong to this lane and none were touched. The cloud session starts from <code>origin/main</code> (<code>41141db</code>), which has the brief and everything this lane needs.</p>
+<p>In the cloud: work on the branch the cloud session gives you. Stage only <code>docs/site/</code> and, if written, <code>scripts/build_site.py</code> and your run spec / plan / this lane's report; never <code>git add -A</code>. Push that branch, not <code>main</code>; Nathan merges. Tell the oversight chat the commit hash when a version is ready.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">uv sync</code></pre>
+<p>The cloud has no <code>data/</code>, <code>weights/</code>, <code>models/</code> or <code>outputs/</code>; this lane needs none of them. Tests needing them skip by marker. If <code>uv sync</code> is slow (torch), it is still required for <code>tests/test_docs_consistency.py</code>, which imports <code>hearsay.metrics</code>.</p>
+<p>Preview: <code>cd docs/site &amp;&amp; python3 -m http.server 8080</code>, and use whatever browser tool the cloud session has; if none, check the HTML structurally (link check below, and <code>python3 -m html.parser</code>-level sanity) and say so in the run spec.</p>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li>Re-read the brief <code>docs/handoffs/2026-09-26_docs-site-handoff.md</code> in full. It has the page list (eight pages, first four carry the grade), the diagram list, the design rules, the sync-pass schedule and the "never invent a number" rule.</li>
+<li>Invoke <code>/plan-review</code> with that file as the argument. Present P1 (problem, approach, the resolved conventions above) and stop for "freeze". Then P2 with a failure-mode table (stale number vs its source, broken internal link, Mermaid CDN unreachable → SVG fallback, dark mode, phone width, a number with no source link, a page that contradicts the README, the footer's commit sha wrong), then the run spec at <code>docs/specs/2026-09-26_docs-site.md</code>, the plan at <code>docs/reports/2026-09-26_docs-site-plan.md</code>, the Claude critique standing in for Codex, stop for approval, execute.</li>
+<li>Recommended build shape (decide in the plan, not here): hand-written HTML with one shared <code>site.css</code> and <code>site.js</code>, Mermaid from jsDelivr with the committed SVG as fallback for the main flow, and a tiny standard-library Python checker (links, numbers-with-sources, footer sha) rather than a full markdown-to-HTML generator, since <code>markdown</code> is not installed and a generator would have to handle the README's tables and Mermaid blocks.</li>
+<li>Sync passes: after the first complete version, and again late tonight, re-read <code>README.md</code> and <code>docs/STATUS.md</code> on the current <code>main</code> and copy any changed number (expected: NSA's returned minDCF, the channel lane's Spectra-probe verdict, a possible final-rule note). Tell the README chat what the site says.</li>
+</ol>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test: <code>uv run pytest -q tests/test_docs_consistency.py</code> → 52 passed (Mac, before this session; re-run in the cloud to confirm the checkout). It does not look at <code>docs/site/</code>, but run it after every sync.</li>
+<li>Full suite: <code>uv run pytest -q</code> → 510 passing on the Mac at cc6670c with data; in the cloud many skip. Lint: <code>uv run ruff check .</code> → clean.</li>
+<li>Link check (no dependency), from <code>docs/site</code>: <code>uv run python -c "import re,pathlib,sys; bad=[(p,l) for p in pathlib.Path('.').rglob('*.html') for l in re.findall(r'href=\"([^\"#:]+)', p.read_text()) if not (p.parent/l).exists()]; print(bad or 'links OK'); sys.exit(bool(bad))"</code> → <code>links OK</code>.</li>
+<li>At-risk on the Mac, not this lane's: the 7 uncommitted files listed above (channel-robustness lane). Not archived; that lane or the oversight chat commits them. Do not recreate them in the cloud.</li>
+<li>At-risk, this lane: nothing yet. Everything this lane makes is committed under <code>docs/site/</code>.</li>
+<li>In flight, other lanes: README polish until ~05:00 Sunday; NSA's returned draft minDCF (placeholder until then); Hrushi's frontend rewire (<code>web/</code>, <code>src/app/</code>, <code>src/components/</code>, <code>package.json</code>: do not touch).</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>Score direction 1.0 = synthetic everywhere; on a score-line diagram, synthetic at the top, the pinned block below 0.001.</li>
+<li>Ten detectors: fused <code>m1b_v3</code>, <code>handcrafted_v5</code>, <code>m5_xlsr_ft</code>, <code>spectra_aasist</code> (suppression only); evidence <code>compression</code>, <code>enf</code>, <code>splice</code>, <code>speaker_drift</code>; routing <code>container</code>; gate <code>speech_gate</code>. Rubric mapping is in the brief's Analytical notes.</li>
+<li>The fusion arithmetic for a worked file (brief page 2): base = 0.6·rank(M1b) + 0.2·rank(handcrafted) + 0.2·rank(M5); if Spectra margin &lt; −3 and base &gt; 0.5, base ×0.5; p = 0.001 + 0.999·sigmoid(a·base + b + logit 0.3) with the Platt constants in <code>models/fusion_v2/constants.json</code> (not in the cloud; the fusion_v1 constants 17.816 / −8.302 / −0.847 are quoted in the worked-examples report, the v2 constants are not quoted in any markdown, so show the formula with the v1 numbers only if labelled as v1, or show it symbolically).</li>
+<li>Freeze is Sunday morning; this lane never touches the TSV.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<ul>
+<li><code>docs/handoffs/2026-09-26_docs-site-handoff.md</code>: the brief (read first).</li>
+<li><code>CLAUDE.md</code>: conventions, the AI-use disclosure to copy for the Credits page, the working rules.</li>
+<li><code>README.md</code>, <code>docs/architecture.md</code>, <code>docs/STATUS.md</code>, <code>docs/reports/2026-09-26_worked-examples.md</code>, <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>, <code>docs/reports/2026-09-26_draft-review-branches.md</code>, <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>, <code>docs/nsa-challenge.md</code>, <code>docs/code-map.md</code>.</li>
+<li><code>.claude/skills/plan-review/</code> (or <code>~/.claude/skills/plan-review/</code> on the Mac), <code>.claude/codex-review-prompt.md</code>, <code>.claude/codex-audit-prompt.md</code>: the pipeline and the two rubrics the Claude critiques must use.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_docs-site-cloud-handoff.md</code> <span class="hash">946745456afe</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

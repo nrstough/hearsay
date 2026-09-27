@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frontend ↔ backend contract (Sat Sep 26, 2026, ~06:30) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_frontend-contract.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_frontend-contract.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-exists-right-now">What exists right now</a></li><li><a href="#the-contract-analyzeresponse-v0">The contract: AnalyzeResponse v0</a></li><li><a href="#build-against-a-static-dump-today">Build against a static dump today</a></li><li><a href="#the-live-endpoint-when-the-runner-exists">The live endpoint, when the runner exists</a></li><li><a href="#boundaries">Boundaries</a></li><li><a href="#rewire-note-sat-0950-after-commit-19925a3">Rewire note (Sat 09:50), after commit 19925a3</a></li></ul></details>
+<h1 id="frontend--backend-contract-sat-sep-26-2026-0630">Frontend ↔ backend contract (Sat Sep 26, 2026, ~06:30)</h1>
+<p>For Hrushi. Short version: the per-file analysis you want to display exists today as Python functions and produces real evidence sentences, but there is no HTTP server and no single "analyze one file" function yet. Build the UI against the JSON contract below and a static dump of the 1,671 test files; the live endpoint is a thin wrapper that lands with the pipeline runner the Docker lane is building. Nothing here is a graded deliverable on its own, but per-file explanations and the routing log feed the 20% explainability and orchestration rubric, so the UI should show exactly those.</p>
+<h2 id="what-exists-right-now">What exists right now</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Piece</th><th>Callable today</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>Every engineered detector on one file, with evidence</td><td>yes, CPU, about 5 s cold for the first file, well under 1 s after</td><td><code>import hearsay.detectors.engineered</code>, then <code>safe_run(det, ClipContext(path))</code> for each of <code>all_detectors()</code>. Returns name, status, score, evidence sentence, features. Sample output below is from a real test file.</td></tr>
+<tr><td>Non-speech gate + default-answer policy</td><td>yes</td><td><code>hearsay.detectors.speech_gate</code>; <code>apply_default_answer(fused_score, is_speech)</code></td></tr>
+<tr><td>M1 / M1b deep score on one file</td><td>yes, as functions</td><td><code>hearsay.embed.load_backbone(device="cpu")</code>, <code>prepare_segment</code>, <code>embed_segment</code>, then <code>Probe.load(dir).llr(e)</code>; see the <code>score()</code> closure in <code>scripts/make_probe_csv.py</code> lines 60–67. About 1–3 s per file on CPU after a 15 s model load.</td></tr>
+<tr><td>M3 Spectra-AASIST on one file</td><td>yes, as functions</td><td><code>hearsay.spectra.load_spectra("cpu")</code>, then the scoring path in <code>scripts/score_spectra.py</code> (zero-padded windows on the prepared clip). About 0.5 s per file on CPU.</td></tr>
+<tr><td>Fusion rule</td><td>batch only</td><td><code>scripts/fuse.py</code> fuses the exported score files for all 21,671 rows. It computes each detector's standardization (inner-fold mean and std) at run time and prints the stacker weights; it does not save them. A live endpoint needs those constants persisted.</td></tr>
+<tr><td>HTTP API</td><td>no</td><td>No web framework is installed. <code>uv add fastapi uvicorn</code> is the obvious choice; keep it out of the Docker scoring path.</td></tr>
+<tr><td>Orchestrator / explanation report</td><td>no</td><td>Planned M4. The routing log is derived from detector features (container <code>lossy</code>, compression <code>bw_hz</code>, ENF presence, splice seams, <code>speech_gate.is_speech</code>).</td></tr>
+</tbody>
+</table></div>
+<h2 id="the-contract-analyzeresponse-v0">The contract: <code>AnalyzeResponse</code> v0</h2>
+<p>One object per file. Field names are stable; fields marked <em>pending</em> are empty until the runner exists.</p>
+<pre><code class="language-json">{
+  "filename": "HGT1013455.wav",
+  "duration_s": 4.74,
+  "probability_synthetic": 0.12,
+  "verdict": "real",
+  "is_speech": true,
+  "default_answer_applied": false,
+  "fusion": {
+    "rule": "stack_nonlj",
+    "inputs": {"m1b_v3": -1.84, "spectra_aasist": -2.31, "handcrafted_v5": 0.42},
+    "weights": {"m1b_v3": 0.9, "spectra_aasist": 1.6, "handcrafted_v5": 0.3}
+  },
+  "detectors": [
+    {
+      "name": "handcrafted",
+      "role": "fused",
+      "status": "ok",
+      "score": 0.2095,
+      "evidence": "spectral/prosody features real-like (P=0.21): spectral contrast, band 0 1.1 SD below real speech (toward synthetic); CQCC 1 frame-to-frame change 2.6 SD above real speech (toward synthetic); MFCC 13 variability 1.7 SD above real speech (toward synthetic)",
+      "features": {"hf_ratio_4k_mean": 0.0707, "voiced_frac": 0.81},
+      "seconds": 0.21,
+      "error": null
+    },
+    {
+      "name": "container",
+      "role": "routing",
+      "status": "ok",
+      "score": 0.5,
+      "evidence": "wav/pcm_s16le 16000 Hz mono 16-bit, 1 tag(s) [encoder=Lavf58.29.100]: no class evidence in the container; written by FFmpeg (libavformat), so the file was re-muxed or transcoded at least once",
+      "features": {"lossy": 0.0, "is_pcm_wav": 1.0, "sample_rate": 16000.0},
+      "seconds": 0.1,
+      "error": null
+    },
+    {
+      "name": "enf",
+      "role": "evidence",
+      "status": "ok",
+      "score": 0.5,
+      "evidence": "no mains hum at 50 or 60 Hz (best 60 Hz candidate: median SNR 2.8 dB, above 12 dB in 0% of frames): no environment evidence either way",
+      "features": {"enf_present": 0.0, "enf_snr_db": 2.81},
+      "seconds": 0.0,
+      "error": null
+    }
+  ],
+  "routing_log": [
+    "container: PCM WAV, not lossy, FFmpeg-written; compression forensics run for evidence, not score",
+    "speech_gate: is_speech=true (voiced 81% of frames); default-answer policy not applied",
+    "fusion: stack_nonlj over m1b_v3, spectra_aasist, handcrafted_v5"
+  ],
+  "version": {"git_sha": "271c24b", "models": {"m1": "m1_wav2vec2-xls-r-300m_L7_20260926-0521", "handcrafted": "hc_lgbm_20260926-055451", "spectra": "lab260/Spectra-AASIST"}}
+}</code></pre>
+<p>Rules the UI can rely on:</p>
+<ul>
+<li><code>score</code> is always in [0, 1] and higher means more synthetic; <code>evidence</code> is always a non-empty sentence; <code>status</code> is <code>ok</code>, <code>skipped</code> or <code>error</code>, and an errored detector has score 0.5 and an <code>error</code> string. This is enforced by the detector contract (<code>src/hearsay/detectors/base.py</code>).</li>
+<li><code>role</code> says how the detector is used: <code>fused</code> (enters the score), <code>evidence</code> (shown, never fused: enf, splice, speaker_drift, compression), <code>routing</code> (container), <code>gate</code> (speech_gate).</li>
+<li><code>verdict</code> is <code>synthetic</code> when <code>probability_synthetic</code> ≥ 0.5, <code>real</code> below, <code>undetermined</code> when <code>is_speech</code> is false or the file failed to decode.</li>
+<li><code>probability_synthetic</code> for the test set equals the logged TSV's value for that file.</li>
+</ul>
+<h2 id="build-against-a-static-dump-today">Build against a static dump today</h2>
+<p><strong>Update 07:30: the dump already exists.</strong> The runner produced <code>outputs/runner/full_20260926/results/&lt;filename&gt;.json</code> for all 1,671 test files (AnalyzeResponse v0, rule zmean, gate on; the run also verified the TSV against the logged submission). Copy that directory into the frontend's fixtures instead of running the script below. The live API is <code>uv run uvicorn hearsay.api:app --port 8000</code> with <code>HEARSAY_RESULTS=outputs/runner/full_20260926</code> for <code>GET /results/{filename}</code>; <code>POST /analyze</code> takes a multipart file and answers in about 1.5 s after the first request.</p>
+<p>Every field except <code>fusion.weights</code> and a full <code>routing_log</code> can be produced now for all 1,671 test files, with the engineered detectors run live on CPU and the deep scores taken from the exports. This gives a real dataset for the UI without a server. About 15 minutes on 6 cores.</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run python - &lt;&lt;'EOF'
+import json, time
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import hearsay.detectors.engineered  # registers every engineered detector
+from hearsay.detectors import all_detectors
+from hearsay.detectors.base import ClipContext, safe_run
+from hearsay.detectors.speech_gate import apply_default_answer
+
+ROLE = {"handcrafted": "fused", "compression": "evidence", "container": "routing", "enf": "evidence",
+        "splice": "evidence", "speaker_drift": "evidence", "speech_gate": "gate"}
+test = pd.read_csv("outputs/manifests/nsa_test.csv")
+scores = {n: pd.read_csv(f"outputs/detector_scores/{n}.csv").query("split == 'test'").set_index("path")
+          for n in ["m1b_v3", "spectra_aasist", "handcrafted_v5"]}
+tsv = pd.read_csv(sorted(Path("submissions").glob("*_M4_fusion_stack_nonlj_*.tsv"))[-1], sep="\t").set_index("filename")
+out = Path("outputs/frontend"); out.mkdir(exist_ok=True)
+dets = all_detectors()
+for _, row in test.iterrows():
+    ctx = ClipContext(Path(row.path)); items = []
+    for d in dets:
+        t0 = time.time(); r = safe_run(d, ctx)
+        items.append({"name": r.name, "role": ROLE.get(r.name, "evidence"), "status": r.status, "score": r.score,
+                      "evidence": r.evidence, "features": r.features, "seconds": round(time.time() - t0, 3), "error": r.error})
+    gate = next(i for i in items if i["name"] == "speech_gate")
+    is_speech = bool(gate["features"].get("is_speech", 1.0))
+    p = float(tsv.loc[row.filename, "cm-score"])
+    p = float(apply_default_answer(np.array([p]), np.array([is_speech]))[0])  # array in, array out
+    doc = {"filename": row.filename, "duration_s": round(ctx.audio.size / 16000, 2), "probability_synthetic": p,
+           "verdict": "undetermined" if not is_speech else ("synthetic" if p &gt;= 0.5 else "real"),
+           "is_speech": is_speech, "default_answer_applied": not is_speech,
+           "fusion": {"rule": "stack_nonlj", "inputs": {n: float(s.loc[row.path, "logit"]) for n, s in scores.items()}, "weights": {}},
+           "detectors": items, "routing_log": [], "version": {"git_sha": "271c24b", "models": {}}}
+    (out / f"{row.filename}.json").write_text(json.dumps(doc))
+print("wrote", len(test), "files to outputs/frontend/")
+EOF</code></pre>
+<p><code>outputs/</code> is gitignored, so commit the frontend's copy of the dump wherever the UI keeps fixtures, not under <code>outputs/</code>. <code>apply_default_answer(fused, is_speech)</code> takes and returns arrays (<code>src/hearsay/detectors/speech_gate.py:113</code>); the snippet wraps the scalars accordingly.</p>
+<h2 id="the-live-endpoint-when-the-runner-exists">The live endpoint, when the runner exists</h2>
+<p><code>POST /analyze</code> with a file → <code>AnalyzeResponse</code>; <code>GET /results/&lt;filename&gt;</code> → the precomputed object. The handler is: decode once into a <code>ClipContext</code>, run the deep scorers and the engineered detectors, standardize each fused logit with the persisted constants, apply the fusion rule, apply the gate policy, assemble the routing log. That is the same function the Docker image needs (<code>scripts/run_pipeline.py</code> in <code>docs/handoffs/2026-09-26_docker-handoff.md</code>), so the endpoint should import it, not reimplement it. Expect 2–4 s per file on CPU with the models held in memory. Owner: whoever builds the runner; the wrapper itself is under an hour.</p>
+<h2 id="boundaries">Boundaries</h2>
+<ul>
+<li><strong>No LLM or hosted service on the scoring path.</strong> A UI may narrate or summarize the evidence sentences with a language model, but <code>probability_synthetic</code> and every <code>score</code> must come from the pipeline alone, and the Docker image runs offline.</li>
+<li><strong>Files:</strong> keep the frontend in its own directory (e.g. <code>web/</code>) and the API wrapper in one new file; do not edit <code>src/hearsay/</code> or <code>scripts/</code> owned by other lanes (list in <code>docs/code-map.md</code>). Stage only your own files; never <code>git add -A</code>; don't push without asking Nathan.</li>
+<li><strong>Time:</strong> the TSV, the Docker image and the README are the deliverables; the UI must not pull Nathan or the Docker owner off them before Sunday 08:00.</li>
+</ul>
+<h2 id="rewire-note-sat-0950-after-commit-19925a3">Rewire note (Sat 09:50), after commit 19925a3</h2>
+<p>The committed frontend (<code>src/app</code>, <code>src/components</code>) calls <code>python -m hearsay.analyzer</code>, a separate re-implementation under <code>src/hearsay/analyzer.py</code>. That module does not run the shipped detectors: its "deep SSL probe" is a zero-crossing-rate rule that returns a fixed 0.84 or 0.16, its verdict is a hand-weighted sum of toy analyses, and <code>src/app/api/forensic/chat/route.ts</code> answers with canned keyword-matched text (one reply describes a "frequency cliff at 16.0 kHz", which cannot exist in 16 kHz audio). Shown to a judge as how HEARSAY decides, it contradicts the README and the submitted TSV. Required changes, in order:</p>
+<ol>
+<li><strong>Score from the real pipeline.</strong> Replace the <code>execFile</code> call in <code>src/app/api/forensic/analyze/route.ts</code> with a <code>POST</code> of the uploaded file to the running API (<code>uv run uvicorn hearsay.api:app --port 8000</code>, endpoint <code>/analyze</code>), or with <code>uv run python scripts/run_pipeline.py --in &lt;tmpdir&gt; --out &lt;tmpdir&gt;/out</code> and read <code>out/results/&lt;file&gt;.json</code>. Both return <code>AnalyzeResponse</code> v0 (this document): <code>probability_synthetic</code>, <code>verdict</code>, <code>detectors[]</code> with real evidence sentences, <code>fusion</code>, <code>routing_log</code>, <code>version</code>. Map the components to those fields; the eight-modality cards correspond to <code>detectors[].name</code> (handcrafted covers spectral and prosody; container, compression, enf, splice, speaker_drift, speech_gate are one each; the deep score is <code>fusion.inputs</code>).</li>
+<li><strong>The copilot must not present canned text as analysis.</strong> Either remove it, or label it "guide" and have it quote only fields from the real response (evidence sentences, routing log, the fusion inputs), or call a language model over that JSON, which is allowed because it is off the scoring path and not in the Docker image.</li>
+<li><strong>Move <code>src/hearsay/analyzer.py</code> out of the package</strong> (for example into <code>web/tools/</code>) or delete it once the route is rewired; while it stays, it fails <code>uv run ruff check .</code> (two unused imports) and every lane's lint gate.</li>
+<li>Keep the batch and export-tsv routes only if they call the same pipeline; a TSV produced by the toy analyzer must never be exported.</li>
+</ol>
+<p>The static dump for all 1,671 test files is the fastest way to build and demo without the server. <strong>Use <code>outputs/runner/v2_full/results/*.json</code></strong> (Sat 12:15 onward: the shipped rule A3 w0.2 + E / <code>models/fusion_v2/constants.json</code>, our direction, 0 rows differing from the submitted TSV). The older <code>outputs/runner/full_20260926/</code> dump is the rejected zmean rule and must not be shown. Under the shipped rule <code>fusion.weights</code> has four keys (<code>m1b_v3</code> 0.6, <code>handcrafted_v5</code> 0.2, <code>m5_xlsr_ft</code> 0.2, <code>spectra_aasist</code> 0.0) and <code>fusion.detail.final</code> reads <code>A3_w0.2_E</code>; render the weights from the JSON, never as fixed text.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_frontend-contract.md</code> <span class="hash">a5af585ee893</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

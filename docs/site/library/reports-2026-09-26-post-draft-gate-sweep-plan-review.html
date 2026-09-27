@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 post draft gate sweep (plan review) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_post-draft-gate-sweep-plan-review.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/reports/2026-09-26_post-draft-gate-sweep-plan-review.md</code>; the markdown file is the record.</p>
+
+<ol>
+<li><p><strong>Critical — <code>E_TIERS</code> is referenced before assignment.</strong> The proposed <code>CANDIDATES</code> literal uses <code>E_TIERS</code> before defining it, so importing the module raises <code>NameError</code>. Define it before <code>CANDIDATES</code>.</p></li>
+<li><p><strong>Critical — Pareto selection compares different populations.</strong> Each candidate may use a different intersection, but <code>pareto_pick</code> compares their absolute six-cell scores. A candidate evaluated on easier rows can appear dominant. Require identical evaluation populations for the final comparison, or report the passers as incomparable and recommend KEEP. Add a test with differing row sets.</p></li>
+<li><p><strong>Critical — Export validation does not enforce the fold contract.</strong> <code>build</code> trusts exported <code>split</code> values without checking <code>fold</code> against <code>splits/nsa_folds.csv</code>; <code>fs.load</code> also silently drops duplicate paths. Validate normalized path uniqueness, split/fold assignments, labels, and finite logits before deduplication or ranking. Require provenance tying the new export to the approved fold-based training run. Otherwise mislabeled holdout rows can enter rank references and Platt fitting.</p></li>
+<li><p><strong>Critical — Partial test coverage can qualify a candidate.</strong> <code>test_agreement</code> checks that supplied names exist in the shipped TSV, but not that all required names are supplied exactly once. An incomplete export can receive a favorable Spearman on a subset and become the winner. Require complete, unique test coverage before recommendation or writing constants; test missing rows and duplicate basenames.</p></li>
+<li><p><strong>Critical — Invalid candidates lack a defined failure path.</strong> The direction guard raises, and malformed or single-class splits can abort the entire sweep before its report is written. Non-finite Spearman is also dangerous: <code>NaN &lt; 0.974</code> is false, bypassing doubled thresholds. Define candidate-local <code>INVALID</code> handling, reject non-finite diagnostics explicitly, and continue evaluating independent candidates. Test that an invalid P_wl still leaves W4’s result and the report intact.</p></li>
+<li><p><strong>Critical — Ratification is not bound to the locked inputs.</strong> <code>--write</code> reruns the sweep against mutable exports, overwrites the report, and accepts any existing <code>--new-column-model</code> directory. Neither the manifest commit nor the heads chat’s code commit identifies the actual score and model bytes. Record input/model hashes in the locked packet and refuse writing if they change or the supplied model does not match the evaluated export.</p></li>
+<li><p><strong>Critical — H_noise has no executable diagnostic.</strong> The candidate loop evaluates it whenever its export exists, but the diagnostic section assumes it remains NOT RUN. The governing manifest requires noise AUC ≥ 0.90 and clean AUC within 0.005 of v5, with missing evidence failing rule 5. Implement that evidence check or explicitly disable H_noise; never infer diagnostic success from export availability.</p></li>
+<li><p><strong>Suggestion — Threshold search omits the always-real decision.</strong> Searching only <code>np.unique(s)</code> excludes a threshold above the maximum score, although <code>min_cost</code> includes that operating point. For an uninformative or constant column, the selected threshold can therefore disagree with the reported minimum and distort <code>new_catches</code>. Include <code>+inf</code> and test constant scores and ties.</p></li>
+<li><p><strong>Suggestion — Verification uses Git to check ignored model files.</strong> <code>models/</code> is gitignored, so <code>git status --short models/</code> cannot establish that fusion constants stayed unchanged. Compare hashes before and after execution, and add write-path tests for a failing candidate, a passing but unselected candidate, and successful serialization to the intended target.</p></li>
+<li><p><strong>Critical — The closing decision and stop behavior are missing.</strong> Step 6 ends with presentation around 19:30, without implementing the manifest’s KEEP log row or explicitly handing off the blocked TSV work. Add a hard stop for late exports or failed checks, the 20:00 ratification cutoff, and a terminal record: KEEP with the verified existing TSV and log note, or a named integration owner/blocker requiring parity, a new immutable TSV, and its log row by 21:30.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_post-draft-gate-sweep-plan-review.md</code> <span class="hash">ada5dd0fc0c2</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

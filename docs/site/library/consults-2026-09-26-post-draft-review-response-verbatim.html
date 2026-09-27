@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 post draft review RESPONSE verbatim · HEARSAY</title>
+<meta name="description" content="Rendered from docs/consults/2026-09-26_post-draft-review_RESPONSE_verbatim.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/consults/2026-09-26_post-draft-review_RESPONSE_verbatim.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#executive-summary">Executive summary</a></li><li><a href="#scope">Scope</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#expert-summaries-2">Expert Summaries (2)</a></li><li><a href="#assumptions-and-limitations">Assumptions and Limitations</a></li><li><a href="#nomenclature-14-symbols">Nomenclature (14 symbols)</a></li><li><a href="#narrative">Narrative</a></li><li><a href="#expert-comparison">Expert Comparison</a></li><li><a href="#expert-divergence">Expert Divergence</a></li><li><a href="#technical-detail">Technical Detail</a></li><li><a href="#scope-definition-qa">Scope Definition Q&amp;A</a></li><li><a href="#appendix-a--scope-definition-qa">Appendix A — Scope Definition Q&amp;A</a></li><li><a href="#appendix-b--project-metadata">Appendix B — Project Metadata</a></li></ul></details>
+<p><img src="data:image/png;base64,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" alt="VeriLM"></p>
+<p>September 26, 2026</p>
+<blockquote>
+<p>Consult: after the draft review — the returned number is fixed; what do we build in the last 13 hours?
+Your role
+You are an applied researcher in audio deepfake detection and detection-cost evaluation (ASVspoof, NIST-style DCF), and you have shipped systems under a deadline. Push back hard on any wrong premise, including ours about what the returned number means. It is Saturday 15:40 EDT; the final file freezes Sunday 05:00 (about 13 hours) and is handed in by 08:00. Practical beats ideal; a runnable experiment beats a literature pointer. We can A/B most ideas on exported scores in minutes and can rent an A100 for a few dollars.
+The problem
+Task. The NSA "HEARSAY" challenge at HackGT 13: output P(synthetic) per audio file, 1.0 = synthetic, on 1,671 unlabeled 16 kHz mono WAVs (3.0–13.6 s, median 3.4 s, English). NSA confirmed in person: about 70% real, the "analyst scenario", ASVspoof 5 track-1 DCF with a false alarm costing 4× a miss, score from 0.0 (confident real) to 1.0 (confident synthetic).
+Judging. 60% minDCF (points = (1 − ours)/(1 − best team) × 60); 20% diversity and depth of techniques (container/metadata, spectral, prosody, ENF, compression, speaker-embedding consistency, deep anti-spoofing, splice, plus a bonus for choosing analyses per file); 20% documentation in our own words, including what did not work and explainability.
+Deliverable. The TSV and the GitHub README. The Docker image is not required (NSA, Saturday noon); we built one anyway as evidence.
+Selection metric on our side. Normalized minDCF at π_synth = 0.3, C_FA = 4, C_miss = 1: 9.33·P_FA + P_miss, swept over thresholds. We also report the sponsor script's own cost (its shipped ASVspoof5 code has Pspoof = 0.5 and treats a higher score as bona fide, which puts the 4× on misses: normalized P_FA + 4·P_miss; "miss-averse" below). Only the ranking of our scores matters to either.
+The one measurement we get, and it is now in hand
+We sent our draft TSV at 12:30 (the exact artifact we intend to ship, gate and pinned block included). NSA returned: minDCF = 0.0733, EER = 3.534%. No P_FA, P_miss or threshold, and NSA did not say which cost weighting or which score-direction convention produced the number.
+This number is fixed. It is the only labeled readout of the test set we will ever get, so we treat it as ground truth about the shipped file and as the baseline every change must beat by reasoning, not by re-measurement. Our two proxies for the same file: outer holdout 0.0065 (in-family generators, clean read speech) and In-the-Wild 0.228 (web audio, never trained on). The test set landed at 11× the holdout and a third of In-the-Wild, next to what our best single detector scores on the holdout (M1b v3 alone: 0.072).
+What we read from it so far, for you to confirm or refute:
+Direction is ours. Under the sponsor's code as shipped (higher = bona fide) our file would have scored 1.00; 0.0733 means they read 1.0 = synthetic, as the instructions say. EER 3.5% confirms it (an inverted file reads 96.5%).
+Regime. By our pre-declared table (0.00–0.20: our direction, the test set behaves like the holdout), the shipped rule stays and no flip or fallback is triggered.
+Error profile is ambiguous. With about 1,170 real and 500 synthetic files: under the brief's cost 0.0733 is, for example, P_FA 0.3% (3–4 real files) plus P_miss 4.5% (about 22 fakes), or 0 false alarms plus 37 missed fakes. Under the sponsor code's cost it is, for example, P_FA 1.3% plus P_miss 1.5%. EER 3.5% says that at the equal-error point about 41 real and 18 fake files are on the wrong side, so the ranking has a tail of hard files on both sides.
+What we shipped in the draft (the baseline; fixed unless you argue otherwise)
+Rule "A3 w0.2 + E" (models/fusion_v2/constants.json), chosen by a selection rule written before its results and ratified at 12:05:
+Rank each of three detector logits against its own inner-fold out-of-fold distribution (ECDF).
+base = 0.6·rank(M1b v3) + 0.2·rank(handcrafted v5) + 0.2·rank(M5).
+If Spectra-AASIST's margin &lt; −3 ("strongly bona fide") and base &gt; 0.5, base *= 0.5. Spectra can only pull a file toward real; nothing is fitted on it (its training data is undisclosed).
+Platt map with a prior shift to 0.3 into [0.001, 1].
+Files the speech gate rejects (non-speech, decode failure) are pinned strictly below every determinate score, in [0, 0.001). 0 of 1,671 test files are gated.
+The three fused detectors and the suppressor:
+Stream What it is Inner OOF Holdout Holdout EER In-the-Wild (brief / miss-averse) ITW real P_FA at inner thr
+M1b v3 frozen XLS-R 300M, layer 7, time-mean, StandardScaler + class-balanced logistic regression + Platt; trained on the NSA sample + ASVspoof19 LA bona fide (40 VCTK speakers) + a 2.5k A01–A06 spoof anchor, inner folds only; band-matched input 0.301 0.072 1.4% 0.343 / 0.296 0.8%
+handcrafted v5b 234 spectral / prosody / LFCC / CQCC / phase / modulation / breath / jitter features on the band-matched, trimmed, RMS-normalized clip; LightGBM (300 trees, 31 leaves); trained with augmented fit-only twins (codec round-trips, ±4 dB/kHz tilt, 4.5–7 kHz low-pass) 0.469 0.137 3.1% 1.00 alone (AUC 0.77; it orders In-the-Wild fakes but its threshold does not transfer) 0.40%
+M5 XLS-R 300M truncated to 12 frozen layers, learned softmax layer weights (peak at layers 5–6) + masked attentive statistics pooling + linear head, 136k trainable params; trained on an A100 with class-blind laundering augmentation, MLAAD spoof capped at 12%, extra LJ/LibriSpeech/VCTK real; the full 12-layer fine-tune lost to this on the unseen ElevenLabs fold (0.38–0.41 vs 0.31) 0.302 0.363 (clips ≤ 4 s: 0.60; LibriSpeech real 0.43) 6.0% — 0.45%
+Spectra-AASIST (M3) lab260/Spectra-AASIST, off the shelf, frozen, band-matched, zero-padded to one 4.04 s window 0.0045 (possibly in-sample) 0.012 0.16% 0.065 / — 0.0%
+The pre-declared sweeps (rule fixed before results; the In-the-Wild column for M5 rules is crop-fair):
+Candidate Inner Holdout (brief) Holdout [#FA, #miss] of 3,858 ITW brief ITW miss-averse ITW P_FA / P_miss at inner thr
+M1b v3 alone 0.301 0.072 [8, 63] 0.343 0.296 0.8% / 27.8%
+A α0.2 (0.8 M1b + 0.2 handcrafted, no M3 step) 0.236 0.030 [3, 30] 0.322 0.280 0.45% / 36.0%
+E on A α0.2 (previous shipped rule) 0.140 0.014 [1, 18] 0.260 0.267 1.4% / 14.8%
+F: M5 as a second suppressor on top 0.136 0.014 [1, 18] 0.258 0.268 1.4% / 14.4%
+A3 w0.2 without the M3 step 0.213 0.020 [1, 30] 0.274 0.251 0.3% / 32.4%
+A3 w0.2 + E (shipped; NSA: 0.0733 / EER 3.5%) 0.135 0.0065 [0, 13] 0.228 0.239 1.3% / 12.2%
+Four-way equal rank mean incl. Spectra (ruled out before measuring) — 0.0045 — 0.214 0.196 —
+Router ablation on the shipped rule (holdout / In-the-Wild brief): router on 0.0065 / 0.229; no M3 suppression 0.020 / 0.274; the suppression touched 83 holdout and 24 In-the-Wild files, every one of them real. The gate touched 0 test files. The equal four-way mean beats us on every proxy by giving Spectra a full vote; we refused that before seeing the numbers because its training data is undisclosed and our validation rows may be in it.
+Reproducibility: the runner reproduces the shipped TSV live from audio on all 1,671 files (Spearman 1.0, max |Δp| 9.3e-4, about 28 minutes of Mac CPU). Any new column enters through the same export format and the same kind of pre-declared sweep.
+Data, validation and what we know about the test set
+Training data: DiffSSD (10 TTS generators: grad_tts, diffgan_tts, pro_diff, wavegrad2, openvoicev2, unit_speech, xtts_v2, your_tts, elevenlabs, playht), LJ Speech (one real speaker), LibriSpeech dev/test (about 80 real speakers); for M1b and M5 only, ASVspoof 2019 LA bona fide (VCTK) and, for M5, MLAAD spoof and extra LJ/LibriSpeech. Never trained on: the outer holdout (playht + wavegrad2 + 26 real speaker groups, 3,858 rows), In-the-Wild (2,000 real / 1,000 spoof), the test set.
+Folds: spoof grouped by generator, real by speaker (LJ by chapter); five inner folds leave whole generators out; every learned piece (scalers, Platt maps, trees, fusion references) is fit fold-locally.
+Test-set facts (label-free): every file is 16 kHz PCM WAV written by the same FFmpeg build; every file is low-passed at about 7.2 kHz (no training corpus is); below 7 kHz the envelope is darker and codec-like across nearly every handcrafted column (train-vs-test AUC 0.99 on the 234 features); median voiced fraction 0.8; no silence or tones.
+Channel-robustness lane, finished at 13:20 (all diagnostic, nothing shipped):
+λ̂, the test set's wild-domain weight from label-free channel statistics: 0.51 (95% CI 0.12–0.64); the test set is between our clean holdout and In-the-Wild on about half the channel axes and outside both on the rest (beyond the wild end on noise-floor stationarity and flatness; beyond the clean end on loudness spread). It is its own recording population.
+The 7.2 kHz wall is a smooth resampling low-pass, not MP3 or AAC (34 codec variants tried; the nearest was 3% closer than our own Kaiser filter where the rule needed 20%). So the symmetric codec refit of M1b did not run.
+M3 memorisation probes: M3 is the most perturbation-stable detector by AUC (mean |ΔAUC| 0.0008 vs M1b 0.0041) but has the least stable rank order; lowest miss rate on 572 MLAAD clips from 143 unseen generators (14.9% vs M1b 22.7%, M5 28.7%, handcrafted 56.1%); the suppression step fired on no spoof clip under any perturbation and never raised the fused minDCF. Kept.
+New weak spot: additive noise. At 20 dB SNR white noise, handcrafted v5 collapses (AUC 0.998 → 0.64) and fakes turn into misses: M1b's holdout minDCF 0.056 → 0.271, the shipped rule's 0.012 → 0.269. M3 is best under noise (0.116) but its step never fires there. MP3, ±2% speed and a one-sample shift move nothing.
+Shortcuts already removed: the 7.2 kHz band, peak level, leading silence, a tiling seam, container format. A "double low-pass stopband" (7–8 kHz after our filter) was found and measured: it moves no detector.
+What is established or dead (do not re-suggest)
+Equal-weight fusion of M1b and handcrafted (z-mean, rank-mean): doubles In-the-Wild misses. Rejected.
+M3 inside a fitted stacker or with a full vote: forbidden by our own rule (undisclosed training data). Suppression-only is its ceiling unless you can argue the returned number changes that.
+Container/metadata, ENF, splice as score streams: dead on this test set by mechanism (one FFmpeg decode erases container evidence; 16 kHz PCM with a 7.2 kHz wall leaves no usable mains component; the sponsor says no clip is partially synthetic). They run for evidence and routing and are documented as such.
+Speaker drift (ECAPA windows): evidence only; fakes are the most self-consistent voices (AUC 0.73 toward fake). Compression forensics: evidence only (it reads the pipeline, holdout 0.90).
+Full fine-tuning of the XLS-R layers: fit the seen generators, transferred worse to ElevenLabs than a frozen backbone. Head-only won.
+Pruning corpus-cue or domain-shifted handcrafted columns: worse every time (the survivors still separate train from test at AUC 0.98).
+Peak-normalizing Spectra's input; the WavLM weights (Large and Base are on disk, never run).
+"Share of test files above 0.5" as a selection signal; nearest-neighbour-to-LJ labelling; one-class objectives; holdout tuning below 0.05.
+We did not attend or record the sponsor's spectral-features talk, so nothing from it is in our system.
+Resources
+One Apple M3 Pro (18 GB): the full runner does 1,671 files in about 28 minutes; XLS-R embedding extraction for the 20,000-row fold file is about 22 minutes per layer set; the handcrafted extraction about 17 minutes. Optional vast.ai A100 at about $0.7/h (spent $5.42 so far; tens of dollars more is fine; the M5 trainer, bundle and cloud scripts exist and a fold model trains in 12 minutes). Weights on disk: XLS-R 300M, WavLM Large and Base, Spectra-AASIST, ECAPA-TDNN. Exported per-detector score files for every row (inner OOF, holdout, test, In-the-Wild) let us A/B any fusion idea in seconds. Four parallel Claude Code sessions; one person (Nathan) owns the TSV and every ship decision. No hosted model may sit on the scoring path.
+What I want (ranked)
+For each: your recommendation, a procedure we can run inside the time it deserves under our fold discipline, and an EV × effort estimate in minDCF points on the test set specifically, with the reasoning that connects it to the returned 0.0733.
+Read the number. minDCF 0.0733 and EER 3.534% on the shipped file. Which regime is the test set in, and what error profile is most likely (a handful of false alarms and a tail of misses, or the reverse)? Does the pair (minDCF, EER) tell us whether NSA used the brief's cost or their script's cost? What do you infer about the number of files that separate us from, say, 0.03, and about whether the remaining errors are unseen-generator misses (where M3 and M5 are strongest) or real-speech false alarms (where the handcrafted column and M1b's short-clip behaviour are the suspects)? Say plainly whether one number on 1,671 files can support any of the changes below or whether we are now optimizing proxies only.
+More and different heads on the SSL backbones. We have one frozen probe (layer 7, logistic) and one frozen-backbone head (12-layer, attentive pooling). Candidates, in our order of guessing: (a) a WavLM Large probe on the same recipe as M1b, as a second SSL view with different pretraining; (b) an M1b variant on a multi-layer concatenation or a learned weighting of layers 5–9 instead of layer 7 alone (embeddings for all 25 layers of XLS-R exist, so this is minutes); (c) averaging M5's five fold models with the full model at test time (free, variance reduction); (d) an attentive-pooling or statistics-pooling head on the frozen layer-7 frames instead of the time-mean (M5's pooling on M1's layer); (e) a probe trained on noise-augmented embeddings, given the noise weak spot. For each you endorse: the training recipe under our folds, the expected gain on a test set that scored 0.0733, how it enters fusion, and what weights you would pre-declare. Which two would you run first, and is any of them a waste?
+More or different engineered features. The handcrafted column is 20% of the vote and is the weakest under noise and under the test set's envelope shift; it is also the only column a judge can read. The previous memo said "no further points there"; the returned number lets us revisit. Candidates: (a) noise-augmented twins in training (symmetric, like the codec twins), aimed at the 20 dB weak spot; (b) a delta/dynamics-only variant that drops the envelope means the test shift lives in (we tried pruning shifted columns and it hurt; we have not tried a model trained on deltas alone); (c) families we have not built: long-term average spectrum residuals against a real-speech template, vocoder-harmonic and inter-harmonic noise ratios, formant bandwidth and trajectory statistics, sub-band modulation of the 4–7 kHz band, bispectral or phase-cyclostationarity cues; (d) a "generator-family" multi-class head whose output is used as routing rather than as a score. For each: what it measures that XLS-R does not, the expected gain given that the test set is band-limited to 7.2 kHz and re-encoded, and the two-hour version of the experiment.
+A more elegant fusion layer. The shipped rule is a fixed-weight rank blend chosen from six candidates, a one-way suppression step and a Platt map. What would you replace or extend it with that is admissible under our rules (no M3 inside a fitted model; nothing fit on holdout, In-the-Wild or test; every reading pre-declared)? Options we can see: a non-negative constrained stacker over the three admissible ranks fit on non-LJ inner rows; per-detector isotonic calibration before blending; a mixture-of-experts gated by measured file properties (voiced fraction, bandwidth, noise-floor level, clip length) so that, for example, M5 gets more weight on the short clips where M1b is weaker; a cascade that trusts M1b alone outside its ambiguous band; a Bayesian combination that treats M3's margin as a likelihood with a capped weight; a second suppression threshold (M3 margin &lt; −3 halves; &lt; −6 quarters). Which of these has a mechanism that could plausibly move a 0.0733 test number, which is holdout-fitting, and what sweep would you pre-declare?
+Time split, bluntly. About 13 hours to the freeze, four sessions, one decision-maker. Split the hours across (a) heads from ask 2, (b) features from ask 3, (c) fusion from ask 4, (d) documentation (the README is drafted; a docs site and the disclosure are in flight), (e) stop touching the file. Say which single change you expect to move the test number the most, and whether the honest answer to "should we keep experimenting" is no.
+Anything we have wrong. You have the whole picture above, including the returned number. Where is the premise error, if there is one?
+Additional context
+What already works and sets the bar: the shipped file scores 0.0733 on the real test set, reproduces from audio end to end, and beat every simpler rule on every proxy under both costs. A change ships only if it wins a pre-declared sweep on inner OOF, holdout and In-the-Wild under both costs, and Nathan ratifies it; otherwise it goes into the README as a negative result, which is itself graded.
+We can A/B anything on exported logits in seconds; new embeddings cost about 22 minutes of CPU per corpus and layer set; a new M5-style head costs about 12 minutes per fold model on an A100 plus setup.
+Hard lines: no training or selection on the holdout, In-the-Wild or the test set; no pseudo-labels; augment both classes or neither; the pinned block stays at the bottom; 1.0 = synthetic; final file frozen Sunday 05:00.
+Output format
+One-line verdict on the returned number (regime, likely error profile, confidence).
+A ranked options table across asks 2–4: approach / mechanism that could move the test number / expected minDCF effect / effort in hours / risk / verdict (do, maybe, skip).
+For each "do": a runnable procedure with the fold discipline spelled out, the pre-declared fusion entry and the acceptance rule.
+The time split for ask 5, with the single highest-value change named.
+A direct call on "are we over-engineering; should we stop touching the file?", no hedging.
+Failure modes we have not named.</p>
+</blockquote>
+<h2 id="executive-summary">Executive summary</h2>
+<h2 id="scope">Scope</h2>
+<p>Post-draft triage for the NSA HEARSAY audio-deepfake challenge, ~13 hours before the Sunday 05:00 EDT freeze. Interprets the single NSA readout on the shipped TSV (minDCF 0.0733, EER 3.534%) — regime, error profile, and evidentiary weight — then ranks the four candidate change classes (SSL heads, engineered features, fusion redesign, or stop touching the file) under the team's fold-discipline, regression-tolerance, and single-ratifier constraints, and allocates the remaining clock.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>The (minDCF, EER) pair cannot identify NSA's cost convention, but the EER tightly constrains each conditional profile: under the brief cost the optimum is forced to <span class="math inline">$<code>\le</code>$</span>~5 false alarms plus 18–37 misses; under the sponsor cost it inverts to ~42–86 false alarms plus <span class="math inline">$<code>\le</code>$</span>5 misses. NSA's verbal statement of the brief cost — not the numbers — makes the few-FA/miss-tail read the working hypothesis. One aggregate readout cannot validate any fusion change; all fusion redesign should stop. Keep the shipped TSV as presumptive final and run only 3–4 bounded, pre-declared experiments (WavLM Large probe first, XLS-R layer 5–9 probe second, a second M3 suppression tier as a free audit, noise-twin handcrafted in a parallel session) under a gate stricter than the standing rule. If nothing clears by ~18:30–19:00 EDT, freeze and sleep.</p>
+<span class="confidence-label">Confidence:</span>
+<span class="confidence-value">Medium</span>
+<p>Both experts converged on the operational core: the miss-heavy profile is the most plausible read, one aggregate readout cannot validate fusion redesign, only bounded new-information experiments under a stricter gate are defensible, and the shipped file stays presumptive final. They diverged on certainty: Gemini declared the brief cost "mathematically definitive," but its proof only rules out the user's specific sponsor decomposition; ChatGPT's code-verified enumeration shows feasible points under both conventions. That divergence is explained (an unstated behavioral assumption plus an unverified layer-5 literature claim), but the actual cost convention and the test-set effect of any change remain unresolved, capping confidence at Medium.</p>
+<h3 id="sensitivities">Sensitivities</h3>
+<ul>
+<li><span class="markdown-body md-compact"></span>
+<p>The miss-tail read is conditional on NSA using the verbally stated brief cost; under the sponsor convention the forced profile inverts to ~42–86 false alarms and <span class="math inline">$<code>\le 5</code>$</span> misses.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>All expected gains assume proxy-to-test transfer; <span class="math inline">$<code>\hat{\lambda}=0.51</code>$</span> already mispredicted the test set's difficulty position, so proxy wins may not move the real number at all.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>The layer 5–9 probe's priority rests on an unverified ASVspoof 5 literature claim; treat it as a hypothesis the gate must confirm, not a prior.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Effective sample size may be well below 1,671 due to shared speakers, generators, and one recording pipeline, making all file-count equivalents look more certain than they are.</p></li>
+</ul>
+<p>Final Verified Code</p>
+<span class="artifact-lines">(46 lines)</span>
+<span class="markdown-body md-compact"></span>
+<p>ChatGPT's script computes per-error cost increments (<code>brief\_fa</code>, <code>brief\_miss</code>, <code>sponsor\_fa</code>, <code>sponsor\_miss</code>), FA/miss equivalents of the 0.0733 readout and of the gap to 0.03 under both conventions, EER error counts, illustrative fixed-threshold standard errors (<code>se\_b</code>, <code>se\_s</code>), and enumerates integer <span class="math inline">$<code>(FA, miss)</code>$</span> pairs consistent with the readout. Selected because it is the only executed, verifiable quantification of the evidentiary-weight question, and its enumeration is what demonstrates the sponsor convention remains feasible — the fact that overturns Gemini's 'definitive' claim.</p>
+<p>Show code</p>
+<pre><code class="language-artifact-content">import numpy as np, math
+N_R=1170
+N_S=500
+m=0.0733
+eer=0.03534
+# Per error increments
+brief_fa=9.33/N_R
+brief_miss=1/N_S
+sponsor_fa=1/N_R
+sponsor_miss=4/N_S
+print('per error', brief_fa, brief_miss, sponsor_fa, sponsor_miss)
+print('equiv current brief', m/brief_fa, m/brief_miss)
+print('equiv current sponsor', m/sponsor_fa, m/sponsor_miss)
+gap=m-0.03
+print('gap equivalents brief', gap/brief_fa, gap/brief_miss)
+print('gap equivalents sponsor', gap/sponsor_fa, gap/sponsor_miss)
+print('EER counts', eer*N_R, eer*N_S)
+print('cost at EER brief/sponsor', (9.33+1)*eer, (1+4)*eer)
+# Conditional fixed-threshold standard error over continuous allocations satisfying total cost.
+# brief: 9.33 pfa + pmiss = m
+pfa_b=np.linspace(0,m/9.33,100001)
+pm_b=m-9.33*pfa_b
+se_b=np.sqrt((9.33**2)*pfa_b*(1-pfa_b)/N_R + pm_b*(1-pm_b)/N_S)
+print('brief p ranges', pfa_b[0],pfa_b[-1],pm_b.min(),pm_b.max())
+print('brief SE range/max loc',se_b.min(),se_b.max(),pfa_b[se_b.argmax()],pm_b[se_b.argmax()], '95 max',1.96*se_b.max())
+# sponsor: pfa + 4 pm = m
+pfa_s=np.linspace(0,m,100001)
+pm_s=(m-pfa_s)/4
+se_s=np.sqrt(pfa_s*(1-pfa_s)/N_R + (4**2)*pm_s*(1-pm_s)/N_S)
+print('sponsor p ranges', pfa_s.min(),pfa_s.max(),pm_s.min(),pm_s.max())
+print('sponsor SE range/max loc',se_s.min(),se_s.max(),pfa_s[se_s.argmax()],pm_s[se_s.argmax()], '95 max',1.96*se_s.max())
+# integer pairs within nearest output rounding 0.00005 around .0733
+pairs_b=[]
+for fa in range(N_R+1):
+    for miss in range(N_S+1):
+        c=9.33*fa/N_R+miss/N_S
+        if abs(c-m)&lt;=0.00005:
+            pairs_b.append((fa,miss,c))
+print('brief integer pairs within .00005, first/last/count:',pairs_b[:10],pairs_b[-10:],len(pairs_b))
+pairs_s=[]
+for fa in range(N_R+1):
+    for miss in range(N_S+1):
+        c=fa/N_R+4*miss/N_S
+        if abs(c-m)&lt;=0.00005:
+            pairs_s.append((fa,miss,c))
+print('sponsor integer pairs within .00005, first/last/count:',pairs_s[:10],pairs_s[-10:],len(pairs_s))</code></pre>
+<h2 id="expert-summaries-2">Expert Summaries (2)</h2>
+<h4 id="chatgpt">ChatGPT</h4>
+<p><strong>Approach:</strong></p>
+<p>Code-verified error-equivalent arithmetic under both cost conventions, treating the returned <span class="math inline">$<code>(\mathrm{minDCF},\mathrm{EER})</code>$</span> pair as non-identifying; conditional error-profile analysis, a 19-row ranked options table, a stricter pre-declared replacement gate, and a wall-clock plan that ends experimentation by ~20:15 EDT.</p>
+<p><strong>Conclusion:</strong></p>
+<p>The pair cannot identify NSA's cost convention or the minimizing error mix; conditional on the brief cost a few-FA/miss-tail profile is likelier. Run four bounded experiments (WavLM probe, XLS-R 5–9 probe, second M3 tier, noise-twin handcrafted) under a stricter gate; otherwise stop touching the file.</p>
+<p><strong>Strengths:</strong></p>
+<ul>
+<li><span class="markdown-body md-compact"></span>
+<p>Executed code verifying per-error increments, FA/miss equivalents, the gap to 0.03, and illustrative fixed-threshold <span class="math inline">$<code>\mathrm{SE}</code>$</span> under both conventions</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Correctly separates what the number proves (effective polarity, feasible regimes) from briefing-derived priors (which convention NSA used)</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Caught concrete internal errors: the M5 fold-averaging OOF leakage, the backwards "M5 on short clips" premise, and that order-preserving calibration cannot move an oracle-threshold <span class="math inline">$<code>\mathrm{minDCF}</code>$</span></p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Stricter, fully specified replacement gate with a hard decision window and Spearman-displacement escalation</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Ten failure modes including effective-sample-size correlation, winner's curse from proxy reuse, and reproducibility near-tie ordering</p></li>
+</ul>
+<p><strong>Weaknesses:</strong></p>
+<ul>
+<li><span class="markdown-body md-compact"></span>
+<p>Did not exploit the EER feasibility constraint (<span class="math inline">$<code>\max(P_{FA},P_{miss})\ge\mathrm{EER}</code>$</span>) that sharply narrows each conditional profile — Gemini's genuine contribution</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>One of its two enumerated sponsor-cost integer pairs (39 FA, 5 misses) violates that DET-feasibility constraint and should have been filtered</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Several literature-flavored claims (WavLM fusion precedent, cross-domain degradation norms) failed source verification</p></li>
+</ul>
+<p><em>Unique:</em></p>
+<p>The quantified evidence bound (improvements below ~0.008 are one expensive-file quantum; fixed-threshold <span class="math inline">$<code>\mathrm{SE}</code>$</span> 0.008–0.024), the leakage analysis killing M5 fold-averaging, and the consolidated-ratification/fatigue framing of Nathan as the binding constraint.</p>
+<h4 id="gemini">Gemini</h4>
+<p><strong>Approach:</strong></p>
+<p>Feasibility argument from the EER: at a single threshold both error rates cannot lie below the <span class="math inline">$<code>\mathrm{EER}</code>$</span>, so the user's hypothesized sponsor-cost point (1.3% FA, 1.5% miss) is impossible; concludes the brief cost is definitive and the tail is ~22–37 unseen-generator misses; recommends pivoting entirely from fusion to an XLS-R layer-5(–9) probe and delta-only handcrafted features.</p>
+<p><strong>Conclusion:</strong></p>
+<p>Brief cost is certain, the errors are a miss tail, all fusion work is proxy-overfitting; run the layer 5–9 probe and delta-only features under a stricter dual-improvement bar.</p>
+<p><strong>Strengths:</strong></p>
+<ul>
+<li><span class="markdown-body md-compact"></span>
+<p>The EER-feasibility argument is valid and correctly refutes the user's specific sponsor-cost decomposition — a real sharpening of the regime read</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Identified the sponsor-code sweep bug as a failure mode: accidentally optimizing <span class="math inline">$<code>P_{FA}+4P_{miss}</code>$</span> would catastrophically raise false alarms under the brief cost</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Named the multiplicity trap of running many free proxy sweeps against a fixed loss-aversion bar</p></li>
+</ul>
+<p><strong>Weaknesses:</strong></p>
+<ul>
+<li><span class="markdown-body md-compact"></span>
+<p>Overreached from refuting one decomposition to declaring the convention "definitively" brief; sponsor-feasible points exist (e.g., ~67 FA + 2 misses), bridged only by an unproven behavioral assumption about the system's FA ceiling</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>The layer-5 ASVspoof5 literature claim driving its Rank-1 recommendation failed source verification (0 of 1 external facts verified)</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>High confidence is unwarranted; effort estimates (4h for WavLM despite on-disk weights and an existing pipeline) and the 13-hour full-clock plan ignore the sleep constraint and Nathan's ratification bandwidth</p></li>
+</ul>
+<p><em>Unique:</em></p>
+<p>The DET-feasibility constraint on the returned pair, the delta-only handcrafted proposal as a channel-invariance mechanism, and the sponsor-code sweep-bug failure mode.</p>
+<h2 id="assumptions-and-limitations">Assumptions and Limitations</h2>
+<h5 id="assumptions">Assumptions</h5>
+<ul>
+<li><span class="markdown-body md-compact"></span>
+<p>NSA test set composition ≈1,170 real / 500 synthetic files (<span class="math inline">$<code>N_R=1170</code>$</span>, <span class="math inline">$<code>N_S=500</code>$</span>), per NSA's ~70% real statement.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Brief cost convention: <span class="math inline">$<code>\mathrm{DCF}_{brief}=9.33P_{FA}+P_{miss}</code>$</span> (from <span class="math inline">$<code>\pi_{synth}=0.3</code>$</span>, <span class="math inline">$<code>C_{FA}=4</code>$</span>, <span class="math inline">$<code>C_{miss}=1</code>$</span>); sponsor-script convention: <span class="math inline">$<code>\mathrm{DCF}_{sponsor}=P_{FA}+4P_{miss}</code>$</span>.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>The returned <span class="math inline">$<code>\mathrm{minDCF}=0.0733</code>$</span> and <span class="math inline">$<code>\mathrm{EER}=3.534\%</code>$</span> are exact, computed on the same ROC for the shipped TSV, with a monotone DET curve (so <span class="math inline">$<code>\max(P_{FA},P_{miss})\ge\mathrm{EER}</code>$</span> at any single threshold).</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>NSA's in-person statement (analyst scenario, false alarm 4× a miss) is taken as an ~80–85% prior that the brief convention produced the readout; the numbers themselves are non-identifying.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Per-error increments under the brief cost: one false alarm = 0.00797, one miss = 0.002 <span class="math inline">$<code>\mathrm{minDCF}</code>$</span> points; under the sponsor cost they invert to 0.000855 and 0.008.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Proxy noise as stated by the team: holdout <span class="math inline">$<code>\pm 0.07</code>$</span>–0.10; proxy-to-test transfer is unverified (<span class="math inline">$<code>\hat{\lambda}=0.51</code>$</span> already underpredicted test difficulty).</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Documentation is fixed and separately staffed; Nathan's ratification bandwidth, not compute, is the binding constraint; A100 budget effectively unconstrained.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>All standing hard lines hold: no fitting on holdout/ITW/test, no pseudo-labels, symmetric augmentation, M3 suppression-only, pinned block at bottom, 1.0 = synthetic, freeze Sunday 05:00 EDT.</p></li>
+</ul>
+<h5 id="limitations">Limitations</h5>
+<ul>
+<li><span class="markdown-body md-compact"></span>
+<p>NSA's actual cost convention, <span class="math inline">$<code>P_{FA}</code>$</span>, <span class="math inline">$<code>P_{miss}</code>$</span>, and threshold remain unknown; the miss-tail profile is conditional on the brief convention and cannot be confirmed from the readout.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>No candidate's effect on the test set is observable before the freeze; all expected-value estimates are subjective priors evaluated on proxies whose transfer to the test population is unproven.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>Gemini's layer-5 discriminability claim and ChatGPT's WavLM-fusion-precedent claims failed source verification; the corresponding rankings rest on mechanism plausibility, not verified literature.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>The illustrative standard errors (0.008–0.024) are fixed-threshold binomial approximations; oracle threshold selection and correlated files invalidate them as formal intervals.</p></li>
+<li><span class="markdown-body md-compact"></span>
+<p>The attribution of the presumed miss tail to unseen generators is inference from indirect probes (MLAAD, M3 behavior), not measurement.</p></li>
+</ul>
+<h2 id="nomenclature-14-symbols">Nomenclature (14 symbols)</h2>
+<table class="nomenclature-table">
+<colgroup>
+<col style="width:33%">
+<col style="width:33%">
+<col style="width:33%">
+</colgroup>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Definition</th>
+<th>Units</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>P</em><sub><em>F</em><em>A</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Probability of false alarm (real file scored as synthetic)</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless (0–1)</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>P</em><sub><em>m</em><em>i</em><em>s</em><em>s</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Probability of miss (synthetic file scored as real)</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless (0–1)</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>π</em><sub><em>s</em><em>y</em><em>n</em><em>t</em><em>h</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Prior probability of the synthetic class used in cost normalization</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless (0–1)</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>C</em><sub><em>F</em><em>A</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Cost weight assigned to a false alarm</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>C</em><sub><em>m</em><em>i</em><em>s</em><em>s</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Cost weight assigned to a miss</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline">minDCF</span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Minimum normalized detection cost over the threshold sweep (variable <span class="math inline"><span class="math inline"><em>m</em></span></span> in the selected code)</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline">EER</span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Equal error rate, the threshold where <span class="math inline"><span class="math inline"><em>P</em><sub><em>F</em><em>A</em></sub> = <em>P</em><sub><em>m</em><em>i</em><em>s</em><em>s</em></sub></span></span> (variable <span class="math inline"><span class="math inline"><em>e</em><em>e</em><em>r</em></span></span> in the code)</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>%</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>N</em><sub><em>R</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Approximate number of real files in the NSA test set (~1,170)</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>files</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>N</em><sub><em>S</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Approximate number of synthetic files in the NSA test set (~500)</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>files</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline">DCF<sub><em>b</em><em>r</em><em>i</em><em>e</em><em>f</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Brief-convention normalized cost, <span class="math inline"><span class="math inline">9.33 <em>P</em><sub><em>F</em><em>A</em></sub> + <em>P</em><sub><em>m</em><em>i</em><em>s</em><em>s</em></sub></span></span></p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline">DCF<sub><em>s</em><em>p</em><em>o</em><em>n</em><em>s</em><em>o</em><em>r</em></sub></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Sponsor-script normalized cost, <span class="math inline"><span class="math inline"><em>P</em><sub><em>F</em><em>A</em></sub> + 4 <em>P</em><sub><em>m</em><em>i</em><em>s</em><em>s</em></sub></span></span></p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>Δ</em>minDCF</span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Candidate <span class="math inline"><span class="math inline">minDCF</span></span> minus baseline; negative values are improvements</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline">SE</span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Illustrative fixed-threshold standard error of a cost estimate (arrays <span class="math inline"><span class="math inline"><em>s</em><em>e</em><sub><em>b</em></sub>, <em>s</em><em>e</em><sub><em>s</em></sub></span></span> in the code)</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless</p></td>
+</tr>
+<tr>
+<td class="nomenclature-symbol"><span class="math inline"><em>λ̂</em></span></td>
+<td><span class="markdown-body md-compact"></span>
+<p>Estimated wild-domain channel weight of the test set from label-free statistics</p></td>
+<td><span class="markdown-body md-compact"></span>
+<p>dimensionless (0–1)</p></td>
+</tr>
+</tbody>
+</table>
+<h2 id="narrative">Narrative</h2>
+<h2 id="expert-comparison">Expert Comparison</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th style="text-align:left">Dimension</th><th style="text-align:left">ChatGPT</th><th style="text-align:left">Gemini</th>
+</tr></thead>
+<tbody>
+<tr><td style="text-align:left">Core approach</td><td style="text-align:left">Code-verified error-equivalent arithmetic; conditional profile analysis under both cost conventions</td><td style="text-align:left">EER-feasibility argument; asserts the convention outright</td></tr>
+<tr><td style="text-align:left">Regime read</td><td style="text-align:left">Pair is non-identifying; miss-tail likely only conditional on brief cost</td><td style="text-align:left">Brief cost "definitive"; ~0–4 FA + 22–37 misses</td></tr>
+<tr><td style="text-align:left">Evidentiary weight</td><td style="text-align:left">~9 FA / ~37 miss equivalents confirmed; single readout cannot license fusion changes</td><td style="text-align:left">Same equivalents confirmed; "zero statistical power" for fusion</td></tr>
+<tr><td style="text-align:left">Top candidates</td><td style="text-align:left">WavLM Large probe, XLS-R 5–9 concat, second M3 tier, noise twins</td><td style="text-align:left">XLS-R layer 5(–9) probe, delta-only handcrafted; WavLM maybe</td></tr>
+<tr><td style="text-align:left">Fusion verdict</td><td style="text-align:left">Skip all fusion redesign</td><td style="text-align:left">Skip all fusion redesign</td></tr>
+<tr><td style="text-align:left">Ship gate</td><td style="text-align:left">ITW brief <span class="math inline">$<code>\ge 0.020</code>$</span> gain, sponsor regression <span class="math inline">$<code>\le 0.002</code>$</span>, holdout degradation <span class="math inline">$<code>\le 0.010</code>$</span>, inner <span class="math inline">$<code>\ge 0.010</code>$</span> gain</td><td style="text-align:left">ITW <span class="math inline">$<code>\ge 0.01</code>$</span> gain AND holdout flat/improve within 0.005</td></tr>
+<tr><td style="text-align:left">Stop/go</td><td style="text-align:left">Yes for ~3 h of four bounded jobs, freeze by ~20:15 EDT</td><td style="text-align:left">Yes, full 13-hour experimental plan</td></tr>
+<tr><td style="text-align:left">Confidence</td><td style="text-align:left">Medium</td><td style="text-align:left">High</td></tr>
+</tbody>
+</table></div>
+<p>The experts agree on everything operationally decisive: the shipped TSV stays presumptive final; the likeliest error profile is a small number of false alarms plus a miss tail; one aggregate number on ~1,671 files cannot validate fusion weights, calibration, stackers, or mixture-of-experts gating, so all fusion redesign is skipped; the standing regression-tolerance bar is too permissive for a one-shot setting and must be tightened; and a small set of bounded, pre-declared head/feature experiments is worth a few hours before a hard stop. They disagree on how certain the regime read is and on which experiment runs first.</p>
+<h2 id="expert-divergence">Expert Divergence</h2>
+<p>Gemini claimed "mathematical certainty" that NSA used the brief cost. The valid core of its argument: on a monotone DET curve, no single threshold can have both <span class="math inline">$<code>P_{FA}</code>$</span> and <span class="math inline">$<code>P_{miss}</code>$</span> strictly below the <span class="math inline">$<code>\mathrm{EER}</code>$</span>, so the user's illustrative sponsor-cost point (1.3% FA, 1.5% miss, both below 3.534%) is impossible. That correctly kills one decomposition — but not the convention. ChatGPT's executed enumeration found sponsor-cost solutions, and applying Gemini's own feasibility constraint to them leaves a valid sponsor region: <span class="math inline">$<code>P_{FA}\in[3.53\%, 7.33\%]</code>$</span> with <span class="math inline">$<code>P_{miss}\le 0.95\%</code>$</span> (e.g., ~67 false alarms and 2 misses). Gemini bridged this gap with a behavioral assumption — that the shipped system "cannot organically reach 4.1% <span class="math inline">$<code>P_{FA}</code>$</span>" — which is a prior about a never-observed population, not mathematics; the <span class="math inline">$<code>\mathrm{minDCF}</code>$</span> sweep is free to select a high-FA threshold if that minimizes the sponsor cost, and the test set has already surprised the proxies once (<span class="math inline">$<code>\hat{\lambda}=0.51</code>$</span> underpredicted its difficulty position). Additionally, Gemini's Rank-1 recommendation rests on a literature claim about layer-5 discriminability in ASVspoof 5 ablations that failed source verification. Resolution: adopt ChatGPT's framing — the pair is non-identifying and the brief-cost/miss-tail read comes from NSA's in-person statement, not the numbers — while keeping Gemini's feasibility constraint as a genuine sharpening of both conditional profiles, and demoting the layer-shift idea from "fixes a fundamental representation gap" to a cheap second experiment tested under the gate. Gemini's High confidence is rejected.</p>
+<h2 id="technical-detail">Technical Detail</h2>
+<h3 id="1-what-the-returned-pair-does-and-does-not-identify">1. What the returned pair does and does not identify</h3>
+<p>The low returned values establish only that NSA evaluated the file with an effective polarity compatible with its ranking; they do not establish whether NSA read 1.0 as synthetic directly or inverted into the official ASVspoof 5 convention, where higher scores represent bona fide speech [S3]. "Direction is ours" is therefore slightly too strong as stated, though operationally moot: the pre-declared 0.00–0.20 branch is correctly triggered, and no flip or fallback applies. Calling the regime "holdout-like" is wrong — at roughly 11× the holdout <span class="math inline">$<code>\mathrm{minDCF}</code>$</span> and ~17× its <span class="math inline">$<code>\mathrm{EER}</code>$</span>, the test set is a distinct, moderately shifted domain whose cost-relevant low-FA tail held up far better than In-the-Wild's.</p>
+<p>On the cost convention: at the equal-error point the brief cost would be <span class="math inline">$<code>(9.33+1)\times 0.03534 = 0.365</code>$</span> and the sponsor cost <span class="math inline">$<code>5\times 0.03534 = 0.177</code>$</span>; a minimum of 0.0733 is feasible under either curve, so the pair alone is non-identifying. But the EER constrains each conditional decomposition sharply (this is the synthesis of Gemini's feasibility argument with ChatGPT's arithmetic):</p>
+<ul>
+<li><strong>Brief cost</strong> <span class="math inline">$<code>(9.33P_{FA}+P_{miss}=0.0733)</code>$</span>: <span class="math inline">$<code>P_{FA}\ge\mathrm{EER}</code>$</span> would cost <span class="math inline">$<code>\ge 0.33</code>$</span> alone, so the optimum forces <span class="math inline">$<code>P_{miss}\in[3.53\%, 7.33\%]</code>$</span> (≈18–37 missed fakes) and <span class="math inline">$<code>P_{FA}\le 0.41\%</code>$</span> (≈0–5 false alarms).</li>
+<li><strong>Sponsor cost</strong> <span class="math inline">$<code>(P_{FA}+4P_{miss}=0.0733)</code>$</span>: <span class="math inline">$<code>P_{miss}\ge\mathrm{EER}</code>$</span> would cost <span class="math inline">$<code>\ge 0.14</code>$</span> alone, so the optimum forces <span class="math inline">$<code>P_{FA}\in[3.53\%, 7.33\%]</code>$</span> (≈42–86 false alarms) and <span class="math inline">$<code>P_{miss}\le 0.95\%</code>$</span> (≈0–5 misses).</li>
+</ul>
+<p>So the profiles are mutually exclusive and each is essentially forced once the convention is fixed — the convention itself is resolved by NSA's in-person statement of the analyst scenario (false alarm 4× a miss), not by the readout. Working read, stated with explicit confidence: <strong>few-FA/miss-tail, conditional on the brief convention; the conditioning assumption is briefing-derived, roughly 80–85% not 100%.</strong> The further attribution of those misses to unseen generators is plausible mechanism (the M3 MLAAD probe evidence) but is inference, not measurement — and note that M3, restricted to suppression-only, can only move files toward real and therefore cannot repair a miss tail regardless of how good it is at recognizing unseen spoofs. Two related corrections from ChatGPT stand: M5 is not a short-clip expert (holdout 0.60 on clips <span class="math inline">$<code>\le 4</code>$</span> s), and since <span class="math inline">$<code>\mathrm{minDCF}</code>$</span> is an oracle-threshold ranking metric [S3], the Platt map and any order-preserving recalibration cannot move it — spend zero clock on calibration.</p>
+<h3 id="2-evidentiary-weight-of-one-readout">2. Evidentiary weight of one readout</h3>
+<p>The user-supplied equivalents check out under the brief normalization: one false alarm costs 0.00797, one miss 0.002, so 0.0733 ≈ 9.2 FA-equivalents or 36.7 miss-equivalents, and the gap to 0.03 is ≈5.4 FA or 21.7 misses (brief) versus ≈50.7 FA or 5.4 misses (sponsor). But this is a resolution calculation, not a confidence bound. ChatGPT's illustrative fixed-threshold standard errors run 0.008–0.024 (95% half-width up to ~0.047), before accounting for oracle threshold selection and correlated files — the effective sample size is plausibly well below 1,671 because shared speakers, generators, and one recording pipeline correlate errors. Practical bound adopted from ChatGPT: improvements below ~0.008 are a single expensive-file quantum and not persuasive test evidence; with the holdout's own noise at <span class="math inline">$<code>\pm 0.07</code>$</span>–0.10, small proxy wins are not evidence of transfer. Both experts' shared verdict follows: <strong>the team is now optimizing proxies only</strong>, and the only defensible changes inject genuinely new discriminative information (new representation or new feature physics), validated on proxies under a stricter gate, never fusion re-slicing of the same three score columns.</p>
+<h3 id="3-ranked-options-across-asks-24">3. Ranked options across asks 2–4</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th style="text-align:right">Rank</th><th style="text-align:left">Approach</th><th style="text-align:left">Mechanism</th><th style="text-align:left">Expected test <span class="math inline">$<code>\Delta\mathrm{minDCF}</code>$</span></th><th style="text-align:left">Effort</th><th style="text-align:left">Risk</th><th style="text-align:left">Verdict</th>
+</tr></thead>
+<tbody>
+<tr><td style="text-align:right">1</td><td style="text-align:left">WavLM Large frozen probe (M1b recipe)</td><td style="text-align:left">Genuinely different SSL pretraining; may reorder unseen-generator or channel-shifted cases XLS-R misses; noise-oriented pretraining precedent exists but transfer of dev gains has failed before</td><td style="text-align:left">EV ≈ −0.002; range −0.015 to +0.020</td><td style="text-align:left">1.5–2 h (weights on disk, pipeline exists)</td><td style="text-align:left">Correlated errors with M1b; transfer failure</td><td style="text-align:left"><strong>DO first</strong></td></tr>
+<tr><td style="text-align:right">2</td><td style="text-align:left">XLS-R layers 5–9 concatenated probe</td><td style="text-align:left">Earlier-layer artifact sensitivity (Gemini's ASVspoof 5 literature claim — unverified, treat as hypothesis); embeddings for all 25 layers on disk</td><td style="text-align:left">EV ≈ −0.001; range −0.008 to +0.010</td><td style="text-align:left">0.5–1 h</td><td style="text-align:left">Added dimensions fit generator identity on inner folds</td><td style="text-align:left"><strong>DO second</strong></td></tr>
+<tr><td style="text-align:right">3</td><td style="text-align:left">Second M3 suppression tier (margin <span class="math inline">$<code>&lt; -6</code>$</span> quarters)</td><td style="text-align:left">Can only further demote confident-real files; cannot touch the hypothesized miss tail</td><td style="text-align:left">EV ≈ 0; range −0.006 to +0.006</td><td style="text-align:left">~10 min</td><td style="text-align:left">Unknown M3 training overlap; likely saturated</td><td style="text-align:left"><strong>DO as free audit</strong></td></tr>
+<tr><td style="text-align:right">4</td><td style="text-align:left">Noise-augmented handcrafted twins (20 dB, both classes)</td><td style="text-align:left">Attacks the measured white-noise collapse; but additive noise is not established as the test-set mechanism (the shift is a smooth 7.2 kHz low-pass)</td><td style="text-align:left">EV ≈ 0; range −0.006 to +0.012</td><td style="text-align:left">~1 h</td><td style="text-align:left">Fixes a lane the test may not exercise</td><td style="text-align:left"><strong>DO in a parallel session only</strong></td></tr>
+<tr><td style="text-align:right">5</td><td style="text-align:left">Delta/dynamics-only handcrafted (disputed: Gemini DO / ChatGPT skip)</td><td style="text-align:left">Channel-mean invariance to the envelope shift — a different mechanism than the column-pruning that already failed, but that prior result points against it</td><td style="text-align:left">EV ≈ +0.001; range −0.005 to +0.015</td><td style="text-align:left">~1–3 h</td><td style="text-align:left">Repeats the pruning failure in new clothes</td><td style="text-align:left">MAYBE — one bounded run if a session is idle</td></tr>
+<tr><td style="text-align:right">6</td><td style="text-align:left">M5 fold-model averaging</td><td style="text-align:left">Naïve averaging leaks each OOF row into its own validation prediction; M5's problem is domain bias, not variance</td><td style="text-align:left">≈ 0</td><td style="text-align:left">0.3–1 h</td><td style="text-align:left">Invalid validation</td><td style="text-align:left">SKIP</td></tr>
+<tr><td style="text-align:right">7</td><td style="text-align:left">Noise-augmented M1b embeddings</td><td style="text-align:left">Duplicates the WavLM slot; noise augmentation has recipe precedent [S3][S6]</td><td style="text-align:left">EV ≈ −0.001</td><td style="text-align:left">1.5 h</td><td style="text-align:left">Clean-ranking regression</td><td style="text-align:left">MAYBE only if WavLM finishes early</td></tr>
+<tr><td style="text-align:right">8</td><td style="text-align:left">New feature families (LTAS residuals, vocoder harmonics, formants, sub-band modulation, bispectral/phase-cyclostationarity)</td><td style="text-align:left">Phase-aware features have mechanism support [S11], but each is a fresh research lane; LTAS residuals would almost certainly learn the AUC-0.99 train/test channel split</td><td style="text-align:left">EV ≈ 0 to +0.004</td><td style="text-align:left">1.5–2+ h each</td><td style="text-align:left">Feature lottery; attribution impossible tonight</td><td style="text-align:left">SKIP tonight, document as future work</td></tr>
+<tr><td style="text-align:right">9</td><td style="text-align:left">Generator-family router; property-gated MoE; NN-stacker; isotonic-before-blend; M1b cascade</td><td style="text-align:left">Re-slicing the same scores against thrice-reused proxies; the short-clip MoE premise is contradicted by M5's own numbers</td><td style="text-align:left">EV +0.002 to +0.005, wide downside</td><td style="text-align:left">0.5–3 h</td><td style="text-align:left">Proxy overfitting — both experts' unanimous skip</td><td style="text-align:left"><strong>SKIP all</strong></td></tr>
+<tr><td style="text-align:right">10</td><td style="text-align:left">Capped Bayesian M3 likelihood</td><td style="text-align:left">M3 margin is not a calibrated likelihood; violates the team's own suppression-only ceiling</td><td style="text-align:left">Unbounded asymmetric downside</td><td style="text-align:left">1 h</td><td style="text-align:left">Rule violation</td><td style="text-align:left"><strong>FORBIDDEN</strong></td></tr>
+</tbody>
+</table></div>
+<h3 id="4-procedures-and-the-stricter-replacement-gate">4. Procedures and the stricter replacement gate</h3>
+<p>Freeze this gate before viewing any candidate's numbers (adopted from ChatGPT; strictly tighter than the standing rule, as both experts independently demanded for a one-shot setting — the standing bar would tolerate the holdout drifting from 0.0065 to 0.0565, which is indefensible):</p>
+<ol>
+<li>Freeze each candidate's definition, weights, and preprocessing in a manifest before its proxy table exists; never combine tonight's candidates.</li>
+<li>In-the-Wild brief improvement <span class="math inline">$<code>\ge 0.020</code>$</span>; sponsor-cost regression <span class="math inline">$<code>\le 0.002</code>$</span>.</li>
+<li>Inner-OOF brief improvement <span class="math inline">$<code>\ge 0.010</code>$</span>; no sponsor-cost regression at printed precision.</li>
+<li>Holdout degradation <span class="math inline">$<code>\le 0.010</code>$</span> under either convention (safety constraint, not evidence).</li>
+<li>Both costs must improve on at least two of three proxy populations, plus the candidate's mechanism-specific diagnostic must pass (e.g., noise twins must recover the 20 dB stress lane, WavLM must correct baseline proxy errors rather than clone M1b ranks).</li>
+<li>If the candidate's test-ranking Spearman versus baseline falls below 0.974, double the required gains; count 0.5-crossings for disclosure only.</li>
+<li>If two candidates pass, ship neither unless one Pareto-dominates across all six split/cost cells; Nathan ratifies exactly one candidate from one consolidated packet, then the end-to-end runner must reproduce the exact ordering and pinned block. Nothing auto-ships.</li>
+</ol>
+<p>Per-candidate discipline, compressed: <strong>WavLM Large</strong> — identical band-matching, clip handling, time-mean, training rows, class balancing, and grouped folds as M1b; scaler, logistic, Platt, and ECDF fit fold-locally; pre-declare one fusion entry (WavLM takes 0.20 from M1b's 0.6; handcrafted and M5 stay 0.20; M3 step unchanged); no weight sweeps tonight. <strong>XLS-R 5–9</strong> — one candidate only (concatenated time-means), all fitting inside grouped training folds, same 0.20-from-M1b entry; a win only on inner OOF is generator fitting, not evidence. <strong>Second M3 tier</strong> — one pre-declared rule (halve below −3 as now, quarter below −6), applied to exported scores, no fitting; absolute diagnostic: the deeper tier must fire on zero known spoof rows across all proxies and perturbations. <strong>Noise twins</strong> — one 20 dB white-noise twin per class on fit-side rows only, clean validation rows, unchanged LightGBM recipe; direct replacement of the handcrafted slot, no old/new blend.</p>
+<h3 id="5-clock-allocation-nathans-bandwidth-not-compute-is-binding">5. Clock allocation (Nathan's bandwidth, not compute, is binding)</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th style="text-align:left">Wall time (EDT)</th><th style="text-align:left">Activity</th><th style="text-align:left">Nathan</th>
+</tr></thead>
+<tbody>
+<tr><td style="text-align:left">15:40–16:00</td><td style="text-align:left">Hash the baseline TSV; freeze the four-candidate manifest and the gate; run the M3 second-tier A/B</td><td style="text-align:left">Approve manifest only</td></tr>
+<tr><td style="text-align:left">16:00–17:30</td><td style="text-align:left">Parallel sessions: WavLM probe, XLS-R 5–9 probe, noise twins (optional 4th session: delta-only handcrafted)</td><td style="text-align:left">None</td></tr>
+<tr><td style="text-align:left">17:30–18:15</td><td style="text-align:left">One locked table: all inner/holdout/ITW results under both costs, mechanism diagnostics, rank displacement</td><td style="text-align:left">None</td></tr>
+<tr><td style="text-align:left">18:15–18:45</td><td style="text-align:left">Review at most one ready-to-ratify candidate</td><td style="text-align:left">30 min hard cap</td></tr>
+<tr><td style="text-align:left">18:45–20:15</td><td style="text-align:left">Only if ratified: regenerate all 1,671 scores, reproduce ordering and pinned block end-to-end, update numbers</td><td style="text-align:left">Final ratification</td></tr>
+<tr><td style="text-align:left">20:15–05:00</td><td style="text-align:left">Stop touching the scoring path and TSV; sleep; documentation lane continues separately; README polish 05:00–07:30 as staffed</td><td style="text-align:left">None</td></tr>
+</tbody>
+</table></div>
+<p>Roughly 3 parallel session-hours to heads, ~1 to features, &lt;1 to the fusion audit, <span class="math inline">$<code>\le 2</code>$</span> to ratification/integration. Gemini's full-13-hour schedule is rejected: it over-allocates against the stated sleep preference, ignores that documentation is separately staffed, and stretches Nathan's decision bandwidth across the night. <strong>Single highest-expected-value change: the WavLM Large frozen probe</strong> — the only cheap candidate offering genuinely different pretraining inside the proven low-variance frozen-probe recipe.</p>
+<h3 id="6-stopgo-direct">6. Stop/go, direct</h3>
+<p><strong>Continue? Yes — but only the frozen, bounded jobs above, for roughly three hours.</strong> The baseline artifact is immutable during experimentation, downside is near zero, and negative results are themselves graded documentation content. <strong>Change the TSV now? No.</strong> <strong>Ship a marginal proxy win? No</strong> — the standing +0.01 ITW bar is too weak for one shot; the stricter gate governs. <strong>If nothing clears by the 18:15 decision window, stop entirely</strong> rather than filling the clock. Both experts independently reached the same shape of answer; the honest version of "should we keep experimenting" is: yes for one tightly bounded window, then an enforced full stop that is itself pre-declared.</p>
+<h3 id="7-failure-modes-not-previously-named">7. Failure modes not previously named</h3>
+<ol>
+<li><strong>Winner's curse from proxy reuse</strong>: fold discipline prevents row leakage but not selection-fitting from running many free sweeps against the same three proxy tables; with enough candidates, one will pass any fixed bar by chance — cap the candidate count in the manifest (both experts flagged this independently).</li>
+<li><strong>Sponsor-code sweep bug</strong> (Gemini): if any automated sweep silently optimizes <span class="math inline">$<code>P_{FA}+4P_{miss}</code>$</span> instead of <span class="math inline">$<code>9.33P_{FA}+P_{miss}</code>$</span>, it will push the system toward exactly the high-FA operating region the brief cost punishes ~9× per file.</li>
+<li><strong>Effective sample size below 1,671</strong> (ChatGPT): correlated speakers/generators/pipeline make file-count equivalents look more certain than they are.</li>
+<li><strong>Reproducibility near-ties</strong> (ChatGPT): Spearman 1.0 with max score drift <span class="math inline">$<code>9.3\times 10^{-4}</code>$</span> does not guarantee identical ordering among near-tied files; compare exact sorted file IDs before and after any regeneration.</li>
+<li><strong>Fatigue-driven ratification error</strong>: one consolidated packet at 18:15 and an early immutable freeze are worth more than any additional experiment; a 03:00 ratification decision is the single most likely way to lose the 0.0733 already in hand.</li>
+</ol>
+<h2 id="scope-definition-qa">Scope Definition Q&amp;A</h2>
+<ul>
+<li><p><strong>Q1:</strong></p>
+<p>If a candidate change wins all pre-declared sweeps on inner OOF, holdout, and In-the-Wild under both costs, do you want it shipped automatically before the freeze, or must Nathan explicitly ratify each one live given the time crunch?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>Ratification. Nathan ratifies every change before it replaces the shipped file. Nothing auto-ships. Experiments run freely in parallel sessions, so recommend aggressively and label candidates "ready to ratify".</p></li>
+<li><p><strong>Q2:</strong></p>
+<p>Should the analysis treat the single NSA readout (0.0733/EER 3.534%) as strong enough evidence to justify any fusion/head/feature change at all, or do you want an explicit stated confidence bound on how much that one number can license before recommending changes?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>State one explicitly. With about 1,170 real and 500 synthetic files, one false alarm is worth 0.008 minDCF under the brief's cost and one miss 0.002, so 0.0733 is about 9 false-alarm equivalents or 37 misses. Under the sponsor code's cost the weights invert to 0.00085 per false alarm and 0.008 per miss. Our holdout's own noise is ±0.07 to 0.10, so holdout gaps under 0.15 are not evidence.</p></li>
+<li><p><strong>Q3:</strong></p>
+<p>Is there a hard minimum bar (e.g., must not risk regression below 0.0733 on the real mechanism) that would make you prefer 'stop touching the file' over any marginal-EV experiment, or is any positive expected-value experiment worth the risk given only one shot?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>Strong loss aversion. Our standing rule is that a candidate replaces the shipped rule only if In-the-Wild improves by at least 0.01 under the brief's cost, worsens by at most 0.01 under the sponsor's, the holdout worsens by at most 0.05, inner OOF by at most 0.03, and Nathan ratifies. The last switch moved 3 of 1,671 files across 0.5 at Spearman 0.974. A change that reorders more than that needs a stronger case. Propose a stricter bar if one shot warrants it.</p>
+<p>that EER and .0773 is set in stone getting worse doesn't hurt us but just doesn't help.</p></li>
+<li><p><strong>Q4:</strong></p>
+<p>Do you want the documentation/README time allocation treated as fixed (already drafted, just needs updates) or as competing directly for hours against the experimental asks 2-4?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>Fixed and separately staffed. The README is drafted with its own session, a docs-site lane is running, the disclosure is current, and the README polish window is Sunday 05:00 to 07:30. A shipped rule change costs 1 to 2 hours of number updates. Experimental hours come from the other sessions plus Nathan's decision bandwidth, which is the binding constraint.</p></li>
+<li><p><strong>Q5:</strong></p>
+<p>Should the A100 rental budget be treated as effectively unconstrained (a few dollars to tens of dollars) for any recommended experiment, or is there a hard ceiling you want respected given the 13-hour clock?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>yes unconstrained could also use better more expensive boxes if helpful.</p></li>
+<li><p><strong>Q6:</strong></p>
+<p>Is there anything else that would help refine this analysis?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>How close our proxies came to your one measurement, shipped rule, recomputed from the exported scores:</p>
+<p>Split Rows (real / synthetic) minDCF (brief) EER P_FA / P_miss at the minDCF threshold<br>
+Outer holdout 1,858 / 2,000 0.0065 0.21% 0.00% / 0.65% (0 false alarms, 13 misses)<br>
+Inner OOF 8,142 / 8,000 0.135 6.83% 0.25% / 11.2%<br>
+In-the-Wild 2,000 / 1,000 0.228 5.80% 0.75% / 15.8%<br>
+NSA test (returned) ~1,170 / ~500 0.0733 3.53% not given</p>
+<p>The holdout was optimistic by 11× on minDCF and 17× on EER. In-the-Wild was pessimistic by 3× on minDCF but only 1.6× on EER. Inner OOF was pessimistic by 2× on both. On a log scale between holdout and In-the-Wild the test sits at 0.68 for minDCF and 0.85 for EER, further toward the wild end than our λ̂ of 0.51 (CI 0.12–0.64) suggested. Relative to In-the-Wild, the test's minDCF is better than its EER, so the low-false-alarm end of the ranking held up better than the middle. We read that as a miss tail from unseen generators rather than a false-alarm problem, but it is an inference; tell us if you read it differently. For reference, M1b alone scores holdout 0.072 / EER 1.4%, almost exactly the full rule's test number.</p>
+<p>ideally no crazy long runs I'd like to sleep tn but you can still suggest some stuff.</p>
+<p>make sure to answer all questions thoroughly they are in no particular order</p></li>
+</ul>
+<hr>
+<h2 id="appendix-a--scope-definition-qa">Appendix A — Scope Definition Q&amp;A</h2>
+<ul>
+<li><p><strong>Q1:</strong></p>
+<p>If a candidate change wins all pre-declared sweeps on inner OOF, holdout, and In-the-Wild under both costs, do you want it shipped automatically before the freeze, or must Nathan explicitly ratify each one live given the time crunch?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>Ratification. Nathan ratifies every change before it replaces the shipped file. Nothing auto-ships. Experiments run freely in parallel sessions, so recommend aggressively and label candidates "ready to ratify".</p></li>
+<li><p><strong>Q2:</strong></p>
+<p>Should the analysis treat the single NSA readout (0.0733/EER 3.534%) as strong enough evidence to justify any fusion/head/feature change at all, or do you want an explicit stated confidence bound on how much that one number can license before recommending changes?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>State one explicitly. With about 1,170 real and 500 synthetic files, one false alarm is worth 0.008 minDCF under the brief's cost and one miss 0.002, so 0.0733 is about 9 false-alarm equivalents or 37 misses. Under the sponsor code's cost the weights invert to 0.00085 per false alarm and 0.008 per miss. Our holdout's own noise is ±0.07 to 0.10, so holdout gaps under 0.15 are not evidence.</p></li>
+<li><p><strong>Q3:</strong></p>
+<p>Is there a hard minimum bar (e.g., must not risk regression below 0.0733 on the real mechanism) that would make you prefer 'stop touching the file' over any marginal-EV experiment, or is any positive expected-value experiment worth the risk given only one shot?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>Strong loss aversion. Our standing rule is that a candidate replaces the shipped rule only if In-the-Wild improves by at least 0.01 under the brief's cost, worsens by at most 0.01 under the sponsor's, the holdout worsens by at most 0.05, inner OOF by at most 0.03, and Nathan ratifies. The last switch moved 3 of 1,671 files across 0.5 at Spearman 0.974. A change that reorders more than that needs a stronger case. Propose a stricter bar if one shot warrants it.</p>
+<p>that EER and .0773 is set in stone getting worse doesn't hurt us but just doesn't help.</p></li>
+<li><p><strong>Q4:</strong></p>
+<p>Do you want the documentation/README time allocation treated as fixed (already drafted, just needs updates) or as competing directly for hours against the experimental asks 2-4?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>Fixed and separately staffed. The README is drafted with its own session, a docs-site lane is running, the disclosure is current, and the README polish window is Sunday 05:00 to 07:30. A shipped rule change costs 1 to 2 hours of number updates. Experimental hours come from the other sessions plus Nathan's decision bandwidth, which is the binding constraint.</p></li>
+<li><p><strong>Q5:</strong></p>
+<p>Should the A100 rental budget be treated as effectively unconstrained (a few dollars to tens of dollars) for any recommended experiment, or is there a hard ceiling you want respected given the 13-hour clock?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>yes unconstrained could also use better more expensive boxes if helpful.</p></li>
+<li><p><strong>Q6:</strong></p>
+<p>Is there anything else that would help refine this analysis?</p>
+<p><br>
+<strong>A:</strong></p>
+<p>How close our proxies came to your one measurement, shipped rule, recomputed from the exported scores:</p>
+<p>Split Rows (real / synthetic) minDCF (brief) EER P_FA / P_miss at the minDCF threshold<br>
+Outer holdout 1,858 / 2,000 0.0065 0.21% 0.00% / 0.65% (0 false alarms, 13 misses)<br>
+Inner OOF 8,142 / 8,000 0.135 6.83% 0.25% / 11.2%<br>
+In-the-Wild 2,000 / 1,000 0.228 5.80% 0.75% / 15.8%<br>
+NSA test (returned) ~1,170 / ~500 0.0733 3.53% not given</p>
+<p>The holdout was optimistic by 11× on minDCF and 17× on EER. In-the-Wild was pessimistic by 3× on minDCF but only 1.6× on EER. Inner OOF was pessimistic by 2× on both. On a log scale between holdout and In-the-Wild the test sits at 0.68 for minDCF and 0.85 for EER, further toward the wild end than our λ̂ of 0.51 (CI 0.12–0.64) suggested. Relative to In-the-Wild, the test's minDCF is better than its EER, so the low-false-alarm end of the ranking held up better than the middle. We read that as a miss tail from unseen generators rather than a false-alarm problem, but it is an inference; tell us if you read it differently. For reference, M1b alone scores holdout 0.072 / EER 1.4%, almost exactly the full rule's test number.</p>
+<p>ideally no crazy long runs I'd like to sleep tn but you can still suggest some stuff.</p>
+<p>make sure to answer all questions thoroughly they are in no particular order</p></li>
+</ul>
+<hr>
+<h2 id="appendix-b--project-metadata">Appendix B — Project Metadata</h2>
+<p><strong>Mode:</strong> Deep Think</p>
+<p><strong>Created:</strong> September 26, 2026</p>
+<p><strong>Expert models:</strong></p>
+<ul>
+<li>ChatGPT GPT-5.6 Sol · Extra High</li>
+<li>Gemini 3.1 Pro · High</li>
+</ul>
+<p>Generated by VeriLM</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/consults/2026-09-26_post-draft-review_RESPONSE_verbatim.md</code> <span class="hash">2a7179195194</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

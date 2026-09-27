@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Non-speech gate, default-answer policy, and speaker-embedding drift · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_gate-and-drift.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_gate-and-drift.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#1-the-problem-the-gate-solves">1. The problem the gate solves</a></li><li><a href="#2-the-gate-hearsaydetectorsspeech_gate">2. The gate (hearsay.detectors.speechgate)</a></li><li><a href="#3-the-policy-speech_gateapply_default_answer">3. The policy (speechgate.applydefaultanswer)</a></li><li><a href="#4-speaker-embedding-drift-hearsaydetectorsspeaker_drift">4. Speaker-embedding drift (hearsay.detectors.speakerdrift)</a></li><li><a href="#5-exports-and-where-they-plug-in">5. Exports and where they plug in</a></li></ul></details>
+<h1 id="non-speech-gate-default-answer-policy-and-speaker-embedding-drift">Non-speech gate, default-answer policy, and speaker-embedding drift</h1>
+<p>Sat Sep 26, 2026, 06:00–07:00. Follows architecture.md section 10, decision 4 (default answer for undetermined files) and the v4 brief's section 8.7 (rubric technique 6, speaker-embedding consistency). Both are contract detectors in <code>src/hearsay/detectors/</code>, registered by <code>hearsay.detectors.engineered</code>, exported in the M4 format by <code>scripts/score_detector.py</code>. Neither is a fusion column: the gate's score is constant and its decision lives in <code>features["is_speech"]</code>; drift's score is mild and, on this data, points the wrong way for a stacker (below).</p>
+<h2 id="1-the-problem-the-gate-solves">1. The problem the gate solves</h2>
+<p>The deep detectors are trained on speech and score non-speech near 1.0: the public-data M1 probe scored pure silence 0.99. With a false alarm at 9.33× a miss, a file with no speech to judge belongs at the real end of the ranking, deliberately and reproducibly, with a reason the explanation report can print.</p>
+<h2 id="2-the-gate-hearsaydetectorsspeech_gate">2. The gate (<code>hearsay.detectors.speech_gate</code>)</h2>
+<p>Speech, for the gate, is material that is</p>
+<ol>
+<li><strong>not silent</strong>: RMS above −70 dBFS (digital silence is −180; the quietest NSA test file is −34.6);</li>
+<li><strong>voiced</strong>: at least 5% of frames within 30 dB of the loudest have a YIN pitch in 65–390 Hz (NSA test minimum 0.099);</li>
+<li><strong>moving in pitch</strong>: std of log F0 over voiced frames ≥ 0.02 (a tone or chord locks YIN to one value: 0.00; NSA test minimum 0.099);</li>
+<li><strong>moving in loudness</strong>: std of frame loudness ≥ 3 dB (a steady tone, hum or stationary noise: under 1 dB; NSA test minimum 6.0);</li>
+<li><strong>not spectrally flat</strong>: long-term spectral flatness &lt; 0.5 (white noise 0.998; NSA test maximum 0.39).</li>
+</ol>
+<p>Any failed cue gates the file; the failed cues are the reasons (<code>reason_silence</code>, <code>reason_unvoiced</code>, <code>reason_tone</code>, <code>reason_static</code>, <code>reason_noise</code>) and go into the evidence sentence. Score is always 0.5. Cost about 0.13 s per clip (YIN).</p>
+<p><strong>Set from the test set, not guessed.</strong> <code>outputs/inventory/nsa_test_speech_gate.csv</code> holds the five cues for all 1,671 test files; every threshold sits beyond that file's extreme, so <strong>no NSA test file is gated</strong>. A sixth cue, "a few spectral lines" (share of long-term energy in the top five bins ≥ 70%, meant for tones and chords), was tried and dropped: 77 real test files exceed it, because speech puts most of its long-term energy in a few low bins; tones and chords are caught by cues 3 and 4 anyway.</p>
+<p><strong>Cases</strong> (<code>tests/test_speech_gate.py</code>): the submission preflight's silence and three-note chord, a 220 Hz tone, white noise, a speech-like synthetic (moving pitch, syllable-rate loudness, a pause) that must pass, the same at −64 dBFS RMS that must not read as silence, and 60 real test clips of which ≥ 98% must pass (100% do).</p>
+<p><strong>Known limit.</strong> Rhythmic polyphonic music moves in pitch and loudness and can pass this gate. The submission preflight (silence, chord) and the flag on any fused score above 0.8 remain the backstop; a learned speech/music discriminator would be the next step if the draft review shows music in the test set.</p>
+<h2 id="3-the-policy-speech_gateapply_default_answer">3. The policy (<code>speech_gate.apply_default_answer</code>)</h2>
+<p>Corrected Sat 08:30 after the fusion consult (<code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>, item 5), which proved the pinned block is the one direction-robust hedge <em>only if it sits strictly below every determinate score</em>; the first version (0.02 + 1e-4 × fused) did not, because the pipeline scores some real files as low as 0.0009.</p>
+<ul>
+<li><strong>Determinate files</strong> (speech): the fused score is mapped monotonically into <strong>[0.001, 1.000]</strong> (<code>0.001 + 0.999 × fused</code>); the ranking among them is unchanged and none can fall into the block.</li>
+<li><strong>Gated files</strong>: a pinned block in <strong>[0.000, 0.001)</strong>, strictly below every determinate score under either scoring convention. Within the block, files are ordered by whatever weak signal remains (<code>order_by</code>: the raw M1b score is the natural choice; voiced fraction and duration can be folded into it; the fused score by default) with a 1% share of the block's range given to a deterministic hash jitter of the file key, so <strong>no two files share a value</strong> (a superset of thresholds can only help the sweep, never hurt). <strong>Decode failures and files with no signal</strong> (NaN, or <code>failed=True</code>) go to the bottom tenth of the block, <code>[0, 0.0001)</code>, by jitter alone.</li>
+<li><strong>Only the gate flag gates a file.</strong> High-disagreement or low-confidence files are a fusion matter and stay in the determinate range (the consult compresses them toward its low end there); they must not be collapsed into the block.</li>
+</ul>
+<p>Call shape unchanged for the runner: <code>apply_default_answer(fused, is_speech)</code>; the keyword options <code>order_by</code>, <code>keys</code>, <code>failed</code> refine the block. Zero test files are gated today, so this changes no submitted ranking; the determinate map shifts every score by at most 0.001.</p>
+<h2 id="4-speaker-embedding-drift-hearsaydetectorsspeaker_drift">4. Speaker-embedding drift (<code>hearsay.detectors.speaker_drift</code>)</h2>
+<p>ECAPA-TDNN speaker embeddings (SpeechBrain <code>spkrec-ecapa-voxceleb</code>, Apache-2.0, 89 MB, fetched to <code>weights/spkrec-ecapa-voxceleb</code>; loaded from there, never from the Hub at run time) on 1.0 s windows at a 0.5 s hop over the silence-trimmed clip (cap 8 s), unit-normalized; features are the minimum, mean and std of the pairwise cosines and the minimum adjacent-window cosine. Rule: minimum pairwise cosine below <strong>0.05</strong> → score 0.6 ("voice drifts across the clip"), else 0.5. Cost about 0.25 s per clip on CPU; the encoder loads in under 2 s.</p>
+<p><strong>Calibration</strong> (<code>outputs/inventory/speaker_drift_calibration.csv</code>; inner rows only): 120 LibriSpeech real, 60 LJ real, 160 DiffSSD fakes (20 per generator), 80 synthetic two-speaker splices (the first half of one LibriSpeech speaker's clip glued to the first half of another's), 80 same-speaker splices as control.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Threshold on minimum pairwise cosine</th><th>Single-voice clips flagged</th><th>Two-speaker splices flagged</th>
+</tr></thead>
+<tbody>
+<tr><td>0.00</td><td>2.6%</td><td>75%</td></tr>
+<tr><td><strong>0.05</strong></td><td><strong>6.2%</strong></td><td><strong>94%</strong></td></tr>
+<tr><td>0.10</td><td>12.6%</td><td>98%</td></tr>
+<tr><td>0.20</td><td>35%</td><td>100%</td></tr>
+</tbody>
+</table></div>
+<p>At 0.05 the flags fall on LibriSpeech real 11.7%, LJ real 6.7%, fakes 1.9%, same-speaker splices 12.5%, two-speaker splices 93.8%. One-second ECAPA windows are noisy for one speaker too (median minimum cosine 0.20 for real, 0.28 for fakes), which is why the rule sits near zero.</p>
+<p><strong>A finding worth a line in the README: the fakes are the most consistent voices.</strong> Every drift statistic points the same way: fakes have higher minimum, adjacent-minimum and mean cosines than real speakers (class AUCs in the table below). A cloned voice does not vary from second to second the way a person does. That makes drift <em>evidence of editing or of a real speaker</em>, not of synthesis; a fused column would learn "drift = real", the opposite of the rubric's framing, so the export is for the routing log and per-file evidence only.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Statistic (real 180 vs fake 160, inner rows)</th><th>Class AUC (&gt; 0.5 = higher on fakes)</th>
+</tr></thead>
+<tbody>
+<tr><td>mean pairwise cosine</td><td>0.725</td></tr>
+<tr><td>minimum pairwise cosine</td><td>0.692</td></tr>
+<tr><td>minimum adjacent-window cosine</td><td>0.663</td></tr>
+<tr><td>std of pairwise cosines</td><td>0.195 (fakes vary less)</td></tr>
+</tbody>
+</table></div>
+<p>These are single-statistic AUCs on a 340-clip inner sample, not a validated detector; they say the direction, and they mark "speaker-embedding consistency" as a candidate v4-style feature family (<code>spk_*</code>, four columns, 0.25 s per clip) for whoever reopens the feature lane. Not pursued here: the lane is closed and the column would need the ECAPA encoder inside every extraction worker.</p>
+<p><strong>Export summaries</strong> (<code>scripts/score_detector.py</code>, all 21,671 rows, no failures; gate 405 s on 6 workers, drift 2,043 s on 4 threads).</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>NSA test (1,671)</th><th>DiffSSD spoof (10,000)</th><th>LibriSpeech real (4,000)</th><th>LJ real (6,000)</th>
+</tr></thead>
+<tbody>
+<tr><td>Gate: files gated</td><td><strong>0</strong></td><td>43 (all "stationary noise")</td><td>41 (all "stationary noise")</td><td>0</td></tr>
+<tr><td>Drift: files flagged (min cosine &lt; 0.05)</td><td><strong>16.1%</strong> (269)</td><td>1.4%</td><td>8.7%</td><td>6.0%</td></tr>
+<tr><td>Drift: median minimum cosine</td><td>0.27</td><td>0.28</td><td>0.21</td><td>0.18</td></tr>
+<tr><td>Drift: median windows per clip</td><td>6</td><td>13</td><td>10</td><td>13</td></tr>
+</tbody>
+</table></div>
+<p>The 84 gated training clips are very noisy recordings and very noisy vocoder output (spectral flatness above 0.5); none of the test set is. The drift rate on the test set (16%) is above every training corpus; per generator in training the rule fires on 0–4% of fakes and 7% of real clips, so on a 70%-real test set with phone and field recordings a rate in the teens is what "drift marks real speakers and harder conditions" predicts. That is one more reason it is a routing and evidence detector, not a fusion column: fused, it would push 16% of the test set, mostly real, toward synthetic.</p>
+<h2 id="5-exports-and-where-they-plug-in">5. Exports and where they plug in</h2>
+<ul>
+<li><code>outputs/detector_scores/speech_gate.csv</code> (score 0.5 throughout) and <code>speech_gate_results.csv</code> with <code>is_speech</code> and the reasons per path; <code>outputs/detector_scores/speaker_drift.csv</code> / <code>_results.csv</code> with the cosine statistics per path. All 21,671 rows.</li>
+<li>Orchestrator: read <code>is_speech</code> from the gate's features (or the results file) and apply <code>apply_default_answer</code> to the fused score; print the gate's evidence for gated files.</li>
+<li>Docker: needs <code>speechbrain</code> (now in <code>pyproject.toml</code>) and <code>weights/spkrec-ecapa-voxceleb</code> copied into the image; <code>HF_HUB_OFFLINE=1</code> is fine because the detector loads from the local directory.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_gate-and-drift.md</code> <span class="hash">259ba5584b04</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

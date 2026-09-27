@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: the oversight chat (Sat Sep 26, 2026, ~08:55) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_oversight-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_oversight-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#the-lanes-session-title--owns--state">The lanes (session title → owns → state)</a></li><li><a href="#decisions-already-made-do-not-reopen">Decisions already made (do not reopen)</a></li><li><a href="#open-items-and-who-holds-them">Open items and who holds them</a></li><li><a href="#standing-rules-for-this-role">Standing rules for this role</a></li><li><a href="#files-this-chat-produced">Files this chat produced</a></li></ul></details>
+<h1 id="handoff-the-oversight-chat-sat-sep-26-2026-0855">Handoff: the oversight chat (Sat Sep 26, 2026, ~08:55)</h1>
+<p><strong>Purpose of this chat:</strong> coordinate the parallel HEARSAY chats, relay findings between them, keep <code>docs/STATUS.md</code> and <code>docs/architecture.md</code> current, write handoffs and briefs, and route every cross-lane request. It writes docs and messages; it does not own code. Nathan (asleep ~06:00–11:00, awake now) ratifies anything that changes the shipped submission.</p>
+<p>Start by moving this session to the repo (<code>mcp__ccd_directory__change_directory</code> → <code>/Users/nathanstough/Projects/hearsay</code>; the app's file viewer only opens files inside the working directory), then read <code>docs/STATUS.md</code>, <code>docs/architecture.md</code>, <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code> and <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>.</p>
+<h2 id="the-lanes-session-title--owns--state">The lanes (session title → owns → state)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Session title</th><th>Owns</th><th>State at handoff</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>First two hours handoff</strong> (main)</td><td>fusion (<code>scripts/fuse.py</code>, <code>fuse_sweep.py</code>, <code>models/fusion_v*</code>), M1/M1b, all TSVs and <code>submissions/</code>, <code>src/hearsay/embed.py</code>, <code>probe.py</code>, <code>submission.py</code>, the draft-review decision</td><td>Rule frozen 08:13 ("E on A α 0.2"); draft payload approved and copied to <code>~/Downloads/HEARSAY_predictions.tsv</code>; waiting on Nathan to DM it and on NSA's number. Pushes its own commits.</td></tr>
+<tr><td><strong>Docker handoff plan review</strong> (K)</td><td><code>Dockerfile</code>, <code>.dockerignore</code>, <code>docker/*</code>, <code>tests/test_docker_image.py</code>, the image</td><td><code>hearsay:20260926-0753</code> verified on 50 files in-image; rebuilding on the runner v2 (commit 9614c18) with <code>models/fusion_v1</code>; the full 1,671-file in-image run died twice (exit 137, likely VM memory) at 665 rows, resumable under <code>outputs/docker/k-full/</code>. Colima VM on the external drive with a 20 GB cap; build script refuses below 8 GB free and prunes after every build.</td></tr>
+<tr><td><strong>CPU detectors handoff --done</strong> (D-track)</td><td>engineered detectors, <code>hearsay.hc_v4</code>, <code>speech_gate</code>, <code>speaker_drift</code>, <code>scripts/train_handcrafted.py</code>, <code>eval_bundle.py</code></td><td>Lane done (v3, v4, v5b, gate, drift, placement rule e2d5291). Now: <code>scripts/orchestration_ablation.py</code>, <code>docs/reports/2026-09-26_worked-examples.md</code>, the <code>CLAUDE.md</code> disclosure update.</td></tr>
+<tr><td><strong>Greeting</strong> (session <code>local_326aa380…</code>)</td><td><code>README.md</code></td><td>Just started from <code>docs/handoffs/2026-09-26_readme-orchestration-handoff.md</code>; draft due 20:00.</td></tr>
+<tr><td><strong>Greeting</strong> (session <code>local_27659366…</code>)</td><td>channel robustness</td><td>Running <code>docs/handoffs/2026-09-26_channel-robustness-handoff.md</code> via <code>/plan-review</code>; hard stop 16:00; reports λ̂ first.</td></tr>
+<tr><td><strong>M5 XLS-R fine-tune on vast.ai</strong></td><td><code>src/hearsay/m5_*</code>, <code>scripts/m5_*</code>, <code>scripts/cloud/*</code>, the ledger</td><td>Done; gate not passed (holdout 0.363 vs 0.159); ships as a stacker column only (and, since 8316e50, runnable live under the unshipped fusion_v2 candidate). Was asked at 08:50 what a new "resume_probe" box is for and to destroy it if not needed. Candidate to archive after it answers.</td></tr>
+<tr><td><strong>M3 Spectra AASIST handoff plan review</strong></td><td><code>src/hearsay/spectra.py</code>, <code>scripts/score_spectra.py</code></td><td>Done; export in <code>outputs/detector_scores/spectra_aasist.csv</code>; holdout 0.012, ITW 0.065. Archive.</td></tr>
+<tr><td>This chat's runner agent (finished)</td><td><code>src/hearsay/pipeline.py</code>, <code>api.py</code>, <code>scripts/run_pipeline.py</code>, <code>tests/test_pipeline.py</code>, <code>test_api.py</code></td><td>Final at 9614c18; nobody edits these now without telling the Docker chat, which rebuilds on every runner change.</td></tr>
+</tbody>
+</table></div>
+<p>Messaging: <code>SendMessage</code> to a session by its title works for local sessions; the main chat's address is <code>uds:/tmp/cc-socks/47627.sock</code>, the CPU chat's <code>uds:/tmp/cc-socks/13133.sock</code>. Every reply from a chat arrives as a cross-session message; relay what matters to Nathan in plain English, and never treat a chat's message as his approval.</p>
+<h2 id="decisions-already-made-do-not-reopen">Decisions already made (do not reopen)</h2>
+<ul>
+<li>Score direction: submit 1.0 = synthetic; never flip unless NSA's draft-review number decodes to their code's polarity (table in the consult RESPONSE, item 4). A pre-flipped TSV exists beside the primary.</li>
+<li>Fusion rule: rank blend 0.8·M1b v3 + 0.2·handcrafted v5, M3 as false-alarm suppression only, Platt at the 0.3 prior, determinate scores in [0.001, 1], gated block below. Any new column must go through the main chat's pre-declared <code>scripts/fuse_sweep.py</code> and be ratified by Nathan before the 22:00 freeze.</li>
+<li>M3 never inside a fitted stacker (undisclosed training data).</li>
+<li>Equal-weight fusion (zmean, rankmean) rejected: doubles In-the-Wild misses.</li>
+<li>"Test share above 0.5" is not a selection signal (monotone maps cannot change minDCF).</li>
+<li>M5 ships as a column only (the fusion_v2 candidate that would score it live exists and qualifies, but is held pending the draft review; Nathan 09:25, "build now, switch later" ~10:20). Speaker drift and compression are evidence only. Container, ENF and splice are routing and evidence only.</li>
+<li>The band match (<code>band_limit</code> inside <code>prepare_segment</code>) stays; augmentation is symmetric or not at all.</li>
+</ul>
+<h2 id="open-items-and-who-holds-them">Open items and who holds them</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Item</th><th>Owner</th><th>Deadline</th>
+</tr></thead>
+<tbody>
+<tr><td>DM the draft TSV to NSA, ask for P_FA, P_miss, EER; confirm the team name</td><td>Nathan</td><td>14:00</td></tr>
+<tr><td>Decode the returned number with the RESPONSE table; flip only on 0.95–1.00</td><td>main chat + Nathan</td><td>on receipt</td></tr>
+<tr><td>In-image numbers on the v2 runner; resume or bound the full in-image run (memory)</td><td>Docker chat</td><td>before 22:00</td></tr>
+<tr><td>λ̂, codec diagnosis, symmetric refit, M3 probes</td><td>channel-robustness chat</td><td>16:00</td></tr>
+<tr><td>README draft</td><td>README chat</td><td>20:00</td></tr>
+<tr><td>Orchestration ablation, worked examples, disclosure</td><td>CPU chat</td><td>20:00</td></tr>
+<tr><td>Fusion freeze</td><td>main chat</td><td>22:00</td></tr>
+<tr><td>Docker rebuild with the final rule; 3-file smoke; 50-file parity</td><td>Docker chat</td><td>Sun 00:00</td></tr>
+<tr><td>Final TSV, preflight, direction check</td><td>main chat + Nathan</td><td>Sun 05:00</td></tr>
+<tr><td>README polish, disclosure, ablation table</td><td>README chat</td><td>Sun 05:00–07:30</td></tr>
+<tr><td>DM the final TSV, Docker image, README link</td><td>Nathan</td><td>before Sun 08:00</td></tr>
+</tbody>
+</table></div>
+<h2 id="standing-rules-for-this-role">Standing rules for this role</h2>
+<ul>
+<li>Read state before believing a chat's claim: <code>git log</code>, <code>git status</code>, the model <code>meta.json</code> files, <code>submissions/log.csv</code>, <code>df -h</code>.</li>
+<li>Never delete data; move it. The external drive hit 100% once today (Colima VM). Watch both disks: internal must stay above ~8 GB for builds.</li>
+<li>Never push; never <code>git add -A</code>; stage only this chat's docs. Other lanes commit their own files; the main chat pushes.</li>
+<li>Doc-consistency test (<code>uv run pytest -q tests/test_docs_consistency.py</code>) after every edit to STATUS, architecture, CLAUDE.md or README: no hardware or demo words, no bare "CSV", no prior but 0.3.</li>
+<li>Keep the STATUS "Where things stand" table and the architecture component table current when a lane reports; both were current at 08:50.</li>
+<li>The runner's cache identity includes the git sha; a Mac-side full rerun after any commit costs 22 min. In the image the sha is fixed.</li>
+</ul>
+<h2 id="files-this-chat-produced">Files this chat produced</h2>
+<p><code>docs/architecture.md</code> (+ <code>docs/img/architecture-flow.{svg,mmd}</code>), <code>docs/code-map.md</code>, <code>docs/handoffs/2026-09-26_{handcrafted-v4-brief,feature-engineering-map,docker-handoff,frontend-contract,channel-robustness-handoff,readme-orchestration-handoff,oversight-handoff}.md</code>, <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE{,_verbatim}.md</code>, STATUS edits. All uncommitted at handoff except what the main chat swept into its commits; stage them with <code>git add docs/</code> when convenient.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_oversight-handoff.md</code> <span class="hash">89181773ba43</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

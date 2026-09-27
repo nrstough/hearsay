@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runner, API and Docker status (Sat Sep 26, 2026, runner lane; written 07:35, v2 at 08:35, v3 at 10:55) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_runner-docker.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_runner-docker.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#v3-1055-m5-as-a-fourth-scorer-fusion_v2-executable-the-default-unchanged">v3 (10:55): M5 as a fourth scorer; fusionv2 executable; the default unchanged</a></li><li><a href="#v2-0835-the-shipped-fusion-rule-changed-to-e_on_a-parity-re-established">v2 (08:35): the shipped fusion rule changed to eona; parity re-established</a></li><li><a href="#what-was-built">What was built</a></li><li><a href="#parity-mac-cpu-6-threads-50-template-files-gate-on-0-gated-0-decode-errors">Parity (Mac, CPU, 6 threads, 50 template files, gate on: 0 gated, 0 decode errors)</a></li><li><a href="#timing-mac-cpu">Timing (Mac, CPU)</a></li><li><a href="#docker">Docker</a></li><li><a href="#findings-worth-knowing">Findings worth knowing</a></li><li><a href="#not-done">Not done</a></li></ul></details>
+<h1 id="runner-api-and-docker-status-sat-sep-26-2026-runner-lane-written-0735-v2-at-0835-v3-at-1055">Runner, API and Docker status (Sat Sep 26, 2026, runner lane; written 07:35, v2 at 08:35, v3 at 10:55)</h1>
+<h2 id="v3-1055-m5-as-a-fourth-scorer-fusion_v2-executable-the-default-unchanged">v3 (10:55): M5 as a fourth scorer; <code>fusion_v2</code> executable; the default unchanged</h2>
+<p>Run spec <code>docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md</code> (M4 fusion chat; Nathan ~10:20: "build now,
+switch later"). The pre-declared M5 sweep's winner <code>A3_w0.2_E</code> (addendum in
+<code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>) is now something the runner can execute, without
+changing what ships:</p>
+<ul>
+<li><code>models/fusion_v2/constants.json</code> (<code>scripts/fuse_sweep_m5.py --write</code>): the same rule family <code>e_on_a</code>
+with a <code>weights</code> dict (m1b_v3 0.6, handcrafted_v5 0.2, m5_xlsr_ft 0.2) over each column's inner-OOF
+rank reference, the same M3 suppression step, the Platt map, a <code>how</code> line, and the M5 checkpoint's
+hashes. <code>FusionConstants</code> reads both layouts (<code>alpha_handcrafted</code> → weights (1 − α, α)); the blend is
+accumulated in weights order, which is bit-identical to the old <code>(1 − a)·r1 + a·rh</code> for a v1 file
+(pinned by a test with exact <code>==</code>, and by the 0813 parity rows below, still 4.4e-16).</li>
+<li><code>Models</code> loads the M5 checkpoint (<code>--m5</code>, <code>$HEARSAY_M5</code>; default <code>models/m5_shipped</code> under the app
+root, else the pinned <code>models/m5_xlsr_ft_20260926-0741/model</code>) <strong>only when the fusion file weights
+it</strong>: a run's scorers are the file's own detectors (v1 three, v2 four), never the flag list.
+<code>m5_logit</code> is <code>scripts/m5_score.py</code>'s sequence on one clip (<code>deploy_transform</code>: trim → band-limit →
+cap 8 s → normalize; then <code>collate</code>, which normalizes again as the export did; <code>score_batch</code>, fp32,
+batch 1, no truncation). <code>check_m5_identity</code> refuses, before anything is scored, a rule that weights
+M5 when M5 is not loaded or when the loaded checkpoint's hashes differ from the file's (checked once
+from <code>hashes.json</code> before the 657 MB load, once from the loaded net).</li>
+<li>Loudness: the preflight now requires every scorer in use to be <code>ok</code> on the silence and chord clips and
+compares the pre-gate fused probability between passes; <code>run_meta.json</code> carries <code>n_scorer_errors</code> per
+fused column over every row (cached rows too); a weighted scorer that failed on any file of a
+<code>--compare-tsv</code> run, or on more than 1% of files otherwise, makes the run exit 4 after the TSV is
+written. <code>version.fusion</code> records <code>fusion_v1/constants.json</code> (the bare file name was the same for
+both layouts); the cache identity gains the M5 head-sha prefix; <code>timings.csv</code> has one column per deep
+scorer and moves an older layout aside on resume.</li>
+<li><strong>Switched at 12:35 (Nathan: GO A3, "switch"):</strong> <code>DEFAULT_CONSTANTS_PATH</code> = <code>models/fusion_v2/constants.json</code>, so
+<code>scripts/run_pipeline.py --team CrossExam</code> reproduces the submitted file with no flags; <code>fusion_v1</code> (the
+08:13 rule) stays loadable via <code>--fusion</code> as the fallback. The Docker image is not a graded deliverable
+(NSA, ~12:00) and stays on <code>e_on_a</code> as reproducibility evidence; no rebuild.</li>
+<li>Seam worth knowing: a rerun that re-fuses under another polarity (<code>--flip</code>) rewrites the per-file JSONs
+under <code>results/</code> and <code>run_meta.json</code> in place; a later rerun whose polarity already matches the cache
+does not rewrite them. After the flip pass on <code>outputs/runner/v2_full</code>, the our-direction JSONs were
+regenerated from <code>results.jsonl</code> (12:30) so that directory matches the submitted TSV again; write the
+flipped pass to its own <code>--out</code> next time.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Comparison (v3)</th><th>Spearman</th><th>max abs diff</th><th>mean abs diff</th><th>notes</th>
+</tr></thead>
+<tbody>
+<tr><td>exported logits -&gt; <code>fusion_v2</code> -&gt; policy vs <code>20260926-0914_..._CANDIDATE_our_direction.tsv</code> (1,671 rows)</td><td></td><td>6.7e-16</td><td>7.3e-17</td><td>the one ulp of <code>0.8 − 0.2</code> in the sweep script vs the file's rounded 0.6</td></tr>
+<tr><td>same, <code>--flip</code>, vs <code>..._CANDIDATE_FLIPPED_...tsv</code></td><td></td><td>7.2e-16</td><td>8.4e-17</td><td></td></tr>
+<tr><td><code>fusion_v2</code> file vs the 09:14 candidate file</td><td></td><td>0.0</td><td></td><td>weights, all three references and Platt a, b identical</td></tr>
+<tr><td>exported logits -&gt; <code>fusion_v1</code> -&gt; policy on the new loader vs the 0813 TSVs (1,671 rows, both polarities)</td><td></td><td>1.1e-16</td><td>4.5e-17</td><td>the frozen rule; bit-identical to the pre-change loader (0 mismatches over all rows and both polarities, which also reads 1.1e-16 today; the v2 table's 4.4e-16 was an earlier measurement)</td></tr>
+<tr><td>live from audio, 50 template files, <code>--fusion models/fusion_v2/constants.json</code>, vs the candidate TSV</td><td>1.000000</td><td>2.6e-4</td><td>1.2e-5</td><td>0 rows over 0.01; 0 E-rule flips; 0 verdict flips; <code>n_scorer_errors</code> all 0</td></tr>
+<tr><td>M5 live logit vs the export, those 50 files</td><td></td><td>6.8e-3</td><td>median 6.9e-4</td><td>the recorded CPU-on-WAV vs A100-on-FLAC gap (<code>parity_f6.json</code>: 0.0118); gate 0.02</td></tr>
+<tr><td>M5 batch 1 (runner) vs batch 8 (<code>m5_score.py</code>), same 50 clips</td><td></td><td>5.7e-6</td><td>median 1.4e-6</td><td>padding is inert on the real model</td></tr>
+<tr><td>live from audio, 50 files, the default <code>fusion_v1</code> after this change, vs the 0813 TSV</td><td>1.000000</td><td>2.7e-5</td><td>6.5e-7</td><td>unchanged from v2; three scorers, M5 neither loaded nor run</td></tr>
+<tr><td>live from audio, all 1,671 files, <code>fusion_v2</code>, our direction, vs the candidate TSV</td><td>1.000000</td><td>9.3e-4</td><td>1.8e-5</td><td>0 rows over 0.01; 0 E-rule flips (the step fires on 47 rows); 0 verdict flips; <code>n_scorer_errors</code> all 0</td></tr>
+<tr><td>same run, <code>--flip</code> re-fused from the cache (1,671 cached rows, 22 s), vs the FLIPPED candidate</td><td>1.000000</td><td>9.3e-4</td><td>1.8e-5</td><td>share above 0.5: 0.2735 / 0.7265</td></tr>
+<tr><td>M5 live logit vs the export, all 1,671 rows</td><td></td><td>0.035</td><td>median 7.0e-4</td><td>p99 9.4e-3; 5 rows over 0.02, 16 over 0.01; no sign bias, no duration dependence; the tail of the CPU-on-WAV vs A100-on-FLAC gap (the 50-file <code>parity_f6</code> sample read 0.0118); bounded to 9.3e-4 in p</td></tr>
+</tbody>
+</table></div>
+<p>Timing and memory (Mac, 6 threads, <code>/usr/bin/time -l</code>, the 50-file v2 run): model load 8.8 s (M1 0.64,
+Spectra 3.74, M5 0.89 with the hash check), 1.10 s per file against 0.78 under v1 (M5 adds about
+0.3 s per clip here; <code>speaker_drift</code> halves torch's thread count after ECAPA loads, so the deep passes
+run at 3 threads), maximum resident set 4.0 GB (3.3 GiB before M5). Preflight: silence 0.0009, chord
+0.0010 (pre-gate 0.898 / 0.939), both gated. Full set (1,671 files): 1.34 s per file mean, median 0.98
+(the first 200 files overlapped the test suite), per stage M5 0.274 s, M1b 0.19 s, Spectra 0.49 s;
+wall 38 min; a full-set v2 run on a free Mac is therefore about 28 min against 22 under v1. The
+runner-made TSVs stay under <code>outputs/runner/v2_full/</code> (the 11:31 PARITY copy under <code>submissions/</code> was withdrawn
+at 12:15 pending Nathan's ruling on the run spec's per-row M5-logit mark, exceeded on 5 rows; the default rule
+is still <code>fusion_v1</code>).</p>
+<h2 id="v2-0835-the-shipped-fusion-rule-changed-to-e_on_a-parity-re-established">v2 (08:35): the shipped fusion rule changed to <code>e_on_a</code>; parity re-established</h2>
+<p>The pre-declared sweep (<code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>, commit 299cab3)
+replaced zmean with <strong>"E on A alpha 0.2"</strong>, persisted in <code>models/fusion_v1/constants.json</code> by
+<code>scripts/fuse_sweep.py --write</code>. The runner now defaults to it (<code>--rule e_on_a</code>, the constants
+file's <code>final</code> = <code>E_on_A_alpha0.2</code>):</p>
+<ol>
+<li><code>rank_d = searchsorted(inner_oof_sorted[d], logit_d) / len</code> for m1b_v3 and handcrafted_v5;</li>
+<li><code>base = 0.8 * rank_m1b + 0.2 * rank_hc</code>;</li>
+<li>M3 as false-alarm suppression only: if the spectra_aasist margin &lt; -3 and base &gt; 0.5, base *= 0.5
+(M3 never promotes; nothing is fit on M3; a missing M3 means no suppression);</li>
+<li><code>p = sigmoid(a * base + b + logit(0.3))</code> with the file's Platt map;</li>
+<li>the determinate map <code>0.001 + 0.999 * p</code> and the pinned block below 0.001 for gated files are
+the <strong>policy</strong>, done by <code>hearsay.detectors.speech_gate.apply_default_answer</code> (e2d5291) and
+applied <strong>exactly once</strong>: <code>FusionConstants.fuse</code> returns the Platt <code>p</code> (<code>fusion.p_fused</code>), then
+<code>final_score</code> calls <code>apply_default_answer(p, is_speech, order_by=sigmoid(m1b LLR), keys=[filename],
+failed=[decode failure])</code>. Gated files land in [0.0001, 0.001) ordered by the weak M1b signal
+with a hash jitter of the filename; decode failures and missing files below 0.0001.
+<code>tests/test_pipeline.py::test_analyze_with_the_shipped_rule_applies_the_map_exactly_once</code> pins
+the single application; the exact test below would drift by ~1e-3 if it were applied twice.</li>
+</ol>
+<p><code>--fusion models/fusion_v0/constants.json --rule zmean|stack_nonlj</code> still selects the 06:02 rules;
+a rule the chosen file does not define is refused before scoring (<code>rule 'e_on_a' is not defined
+by models/fusion_v0/constants.json (it has ('zmean', 'stack_nonlj'))</code>). <code>--flip</code> emits the
+pre-flipped variant (1 - p through the same map, block still at the minimum) as
+<code>&lt;team&gt;_predictions_FLIPPED.tsv</code>. <code>--policy none</code> disables the block only; the determinate map is
+step 5 of the rule and always applies, so scores are in [0.001, 1] in every mode. The cache
+identity already covered the constants file's sha, so a <code>--out</code> scored under fusion_v0 is moved
+aside and rescored; <code>--flip</code>, like <code>--rule</code> and <code>--policy</code>, re-fuses cached logits in 0.1 s.
+Every pre-existing flag and environment variable is unchanged. The API defaults to <code>e_on_a</code>
+(<code>HEARSAY_RULE</code>; <code>HEARSAY_FUSION=models/fusion_v0/constants.json</code> for the old rules) and answers
+500 with the file's rule list when asked for a rule the file lacks.</p>
+<p><strong>Parity v2</strong> (Mac, CPU, 50 template files, gate on: 0 gated, 0 decode errors; a busier machine
+than at 06:50, 1.7 s/file):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Comparison</th><th>Spearman</th><th>max abs diff</th><th>mean abs diff</th>
+</tr></thead>
+<tbody>
+<tr><td>exported logits -&gt; fusion_v1 constants -&gt; policy vs <code>20260926-0813_..._our_direction.tsv</code> (1,671 rows, test at 1e-6)</td><td></td><td>4.4e-16</td><td></td></tr>
+<tr><td>same, <code>--flip</code>, vs <code>20260926-0813_..._FLIPPED_only_if_NSA_scores_inverted.tsv</code></td><td></td><td>4.4e-16</td><td></td></tr>
+<tr><td>live from audio, <code>e_on_a</code>, vs the our-direction TSV</td><td>1.000000</td><td>2.7e-5</td><td>6.5e-7</td></tr>
+<tr><td>live from audio, <code>--flip</code> (re-fused from the cache), vs the FLIPPED TSV</td><td>1.000000</td><td>2.7e-5</td><td>6.5e-7</td></tr>
+<tr><td>live from audio, <code>--fusion fusion_v0 --rule zmean</code>, vs the 06:02 zmean TSV</td><td>1.000000</td><td>1.0e-3</td><td>7.7e-4</td></tr>
+</tbody>
+</table></div>
+<p>The zmean row's 1.0e-3 is the determinate map itself (the 06:02 TSVs predate it: p vs
+0.001 + 0.999 p differs by at most 0.001); the underlying Platt p still matches to 2.4e-5 (v1
+section below). The rank rule is far less sensitive to the CPU-vs-MPS logit noise than the z
+rules were: a 5e-4 M1 logit difference moves a rank only when it crosses one of 16,142 reference
+values, hence 2.7e-5 on p (one or two files crossing a step) with a mean of 6.5e-7. Per-detector
+logit parity is unchanged from the 06:50 table (same score paths).</p>
+<p>Commits: see the end of this file's commit list (v2 commit noted in the handoff message).</p>
+<hr>
+<p>Owner of this lane: the runner chat. Files: <code>src/hearsay/pipeline.py</code>, <code>scripts/run_pipeline.py</code>,
+<code>src/hearsay/api.py</code>, <code>tests/test_pipeline.py</code>, <code>tests/test_api.py</code>, this report. The Docker image
+itself (<code>Dockerfile</code>, <code>.dockerignore</code>, <code>docker/*</code>) is the K Docker chat's (run spec
+<code>docs/specs/2026-09-26_k-docker-image.md</code>); this lane only checked that its image runs this runner.</p>
+<p>Commits: <code>1394ca0</code> runner, <code>b97bbb0</code> preflight tolerance, <code>6c2d1ca</code> API. Suite after them:
+<code>uv run pytest -q</code> 416 passed (359 at 06:20), <code>uv run ruff check .</code> clean.</p>
+<h2 id="what-was-built">What was built</h2>
+<p><strong><code>hearsay.pipeline</code></strong> — one clip in, one <code>AnalyzeResponse</code> out (frontend contract v0,
+<code>docs/handoffs/2026-09-26_frontend-contract.md</code>), through <code>analyze_clip(ctx, models, consts, rule)</code>:</p>
+<ul>
+<li>decode once into a <code>ClipContext</code>; every registered engineered detector through <code>safe_run</code>
+(<code>import hearsay.detectors.engineered</code>: compression, container, enf, handcrafted, speaker_drift,
+speech_gate, splice), each timed, with roles fused / routing / gate / evidence;</li>
+<li><strong>m1b_v3</strong>: <code>prepare_segment -&gt; embed_segment -&gt; Probe.llr</code> on the frozen XLS-R backbone, the
+probe at <code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0521</code>. The probe's own <code>segment=False</code> flag
+is not consulted: it was wrong (train_probe.py looked for <code>extract_meta.json</code> under the
+comma-joined train name; fixed upstream in <code>541afdb</code>), and the export was produced from
+segment-mode embeddings. The embedding is rounded through float16, the dtype the extracted
+shards were stored in (<code>M1_EMBED_FP16</code>, chosen by parity, table below). The encoder is
+truncated to <code>layers[:8]</code> (<code>truncate_backbone</code>): <code>hidden_states[7]</code> is bit-identical on the real
+backbone (max |d| = 0.0 on two test files, <code>tests/test_pipeline.py::test_truncated_backbone_keeps_layer_7_identical</code>),
+M1 per file 0.82 s -&gt; 0.28 s; <code>--no-truncate</code> keeps all 24 layers;</li>
+<li><strong>spectra_aasist</strong>: <code>hearsay.spectra.prepare_input -&gt; score_clip(..., ("zero",), 16)</code>, no peak
+normalization, <code>synth_logit</code>: the published export's configuration
+(<code>outputs/detector_scores/spectra_aasist_summary.json</code>);</li>
+<li><strong>handcrafted_v5</strong>: the registered detector pinned to <code>models/hc_selected</code>
+(-&gt; <code>hc_lgbm_20260926-055451</code>, the bundle behind <code>handcrafted_v5.csv</code>); its <code>hc_logit</code> feature
+is the export's logit;</li>
+<li><strong>fusion</strong>: <code>FusionConstants.load(models/fusion_v0/constants.json)</code> (written by
+<code>scripts/fuse.py</code>, never refit here): <code>z = (logit - mean) / std</code> per detector from the inner-OOF
+rows, <code>zmean</code> = mean of z (default) or <code>stack_nonlj</code> = weights . z + intercept, then
+<code>p = sigmoid(a * fused + b + prior_shift)</code> with that rule's Platt map. A fused detector that
+errored is imputed at z = 0 (its inner mean) and named in the routing log. <code>--detectors m1b</code>
+is the probe-only mode: <code>p = sigmoid(LLR + logit(0.3))</code>, <code>scripts/make_probe_csv.py</code>'s arithmetic;</li>
+<li><strong>gate</strong>: <code>speech_gate.apply_default_answer</code> after fusion (<code>--policy none</code> leaves the fused
+probability alone, for parity against pre-gate TSVs). A decode failure or a template name with
+no file is gated the same way (<code>undetermined</code>, flag <code>decode_error</code> / <code>missing_file</code>);</li>
+<li><strong>routing_log</strong> from the features: container <code>lossy</code> / <code>is_pcm_wav</code> / <code>ffmpeg_written</code>,
+compression <code>bw_hz</code> against the 7.25 kHz band match, enf <code>enf_present</code> / <code>enf_stable</code>, splice
+<code>n_seams</code>, speaker_drift <code>drift</code> / <code>cos_min</code>, speech_gate <code>is_speech</code> / <code>voiced_frac</code>, the fusion
+rule and any imputation; <strong>version</strong>: git sha (<code>HEARSAY_GIT_SHA</code> in the image), probe dir,
+resolved hc bundle, Spectra id, the M5 checkpoint name and hash prefixes (v3), constants file as
+<code>&lt;dir&gt;/constants.json</code>, rule, policy, truncation depth.</li>
+</ul>
+<p><strong><code>scripts/run_pipeline.py</code></strong> — the Docker entrypoint's runner, also the Mac-side parity tool.</p>
+<pre><code>uv run python scripts/run_pipeline.py --in &lt;audio dir&gt; --out &lt;dir&gt; [--template &lt;tsv&gt;] [--team NAME]
+    [--limit N] [--device cpu] [--rule zmean|stack_nonlj] [--policy speech_gate|none]
+    [--detectors m1b|m1b,spectra,handcrafted] [--fusion|--constants &lt;constants.json&gt;]
+    [--m1-mode segment|windows|auto] [--no-truncate] [--fresh] [--threads N]
+    [--require-offline] [--app-root DIR] [--probe DIR] [--hc DIR] [--m5 DIR] [--no-preflight] [--no-tsv]
+    [--compare-tsv &lt;logged.tsv&gt;]
+env: HEARSAY_TEAM HEARSAY_TEMPLATE HEARSAY_RULE HEARSAY_POLICY HEARSAY_FUSION HEARSAY_DETECTORS HEARSAY_M5 OMP_NUM_THREADS
+(v3: `--fusion models/fusion_v2/constants.json` runs four fused scorers, M5 from `--m5`; the fused
+columns a run computes are the constants file's own, whatever `--detectors` says beyond `m1b` alone)</code></pre>
+<ul>
+<li>Rows: the template's order (<code>filename</code> column, tab-only parse, duplicates fail before scoring);
+each name resolves as a relative path under <code>--in</code>, else by basename against a recursive index
+(nested layouts; an ambiguous basename fails before scoring); a name with no file keeps its row.
+Without a template: sorted audio files. An empty listing fails with no TSV.</li>
+<li>Outputs under <code>--out</code>, never <code>submissions/</code>, never <code>append_log</code>: <code>&lt;team&gt;_predictions.tsv</code> via
+<code>hearsay.submission.write_submission</code> (a stamped name if it exists), <code>results/&lt;filename&gt;.json</code>
+(one AnalyzeResponse per file), <code>results.jsonl</code> (the resumable cache; its header line records
+git sha, probe, hc bundle, constants sha, scorers, m1 mode, fp16, truncation, and a resume
+requires an exact match, else the old cache is moved to <code>results.jsonl.stale-&lt;stamp&gt;</code>;
+<code>--fresh</code> forces that), <code>&lt;team&gt;_predictions.sidecar.csv</code> (per file: p, flag, is_speech, the
+logits of all four fused columns in <code>DETECTOR_ORDER</code>, empty where a column was not run, fused),
+<code>timings.csv</code> (per file and per stage), <code>run_meta.json</code>, <code>preflight/</code>.</li>
+<li>A rerun with another <code>--rule</code> or <code>--policy</code> re-fuses the cached logits without loading a model
+(0.1 s for 50 files) and rewrites the per-file JSON.</li>
+<li>Preflight before the first file: silence and a chord through the whole pipeline twice; both
+finite, the two passes within 1e-6 (<code>preflight_consistent</code>; multithreaded x86 BLAS is not
+bit-reproducible: the amd64 image differed by 8e-10), both gated at the default answer.</li>
+</ul>
+<p><strong><code>hearsay.api</code></strong> — <code>uv run uvicorn hearsay.api:app --port 8000</code>. <code>POST /analyze</code> (multipart
+<code>file</code> -&gt; AnalyzeResponse; models loaded once on first use, one clip at a time),
+<code>GET /results/{filename}</code> and <code>GET /results</code> (a runner <code>--out</code> given by <code>HEARSAY_RESULTS</code>),
+<code>GET /health</code>. Honours <code>HEARSAY_RULE</code>, <code>HEARSAY_POLICY</code>, <code>HEARSAY_FUSION</code>, <code>HEARSAY_DETECTORS</code>.
+Off the scoring path; not in the image.</p>
+<p><strong>Tests</strong> — <code>tests/test_pipeline.py</code> (31: toy constants in fuse.py's file layout, the two rules'
+arithmetic to 1e-15, imputation, response shape and roles, routing log, default answer, gate
+error, decode failure, re-fuse, M1-only, template listing, cache identity, preflight tolerance,
+truncation on tiny stable/non-stable configs; <code>needs_data</code> exact checks that the exported logits
+through <code>constants.json</code> reproduce both logged TSVs to 1e-6 (measured 1.1e-16); one
+<code>slow</code>/<code>needs_weights</code> truncation identity test on the real backbone) and <code>tests/test_api.py</code> (7,
+fake models behind <code>/analyze</code>, a temp results dir behind <code>/results</code>).</p>
+<h2 id="parity-mac-cpu-6-threads-50-template-files-gate-on-0-gated-0-decode-errors">Parity (Mac, CPU, 6 threads, 50 template files, gate on: 0 gated, 0 decode errors)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Comparison</th><th>Spearman</th><th>max abs diff</th><th>mean abs diff</th>
+</tr></thead>
+<tbody>
+<tr><td>live p vs logged <code>20260926-0602_M4_fusion_stack_nonlj_m1bv3_hcv5_m3.tsv</code></td><td>1.000000</td><td>2.4e-7</td><td>8.9e-9</td></tr>
+<tr><td>live p vs logged <code>20260926-0602_M4_fusion_zmean_m1bv3_hcv5_m3.tsv</code></td><td>1.000000</td><td>2.4e-5</td><td>2.3e-6</td></tr>
+<tr><td>fusion from the exported logits through <code>constants.json</code> vs both TSVs</td><td></td><td>1.1e-16</td><td></td></tr>
+<tr><td><code>--detectors m1b --policy none</code> vs logged <code>20260926-0522_M1_..._0521.tsv</code> (20 files)</td><td>1.0</td><td>1.5e-5</td><td>2.0e-6</td></tr>
+</tbody>
+</table></div>
+<p>Per detector, live logit vs the export fusion was fit on (<code>outputs/detector_scores/*.csv</code>, test rows):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Detector</th><th>max abs dlogit</th><th>mean</th><th>note</th>
+</tr></thead>
+<tbody>
+<tr><td>m1b_v3 (fp16 rounding, default)</td><td>5.5e-4</td><td>1.1e-4</td><td>CPU fp32 vs the MPS-extracted, fp16-stored shards</td></tr>
+<tr><td>m1b_v3 without fp16 rounding</td><td>4.7e-3</td><td>1.7e-3</td><td>10x worse, so fp16 stays the default</td></tr>
+<tr><td>m1b_v3 via the <code>windows</code> path</td><td>3.95</td><td>0.95</td><td>confirms segment mode is the export's path</td></tr>
+<tr><td>handcrafted_v5</td><td>4.4e-16</td><td>1.8e-17</td><td>identical (numpy trees, same features)</td></tr>
+<tr><td>spectra_aasist</td><td>1.1e-4</td><td>9.3e-6</td><td>CPU vs MPS</td></tr>
+</tbody>
+</table></div>
+<p>zmean's Platt slope (11.7) amplifies the M1 noise more than stack_nonlj's (1.76), hence 2.4e-5
+vs 2.4e-7 on p. Both are far inside the 0.05 / 0.99 gate.</p>
+<h2 id="timing-mac-cpu">Timing (Mac, CPU)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Setting</th><th>s/file</th><th>m1b_v3</th><th>spectra</th><th>engineered (7 detectors)</th>
+</tr></thead>
+<tbody>
+<tr><td>6 threads, all 24 layers (first 50-file run)</td><td>2.31 (median 2.17, max 6.0)</td><td>0.82</td><td>1.04</td><td>0.35</td></tr>
+<tr><td>6 threads, truncated to layer 7</td><td>0.77</td><td>0.28</td><td>0.36</td><td>0.27</td></tr>
+<tr><td>4 threads, truncated, full test set (1,671 files)</td><td>0.78 (median 0.68, p95 1.25, max 5.7)</td><td>0.14</td><td>0.33</td><td>0.23</td></tr>
+</tbody>
+</table></div>
+<p>Model load: 5-8 s (XLS-R 0.5 s, Spectra 1.7-4.9 s). Full test set, 1,671 files, 4 threads,
+<code>--rule zmean</code>, gate on: <strong>1,319 s wall (22.0 min)</strong>, 1,306 s scoring, 8 s model load, 0 gated,
+0 decode errors, share &gt; 0.5 = 0.2932 (the logged zmean TSV's share), and vs the logged zmean TSV
+over all 1,671 rows: Spearman 1.000000, max abs diff 1.2e-4, mean 2.3e-6, 0 rows over 0.01.
+Outputs (gitignored): <code>outputs/runner/full_20260926/</code> with <code>HEARSAY_predictions.tsv</code>,
+<code>results/&lt;filename&gt;.json</code> for every test file (the frontend's static dump, every field
+populated including <code>fusion.weights</code> and the full <code>routing_log</code>), <code>results.jsonl</code>, the sidecar,
+<code>timings.csv</code> and <code>run_meta.json</code>.</p>
+<p>API latency (<code>curl -F file=@... localhost:8000/analyze</code>, 6 threads): first request 11.4 s
+(7.8 s model load + warm-up), then 1.7 s (HGT1046947) and 1.1 s (HGT1013455);
+<code>GET /results/&lt;filename&gt;</code> in milliseconds.</p>
+<h2 id="docker">Docker</h2>
+<p>Not built by this lane: the K Docker chat owns <code>Dockerfile</code>, <code>.dockerignore</code>, <code>docker/*</code> and
+was building concurrently (images <code>hearsay:20260926-0637</code>, <code>hearsay:20260926-0648</code> = <code>latest</code>,
+linux/amd64, 2.66 GB content / 7.49 GB on disk, <code>BUILD_INFO</code> sha=9301666 with the 0521 probe,
+<code>hc_lgbm_20260926-055451</code>, <code>cmp_lgbm_20260926-0233</code>, <code>fusion_v0/constants.json</code>; inside,
+<code>platform.machine()</code> = <code>x86_64</code> under Rosetta). Their <code>docker/build.sh</code> runs
+<code>docker buildx build --platform linux/amd64 --load</code> and retags <code>hearsay:latest</code>; running it from
+this lane while they rebuild after "runner final" would have raced their tags and their VM's six
+CPUs, so this lane did not run it (the main chat's instruction: run it only if it works with this
+runner, otherwise stop). What this lane did check on their <code>hearsay:latest</code>, <code>--network none</code>,
+3 test files, a reversed template, <code>--no-preflight</code> (that image predates <code>b97bbb0</code>, so its
+preflight still compares the two passes with <code>==</code>): the image decoded and scored two of the
+three files, then died on the third with <code>OSError: [Errno 5] Input/output error: 'ffmpeg'</code> while
+containerd logged <code>write /var/lib/containerd/.../meta.db: input/output error</code> (exit 125): the
+Colima VM disk on the external drive, not the runner (the same files score on the Mac). The two
+files that did score, vs the logged zmean TSV: HGT1046947 0.685507 vs 0.685650 (1.4e-4),
+HGT1013455 0.00089800 vs 0.00089792 (8e-8). Under Rosetta emulation the image took 22-28 s per
+file (m1b_v3 7.6-9.6 s, spectra 8-10 s), about 30x the Mac's 0.77 s: an emulated full-set run
+would take about 11 h, a native amd64 box would not pay that. So the image runs this runner end
+to end (listing from a mounted template, decode, all detectors, fusion from the shipped
+constants, gate) and the remaining image checks are blocked on the VM disk and the rebuild.</p>
+<p>Their entrypoint execs <code>python /app/scripts/run_pipeline.py --in /data --out /out --threads N "$@"</code>
+with <code>HEARSAY_TEAM</code> / <code>HEARSAY_TEMPLATE</code>; every flag and variable it relies on is unchanged in
+<code>b97bbb0</code>/<code>6c2d1ca</code>, and the additions (<code>--detectors</code>, <code>--policy</code>, <code>--fusion</code>, <code>--m1-mode</code>,
+<code>--no-truncate</code>, <code>--fresh</code>, <code>--require-offline</code>, <code>--app-root</code>) are additive.</p>
+<h2 id="findings-worth-knowing">Findings worth knowing</h2>
+<ul>
+<li>The 0521 probe's <code>segment</code> flag was False for the wrong reason (comma-joined <code>--train</code> name);
+<code>scripts/make_probe_csv.py</code> would have scored it through the tiled 4 s window path, which is
+off by up to 3.95 in LLR against the export. The runner never trusts the flag.</li>
+<li>The extracted embeddings are float16 on disk; rounding the live embedding the same way is
+what makes M1 parity 5e-4 instead of 5e-3.</li>
+<li>Encoder truncation is safe: both Wav2Vec2 encoder variants append <code>hidden_states[k]</code> before
+running layer k, so <code>layers[:k+1]</code> leaves it untouched (bit-identical on the real backbone).</li>
+<li>Two runs of the same clip differ by ~1e-9 on x86 with 6 BLAS threads; anything that asserts
+<code>==</code> on scores (including <code>hearsay.submission.preflight</code>) will fail in the amd64 image.</li>
+<li><code>speaker_drift</code> (ECAPA, SpeechBrain) runs in the pipeline as evidence only and costs
+0.1-0.4 s per file; the ENF detector emits a numpy divide-by-zero warning on digital silence
+(harmless: the SNR of an all-zero frame).</li>
+</ul>
+<h2 id="not-done">Not done</h2>
+<ul>
+<li>No image built by this lane (above). The in-image 50-file parity, the 3-file smoke with the
+fixed preflight and the 1,671-file in-image wall time are the K chat's checks with its rebuild.</li>
+<li>The full-set run above was done on the Mac (22 min), not in the image.</li>
+<li>The API is not in the image and has no auth or rate limiting (demo only).</li>
+<li>The runner scores files one at a time (decode + engineered detectors + the deep models the
+constants file names, two under v1 and three under v2, on one thread pool); a decode/engineered prefetch thread would overlap the ~0.3 s of CPU
+detectors with the deep models and buy ~30%.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_runner-docker.md</code> <span class="hash">d7b200f1b0ee</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

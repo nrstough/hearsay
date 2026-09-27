@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NSA HEARSAY: rules and sponsor questions (Fri Sep 25) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-25_sponsor-questions.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-25_sponsor-questions.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#rules-from-the-kickoff-slides-photos-taken-by-nathan-fri-sep-25-evening">Rules from the kickoff slides (photos taken by Nathan, Fri Sep 25 evening)</a></li><li><a href="#what-the-presenter-said-aloud-nathans-notes-fri-sep-25">What the presenter said aloud (Nathan's notes, Fri Sep 25)</a></li><li><a href="#what-this-changes-implemented">What this changes (implemented)</a></li><li><a href="#conflicts-to-resolve">Conflicts to resolve</a></li><li><a href="#questions-for-the-sponsor">Questions for the sponsor</a></li><li><a href="#answers">Answers</a></li></ul></details>
+<h1 id="nsa-hearsay-rules-and-sponsor-questions-fri-sep-25">NSA HEARSAY: rules and sponsor questions (Fri Sep 25)</h1>
+<p><strong>The sponsor brief is now in <code>docs/nsa-challenge.md</code> (PDF: <code>docs/nsa-challenge.pdf</code>) and is authoritative.</strong> It adds two submission requirements: a Docker image that runs inference on the test set, and a README covering approach, architecture and run instructions. The 20% diversity score is itemized per detector type, with a bonus for agentic orchestration.</p>
+<h2 id="rules-from-the-kickoff-slides-photos-taken-by-nathan-fri-sep-25-evening">Rules from the kickoff slides (photos taken by Nathan, Fri Sep 25 evening)</h2>
+<p><strong>Data</strong></p>
+<ul>
+<li>Audio files split into training and testing, about 50% real and 50% synthetic.</li>
+<li>Labels ("answers") are given for training.</li>
+<li>Clips are over 2 s and English only.</li>
+<li>Some countermeasures, e.g. added noise. Noise added to real or synthetic audio keeps its label.</li>
+<li>A held-out dataset is used for testing.</li>
+<li>No determination of intent, and no partially synthetic clips.</li>
+</ul>
+<p><strong>Definitions</strong></p>
+<ul>
+<li>Miss: not identifying synthetic speech.</li>
+<li>False alarm / false positive: identifying real speech as synthetic.</li>
+<li>False alarms need analysis, so they cost more: the penalty factor is 4.</li>
+</ul>
+<p><strong>Metric</strong></p>
+<ul>
+<li>Detection Cost Function (MinDCF) as in ASVspoof 5 (Track 1 baselines, <code>asvspoof5-baselines</code>).</li>
+<li>Formula as transcribed from the slide: <code>DCF = C_miss·(1−P(attack))·P(miss) + C_FA·P(attack)·P(FA)</code>, minimized.</li>
+<li>It is a minimum over thresholds, so <strong>only the ranking of our scores matters</strong>.</li>
+</ul>
+<p><strong>Judging</strong></p>
+<ul>
+<li>60% MinDCF.</li>
+<li>20% diversity in techniques (quality, innovation, depth).</li>
+<li>20% documentation in GitHub, "in your own words".</li>
+</ul>
+<p><strong>Submission</strong></p>
+<ul>
+<li>A tab-separated file named <code>TeamName_predictions.tsv</code>.</li>
+<li>Two columns with header <code>filename&lt;TAB&gt;cm-score</code>. The score is a probability: 0.0 = real/bona fide, 1.0 = synthetic. No logarithms or log-likelihood ratios. Every test file must have an entry.</li>
+<li>Send it as a DM in the NSA x HexLabs Discord channel.</li>
+<li>Optional one-time feedback on a test-data submission.</li>
+<li>Final submission is due <strong>no later than 8 AM</strong> (Sunday).</li>
+</ul>
+<p><strong>Generators named on the "Text to Speech: inexpensive and ubiquitous" slide</strong> (likely what the NSA fakes come from):</p>
+<ul>
+<li>ElevenLabs: instant voice cloning from 10 s to 1 min of audio; professional voice cloning from 30+ min.</li>
+<li>Amazon Polly, Grok TTS, Google Gemini.</li>
+<li>Open-weight models on Hugging Face, e.g. Qwen-3 (Qwen3-TTS).</li>
+</ul>
+<p>Black-box detectors are discouraged, not forbidden (said aloud, per Nathan).</p>
+<p><strong>What they're looking for</strong></p>
+<ul>
+<li>Unique perspectives: synthetic-speech consistency, breathing, pauses, emotion, prosody; read transcript vs. real-time speech; correlation, stacking, signal processing, artifacts, metadata, statistics.</li>
+<li>Test yourself: generate your own synthetic speech.</li>
+<li>Tell us what didn't work, and what did work and how it can be explained.</li>
+<li>Minimize black-box detectors.</li>
+</ul>
+<h2 id="what-the-presenter-said-aloud-nathans-notes-fri-sep-25">What the presenter said aloud (Nathan's notes, Fri Sep 25)</h2>
+<ul>
+<li>Class balance is <strong>70% real / 30% synthetic</strong>. The slide photo reads "~50% real, ~50% synthetic". We go with 70/30 (π_synth = 0.3) and will check it against the NSA train labels.</li>
+<li>Clips are 3 s or longer, with a likely upper bound around 30 s. The slide says "more than 2 seconds".</li>
+<li>Labels are discrete, pass or fail: every clip is fully synthetic or fully real, with nothing in between. Added noise does not change the label.</li>
+<li>One-time early submission to check whether we're on track against the test data.</li>
+<li>Diversity means "not just SSL": fine-tuning, depth, multiple layers, engineered features.</li>
+<li>Ranking preference, using the bullseye slide: accurate and precise &gt; accurate but not precise &gt; neither. The worst case is <strong>high precision, low accuracy</strong>, i.e. consistently and confidently wrong. For us: submit calibrated probabilities, not saturated 0/1 scores, and never be confidently wrong on a whole subpopulation (e.g. silence or a noise type).</li>
+<li>Black-box detectors are discouraged, not forbidden.</li>
+<li>Outside data was neither allowed nor forbidden, so we use it and disclose it. ElevenLabs was mentioned as a way to generate our own test fakes.</li>
+</ul>
+<p>With π_synth = 0.3 and C_FA = 4, normalized DCF = (4·0.7·P_FA + 0.3·P_miss) / 0.3 = <strong>9.33·P_FA + P_miss</strong>. False alarms dominate. The best constant is "always real" (normalized 1.0).</p>
+<h2 id="what-this-changes-implemented">What this changes (implemented)</h2>
+<ul>
+<li><code>hearsay.metrics</code>: normalized minDCF with C_FA = 4, C_miss = 1, π_synth = 0.5 <em>(corrected Sep 26: now π_synth = 0.3, confirmed by the NSA instructions, "approximately 70% of the files are real")</em>. It is the selection metric for layer choice, bake-off, fusion and submissions. EER is logged alongside. The <code>validation_score</code> column in <code>submissions/log.csv</code> holds normalized minDCF.</li>
+<li><code>hearsay.submission.write_submission</code> writes the TSV above.</li>
+<li>The constant rollback submission is all 0.0 ("always real"; 1.0 only if π_synth &gt; 0.8). Its normalized minDCF is 1.0, which every model must beat.</li>
+<li>Submissions are calibrated posteriors, sigmoid(LLR + logit π). Because MinDCF sweeps the threshold, the −ln 4 decision shift is opt-in (<code>--cost-shift</code>) and does not change the score.</li>
+<li>The one-time feedback is valuable: use it on the first strong learned model, not the constant one.</li>
+</ul>
+<h2 id="conflicts-to-resolve">Conflicts to resolve</h2>
+<ul>
+<li><strong>Class balance.</strong> A pasted note (source not filled in) said 70% real / 30% synthetic. The slide says ~50/50. We use the slide's number until the NSA train labels are counted. <em>(Resolved Sep 26: the NSA instructions say about 70% real, so π_synth = 0.3.)</em> If the train split really is 70/30, normalized minDCF becomes 9.33·P_FA + P_miss.</li>
+<li><strong>Prior in the DCF.</strong> The slide weights the false-alarm term by P(attack). That is not the usual ASVspoof 5 form (miss/FA roles and the P(attack) value differ). At P(attack) = 0.5 both readings give the same number. <em>(Sep 26: the sponsor's scoring code uses Pspoof = 0.5, Cmiss = 1, Cfa = 4 and treats a higher score as bona fide; see <code>docs/plan.md</code>, "Score direction".)</em></li>
+</ul>
+<h2 id="questions-for-the-sponsor">Questions for the sponsor</h2>
+<p>Post these in writing (NSA x HexLabs Discord) and record the answers below.</p>
+<ol>
+<li><strong>Outside data.</strong> May we train on public datasets (ASVspoof 2019 LA, MLAAD, In-the-Wild, ReplayDF) as well as the provided training set?</li>
+<li><strong>Pretrained checkpoints.</strong> Do pretrained anti-spoofing checkpoints (e.g. <code>lab260/Spectra-AASIST</code>) count as outside data? Are general SSL speech models (XLS-R, WavLM) fine?</li>
+<li><strong>Pre-event downloads.</strong> We downloaded public weights and datasets before 8 pm Friday; no code was written or run on them. Is that OK?</li>
+<li><strong>DCF parameters.</strong> Which P(attack) goes into the MinDCF (0.5 to match the data, or ASVspoof 5's 0.05)? Is the 4× penalty on false alarms, i.e. real called synthetic?</li>
+<li><strong>Filename column.</strong> Basename or relative path? Extension included?</li>
+<li><strong>Test balance.</strong> Is the test set also ~50/50?</li>
+<li><strong>Feedback.</strong> What does the one-time feedback return: the MinDCF on the full test set?</li>
+<li><strong>Track stacking.</strong> Can a Shipyard (hardware) project also submit to NSA HEARSAY?</li>
+</ol>
+<h2 id="answers">Answers</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Answer</th><th>Source / time</th>
+</tr></thead>
+<tbody>
+<tr><td>metric</td><td>MinDCF, false alarm ×4, label 1 = synthetic, not log-loss</td><td>kickoff slides, Fri Sep 25; confirmed by Nathan</td></tr>
+<tr><td>format</td><td>TSV <code>filename&lt;TAB&gt;cm-score</code>, probability, no LLR</td><td>kickoff slides</td></tr>
+<tr><td>direction</td><td><strong>1.0 = synthetic</strong> ("Output a synthetic probability score (0.0 to 1.0), 1.0 means synthetic"). We submit this and never flip; the sponsor's ASVspoof5 code treats higher = bona fide, so the draft review doubles as a check (a strong model scoring near 1.0 → raise it with NSA). NSA's document seen Sat ~11:50 repeats it in plain words: "0.0 for 100% confident Real to 1.0 for 100% confident synthetic".</td><td>NSA brief; reaffirmed by Nathan, Sat Sep 26; NSA doc Sat 11:50</td></tr>
+<tr><td>balance</td><td><strong>70/30 real/synthetic, confirmed by NSA</strong> (Sat Sep 26, ~12:10, via Nathan). The 0.3 prior in <code>hearsay.metrics</code> and the fusion calibration already assume this; nothing changes.</td><td>presenter at kickoff; NSA confirmation Sat Sep 26</td></tr>
+<tr><td>1</td><td>Yes: the brief lists ASVspoof 2019/2021/5, WaveFake, In-the-Wild, MLAAD, ADD, VCTK, LibriSpeech, VOiCES for training/calibration</td><td><code>docs/nsa-challenge.md</code></td></tr>
+<tr><td>2</td><td>Yes: "any open-source or commercial tools"; AASIST, RawNet, wav2vec 2.0/WavLM/Whisper front ends suggested</td><td><code>docs/nsa-challenge.md</code></td></tr>
+<tr><td>3</td><td></td><td></td></tr>
+<tr><td>4</td><td></td><td></td></tr>
+<tr><td>5</td><td>Filename including its extension</td><td><code>docs/nsa-challenge.md</code></td></tr>
+<tr><td>6</td><td>Test set is ~70% real / 30% synthetic (the slide's ~50/50 was wrong)</td><td>NSA, Sat Sep 26, ~12:10, via Nathan</td></tr>
+<tr><td>7</td><td><strong>minDCF only.</strong> The draft review returns the minDCF number and nothing else (no EER, P_FA or P_miss). Decoding therefore rests on the minDCF bands in <code>docs/reports/2026-09-26_draft-review-branches.md</code>; the 0.45–0.90 band is the one that cannot be resolved without a second number. NSA's own document (screenshot <code>data/nsa/hearsay-doc-screenshot-2026-09-26.png</code>, gitignored) also says: score "ranges from 0.0 for 100% confident Real to 1.0 for 100% confident synthetic"; "approximately 70% of the files are real"; the "Analyst scenario", ASVspoof 5 track-1 DCF, false alarm penalised 4× a miss; teams should use "Game Theory or Benchmark maxing to determine what the default answer [should] be if you cannot determine an answer" (our pinned block); their answer key carries a placeholder of <code>.006</code> "to keep track of files done and not done" (our copy of the key has 0.5 in every row; either way every row must be filled and none removed).</td><td>NSA, Sat Sep 26, ~11:50, via Nathan</td></tr>
+<tr><td>8</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-25_sponsor-questions.md</code> <span class="hash">50254b6901a2</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

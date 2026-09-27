@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consult: M5, XLS-R fine-tune data mix and recipe (Sat Sep 26, 2026, ~02:30 EDT) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/consults/2026-09-26_m5-extra-data-finetune_CONSULTATION.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/consults/2026-09-26_m5-extra-data-finetune_CONSULTATION.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#your-role">Your role</a></li><li><a href="#the-problem">The problem</a></li><li><a href="#whats-fixed">What's fixed</a></li><li><a href="#core-training-data-sponsor-provided-in-the-fold-file">Core training data (sponsor-provided, in the fold file)</a></li><li><a href="#extra-open-data-we-can-add-to-training-training-only-never-scored-never-in-the-holdout">Extra open data we can add to training (training only; never scored, never in the holdout)</a></li><li><a href="#current-numbers-for-calibration-of-expectations">Current numbers (for calibration of expectations)</a></li><li><a href="#what-i-want-ranked">What I want (ranked)</a></li><li><a href="#additional-context">Additional context</a></li><li><a href="#output-format">Output format</a></li></ul></details>
+<h1 id="consult-m5-xls-r-fine-tune-data-mix-and-recipe-sat-sep-26-2026-0230-edt">Consult: M5, XLS-R fine-tune data mix and recipe (Sat Sep 26, 2026, ~02:30 EDT)</h1>
+<p><strong>Target:</strong> a frontier LLM, for strategic and technical opinion.
+<strong>Scope:</strong> only the M5 fine-tune rung of HEARSAY: four questions on the extra-data mix and the fine-tune recipe.
+<strong>Blocking?</strong> No. The data bundle and training code are being built in parallel. Answers become config: ratios, caps, unfreeze depth, augmentation set. A small inner-fold ablation has the final say.</p>
+<p>Copy below the line.</p>
+<hr>
+<h2 id="your-role">Your role</h2>
+<p>You are a speech anti-spoofing / audio deepfake detection researcher: SSL front ends, ASVspoof, In-the-Wild generalization. Push back hard if a premise below is wrong or we're over-engineering. We have about 30 hours left in a hackathon and about $13 of cloud GPU credit (roughly 6 H100-hours), so practical beats ideal.</p>
+<h2 id="the-problem">The problem</h2>
+<ul>
+<li><strong>Task.</strong> Binary clip-level detection: bona fide vs synthetic speech, for the NSA "HEARSAY" challenge at HackGT 13.</li>
+<li><strong>Output.</strong> A probability per file, 1.0 = synthetic.</li>
+<li><strong>Scoring (60% of the judging).</strong> Normalized minDCF with C_FA = 4 (calling real audio synthetic), C_miss = 1, and π_synth = 0.3; about 70% of the test files are real.
+<ul>
+<li>That works out to minDCF = 9.33·P_FA + P_miss, normalized.</li>
+<li><strong>False alarms on real speech dominate.</strong> Only the score ranking matters.</li>
+</ul></li>
+<li><strong>Test set.</strong> 1,671 WAV files, 16 kHz PCM, unlabeled.
+<ul>
+<li>Durations: 3.0–13.6 s, median 3.41 s, p90 4.57 s, p99 7.1 s; 5.9% are over 5 s and 0.6% over 8 s.</li>
+<li>The brief says the set may include:
+<ul>
+<li>bona fide speech from studio, smartphone, telephony and field recordings across codecs and bitrates</li>
+<li>modern zero-shot TTS and neural vocoders</li>
+<li>voice conversion</li>
+<li>replay</li>
+<li>scene manipulation</li>
+<li>laundered fakes: transcoding, band-limiting, noise</li>
+<li>metadata-spoofed containers</li>
+</ul></li>
+</ul></li>
+<li><strong>Deployment.</strong> Scoring runs offline in a Docker image on CPU.</li>
+</ul>
+<h2 id="whats-fixed">What's fixed</h2>
+<ul>
+<li><strong>Front end.</strong> <code>facebook/wav2vec2-xls-r-300m</code>: 24 transformer layers, 1024-d.</li>
+<li><strong>Input path, identical for train and test:</strong>
+<ol>
+<li>FFmpeg decodes to 16 kHz mono float32.</li>
+<li>Leading and trailing silence are trimmed (relative 35 dB).</li>
+<li>Per-input zero-mean, unit-variance normalization.</li>
+<li>No tiling or repeat-padding.</li>
+<li>Test-time input is the whole trimmed clip, with a cap of about 14 s.</li>
+</ol></li>
+<li><strong>Shortcuts deliberately neutralized:</strong>
+<ul>
+<li><strong>Level:</strong> the LJ Speech real audio peaks around 0.54, while the NSA test set peaks around 1.0.</li>
+<li><strong>Leading silence:</strong> about 0.37 s in LibriSpeech vs about 0.06 s in the test set.</li>
+<li><strong>Tiling seams</strong>, from repeat-padding short clips.</li>
+<li><strong>Container/codec:</strong> all of it is decoded before training.</li>
+</ul></li>
+<li><strong>Training crops.</strong> A per-batch crop length is sampled from the test-duration distribution, about 70%, mixed with uniform 3–14 s. Clips are length-bucketed with an attention mask and re-cropped at random each epoch.</li>
+<li><strong>Validation.</strong> A grouped nested fold file.
+<ul>
+<li><strong>Outer holdout:</strong> the <code>playht</code> and <code>wavegrad2</code> generators plus 26 bona fide speaker/chapter groups. It is never used for training or selection.</li>
+<li><strong>Inner folds 0–4:</strong> generator-grouped for spoof, speaker- or chapter-grouped for bona fide.</li>
+<li>We produce 5-fold out-of-fold scores for a logistic stacker with engineered detectors, plus one "full" model trained on all inner folds for holdout and test.</li>
+</ul></li>
+<li><strong>Fine-tune plan (open to change).</strong>
+<ul>
+<li>The CNN feature encoder stays frozen; the top N transformer layers and a pooled linear head are trained.</li>
+<li>bf16, with class-balanced sampling.</li>
+<li>A fixed epoch count, chosen in a pilot on inner fold 4.</li>
+</ul></li>
+<li><strong>Augmentation plan (open to change).</strong> Applied to both classes. We always report a clean-only score next to the augmented one.
+<ul>
+<li>Precomputed codec round-trips: MP3, Opus, AAC, AMR-NB, μ-law.</li>
+<li>On the fly: additive noise at 5–30 dB SNR, band-limits of 3.4, 4 and 7 kHz, simulated RIR (synthetic exponential-decay impulses, since we have no RIR corpus), and random gain before normalization.</li>
+</ul></li>
+</ul>
+<h2 id="core-training-data-sponsor-provided-in-the-fold-file">Core training data (sponsor-provided, in the fold file)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Pool</th><th>Clips (sample / full available)</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>DiffSSD spoof, 10 generators: grad_tts, unit_speech, diffgan_tts, openvoicev2, pro_diff, xtts_v2, your_tts, elevenlabs, playht, wavegrad2</td><td>10k in the sample (1k per generator) / 70k</td><td>Mostly diffusion TTS, plus XTTS, YourTTS and 2 commercial generators. Some files are MP3 or 22 kHz; all are decoded to 16 kHz.</td></tr>
+<tr><td>LJ Speech, bona fide</td><td>6k / 13.1k</td><td><strong>One female speaker</strong>; a 16 kHz resampled subset</td></tr>
+<tr><td>LibriSpeech dev-clean + test-clean, bona fide</td><td>4k / 5.3k</td><td>LibriVox audiobooks</td></tr>
+</tbody>
+</table></div>
+<p>Per-fold spoof generators:</p>
+<ul>
+<li>fold 0: grad_tts, unit_speech</li>
+<li>fold 1: diffgan_tts, openvoicev2</li>
+<li>fold 2: pro_diff, xtts_v2</li>
+<li>fold 3: your_tts</li>
+<li>fold 4: elevenlabs</li>
+<li>holdout: playht, wavegrad2</li>
+</ul>
+<p>Each inner fold has about 1.6k bona fide.</p>
+<h2 id="extra-open-data-we-can-add-to-training-training-only-never-scored-never-in-the-holdout">Extra open data we can add to training (training only; never scored, never in the holdout)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Pool</th><th>Size</th><th>Our concern</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Rest of the NSA manifest</strong></td><td>+50k DiffSSD spoof (inner generators only), +8.4k LJ and Libri real</td><td>Low risk; same domain</td></tr>
+<tr><td><strong>ASVspoof 2019 LA, train + dev</strong></td><td>5.1k bona fide (VCTK, about 100 speakers) + 45k spoof (A01–A06, 2018-era TTS and VC)</td><td>The real-speaker diversity looks valuable, since our real side is one LJ speaker plus LibriSpeech. The attacks are old, and ASV19 has a known silence shortcut, which our trimming mostly removes.</td></tr>
+<tr><td><strong>MLAAD English</strong></td><td>6.4k <strong>spoof only</strong>, from 143 TTS models: 30 clips per model, plus 300 each for ElevenLabs Turbo v2.5 / v2 Multilingual / v3, Gemini 3.1 Flash TTS, Qwen3-TTS (0.6B/1.7B/CustomVoice). Durations 2–26 s.</td><td>Its matching bona fide (M-AILABS audiobooks) is <strong>not downloaded</strong>. The generators are modern and commercial, which is exactly what the test likely contains. Family overlap with our folds (ElevenLabs → fold 4, OpenVoiceV2 → fold 1, the XTTS family → fold 2) is handled: a fold model never trains on the extra generators from its own validation families.</td></tr>
+<tr><td>In-the-Wild (Müller 2022)</td><td>16 GB</td><td><strong>Never trained on</strong> (project rule); used only as a stress-test readout</td></tr>
+</tbody>
+</table></div>
+<p>Planned batch mix (a first guess): balanced by label, NSA at 50% or more of every batch, MLAAD at 15% or less of the spoof side, ASV19 spoof about 1:1 with ASV19 real.</p>
+<h2 id="current-numbers-for-calibration-of-expectations">Current numbers (for calibration of expectations)</h2>
+<ul>
+<li><strong>The frozen XLS-R probe (M1) on NSA</strong> is not in yet; it's running now. This is the bar M5 must beat, measured as outer-holdout minDCF at π = 0.3.</li>
+<li><strong>The frozen XLS-R probe on ASVspoof 2019 (public shakedown):</strong>
+<ul>
+<li>generator-grouped CV minDCF 0.180 (π = 0.5), layer 7 best</li>
+<li>A07–A19 eval minDCF 0.023</li>
+<li>Probably inflated by the ASV19 silence shortcut.</li>
+</ul></li>
+<li><strong>Engineered detectors on NSA</strong> (handcrafted spectral and prosody features + LightGBM), inner-fold CV at π = 0.3:
+<ul>
+<li>overall minDCF 0.61</li>
+<li>per held-out generator: diffgan_tts 0.27, unit_speech 0.25, your_tts 0.32, xtts_v2 0.47, openvoicev2 0.53, elevenlabs 0.80, grad_tts 1.0, pro_diff 1.0</li>
+<li>per bona fide source: LJ 0.43, LibriSpeech 0.77</li>
+<li>So the hard cases are the diffusion vocoders and the commercial generators, and real LibriSpeech is the main false-alarm source.</li>
+</ul></li>
+<li><strong>Compression-forensics detector:</strong> CV minDCF 0.93, near chance on these decoded inputs.</li>
+</ul>
+<h2 id="what-i-want-ranked">What I want (ranked)</h2>
+<p>For each question: your recommendation, a runnable experiment we can finish in under 1 H100-hour, and EV × effort.</p>
+<ol>
+<li><strong>Spoof-only MLAAD.</strong> Adding 6.4k MLAAD spoof without its M-AILABS bona fide: how big is the corpus/recording-chain shortcut risk ("audiobook-TTS acoustics = fake")?
+<ul>
+<li>Do our mitigations handle it: laundering augmentation, a cap of 15% or less of the spoof side, silence trimming, level normalization?</li>
+<li>Is LibriSpeech (also LibriVox) an adequate bona fide proxy, or should we fetch M-AILABS en_US real audio (a few GB) or drop MLAAD?</li>
+<li>Is there a cheap diagnostic that reveals the shortcut? One idea: a classifier trained on MLAAD vs LibriSpeech, scored on held-out MLAAD-source real audio.</li>
+</ul></li>
+<li><strong>ASVspoof 2019 LA.</strong> Do its A01–A06 attacks help or hurt when the targets are modern diffusion and commercial TTS?
+<ul>
+<li>Use bona fide only, bona fide plus balanced spoof, or skip it?</li>
+<li>Does ASV19 bona fide (VCTK read speech, a different mic chain) add false-alarm risk on phone or field real audio, or reduce it?</li>
+</ul></li>
+<li><strong>Mixing and curriculum.</strong>
+<ul>
+<li>What NSA share per batch, and what caps per source?</li>
+<li>Should the extra data stay in the whole run, be used for warm-up then tapered, or come in only after an NSA-only warm-up?</li>
+<li>Any per-source loss weighting?</li>
+<li>With only about 16k NSA training clips per fold model, is more data likely to dominate the recipe?</li>
+</ul></li>
+<li><strong>Fine-tune recipe for XLS-R 300M under this budget</strong> (each run about 10–15 min on an H100):
+<ul>
+<li>how many top layers to unfreeze (vs full fine-tune with a frozen CNN)</li>
+<li>learning rates, backbone vs head; layer-wise LR decay</li>
+<li>epochs</li>
+<li><strong>RawBoost</strong> vs our codec/noise/RIR/band-limit set (or both, and at what probability)</li>
+<li>pooling: mean, attentive statistics, or AASIST-style graph back ends</li>
+<li>whether to use hidden states from middle layers (e.g. a learned weighted sum of layers) rather than the last layer, given that the frozen probe liked layer 7</li>
+<li>whether one-class / OC-softmax loss is worth it for unseen generators</li>
+</ul></li>
+</ol>
+<h2 id="additional-context">Additional context</h2>
+<ul>
+<li><strong>What already works (the bar):</strong> the frozen-probe pipeline on the identical input path. M5 must beat it on the outer holdout, or we keep M1.</li>
+<li><strong>What we can A/B:</strong> inner-fold minDCF from any config in about 15 min of H100 per run. The ablation budget is about 4–6 runs total, including the final 6 (5 fold models plus 1 full model).</li>
+<li><strong>Hard lines:</strong>
+<ul>
+<li>no training on the outer holdout or In-the-Wild</li>
+<li>no selection on the holdout</li>
+<li>offline CPU inference: a single model, no big ensembles</li>
+<li>16 kHz mono everywhere</li>
+<li>output 1.0 = synthetic</li>
+</ul></li>
+<li><strong>Physical replay</strong> is not covered in training (simulated RIR only).</li>
+<li><strong>The false-alarm cost dominates.</strong> A config that raises real-speech diversity may beat one that adds spoof diversity, even at equal EER. Tell us if you disagree.</li>
+</ul>
+<h2 id="output-format">Output format</h2>
+<ol>
+<li>A one-line <strong>verdict</strong> on the overall data plan.</li>
+<li>A <strong>ranked options table</strong>: approach | fit to our constraints | GPU cost | effort | verdict (do / maybe / skip).</li>
+<li>For each of the four questions: a recommendation with concrete numbers (ratios, caps, N layers, LRs, epochs, augmentation probabilities) and one <strong>runnable experiment</strong>.</li>
+<li>A direct <strong>"are we over-engineering?" call</strong>. What would you cut, given about 6 H100-hours and 30 hours of wall clock?</li>
+<li>Any <strong>failure mode we haven't named</strong>, especially around the cost asymmetry (false alarms on real speech).</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/consults/2026-09-26_m5-extra-data-finetune_CONSULTATION.md</code> <span class="hash">d0e1ec5b6db9</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

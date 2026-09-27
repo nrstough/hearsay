@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff — post-draft CPU lane: the negative results, written up for the README (Sat Sep 26, 2026, ~17:25; revised after the Fable second opinion) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_post-draft-cpu-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_post-draft-cpu-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff--post-draft-cpu-lane-the-negative-results-written-up-for-the-readme-sat-sep-26-2026-1725-revised-after-the-fable-second-opinion">Handoff — post-draft CPU lane: the negative results, written up for the README (Sat Sep 26, 2026, ~17:25; revised after the Fable second opinion)</h1>
+<p><strong>Purpose of this chat:</strong> turn tonight's measured negatives into one report the README chat can cite, <code>docs/reports/2026-09-26_post-draft-negatives.md</code>, by ~19:00. Optionally, only if that is done and the CPU is free, run the handcrafted noise-twin experiment (v6) as a candidate for the gate chat. CPU only; you never touch the GPU, fusion, the runner or the shipped bundle <code>models/hc_selected</code>.</p>
+<p><strong>What changed since the first version of this handoff:</strong> the noise twins were this lane's main job. Two independent opinions (<code>docs/consults/2026-09-26_post-draft-review_RESPONSE.md</code>, "What to do" and "Round 2") now put its test-set effect at zero: the channel lane's per-feature table shows the test set's noise-floor percentiles beyond the clean end, so additive noise is a measured weakness the test set does not exercise. It is worth a README paragraph, not a switch. The write-ups are worth more: 20 points of the grade are "what worked and what did not", and tonight produced five measured negatives nobody has written down.</p>
+<h2 id="context">Context</h2>
+<ul>
+<li>NSA's draft review returned <strong>minDCF 0.0733, EER 3.534%</strong> on the shipped rule; one team is ahead at 0.0584. The consult records (<code>docs/consults/2026-09-26_post-draft-review_{CONSULTATION,RESPONSE,RESPONSE_fable}.md</code>) hold every number below; cite them by file and section, and never invent a number.</li>
+<li><strong>The negatives to write up</strong> (each with the number and the mechanism, README voice: plain, short sentences, no marketing):
+<ol>
+<li><strong>More heads on the same backbone are dead on arrival.</strong> XLS-R layer probes on the M1b recipe (Fable memo, option 10): layer-7 baseline reproduces M1b (inner 0.2649, holdout 0.0717, In-the-Wild 0.342); mean of layers 5–9 gives holdout 0.052 but In-the-Wild 0.368 and doubles the In-the-Wild false-alarm rate (0.8% → 1.55%); concatenations of 6–8, 5/7/9 and 5–9 give In-the-Wild 0.353 / 0.430 / 0.399. Mechanism: of the shipped rule's 158 In-the-Wild misses, M1b alone would flag 1, handcrafted 2, M5 33, Spectra 107; a head on M1b's backbone inherits its blind spot.</li>
+<li><strong>Fusion re-slicing has a measured ceiling.</strong> Cheating on purpose (weights chosen on In-the-Wild itself, (0.3, 0.2, 0.5)) reaches In-the-Wild 0.186, a 0.04 gain that costs the holdout two false alarms; a logistic stacker fit on In-the-Wild scores 0.257, worse than the shipped rank blend; the admissible non-negative stacker on inner non-LJ rows gives weights (0.66, −0.04, 0.37) and In-the-Wild 0.222 with holdout 0.029. The second M3 suppression tier is inert at the metric on every split (consult chat verification, Round 2 table). Calibration cannot move minDCF at all.</li>
+<li><strong>The handcrafted column is the readable column, not a vote.</strong> Admissible stacker coefficient −0.04; test-set Spearman with M1b 0.21 against 0.79 on the holdout, so on the test set it reads the envelope shift. Tie this to the existing README text on the test-domain offset.</li>
+<li><strong>The excluded detector could shrink the miss tail, and stays excluded.</strong> Promoting files with Spectra margin &gt; 6.9 and base &lt; 0.5 recovers 76 of 158 In-the-Wild misses at zero added false alarms (In-the-Wild 0.152), but the holdout shows two real files promoted [2, 11], the evidence is a set Spectra's authors evaluated on, and the suppression-only rule is a principle stated before any number. Loosening the threshold from −3 to −1.5 improves every proxy for the same reason and is skipped for the same reason.</li>
+<li><strong>The cost convention is unknowable from the returned pair, and we hedge by requiring gains under both costs.</strong> The sponsor's scorer was edited from ASVspoof5's defaults to Pspoof 0.5, C_FA 4, and in that code the 4× multiplies accepted spoofs; the spoken rule puts it on false alarms. (0.0733, 3.53%) fits both: e.g. 3 false alarms + 25 misses, or 5 misses + 40 false alarms. The EER forces the two profiles to be mutually exclusive (at a single threshold both error rates cannot sit below the EER), so our own earlier decomposition (1.3% / 1.5%) was impossible.</li>
+<li><strong>The proxies against the one measurement:</strong> the table in the CONSULTATION's second addendum (holdout optimistic 11× on minDCF and 17× on EER; In-the-Wild pessimistic 3× and 1.6×; the test sits further toward the wild end than λ̂ = 0.51 suggested).</li>
+<li><strong>The M5 weight.</strong> A3 with M5 at 0.4 improves In-the-Wild by 0.028 under both costs with the holdout unchanged and inner slightly worse (0.135 → 0.137 brief, 0.300 → 0.337 sponsor-cost); post hoc, because the pre-declared sweep stopped at 0.2. Report it as measured; whether it ships is the gate chat's and Nathan's, and your paragraph must say so and be updated by 21:30 either way.</li>
+</ol></li>
+<li><strong>The optional experiment (v6, noise twins)</strong> if and only if the report is committed and the CPU is free before 18:20: the shipped v5b recipe (<code>docs/reports/2026-09-26_handcrafted-v4.md</code>, "v5: training-side augmentation") plus a 20 dB white-noise twin per class on fit-side rows via a new <code>--noise-frac</code> / <code>--noise-snr-db</code> option in <code>scripts/extract_handcrafted.py</code> (same per-row <code>default_rng(seed + row)</code> draw as laundering and tilt, recorded in <code>hc_augment</code>, applied before band match on both classes; <code>hearsay.augment.add_noise(x, rng, snr_db)</code> exists). Re-extract the training sample as <code>nsa_train_sample_v6aug</code> (~25 min at 4 workers), train exactly like v5b with <code>--extra-rows-from</code>, out-name <code>handcrafted_v6</code>, score In-the-Wild with <code>scripts/eval_bundle.py</code> on the seed-200 v4 features into <code>_itw_handcrafted_v6.csv</code>, and run the pre-declared diagnostic (the channel lane's 500-clip cohort under 20 dB noise through <code>scripts/m3_probes.py</code>'s perturbation path, handcrafted only; pass bar AUC ≥ 0.90 with clean AUC within 0.005 of 0.998). Numbers to sit beside, v5b clean rows: inner 0.469, LibriSpeech real 0.59, clean holdout 0.137, holdout LibriSpeech 0.16, ITW P_FA / P_miss 0.40% / 96%, ITW AUC 0.77. Do not re-pin <code>models/hc_selected</code>. If it is not exported by 18:50, report it as not run.</li>
+</ul>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>main</code> in <code>~/Projects/hearsay</code>, shared. Your files: <code>docs/reports/2026-09-26_post-draft-negatives.md</code>; if the experiment runs, <code>scripts/extract_handcrafted.py</code> (the option only), one test, <code>outputs/handcrafted/nsa_train_sample_v6aug.csv</code>, <code>models/hc_lgbm_&lt;stamp&gt;/</code>, the two exports, and <code>docs/reports/2026-09-26_post-draft-hc-noise.md</code>. Stage only those; never <code>git add -A</code>; do not push; tell the README chat and the gate chat the commit hash.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync</code></pre>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li>Read the three consult records and the Round 2 table. Write <code>docs/reports/2026-09-26_post-draft-negatives.md</code> with the seven items above, one short section each: what was tried, the number, the mechanism, the file it comes from. Mark item 7 "pending the 19:30 decision" and update it when the gate chat reports.</li>
+<li>Message the README chat ("README" lane, address in <code>docs/handoffs/2026-09-26_docs-site-handoff.md</code>) with the path so it can fold the items into "What did not work"; the README chat edits the README, you do not.</li>
+<li>Run <code>uv run pytest -q tests/test_docs_consistency.py</code> (52 passed at last count) after committing, because the README chat will cite you.</li>
+<li>Only then, and only before 18:20: the optional v6 experiment above. Otherwise stop at 19:00.</li>
+</ol>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test: <code>uv run pytest -q tests/test_docs_consistency.py</code> → 52 passed; full <code>uv run pytest -q</code> → all passing and <code>uv run ruff check .</code> clean if you touch a script.</li>
+<li>Self-check for the optional experiment: with <code>--noise-frac 0</code> the extraction is byte-identical to a v5-style run on the same rows.</li>
+<li>At-risk: nothing for the write-up (tracked). For the optional experiment: <code>outputs/handcrafted/nsa_train_sample_v6aug.csv</code> (gitignored, ~25 min to regenerate; NOT archived), the bundle (gitignored; NOT archived), the exports (regenerable); copy the bundle's <code>meta.json</code> numbers into its report.</li>
+<li>LightGBM and torch must never be imported in one process (macOS OpenMP crash); <code>train_handcrafted.py</code> is the only LightGBM importer.</li>
+<li>In flight: heads chat (GPU: WavLM), gate chat (manifest, sweep, packet 19:30, sleep-equals-ship copy), README and docs-site lanes.</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>Score direction 1.0 = synthetic everywhere. Augment both classes or neither; readouts on clean rows; the holdout never trained on; In-the-Wild eval-only.</li>
+<li>Every number in the report is cited to a file; where a number exists only in the Fable memo, cite that memo and say the consult chat verified the M5-weight and second-tier rows from the exports and did not re-run the layer probes.</li>
+<li>Tone: the README's voice. A negative result with its mechanism is graded content; a negative result without the mechanism is not.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<ul>
+<li><code>docs/consults/2026-09-26_post-draft-review_RESPONSE.md</code>, <code>…_RESPONSE_fable.md</code>, <code>…_CONSULTATION.md</code>; <code>docs/reports/2026-09-26_channel-robustness.md</code> (§A per-feature positions, §E the noise finding); <code>docs/reports/2026-09-26_handcrafted-v4.md</code>; <code>README.md</code> "What did not work" (the section your items extend); <code>src/hearsay/augment.py</code>, <code>scripts/{extract_handcrafted,train_handcrafted,eval_bundle,m3_probes}.py</code>.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_post-draft-cpu-handoff.md</code> <span class="hash">3c3faa40ef9a</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

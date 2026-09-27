@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codex review prompt · HEARSAY</title>
+<meta name="description" content="Rendered from .claude/codex-review-prompt.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>.claude/codex-review-prompt.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-to-check">What to check</a></li><li><a href="#hearsay-specific-checks-this-project">HEARSAY-specific checks (this project)</a></li><li><a href="#output-format">Output format</a></li></ul></details>
+<p>You are reviewing an implementation plan written by Claude Code for the project whose
+directory is available to you. Read <code>CLAUDE.md</code> / <code>AGENTS.md</code> / <code>README.md</code> first to learn
+what the project is, its language and stack, and its established patterns — then read
+whatever source files you need for codebase context.</p>
+<p>Your job is to find problems the plan author may have missed.</p>
+<h2 id="what-to-check">What to check</h2>
+<ul>
+<li><strong>Missing edge cases</strong> — failure modes, error handling, race conditions</li>
+<li><strong>Architectural issues</strong> — does the plan respect the existing patterns and module
+boundaries you found while reading the codebase? Does it route work through the
+module that already owns that responsibility?</li>
+<li><strong>Consistency with codebase</strong> — does the plan reuse existing utilities or
+unnecessarily reinvent?</li>
+<li><strong>Logical gaps</strong> — steps that assume something not established, missing
+dependencies between steps</li>
+<li><strong>Over-engineering</strong> — unnecessary abstraction, premature generalization,
+features not asked for</li>
+<li><strong>Under-specified steps</strong> — steps too vague to execute without guessing</li>
+<li><strong>File paths</strong> — do referenced files/directories actually exist? Are paths correct?</li>
+<li><strong>Testing gaps</strong> — does the verification section actually cover the changes?</li>
+</ul>
+<h2 id="hearsay-specific-checks-this-project">HEARSAY-specific checks (this project)</h2>
+<ul>
+<li><strong>Model rules</strong> — does the plan validate by <em>generator and speaker</em> (whole groups held
+out via the fold file, nested outer holdout), never by clip? Does it keep a clean-only
+validation score beside any augmented one? Can the validation split leak into training
+through scalers, calibration, imputation, or stacking folds?</li>
+<li><strong>Always a valid TSV</strong> — from M1 on, does every step leave the repo able to emit a valid
+<code>teamName_predictions.tsv</code>, and does the plan end with a new TSV plus a
+<code>submissions/log.csv</code> row (or name the blocker)? Does anything overwrite a previously
+submitted TSV?</li>
+<li><strong>Time box</strong> — does the plan state a time box of a few hours at most (build ends 8 AM
+Sunday; hard cutoffs in <code>docs/plan.md</code>) and a point where it stops and reports?</li>
+<li><strong>Detector contract</strong> — does it change <code>DetectorResult</code> / <code>ClipContext</code> / <code>safe_run</code>
+(<code>src/hearsay/detectors/base.py</code>)? If so, are the affected detector owners named?</li>
+<li><strong>16 kHz mono</strong> — does every audio path resample/downmix at the loader boundary? Are
+format conversion errors (sample rate, channels, int/float scaling, decoder padding)
+covered by tests?</li>
+<li><strong>Offline scoring path</strong> — does anything add a hosted API or LLM to the scoring path or
+the Docker image, or a secret outside <code>.env</code>?</li>
+<li><strong>Standing failure modes</strong> — does P2/verification address laundering/telephony/replay in
+the test set (physical replay not covered), generator/speaker overfitting, class
+imbalance and the π_synth = 0.3 prior (including the metric readings), shortcuts
+(duration, level, silence, container, single LJ speaker), and loader format errors?</li>
+</ul>
+<h2 id="output-format">Output format</h2>
+<p>Numbered list of findings. Each finding has:</p>
+<ul>
+<li><strong>Severity</strong>: <code>Critical</code> (must fix before implementing) or <code>Suggestion</code> (worth considering)</li>
+<li><strong>Brief explanation</strong> of the issue and what to do about it</li>
+</ul>
+<p>No praise, no preamble, no summary. Just the findings. If the plan is solid,
+say "No findings." and nothing else.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>.claude/codex-review-prompt.md</code> <span class="hash">eb782747c3dc</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 channel robustness (plan review) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_channel-robustness-plan-review.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/reports/2026-09-26_channel-robustness-plan-review.md</code>; the markdown file is the record.</p>
+
+<ol>
+<li><p><strong>Critical — A’s mean posterior is not generally a mixture proportion.</strong> D3 treats a balanced domain classifier’s mean prediction as λ̂. With overlapping domains, this depends on classifier separation and shrinks toward 0.5; it need not recover a true 0.3 mixture. Keep it as a descriptive score, use an appropriately adjusted estimator for λ̂, and test overlapping domains and endpoint mixtures—not only easily separated Gaussians.</p></li>
+<li><p><strong>Critical — A does not establish that its mixture model applies to test audio.</strong> The classifier learns from real speech only, but predicts on a test set containing roughly 30% synthetic speech; compression holes and spectral floors can distinguish synthesis as well as channel. Selecting the lowest-scoring 70% introduces detector-dependent selection rather than establishing real labels. Require class/source sensitivity checks and an “unidentifiable” outcome before using λ̂ against the 0.32 crossover. Novelty detection alone cannot resolve this confound.</p></li>
+<li><p><strong>Critical — D2’s claimed speaker isolation is false for LJ Speech.</strong> <code>scripts/make_folds.py::group_key</code> groups LJ by chapter, so reusing its <code>group</code> column spreads the same speaker across domain-classifier folds. Build separate speaker groups for this diagnostic without changing the canonical fold file, and report an LJ-excluded sensitivity analysis. Fit scaling inside each training fold and bootstrap reference speakers/groups rather than individual OOF rows; otherwise the advertised confidence interval understates dependence.</p></li>
+<li><p><strong>Critical — E compares M3 against an in-sample M1b/M5 baseline.</strong> D6 samples inner clips but scores them with shipped models. <code>scripts/train_probe.py</code> fits the final probe on all inner rows, so these are not held-out M1b predictions; M5 also trained on inner data. Use the corresponding fold-specific checkpoints for every clean/perturbed pair, or use an explicitly evaluation-only held-out cohort. Without this change, D9(a)’s relative degradation verdict has an uncontrolled training-exposure confound.</p></li>
+<li><p><strong>Critical — D7’s correlation drop cannot independently establish memorisation risk.</strong> Pooled M1b–M3 Spearman depends on class proportions, generator mix and score distributions, which differ between holdout and unlabeled test. Bootstrapping does not remove those differences. Remove this statistic as a standalone D9 trigger, or establish an appropriate composition-controlled reference; describe the raw gap as descriptive domain disagreement.</p></li>
+<li><p><strong>Critical — E’s readouts do not measure the claimed shipped suppression exposure.</strong> D8 calls <code>M3 logit &lt; −3</code> “exactly” the exposure, but <code>pipeline.py</code> and <code>fuse_sweep_m5.py</code> also require the fused base rank to exceed 0.5. Record the actual conjunction through the existing fusion implementation, or label the M3-only percentage as an upper bound. Add clean and perturbed minDCF/EER, fixed-inner-threshold false-alarm/miss rates, and both metric readings: AUC and spoof-only MLAAD misses cannot assess the cost-sensitive effect of keeping suppression.</p></li>
+<li><p><strong>Critical — Codec delay/padding can contaminate both B and E.</strong> <code>compression.launder</code> returns the decoded stream without alignment or length restoration; the existing compression test explicitly tolerates added samples. Those samples can alter spectral-floor statistics, trimming and Spectra’s padding behavior. Specify alignment/common-support handling and test MP3/AAC at both encoding rates, including short clips, float scaling and failed decodes. Otherwise measured “codec sensitivity” can be a duration/padding artifact.</p></li>
+<li><p><strong>Critical — Several acceptance calculations have undefined degenerate cases.</strong> D3 divides by the clean–wild median difference, D4 divides by test IQR, and Mahalanobis distance requires a covariance treatment that is unspecified. Constant or redundant features can therefore produce infinities or singular matrices. Define tolerances, excluded-column reporting, covariance regularization, and insufficient-data/undefined-verdict behavior; add tests so NaN comparisons cannot silently produce “kept.”</p></li>
+<li><p><strong>Critical — The plan omits the required submission/log disposition.</strong> Steps 10–14 produce reports and commits but neither a new TSV plus <code>submissions/log.csv</code> row nor an explicit blocker. Preserving the shipped TSV is correct, but does not satisfy the stated completion requirement. Add a timestamped artifact through the existing no-overwrite writer with its validation provenance, or explicitly report that this diagnostic-only rung produces no new submission and why.</p></li>
+<li><p><strong>Suggestion — “Resumable” caches need an identity and completeness contract.</strong> Define keys covering path, crop seed, perturbation/codec settings, feature version and model identity. Validate unique keys and expected coverage before computing verdicts; retain explicit failures and use paired complete observations for ΔAUC. Test interrupted writes and changed settings so a restart cannot silently combine incompatible runs.</p></li>
+<li><p><strong>Suggestion — Bound the incomplete and uncovered outcomes explicitly.</strong> The hard stop is stated, but the audit loop is unbounded and C’s approval wait precedes final reporting. Define a deadline for launching work, checkpoint/cancellation behavior, and an “inconclusive” verdict for unfinished E probes. Also record telephony and physical replay as untested; the current perturbation grid cannot support a general channel-robustness conclusion.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_channel-robustness-plan-review.md</code> <span class="hash">8511d1483b8d</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

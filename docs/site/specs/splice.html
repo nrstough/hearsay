@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Splice and discontinuity detection · HEARSAY</title>
+<meta name="description" content="Looks for the seams an edit leaves: a single-sample click, or a jump in the DC offset between short windows. On this data it finds vocoder artifacts more often ">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html" aria-current="page">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">Systems and subsystems</p>
+<h1>Splice and discontinuity detection</h1>
+<p class="lead">Looks for the seams an edit leaves: a single-sample click, or a jump in the DC offset between short windows. On this data it finds vocoder artifacts more often than edits, and the sponsor said no test clip is partially synthetic, so it is evidence.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Parameters and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>Inserting or replacing words in a recording leaves a <span class="term" tabindex="0" data-term="splice" aria-describedby="tip-1">splice<span class="tip-body" role="tooltip" id="tip-1">A discontinuity where audio was cut or inserted: a single-sample click or a jump in the DC offset between windows. Evidence of editing, though on this data it mostly finds vocoder artifacts.</span></span>, a discontinuity where the cut is, unless the editor is careful. Two cheap signals catch careless cuts: a sample step far larger than its neighbours, and a shift in the waveform's mean between one window and the next. On the training data those signals fire on several generators' outputs and on some real LibriSpeech clips alike, so they describe artifacts, not the class.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: the clip normalized to peak 1. Out: the counts and sizes of clicks and DC jumps, the time of the first seam, an informational background-floor range, and a sentence such as <code>editing seam at 1.59 s: 1 click(s) (largest step 17x the surrounding waveform); consistent with a cut or inserted segment (background-floor range 26 dB, informational)</code>, or <code>no clicks or DC-offset jumps: no sign of a cut or inserted segment</code>.</p>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py" title="src/hearsay/detectors/splice.py (GitHub; assumes main is public)">detectors/splice.py</a>.</p>
+<h2 id="params">Parameters and where each is set</h2>
+<ul>
+<li>A click is a sample step more than <span class="num" data-src="src/hearsay/detectors/splice.py#L30">15.0</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L30" title="Source: src/hearsay/detectors/splice.py line 30 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/splice.py line 30 (GitHub; assumes main is public)</span></a> times the RMS of the steps in the surrounding 20 ms (the step itself excluded) and larger than <span class="num" data-src="src/hearsay/detectors/splice.py#L30">0.15</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L30" title="Source: src/hearsay/detectors/splice.py line 30 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/splice.py line 30 (GitHub; assumes main is public)</span></a> of full scale; hits within 5 ms are merged (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L30" title="src/hearsay/detectors/splice.py line 30 (GitHub; assumes main is public)">splice.py, line 30</a> and <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L52" title="src/hearsay/detectors/splice.py line 52 (GitHub; assumes main is public)">lines 52–56</a>).</li>
+<li>A DC jump is a change in the mean between consecutive windows a tenth of a second long, larger than both <span class="num" data-src="src/hearsay/detectors/splice.py#L31">0.02</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L31" title="Source: src/hearsay/detectors/splice.py line 31 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/splice.py line 31 (GitHub; assumes main is public)</span></a> and <span class="num" data-src="src/hearsay/detectors/splice.py#L31">6.0</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L31" title="Source: src/hearsay/detectors/splice.py line 31 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/splice.py line 31 (GitHub; assumes main is public)</span></a> times the median window-to-window change (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L57" title="src/hearsay/detectors/splice.py line 57 (GitHub; assumes main is public)">splice.py, lines 57–61</a>).</li>
+<li>Scores: a seam <span class="num" data-src="src/hearsay/detectors/splice.py#L33">0.6</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L33" title="Source: src/hearsay/detectors/splice.py line 33 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/splice.py line 33 (GitHub; assumes main is public)</span></a>, none <span class="num" data-src="src/hearsay/detectors/splice.py#L33">0.5</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/detectors/splice.py#L33" title="Source: src/hearsay/detectors/splice.py line 33 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/detectors/splice.py line 33 (GitHub; assumes main is public)</span></a>; never fused.</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built; evidence only.</p>
+<h2 id="numbers">Numbers</h2>
+<p>On training data the seams are single-sample clicks in <span class="num" data-src="README.md#what-did-not-work">27%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> of WaveGrad2 and DC jumps in 9–<span class="num" data-src="README.md#what-did-not-work">13%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> of several generators and <span class="num" data-src="README.md#what-did-not-work">9%</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> of LibriSpeech. It flags <span class="num" data-src="README.md#what-did-not-work">58</span><a class="src" href="../library/readme.html#what-did-not-work" title="Source: README.md, section what-did-not-work"><span class="sr">source: README.md, section what-did-not-work</span></a> test files; in the ablation <span class="num" data-src="README.md#orchestration-what-routing-changes">504</span><a class="src" href="../library/readme.html#orchestration-what-routing-changes" title="Source: README.md, section orchestration-what-routing-changes"><span class="sr">source: README.md, section orchestration-what-routing-changes</span></a> holdout rows, without moving a score.</p>
+<h2 id="limits">Known limits</h2>
+<p>A plosive can look like a click; the local-RMS rule and the absolute floor are what keep it from firing on speech, and a test pins that a burst is not a click. The rubric's phase breaks and background seams beyond DC are not measured.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_splice_detector.py</code>: a continuous signal is neutral, a click is a seam at the right time, a DC jump is a seam, a plosive burst is not a click, short and silent clips, the contract, the analysis keys, registration.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/reports-2026-09-26-cpu-detectors.html" title="docs/reports/2026-09-26_cpu-detectors.md">The CPU detectors report, "Splice / discontinuity detector"</a>; <a class="srclink" href="../library/reports-2026-09-26-worked-examples.html#8-hgt2305393wav-genuinely-uncertain-and-it-says-so-p--0471-z-mean-0995" title="docs/reports/2026-09-26_worked-examples.md, section 8-hgt2305393wav-genuinely-uncertain-and-it-says-so-p--0471-z-mean-0995">worked example 8</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="enf.html">← ENF: mains hum</a><a class="next" rel="next" href="speaker-drift.html">Speaker drift →</a></nav>
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/site/source/specs/splice.frag</code> <span class="hash">57a5dd970201</span>, <code>src/hearsay/detectors/splice.py</code> <span class="hash">e6c909f0755e</span>, <code>docs/reports/2026-09-26_cpu-detectors.md</code> <span class="hash">31a66d317d4a</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>
