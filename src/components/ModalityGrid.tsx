@@ -68,7 +68,7 @@ export function ModalityGrid() {
   const displayKeys = showAllModalities ? Object.keys(modalities) : primaryKeys;
 
   return (
-    <div className="flex flex-col h-full justify-between select-none">
+    <div id="tour-modality-grid" className="flex flex-col h-full justify-between select-none">
       {/* 2x2 Grid of Modality Cards */}
       <div className="grid grid-cols-2 gap-4 h-full">
         {displayKeys.slice(0, 4).map((key) => {

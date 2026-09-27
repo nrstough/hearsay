@@ -11,7 +11,7 @@ export function SpectrogramView() {
   const isSynthetic = currentAudio.decision === "SYNTHETIC";
 
   return (
-    <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14 space-y-6 select-none relative z-10">
+    <div id="tour-spectrogram-view" className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14 space-y-6 select-none relative z-10">
       {/* Top Banner */}
       <div className="bg-white rounded-[28px] p-6 shadow-sm border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>

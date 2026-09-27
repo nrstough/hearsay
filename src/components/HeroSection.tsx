@@ -8,9 +8,10 @@ import { useForensic } from "@/context/ForensicContext";
 interface HeroSectionProps {
   onOpenBatch?: () => void;
   onOpenAudit?: () => void;
+  onStartTour?: () => void;
 }
 
-export function HeroSection({ onOpenBatch, onOpenAudit }: HeroSectionProps) {
+export function HeroSection({ onOpenBatch, onOpenAudit, onStartTour }: HeroSectionProps) {
   const {
     currentAudio,
     runBatchEvaluation,
@@ -25,7 +26,7 @@ export function HeroSection({ onOpenBatch, onOpenAudit }: HeroSectionProps) {
   const isSynthetic = currentAudio.decision === "SYNTHETIC";
 
   return (
-    <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14 pt-0 sm:pt-0.5 pb-6 sm:pb-8">
+    <div id="tour-hero" className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14 pt-0 sm:pt-0.5 pb-6 sm:pb-8">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-end">
         {/* Left Column: Welcome & Action Buttons */}
         <div className="lg:col-span-7 flex flex-col justify-end -translate-y-2 sm:-translate-y-4 lg:-translate-y-5">
@@ -41,12 +42,23 @@ export function HeroSection({ onOpenBatch, onOpenAudit }: HeroSectionProps) {
           </h1>
 
           {/* Action Buttons Row */}
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            {/* Interactive Guided Demo Tour */}
+            {onStartTour && (
+              <button
+                onClick={onStartTour}
+                className="btn-glow-inward-light bg-gradient-to-r from-amber-500/25 to-[#c37530]/30 hover:from-amber-500/35 hover:to-[#c37530]/40 text-amber-200 border border-amber-400/40 hover:border-amber-300 font-semibold px-5 py-3 rounded-full text-sm transition-all flex items-center justify-center gap-2 select-none cursor-pointer shadow-md hover:scale-[1.02] active:scale-95"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300 relative z-10 animate-pulse" />
+                <span className="relative z-10">Start Guided Tour</span>
+              </button>
+            )}
+
             {/* Run Full Forensic Audit */}
             <button
               onClick={runFullForensicAudit}
               disabled={isAnalyzing}
-              className="btn-glow-inward-light bg-white/95 text-slate-900 border border-white/70 font-semibold px-7 py-3 rounded-full text-sm transition-all hover:bg-white flex items-center justify-center gap-2.5 select-none cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95 min-w-[210px]"
+              className="btn-glow-inward-light bg-white/95 text-slate-900 border border-white/70 font-semibold px-6 py-3 rounded-full text-sm transition-all hover:bg-white flex items-center justify-center gap-2 select-none cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95 min-w-[190px]"
             >
               <Sparkles className="w-4 h-4 text-[#c37530] relative z-10" />
               <span className="relative z-10">
@@ -58,7 +70,7 @@ export function HeroSection({ onOpenBatch, onOpenAudit }: HeroSectionProps) {
             <button
               onClick={runBatchEvaluation}
               disabled={isBatchRunning}
-              className="btn-glow-inward-nsa bg-gradient-to-r from-[#005493] via-[#003d73] to-[#c37530] text-white font-semibold px-6 py-3 rounded-full text-sm flex items-center justify-center gap-2 select-none cursor-pointer shadow-lg shadow-[#005493]/30 hover:brightness-110 active:scale-95 transition-all min-w-[260px]"
+              className="btn-glow-inward-nsa bg-gradient-to-r from-[#005493] via-[#003d73] to-[#c37530] text-white font-semibold px-6 py-3 rounded-full text-sm flex items-center justify-center gap-2 select-none cursor-pointer shadow-lg shadow-[#005493]/30 hover:brightness-110 active:scale-95 transition-all min-w-[240px]"
             >
               <PlayCircle className="w-4 h-4 text-white relative z-10" />
               <span className="relative z-10">
