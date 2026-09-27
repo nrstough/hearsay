@@ -4,6 +4,8 @@ HEARSAY is our entry to the NSA HEARSAY challenge at HackGT 13 (Sep 25–27, 202
 
 It is a software pipeline and nothing else: one decode path, ten detectors behind one contract, and a fusion rule chosen by a selection rule we wrote down before looking at any result. The deliverable is `CrossExam_predictions.tsv` and this README. An offline Docker image that reproduces the pipeline is kept as reproducibility evidence; NSA said on Saturday it is not required.
 
+**Documentation site:** [nrstough.github.io/hearsay/site](https://nrstough.github.io/hearsay/site/), the same material as a set of pages, also rendered as a PDF at [docs/HEARSAY_CrossExam_documentation.pdf](docs/HEARSAY_CrossExam_documentation.pdf).
+
 **Where to look next:** [docs/STATUS.md](docs/STATUS.md) for the live state, [docs/architecture.md](docs/architecture.md) for diagrams of every component, [docs/code-map.md](docs/code-map.md) for where the code lives, and [docs/reports/](docs/reports/) for the experiment write-ups every number below comes from.
 
 ---
@@ -392,6 +394,7 @@ tests/                  pytest suite (hermetic; data- and weight-dependent tests
 scripts/                extraction, training, fusion, runner, cloud and ops scripts
 docker/                 build, entrypoint, smoke, parity and asset-manifest scripts
 docs/                   plan, architecture, code map, reports/, specs/, consults/, handoffs/
+docs/site/              the documentation site (GitHub Pages from main:/docs), PDF render beside it
 submissions/            log.csv (tracked) and submission TSVs (ignored)
 data/ weights/ models/  local only
 .claude/                Claude Code skills and review scripts shared by the team
