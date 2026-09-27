@@ -51,6 +51,7 @@ export function GuidedTour({
   onOpenCopilot,
 }: GuidedTourProps) {
   const {
+    presets,
     loadPreset,
     togglePlay,
     isPlaying,
@@ -75,14 +76,14 @@ export function GuidedTour({
       tab: "dashboard",
       targetId: "tour-hero",
       badge: "Architecture & Benchmark",
-      title: "Autonomous 8-Modality Forensic Cockpit",
+      title: "Autonomous 10-Detector Forensic Cockpit",
       description:
-        "Engineered for the NSA Audio Authentication Challenge at HackGT 13. HEARSAY operates an 8-vector forensic ensemble running offline inference to detect synthetic voices, generative neural vocoders, and acoustic splices.",
-      rubricNote: "Achieves an ultra-calibrated minDCF of 0.1983 (vs 0.3540 baseline) and 4.82% Equal Error Rate.",
+        "Engineered for the NSA Audio Authentication Challenge at HackGT 13. HEARSAY operates a 10-detector forensic pipeline running offline inference with 4-way rank fusion to detect synthetic voices, generative models, and acoustic splices.",
+      rubricNote: "Achieved NSA draft-review minDCF of 0.0733 and 3.53% Equal Error Rate on the submitted 1,671-file evaluation.",
       metrics: [
-        { label: "minDCF", value: "0.1983" },
-        { label: "EER", value: "4.82%" },
-        { label: "Latency", value: "18ms / clip" },
+        { label: "minDCF", value: "0.0733" },
+        { label: "EER", value: "3.53%" },
+        { label: "Throughput", value: "1.34s / clip" },
       ],
     },
     {
@@ -90,16 +91,16 @@ export function GuidedTour({
       tab: "dashboard",
       targetId: "tour-audio-analyzer",
       badge: "Real-Time Telemetry",
-      title: "Live Waveform & Intercept Ingestion",
+      title: "Live Waveform & Audio Ingestion",
       description:
-        "Inspect the 96-bar dynamic energy soundwave. Upload external audio files, capture microphone recordings in real-time, or test pre-ingested NSA intercepts to view immediate score attribution.",
-      rubricNote: "Features dynamic timecode scrubbing, volume peak monitoring, and instant probability breakdown.",
+        "Inspect the 96-bar dynamic energy soundwave. Upload external audio files, capture microphone recordings in real-time, or test pre-scored pipeline presets (Apple TTS Samantha at 0.998 vs In-the-Wild Real Clip at 0.001) to view immediate score attribution.",
+      rubricNote: "Decodes to 16 kHz mono float32 band-matched to 7.25 kHz with dynamic timecode scrubbing and instant probability breakdown.",
       metrics: [
         { label: "Waveform Resolution", value: "96 Bars" },
-        { label: "Sample Rate", value: "48.0 kHz" },
-        { label: "Bit Depth", value: "24-bit PCM" },
+        { label: "Sample Rate", value: "16.0 kHz" },
+        { label: "Band-Match", value: "7.25 kHz" },
       ],
-      actionLabel: isPlaying ? "Pause Audio" : "Play & Test Intercept #0042",
+      actionLabel: isPlaying ? "Pause Audio" : "Play & Test Apple TTS (0.998)",
       actionIcon: isPlaying ? Pause : Play,
     },
     {
@@ -109,12 +110,12 @@ export function GuidedTour({
       badge: "Telemetry & Drift",
       title: "Dual-Axis Spectral & Drift Tracking",
       description:
-        "Monitors high-frequency spectral roll-off (Left Axis in kHz) against ECAPA-TDNN speaker embedding drift (Right Axis) over a 2-hour timeline to detect instantaneous deepfake voice conversion.",
-      rubricNote: "The golden threshold denotes the critical minDCF decision boundary for synthetic detection.",
+        "Monitors high-frequency spectral roll-off against ECAPA-TDNN speaker embedding drift across temporal windows to detect instantaneous deepfake voice conversion.",
+      rubricNote: "Tracks the 7.25 kHz band-matched roll-off alongside frame-by-frame speaker consistency.",
       metrics: [
-        { label: "Roll-off Threshold", value: "16.0 kHz" },
+        { label: "Band-Match Cutoff", value: "7.25 kHz" },
         { label: "Cosine Drift", value: "0.44 Jump" },
-        { label: "Window", value: "2-Hour Sliding" },
+        { label: "Window", value: "Sliding Frames" },
       ],
     },
     {
@@ -122,14 +123,14 @@ export function GuidedTour({
       tab: "dashboard",
       targetId: "tour-modality-grid",
       badge: "Multi-Vector Defense",
-      title: "8-Vector Forensic Sensor Matrix",
+      title: "Ten-Detector Forensic Matrix (4 Fused)",
       description:
-        "HEARSAY combines 8 independent physical and machine learning sensors: Deep SSL Wav2Vec2 Probing, Neural Vocoder Nyquist Cliffs, Phase Discontinuity, 60Hz ENF Mains Hum, Speaker Identity Drift, Splice Boundaries, Double-Compression, and Bayesian Stacking.",
-      rubricNote: "Fulfills 20% Forensic Breadth by verifying both physics-based (ENF/phase) and ML embeddings.",
+        "HEARSAY deploys ten detectors with four fused in a rank blend: XLS-R Layer-7 Probe (M1b), Fine-Tuned XLS-R Head (M5), Handcrafted Spectral/Prosody Model, and Spectra-AASIST (suppression only), backed by six routing, gate, and evidence detectors.",
+      rubricNote: "Fulfills forensic breadth across foundation models, handcrafted acoustic features, container parsing, and physical forensic traces.",
       metrics: [
-        { label: "Active Vectors", value: "8 / 8 Online" },
-        { label: "Primary Model", value: "Wav2Vec2 Probe" },
-        { label: "Power Hum", value: "60.014 Hz ENF" },
+        { label: "Detectors", value: "10 (4 Fused)" },
+        { label: "Primary Model", value: "XLS-R M1b (60%)" },
+        { label: "Mains Hum", value: "50/60 Hz Trace" },
       ],
     },
     {
@@ -139,12 +140,12 @@ export function GuidedTour({
       badge: "Fourier Analysis",
       title: "Interactive STFT Spectrogram & ENF Trace",
       description:
-        "Inspect acoustic signals in high-resolution time and frequency. Switch between 512, 1024, and 2048 FFT windows, toggle specialized colormaps (CyberNavy, Sapphire, Viridis), and zoom into 16kHz Nyquist cliffs characteristic of ElevenLabs vocoders.",
+        "Inspect acoustic signals in high-resolution time and frequency. Switch between 512, 1024, and 2048 FFT windows, toggle specialized colormaps (CyberNavy, Sapphire, Viridis), and inspect 7.25 kHz band-matched roll-offs and vocoder cutoff boundaries.",
       rubricNote: "Pinpoints unnatural frequency drop-offs and harmonic overtone flatlines in real-time.",
       metrics: [
         { label: "FFT Window", value: "1024 Samples" },
         { label: "Hop Size", value: "256 Samples" },
-        { label: "ENF Grid", value: "Eastern Interconnect" },
+        { label: "ENF Trace", value: "50/60 Hz Monitor" },
       ],
     },
     {
@@ -154,12 +155,12 @@ export function GuidedTour({
       badge: "Ensemble Calibration",
       title: "Modality Calibration & ROC Analytics",
       description:
-        "Deep dive into the 8 individual forensic modalities. Review calibrated weights, false-alarm trade-offs, and empirical confidence distributions for each analytical detector.",
+        "Deep dive into the ten individual forensic detectors. Review calibrated rank weights, false-alarm suppression, and empirical evidence distributions for each analytical detector.",
       rubricNote: "Includes container metadata headers, compression quantization steps, and acoustic prosody.",
       metrics: [
-        { label: "Calibration", value: "Isotonic Stacking" },
-        { label: "Ensemble Type", value: "Weighted Fusion" },
-        { label: "Robustness", value: "Channel Invariant" },
+        { label: "Calibration", value: "Rank Fusion" },
+        { label: "Ensemble Rule", value: "A3 w0.2 + E" },
+        { label: "Robustness", value: "7.25 kHz Match" },
       ],
     },
     {
@@ -169,11 +170,11 @@ export function GuidedTour({
       badge: "Enterprise Pipeline",
       title: "1,671 Audio NSA Batch Evaluation",
       description:
-        "High-throughput batch pipeline capable of evaluating entire wiretap archives offline without internet connectivity. Generates competition-ready tab-delimited 'teamName_predictions.tsv' with a single click.",
+        "High-throughput batch pipeline capable of evaluating entire wiretap archives offline without internet connectivity. Serves the submitted 'CrossExam_predictions.tsv' byte-for-byte with the exact hash scored by the NSA.",
       rubricNote: "Includes status filters, worker thread telemetry, and calibrated submission export.",
       metrics: [
         { label: "Batch Size", value: "1,671 Clips" },
-        { label: "Submission", value: "team_predictions.tsv" },
+        { label: "Submission", value: "CrossExam_predictions.tsv" },
         { label: "Mode", value: "100% Offline" },
       ],
       actionLabel: "Export Calibrated TSV",
@@ -201,12 +202,12 @@ export function GuidedTour({
       badge: "Agentic Intelligence",
       title: "Autonomous Acoustic Forensic Copilot",
       description:
-        "An AI specialist trained specifically on the 8 forensic modalities. Cross-examine flagged intercepts, request explanations of spectral anomalies, assess minDCF risk, or activate voice synthesis read-outs.",
-      rubricNote: "Strictly bounded to acoustic telemetry, vocoder physics, and forensic verification.",
+        "An interactive forensic guide that quotes calibrated pipeline fields. Cross-examine scored clips, inspect per-detector evidence sentences, check routing decisions, and review rank contributions directly from the pipeline JSON.",
+      rubricNote: "Strictly bounded to quoting pipeline fields, detector evidence, and calibrated routing logs.",
       metrics: [
-        { label: "Agent Scope", value: "Acoustic Intelligence" },
-        { label: "Voice Output", value: "TTS Readout" },
-        { label: "Context", value: "Live Analyte Stream" },
+        { label: "Agent Scope", value: "Pipeline Evidence" },
+        { label: "Grounding", value: "Pipeline Fields" },
+        { label: "Context", value: "Live Scored JSON" },
       ],
       actionLabel: "Open Acoustic Copilot",
       actionIcon: Bot,
@@ -356,7 +357,10 @@ export function GuidedTour({
   const handleStepAction = () => {
     const step = TOUR_STEPS[currentStep];
     if (step.id === "step-waveform") {
-      loadPreset("preset-1");
+      const applePreset = presets.find((p) => p.filename.includes("apple") || p.id.includes("apple")) || presets[0];
+      if (applePreset) {
+        loadPreset(applePreset.id);
+      }
       togglePlay();
     } else if (step.id === "step-batch") {
       exportPredictionTsv();
@@ -395,17 +399,17 @@ export function GuidedTour({
             </div>
 
             <p className="text-sm text-slate-600 leading-relaxed font-sans mb-5">
-              Welcome to the HEARSAY Forensic Intelligence Cockpit. Since we're presenting via slide deck, take this <strong>9-step interactive guided tour</strong> to review all 8 forensic modalities, dynamic waveform analysis, batch pipeline, and AI copilot without needing a live presenter.
+              Welcome to the HEARSAY Forensic Intelligence Cockpit. Since we're presenting via slide deck, take this <strong>9-step interactive guided tour</strong> to review our ten forensic detectors, dynamic waveform analysis, batch pipeline, and forensic copilot without needing a live presenter.
             </p>
 
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-6 text-xs text-slate-700 space-y-2 font-sans">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>8-Vector Forensic Analysis &amp; Calibrated minDCF (0.1983)</span>
+                <span>10-Detector Forensic Matrix &amp; Calibrated minDCF (0.0733)</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Live 96-bar audio waveform &amp; test intercept simulation</span>
+                <span>Live 96-bar audio waveform &amp; test clip evaluation</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />

@@ -31,7 +31,7 @@ export function BatchQueueView() {
             1,671 NSA Test Audio Evaluation &amp; Submission Pipeline
           </h2>
           <p className="text-xs text-slate-600 mt-1 font-sans">
-            Running offline inference without network access. Generates official tab-delimited 'teamName_predictions.tsv' with filename and cm-score.
+            Running offline inference without network access. Serves official tab-delimited 'CrossExam_predictions.tsv' with filename and cm-score.
           </p>
         </div>
 
@@ -46,7 +46,7 @@ export function BatchQueueView() {
             ) : (
               <PlayCircle className="w-4 h-4 relative z-10" />
             )}
-            <span className="relative z-10">{isBatchRunning ? "Evaluating 1,671 Clips..." : "Execute Full Batch"}</span>
+            <span className="relative z-10">{isBatchRunning ? "Loading Submitted Run..." : "Load Submitted 1,671 Run"}</span>
           </button>
 
           <button
@@ -54,7 +54,7 @@ export function BatchQueueView() {
             className="btn-glow-inward-light bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold px-4 py-2.5 rounded-full flex items-center gap-2 cursor-pointer border border-slate-200/90 shadow-2xs"
           >
             <Download className="w-4 h-4 text-slate-700 relative z-10" />
-            <span className="relative z-10">Download TSV</span>
+            <span className="relative z-10">Export TSV</span>
           </button>
         </div>
       </div>
@@ -102,14 +102,14 @@ export function BatchQueueView() {
           </span>
           <div className="my-3 font-mono text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
             <p className="text-slate-400 font-semibold">filename \t cm-score</p>
-            <p>nsa_eval_0042.wav \t 0.9420</p>
-            <p>nsa_eval_0043.wav \t 0.0240</p>
+            <p>synthetic_apple_tts_samantha.wav \t 0.9979</p>
+            <p>real_in_the_wild_28886.wav \t 0.0012</p>
           </div>
           <button
             onClick={exportPredictionTsv}
             className="text-xs text-[#005493] hover:text-[#003d73] font-semibold flex items-center gap-1 cursor-pointer font-sans"
           >
-            <span>teamName_predictions.tsv</span>
+            <span>CrossExam_predictions.tsv</span>
             <Download className="w-3.5 h-3.5" />
           </button>
         </div>
