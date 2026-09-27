@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HEARSAY architecture · HEARSAY</title>
+<meta name="description" content="Rendered from docs/architecture.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/architecture.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#1-what-shapes-the-design">1. What shapes the design</a></li><li><a href="#2-system-flow">2. System flow</a></li><li><a href="#3-components">3. Components</a></li><li><a href="#4-invariants-the-rules-the-code-enforces">4. Invariants (the rules the code enforces)</a></li><li><a href="#5-the-detector-contract">5. The detector contract</a></li><li><a href="#6-deep-detectors">6. Deep detectors</a></li><li><a href="#7-engineered-detectors">7. Engineered detectors</a></li><li><a href="#8-validation-and-selection">8. Validation and selection</a></li><li><a href="#9-fusion-and-outputs-m4-rule-frozen-0813">9. Fusion and outputs (M4, rule frozen 08:13)</a></li><li><a href="#10-open-architecture-decisions">10. Open architecture decisions</a></li><li><a href="#11-shortcut-ledger">11. Shortcut ledger</a></li></ul></details>
+<h1 id="hearsay-architecture">HEARSAY architecture</h1>
+<p>Living document. Status as of <strong>Sat Sep 26, 2026, ~04:40</strong>. Where this file and <code>docs/plan.md</code> disagree on scope, the plan wins; on numbers, <code>submissions/log.csv</code> and the <code>models/*/meta.json</code> files win. Each component says whether it is <strong>built</strong>, <strong>in flight</strong> or <strong>planned</strong>, and which lane owns it (lanes are the parallel chats listed in <code>docs/handoffs/</code>). Diagrams are Mermaid and render on GitHub.</p>
+<p>Legend for every diagram: green = built, amber = in flight, dashed grey = planned, blue = frozen pretrained weights.</p>
+<h2 id="1-what-shapes-the-design">1. What shapes the design</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Constraint</th><th>Source</th><th>Architectural consequence</th>
+</tr></thead>
+<tbody>
+<tr><td>60% of the grade is normalized minDCF on 1,671 unlabeled test files; a false alarm costs 4× a miss; about 70% of files are real</td><td>NSA instructions</td><td>Every learned piece is selected on <code>9.33·P_FA + P_miss</code>; the real-speech side gets the most attention; ranking is all that matters, calibration is cosmetic</td></tr>
+<tr><td>20% for distinct techniques "actually leveraged", plus a bonus for choosing analyses per file</td><td>NSA brief rubric</td><td>One detector per rubric technique behind one contract; a rule-based orchestrator with a routing log</td></tr>
+<tr><td>20% for documentation in our own words, including what did not work</td><td>NSA brief</td><td>Every rung leaves a report; failed ideas are recorded, not deleted</td></tr>
+<tr><td>Output is <code>filename&lt;TAB&gt;cm-score</code>, 1.0 = synthetic, one row per test file in template order</td><td>NSA instructions</td><td>A validating writer that never overwrites and always logs; a constant rollback TSV exists from hour one</td></tr>
+<tr><td>Inference must run offline on CPU in a Docker image</td><td>NSA instructions</td><td>No hosted API or LLM on the scoring path; LightGBM is never imported at inference; one heavy model in memory at a time</td></tr>
+<tr><td>The sponsor's shipped scoring code treats a higher score as bona fide, the opposite of the instructions</td><td><code>data/nsa/HackGTMinDCF</code></td><td>Both readings are logged for every model; direction is decided once (1.0 = synthetic, never flipped) and checked at the draft review</td></tr>
+</tbody>
+</table></div>
+<h2 id="2-system-flow">2. System flow</h2>
+<p><img src="../img/architecture-flow.svg" alt="System flow: ingest, orchestrator, deep and engineered detectors, fusion, outputs"></p>
+<p><em>Rendered from <a href="../img/architecture-flow.mmd">img/architecture-flow.mmd</a>; edit that file and re-render if the flow changes.</em></p>
+<p>Since 08:35 the runner (<code>scripts/run_pipeline.py</code>) is the whole path: audio → every detector → the frozen fusion rule from <code>models/fusion_v1/constants.json</code> → the non-speech policy → TSV plus one explanation JSON per file with a routing log. M5 is not part of the shipped rule; its exported column exists for the stacker, and since 8316e50 the runner can also score it live, loaded only when the constants file weights it (<code>models/fusion_v2/constants.json</code>, the unshipped A3 w0.2 + E candidate). The rollback path is <code>--detectors m1b</code>, the M1b probe alone through its own Platt map.</p>
+<h2 id="3-components">3. Components</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Component</th><th>Where</th><th>Status</th><th>Lane</th>
+</tr></thead>
+<tbody>
+<tr><td>Loader, probe, silence trim, windows</td><td><code>src/hearsay/audio.py</code></td><td>built</td><td>main</td></tr>
+<tr><td>Detector contract, <code>safe_run</code>, registry</td><td><code>src/hearsay/detectors/base.py</code></td><td>built</td><td>main (changes need every detector owner)</td></tr>
+<tr><td>Metric (minDCF, EER, both sponsor-code readings)</td><td><code>src/hearsay/metrics.py</code></td><td>built</td><td>main</td></tr>
+<tr><td>Fold file</td><td><code>splits/nsa_folds.csv</code> (<code>scripts/make_folds.py</code>); training-only extension <code>splits/nsa_folds_plus_asv19.csv</code> (<code>scripts/extend_folds.py</code>)</td><td>built, frozen</td><td>main</td></tr>
+<tr><td>Segment preparation for deep detectors</td><td><code>src/hearsay/embed.py</code> (<code>prepare_segment</code>, <code>normalize_windows</code>, <code>test_duration_sampler</code>)</td><td>built</td><td>main</td></tr>
+<tr><td>M1 embeddings + probe + TSV</td><td><code>scripts/extract_embeddings.py</code>, <code>train_probe.py</code>, <code>make_probe_csv.py</code>, <code>src/hearsay/probe.py</code></td><td>built</td><td>main</td></tr>
+<tr><td>M3 Spectra-AASIST stream</td><td><code>src/hearsay/spectra.py</code>, <code>scripts/spectra_direction.py</code>; <code>scripts/score_spectra.py</code> to come</td><td>in flight</td><td>M3</td></tr>
+<tr><td>M5 fine-tune (bundle, model, trainer, scorer, assembler)</td><td><code>src/hearsay/m5_{bundle,data,model}.py</code>, <code>scripts/m5_*.py</code>, <code>scripts/cloud/</code> to come</td><td>in flight</td><td>M5 (vast.ai only)</td></tr>
+<tr><td>Handcrafted features + v4 families + trainer + export</td><td><code>src/hearsay/handcrafted.py</code>, <code>src/hearsay/hc_v4.py</code>, <code>scripts/extract_handcrafted.py</code>, <code>scripts/train_handcrafted.py</code></td><td>built (v3); v4 families landing</td><td>CPU / teammate</td></tr>
+<tr><td>Compression features + laundering</td><td><code>src/hearsay/compression.py</code>, <code>scripts/extract_compression.py</code></td><td>built</td><td>CPU</td></tr>
+<tr><td>Rule-based detectors + exporter</td><td><code>src/hearsay/detectors/{container,enf,splice,speech_gate,speaker_drift}.py</code>, <code>scripts/score_detector.py</code></td><td>built</td><td>CPU</td></tr>
+<tr><td>Learned-detector wrapper, numpy trees</td><td><code>src/hearsay/detectors/_learned.py</code>, <code>src/hearsay/trees.py</code></td><td>built</td><td>CPU</td></tr>
+<tr><td>Fusion</td><td><code>scripts/fuse.py</code>, <code>scripts/fuse_sweep.py</code> → <code>models/fusion_v1/constants.json</code> (rank references, α = 0.2, M3 false-alarm suppression, Platt at the 0.3 prior); <code>fusion_v0</code> retained for zmean / stack_nonlj; <code>scripts/fuse_sweep_m5.py --write</code> → <code>models/fusion_v2/constants.json</code> (A3 w0.2 + E: weights 0.6 / 0.2 / 0.2 over M1b v3, handcrafted v5, M5 in rank space, the same M3 step and Platt, M5 checkpoint hashes), runnable but not shipped</td><td>rule frozen by pre-declared sweep at 08:13 (<code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>); fusion_v2 candidate qualifies (M5 addendum), held pending the draft review; final freeze Sat 22:00</td><td>main</td></tr>
+<tr><td>End-to-end runner, per-file explanation JSON, API</td><td><code>src/hearsay/pipeline.py</code>, <code>scripts/run_pipeline.py</code>, <code>src/hearsay/api.py</code></td><td>built (routing log from detector features; orchestrator v1 is static rules)</td><td>oversight chat's agent</td></tr>
+<tr><td>Docker image</td><td><code>Dockerfile</code>, <code>.dockerignore</code>, <code>docker/{build.sh,entrypoint.sh,assets.py}</code>, <code>tests/test_docker_image.py</code></td><td>built and verified 07:56 (<code>hearsay:20260926-0753</code>, source 0963ed8): amd64, 2.66 GB compressed, offline-enforced, in-image 50-file parity max diff 1.4e-4, sha manifest of 70 shipped files checked at start</td><td>Docker chat</td></tr>
+<tr><td>Submission writer + log</td><td><code>src/hearsay/submission.py</code></td><td>built</td><td>main</td></tr>
+</tbody>
+</table></div>
+<h2 id="4-invariants-the-rules-the-code-enforces">4. Invariants (the rules the code enforces)</h2>
+<ol>
+<li><strong>One audio path.</strong> Everything decodes through <code>load_audio</code>: FFmpeg, first audio stream, downmix, 16 kHz, float32, non-finite samples zeroed. Nothing downstream resamples or denoises. This also erases the container shortcut (training real speech is FLAC/22 kHz WAV, training fakes include MP3, every test file is 16 kHz PCM WAV).</li>
+<li><strong>Same preparation for train and test, per detector.</strong> Deep detectors: <code>prepare_segment</code> = <code>band_limit</code> (same filter) → silence trim (35 dB relative) → random crop to a test-duration length for training rows only → 8 s cap → per-input zero-mean/unit-variance. Engineered detectors: <code>hearsay.handcrafted._crop</code> = <code>band_limit</code> (Kaiser low-pass matching the test set's 7.2 kHz roll-off) → <code>prepare_segment</code> → RMS-normalize. Test clips are never cropped or tiled. The deep path gained <code>band_limit</code> inside <code>prepare_segment</code> on Sat Sep 26, ~04:20; <code>handcrafted._crop</code> passes <code>band_match=False</code> to it because it filters first.</li>
+<li><strong>Score direction.</strong> Every detector's score increases with synthetic likelihood; <code>DetectorResult</code> rejects anything else; <code>spectra_direction.py</code> asserts it on labeled data for M3; <code>train_handcrafted.py</code> defines the label so the export cannot invert.</li>
+<li><strong>Never lose a row.</strong> <code>safe_run</code> turns a crashing detector into <code>status="error"</code>, score 0.5, which fusion treats as missing, never as evidence. <code>score_files</code> gives a decode failure the fallback score plus a flag. <code>write_submission</code> refuses duplicates, non-finite values, out-of-range scores and existing paths.</li>
+<li><strong>Fold discipline.</strong> Spoof grouped by generator, real by speaker (LJ by chapter). Outer holdout = <code>playht</code> + <code>wavegrad2</code> + 26 real groups (3,858 rows), never trained on, never used for selection, read once per model. Inner folds 0–4 (16,142 rows) give out-of-fold scores; scalers, classifiers and the stacker are fit fold-locally. The exception is calibration: the 2-parameter Platt maps (the M1-family probes' and the fusion rule's) are fit once on the pooled inner out-of-fold scores and applied back to them, so the <code>inner_oof</code> column is out-of-fold in its ranking but in-sample in its calibrated values. A positive affine map leaves ranks, minDCF, EER and rank-fusion inputs unchanged. No outer-holdout, stress-set or test label enters any fit. Extra training data (ASVspoof 2019 real speech for M1b, the M5 extra pool) enters inner folds only, so holdout numbers stay comparable across models.</li>
+<li><strong>One export format.</strong> <code>outputs/detector_scores/&lt;name&gt;.csv</code> with <code>path, fold, split ∈ {inner_oof, holdout, test}, score, logit</code>, 21,671 rows, unique paths. Fusion is trained on the <code>inner_oof</code> rows, read out on <code>holdout</code>, applied to <code>test</code>.</li>
+<li><strong>No LightGBM at inference.</strong> It and torch each bundle an OpenMP runtime and crash together on macOS. Bundles store the dumped trees; <code>hearsay.trees</code> evaluates them in numpy and gives per-feature contributions for the evidence sentence.</li>
+<li><strong>Offline.</strong> Weights are local (<code>weights/</code>), <code>HF_HUB_OFFLINE=1</code>; no LLM or hosted service is on the scoring path.</li>
+<li><strong>Every TSV is logged</strong> with its outer-holdout minDCF and EER; a submitted TSV is never overwritten.</li>
+</ol>
+<h2 id="5-the-detector-contract">5. The detector contract</h2>
+<p><code>ClipContext</code> → <code>DetectorResult(name, score ∈ [0, 1], evidence: str, features: {str: float}, status ∈ {ok, skipped, error})</code>. Detectors load heavy models lazily inside <code>run</code>, share expensive intermediates through <code>ctx.memo</code>, and never read filenames or filesystem timestamps. Fusion input per detector: the exported <code>logit</code> column from <code>outputs/detector_scores/&lt;name&gt;.csv</code>, standardized on inner rows, when <code>ok</code>. That column holds the raw decision value (e.g. Spectra-AASIST's synth_logit, whose margins run ±10–17), so nothing saturates. For live <code>DetectorResult</code>s without an export it falls back to <code>logit(clip(score, 1e-4, 1 − 1e-4))</code>. When a detector isn't <code>ok</code>, the value is imputed with the fold-local train mean plus a <code>&lt;name&gt;.missing</code> indicator. The registry iterates in sorted name order so fusion columns are stable.</p>
+<h2 id="6-deep-detectors">6. Deep detectors</h2>
+<h3 id="61-depth-at-a-glance">6.1 Depth at a glance</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Rung</th><th>Backbone</th><th>Depth used</th><th>Width · heads</th><th>Trainable</th><th>Head</th><th>Output</th>
+</tr></thead>
+<tbody>
+<tr><td>M1</td><td>XLS-R 300M (<code>facebook/wav2vec2-xls-r-300m</code>)</td><td>all 24 transformer layers run; layer 7 hidden state is read</td><td>1024-d · 16 heads · FFN 4096</td><td>nothing (probe only: 1,024 weights + bias)</td><td>time-mean → StandardScaler → logistic regression (C = 1, class-balanced) → Platt map</td><td>prior-neutral LLR, then posterior at π = 0.3</td></tr>
+<tr><td>M5</td><td>XLS-R 300M, truncated</td><td>layers 1–12 kept, 13–24 discarded (≈ 151 M of the ≈ 302 M transformer params)</td><td>1024-d · 16 heads</td><td>all 12 kept layers (layer-wise LR decay 0.85, backbone 1e-5, head 5e-4); CNN encoder frozen</td><td>softmax-weighted sum over hidden states h0…h12 → masked attentive statistics pooling (tanh bottleneck 128; mean ‖ std → 2048-d) → linear</td><td>one logit, high = synthetic</td></tr>
+<tr><td>M3</td><td>Spectra-AASIST (<code>lab260/Spectra-AASIST</code>), its own XLS-R copy</td><td>full 24-layer XLS-R inside the checkpoint</td><td>1024-d · 16 heads</td><td>nothing (scoring only)</td><td>MLP bridge → residual conv encoder → spectral + temporal graph attention → 4 heterogeneous stacked-graph branches (64 → 32) → linear</td><td>2 logits (spoof, bonafide); synth_logit = spoof − bonafide, window-averaged</td></tr>
+</tbody>
+</table></div>
+<p>The CNN feature encoder is the same in all three: 7 convolution layers of 512 channels, kernels 10,3,3,3,3,2,2 with strides 5,2,2,2,2,2,2, so one 512-d frame every 20 ms (320× downsampling). Each transformer layer is about 12.6 M parameters.</p>
+<h3 id="62-xls-r-backbone-with-the-m1-probe-and-the-m5-head">6.2 XLS-R backbone with the M1 probe and the M5 head</h3>
+<figure class="diagram"><img class="diagram-img diagram-light" src="../img/diagrams/doc-ac2fdc75ce3c-light.svg" alt="Diagram from the document" width="1107" height="1347"><img class="diagram-img diagram-dark" src="../img/diagrams/doc-ac2fdc75ce3c-dark.svg" alt="" aria-hidden="true" width="1107" height="1347"><figcaption>Diagram from the document <a class="fullsize" href="../img/diagrams/doc-ac2fdc75ce3c-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>flowchart TB
+  W["prepared waveform · 16 kHz&lt;br/&gt;band_limit → trim → crop or 8 s cap → zero-mean unit-variance"]
+
+  subgraph cnn["CNN feature encoder · frozen in every rung"]
+    K["7 conv layers · 512 channels&lt;br/&gt;kernels 10,3,3,3,3,2,2 · strides 5,2,2,2,2,2,2&lt;br/&gt;one 512-d frame per 20 ms"]
+  end
+  PJ["feature projection 512 → 1024&lt;br/&gt;+ convolutional positional embedding"]
+
+  subgraph tf["Transformer encoder · 24 layers · 1024-d · 16 heads · FFN 4096"]
+    T1["layers 1 – 7"]
+    T2["layers 8 – 12"]
+    T3["layers 13 – 24"]
+  end
+  W --&gt; K --&gt; PJ --&gt; T1 --&gt; T2 --&gt; T3
+
+  subgraph m1["M1 probe · frozen backbone"]
+    H7["hidden state h7&lt;br/&gt;time-mean over frames → 1024-d"]
+    SC["StandardScaler → logistic regression&lt;br/&gt;C = 1 · class-balanced · fit fold-locally"]
+    PL["Platt map on out-of-fold scores&lt;br/&gt;→ prior-neutral LLR"]
+  end
+  T1 --&gt;|"read h7 (layer chosen by inner CV: 6 and 8 close, 20+ poor)"| H7 --&gt; SC --&gt; PL
+
+  subgraph m5["M5 head · layers 1 – 12 trainable, 13 – 24 dropped"]
+    LW["softmax layer weights&lt;br/&gt;over h0 … h12 (13 states)"]
+    AP["masked attentive statistics pooling&lt;br/&gt;tanh bottleneck 128 → mean ‖ std → 2048-d"]
+    HD["linear head → 1 logit&lt;br/&gt;high = synthetic"]
+  end
+  T2 --&gt;|"same 12 layers, fine-tuned&lt;br/&gt;LLRD 0.85 · backbone 1e-5 · head 5e-4"| LW --&gt; AP --&gt; HD
+
+  classDef frozen fill:#e8eaf6,stroke:#3949ab,color:#111
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class W,K,PJ,T1,T2,T3 frozen
+  class H7,SC,PL built
+  class LW,AP,HD flight</code></pre></details></figure>
+<p><strong>M1, frozen XLS-R 300M + logistic probe (built).</strong> Segment-mode embeddings: per-layer time-mean of the whole prepared clip, all 25 hidden states kept (<code>(N, 25, 1024)</code> shards under <code>outputs/embeddings/</code>). Layer chosen by inner-fold CV (layer 7 wins; 6 and 8 close, 20+ poor). Standardized class-balanced logistic regression, Platt-mapped to a prior-neutral LLR on out-of-fold scores. Current: holdout minDCF 0.146, EER 2.5% (v2; the band-matched v3 re-extraction is running). <strong>M1b</strong> adds 5,128 ASVspoof 2019 real clips (40 speakers) plus 2,520 spoof anchors to the inner folds: holdout 0.079, but In-the-Wild stress slightly worse (0.405 vs 0.374) and P_FA at the inner threshold up from 1.2% to 5.7%. Both sit at 0.37–0.40 on In-the-Wild against 0.08–0.15 on the NSA-domain holdout; that gap, not the fusion choice, is the headline risk.</p>
+<p><strong>M5, fine-tuned XLS-R (in flight, vast.ai A100s).</strong> Backbone truncated to 12 transformer layers, CNN encoder frozen, learned softmax-weighted layer sum → attentive statistics pooling → linear logit (<code>src/hearsay/m5_model.py</code>). Trained on the NSA sample plus a training-only extra pool (rest of DiffSSD capped per generator, ASVspoof 2019 real + a spoof channel anchor, gated MLAAD), with class-blind augmentation (noise, band-limits, reverb, codec round-trips, RawBoost convolutive, trim jitter), label smoothing 0.05, cosine schedule with 8% warmup, bf16. Protocol: pilot → NSA-only vs NSA+extra ablation on inner folds → 5 fold models (out-of-fold scores for stacking) + 1 full model (holdout and test). Gate: beat M1 on inner OOF and holdout by Sat 12:00, and not worse than M1 on In-the-Wild false alarms, or M1 stays. Ships one checkpoint (truncated backbone + head as safetensors, sha-pinned) that must run on CPU with Spearman &gt; 0.99 against the box's bf16 scores.</p>
+<h3 id="63-spectra-aasist-m3">6.3 Spectra-AASIST (M3)</h3>
+<figure class="diagram"><img class="diagram-img diagram-light" src="../img/diagrams/doc-d2e94ac1fec8-light.svg" alt="Diagram from the document" width="2239" height="129"><img class="diagram-img diagram-dark" src="../img/diagrams/doc-d2e94ac1fec8-dark.svg" alt="" aria-hidden="true" width="2239" height="129"><figcaption>Diagram from the document <a class="fullsize" href="../img/diagrams/doc-d2e94ac1fec8-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>flowchart LR
+  W3["window · 64,600 samples ≈ 4.04 s&lt;br/&gt;pre-emphasis · from the prepared clip"]
+  X3["XLS-R 300M · 24 layers · 1024-d · 16 heads&lt;br/&gt;Spectra's own fine-tuned copy"]
+  B3["MLP bridge&lt;br/&gt;1024-d frames → AASIST input"]
+  E3["residual conv encoder&lt;br/&gt;filters 32 → 32 → 64 → 64"]
+  G3["spectral GAT + temporal GAT · dim 64&lt;br/&gt;graph pooling ratio 0.5"]
+  H3["4 heterogeneous stacked-graph attention branches&lt;br/&gt;64 → 32 · max + mean readout"]
+  O3["linear 160 → 2&lt;br/&gt;logits (spoof, bonafide)"]
+  S3["synth_logit = spoof − bonafide&lt;br/&gt;averaged over windows · exported as the logit column"]
+  W3 --&gt; X3 --&gt; B3 --&gt; E3 --&gt; G3 --&gt; H3 --&gt; O3 --&gt; S3
+  classDef frozen fill:#e8eaf6,stroke:#3949ab,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class X3,B3,E3,G3,H3,O3 frozen
+  class W3,S3 flight</code></pre></details></figure>
+<p><strong>M3, Spectra-AASIST (in flight).</strong> Off-the-shelf detector wrapping its own XLS-R; logits <code>(spoof, bonafide)</code>, <code>synth_logit = logit_spoof − logit_bonafide</code>. No training. Every row (inner, holdout, In-the-Wild, test) goes through <code>prepare_segment</code> with the shared test-length crops for training rows, then 64,600-sample windows; short-clip handling (zero-pad by default) is chosen by a pilot on inner rows. Value: a second deep score stream trained on different data, for the stacker. Its In-the-Wild readout is flagged "possibly optimistic" because the checkpoint's training data is undisclosed. Cost is comparable to M1 extraction, so it shares the MPS GPU with the main chat in turns.</p>
+<h2 id="7-engineered-detectors">7. Engineered detectors</h2>
+<figure class="diagram"><img class="diagram-img diagram-light" src="../img/diagrams/doc-103d91d1b85e-light.svg" alt="Diagram from the document" width="2938" height="252"><img class="diagram-img diagram-dark" src="../img/diagrams/doc-103d91d1b85e-dark.svg" alt="" aria-hidden="true" width="2938" height="252"><figcaption>Diagram from the document <a class="fullsize" href="../img/diagrams/doc-103d91d1b85e-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>flowchart LR
+  A["load_audio&lt;br/&gt;16 kHz mono"] --&gt; B["band_limit&lt;br/&gt;Kaiser 71 taps · 7.25 kHz · 45 dB"] --&gt; T["trim_silence&lt;br/&gt;35 dB relative"] --&gt; D["train: random crop to a test-duration length&lt;br/&gt;test: whole clip, 8 s cap"] --&gt; N["RMS-normalize to 0.1"]
+  N --&gt; S["STFT · n_fft 512 · hop 160&lt;br/&gt;32 ms frames every 10 ms"]
+  N --&gt; Y["YIN pitch · 60 – 400 Hz&lt;br/&gt;voiced mask"]
+  S --&gt; F75["75 handcrafted features&lt;br/&gt;64 spectral · 11 prosody"]
+  Y --&gt; F75
+  S --&gt; V4["v4 families, opt-in via --families&lt;br/&gt;lfcc 60 · phase 12 · cqcc · modulation · breath"]
+  F75 --&gt; TR["training only: LightGBM vs logistic&lt;br/&gt;300 trees · 31 leaves · min_child 40&lt;br/&gt;winner chosen by inner out-of-fold minDCF"]
+  V4 --&gt; TR
+  TR --&gt; DU["bundle: dumped trees + feature stats&lt;br/&gt;models/hc_lgbm_stamp/model.joblib"]
+  DU --&gt; NP["hearsay.trees · numpy evaluator&lt;br/&gt;P(synthetic) + per-feature path contributions"]
+  NP --&gt; EV["evidence sentence&lt;br/&gt;top-3 features in SD from real speech"]
+  NP --&gt; EX["outputs/detector_scores/handcrafted.csv&lt;br/&gt;path · fold · split · score · logit"]
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class A,B,T,D,N,S,Y,F75,TR,DU,NP,EV,EX built
+  class V4 flight</code></pre></details></figure>
+<p><strong>Handcrafted spectral + prosody (built, v3; v4 families landing).</strong> 75 features on the band-matched, trimmed, test-length-cropped, RMS-normalized clip: high-band energy ratios, roll-offs, centroid, bandwidth, flatness, 6-band spectral contrast, flux, 20 MFCC means + stds; YIN pitch statistics, energy dynamics, pauses, zero-crossing rate. Logistic vs LightGBM chosen by inner OOF; LightGBM wins since band matching. Holdout minDCF 0.254, EER 4.3%; blind to <code>grad_tts</code>, <code>pro_diff</code> (1.00) and <code>elevenlabs</code> (0.80); weak on LibriSpeech real (0.77 inner). <code>src/hearsay/hc_v4.py</code> (commits <code>4b644c9</code>..<code>22b1ac3</code>) adds six opt-in families over the same context, all implemented and gated per <code>docs/handoffs/2026-09-26_handcrafted-v4-brief.md</code>: LFCC (40 linear filters to 7 kHz, 20 coefficients, mean/std/delta-std), phase (group-delay spread per voiced frame, peak phase-vs-magnitude coherence), CQCC (65 Hz–7 kHz, 24 coefficients), modulation spectrum of the loudness envelope, breath (between-speech frames) and cycle-level jitter/shimmer. Gate tables and the codec check are in <code>docs/reports/2026-09-26_handcrafted-v4.md</code>. v3 output is byte-identical with no families.</p>
+<p><strong>Compression forensics (built).</strong> 19 features in 3–7 kHz: spectral holes (deep and local), hole flicker and runs, floor depth, effective bandwidth, high-band tilt. Trained with laundering equalization (a random half of both classes re-encoded through MP3/AAC) so "lossy = ElevenLabs/PlayHT" cannot be learned. It detects codec history well (AUC 0.90–0.94) and the class barely (holdout 0.90). The test set reads as laundered throughout, so this is routing and evidence, not a fusion column, unless leave-one-out says otherwise.</p>
+<p><strong>Non-speech gate and speaker drift (built ~06:10, rule-based; report <code>docs/reports/2026-09-26_gate-and-drift.md</code>).</strong> <code>speech_gate</code> decides <code>is_speech</code> from five cues (not silent, voiced ≥ 5% of frames, log-F0 std ≥ 0.02, loudness std ≥ 3 dB, spectral flatness &lt; 0.5), each threshold set beyond the extreme of the full NSA test set, so 0 of 1,671 test files are gated; its score stays 0.5 and fusion never sees it. <code>speech_gate.apply_default_answer</code> implements decision 4: a gated file gets <code>0.02 + 1e-4 × fused score</code>, so it ranks below every speech file in a deterministic order. Known limit: rhythmic polyphonic music can pass; the preflight and the &gt; 0.8 flag remain the backstop. <code>speaker_drift</code> runs ECAPA (<code>speechbrain/spkrec-ecapa-voxceleb</code>, Apache-2.0, 89 MB in <code>weights/</code>) on 1 s windows at 0.5 s hop and flags min pairwise cosine &lt; 0.05 (score 0.6, else 0.5): 94% of two-speaker splices flagged, 6% of single voices. Finding: fakes are the most self-consistent voices (mean-cosine class AUC 0.73 toward fake), so drift is evidence of editing or of a real speaker and the column must not be fused; routing and evidence only. Docker needs SpeechBrain and those weights.</p>
+<p><strong>Container, ENF, splice (built, rule-based).</strong> Container returns header facts and a constant 0.5 on this test set by design (the container is the label on the training data; every test file carries the same FFmpeg tag). ENF tracks 50/60 Hz hum stability (present in 24 test files; in 36% of LJ clips, so a learned version would learn "hum = real"). Splice flags clicks and DC jumps (58 test files). All three carry evidence and routing facts for the rubric; none moves minDCF.</p>
+<h2 id="8-validation-and-selection">8. Validation and selection</h2>
+<figure class="diagram"><img class="diagram-img diagram-light" src="../img/diagrams/doc-ce96ea865422-light.svg" alt="Diagram from the document" width="2357" height="671"><img class="diagram-img diagram-dark" src="../img/diagrams/doc-ce96ea865422-dark.svg" alt="" aria-hidden="true" width="2357" height="671"><figcaption>Diagram from the document <a class="fullsize" href="../img/diagrams/doc-ce96ea865422-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>flowchart LR
+  FF["splits/nsa_folds.csv · 20,000 rows&lt;br/&gt;spoof grouped by generator · real by speaker or LJ chapter"]
+
+  subgraph inner["Inner folds · 16,142 rows"]
+    f0["0 · grad_tts, unit_speech"]
+    f1["1 · diffgan_tts, openvoicev2"]
+    f2["2 · pro_diff, xtts_v2"]
+    f3["3 · your_tts"]
+    f4["4 · elevenlabs"]
+  end
+  HO["Outer holdout · 3,858 rows&lt;br/&gt;playht, wavegrad2 + 26 real groups&lt;br/&gt;read once per model · never selected on · noise ±0.07 – 0.10"]
+  ST["Stress sets · eval only, never trained on&lt;br/&gt;In-the-Wild 2,000 real / 1,000 spoof · MLAAD 143 generators"]
+  TE["NSA test · 1,671 files · unlabeled&lt;br/&gt;check: share above 0.5 vs the 30% prior"]
+
+  FF --&gt; inner
+  FF --&gt; HO
+  inner --&gt;|"leave-fold-out · scalers and classifiers fit fold-locally · Platt maps fit once on pooled inner OOF (monotone, ranks unchanged)"| OOF["inner_oof column"]
+  OOF --&gt; SEL["selection · minDCF = 9.33·P_FA + P_miss&lt;br/&gt;layer, model, features, fusion weights"]
+  OOF --&gt; STK["stacker training rows"]
+  HO --&gt; HOC["holdout column · one readout"]
+  ST --&gt; SR["P_FA at the inner-fold threshold&lt;br/&gt;the real-world false-alarm gate"]
+  TE --&gt; TC["test column → TSV"]
+  DR["NSA draft review · Sat 14:00&lt;br/&gt;the one labeled readout on the real test set&lt;br/&gt;settles score direction"]
+  TC --&gt; DR
+
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef planned fill:#f1f3f4,stroke:#5f6368,color:#111,stroke-dasharray:5
+  class FF,f0,f1,f2,f3,f4,HO,ST,TE,OOF,SEL,HOC,SR,TC built
+  class STK,DR planned</code></pre></details></figure>
+<ul>
+<li><strong>Selection metric:</strong> normalized minDCF at π_synth = 0.3, C_FA = 4, on inner out-of-fold scores. EER and the sponsor-code readings are reported alongside, never selected on.</li>
+<li><strong>Holdout:</strong> read once per model; two generators and 26 real groups, so its noise is about ±0.07–0.10 and a gap under 0.15 is not evidence.</li>
+<li><strong>Stress sets (eval only, never trained on):</strong> In-the-Wild (2,000 real from 54 speakers, 1,000 spoof) for false alarms on unfamiliar real speech; MLAAD (143 generators) available as a miss-rate readout for models that did not train on it.</li>
+<li><strong>Test-set distribution check:</strong> share of test files above 0.5 against the stated ~30% synthetic. Handcrafted went from 90% to 42% with band matching; M1 sat at 40% before its band match.</li>
+<li><strong>Preflight before every TSV:</strong> silence and a synthetic chord through the scorer; finite, reproducible, and the scores are logged (M1 currently scores both near 1.0, which a non-speech gate must address).</li>
+<li><strong>The one labeled readout on the real test set</strong> is NSA's draft review on Saturday afternoon. It settles the score-direction question and compares at most two candidates.</li>
+</ul>
+<h2 id="9-fusion-and-outputs-m4-rule-frozen-0813">9. Fusion and outputs (M4, rule frozen 08:13)</h2>
+<figure class="diagram"><img class="diagram-img diagram-light" src="../img/diagrams/doc-2a2e6a48b124-light.svg" alt="Diagram from the document" width="2063" height="315"><img class="diagram-img diagram-dark" src="../img/diagrams/doc-2a2e6a48b124-dark.svg" alt="" aria-hidden="true" width="2063" height="315"><figcaption>Diagram from the document <a class="fullsize" href="../img/diagrams/doc-2a2e6a48b124-light.svg">Open full size</a></figcaption><details><summary>Mermaid source</summary><pre><code>flowchart LR
+  E1["m1b_v3 · logit"]
+  E2["handcrafted_v5 · logit"]
+  E3["spectra_aasist · synth_logit"]
+  E4["m5_xlsr_ft · logit&lt;br/&gt;exported column; live under fusion_v2 only (not shipped)"]
+  R1["rank against inner out-of-fold references&lt;br/&gt;from models/fusion_v1/constants.json"]
+  E1 --&gt; R1
+  E2 --&gt; R1
+  BL["base = 0.8 · rank(M1b) + 0.2 · rank(handcrafted)&lt;br/&gt;alpha chosen by the pre-declared sweep"]
+  R1 --&gt; BL
+  SUP["M3 suppression only&lt;br/&gt;if Spectra margin below −3 and base above 0.5, halve base&lt;br/&gt;never promotes; nothing fit on M3"]
+  E3 --&gt; SUP
+  BL --&gt; SUP
+  PL["Platt at the 0.3 prior&lt;br/&gt;p = sigmoid(a · base + b + logit 0.3)"]
+  SUP --&gt; PL
+  GATE["default-answer policy&lt;br/&gt;determinate scores in [0.001, 1]; gated and failed files below 0.001&lt;br/&gt;ordered by weak signal, hash tie-jitter"]
+  PL --&gt; GATE
+  TSV["teamName_predictions.tsv&lt;br/&gt;plus the pre-flipped twin"]
+  GATE --&gt; TSV
+  RB["container · enf · splice · speaker drift · compression&lt;br/&gt;routing facts and evidence only"]
+  EXP["explanation JSON per file&lt;br/&gt;every detector's evidence · fusion inputs · routing log"]
+  RB --&gt; EXP
+  GATE --&gt; EXP
+  E4 -.-&gt; R1
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class E1,E2,E3,R1,BL,SUP,PL,GATE,TSV,RB,EXP built
+  class E4 flight</code></pre></details></figure>
+<h2 id="10-open-architecture-decisions">10. Open architecture decisions</h2>
+<ol>
+<li><strong>Band matching in the deep path: resolved.</strong> <code>prepare_segment</code> applies <code>band_limit</code> first since commit <code>133e536</code> (Sat ~04:20). M1's v3 embeddings are being re-extracted; M3 inherits it through <code>prepare_segment</code>; M5 filters once in the bundle build and passes <code>band_match=False</code> on the box. The v2 embeddings and every number quoted from them predate the fix.</li>
+<li><strong>Fusion rule.</strong> Inner OOF says M1 alone (0.250) beats the M1 + handcrafted mean (0.258); the holdout says the mean is far better (0.066 vs 0.146); the logistic stacker zeroes the handcrafted column. Both gaps are inside holdout noise. Candidates: constrained stacker (non-negative weights, shrink toward equal), rank averaging, nested CV of the fusion rule. LJ is one speaker on both sides of every fold, so the stacker should be fit on LibriSpeech and ASVspoof out-of-fold real rows, or treat LJ as weakly grouped. Awaiting the fusion consult's answer (<code>docs/consults/2026-09-26_fusion-strategy_CONSULTATION.md</code>, updated with the In-the-Wild table and the band-wall finding).</li>
+<li><strong>Which columns fuse.</strong> M1 (or M5), handcrafted, M3 if it lands: yes. Compression: only if leave-one-out shows a gain. Container, ENF, splice: evidence and routing only. M5 exports <code>stackable:false</code> if any fold model is missing; fusion must handle a test/holdout-only column.</li>
+<li><strong>Default answer for undetermined files.</strong> Decode failures, non-speech (silence, music), detector disagreement: with a false alarm at 9.33× a miss, uncertain files belong at the real end of the ranking, deliberately tie-broken. A voiced-fraction gate is the first candidate (test median voiced fraction 0.8). Depends on the sponsor's scoring direction; the draft review is the tripwire.</li>
+<li><strong>Orchestrator scope.</strong> Routing facts already exist as detector features: container <code>lossy</code>/<code>is_pcm_wav</code>/<code>ffmpeg_written</code>, compression <code>bw_hz</code> (69 test files lack the 7.2 kHz wall; a few are telephony-band), ENF presence, splice seams, voiced fraction. v1 is static rules over these plus a per-file routing log in the explanation report. Escalation (run the expensive deep model only where cheap detectors disagree) is possible but unnecessary at 1,671 files; see 6.</li>
+<li><strong>Test-time compute.</strong> The test set is about 95 minutes of audio, so inference cost is not a constraint; validation is. Options ranked by expected value: average M5's five fold models with the full model at test time (free once trained, reduces variance, which is what drives false alarms); average M1 probes on layers 6–8 (embeddings exist; validate on inner folds); a second backbone (WavLM Large weights are downloaded, never run); multi-crop averaging only for the few test clips over 8 s (75% are under 3.8 s). Anything adopted must be validated on inner folds and must keep the test-set share above 0.5 near 30%.</li>
+<li><strong>Docker: resolved.</strong> Image built and verified at 07:40 (see section 3). Encoder truncation to layer 8 is on in the runner, bit-identical and pinned by a test. Remaining: the Sunday rebuild after the fusion freeze, and M5's checkpoint if M5 clears its gate.</li>
+</ol>
+<h2 id="11-shortcut-ledger">11. Shortcut ledger</h2>
+<p>Every train-vs-test difference found so far, and where it is closed. Any new detector or dataset is checked against this list.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Shortcut</th><th>Evidence</th><th>Closed by</th>
+</tr></thead>
+<tbody>
+<tr><td>Peak level</td><td>test peaks near 1.0, training real ~0.5; AUC 0.66 alone</td><td>per-input z-normalization (deep), RMS normalization (engineered); level is never a feature</td></tr>
+<tr><td>Leading silence</td><td>LibriSpeech 0.37 s vs test 0.06 s</td><td><code>trim_silence</code> on train and test</td></tr>
+<tr><td>Duration and tiling</td><td>training 5–9 s vs test ~3.4 s; repeat-padding put a seam only in test data</td><td>segment mode: no tiling, training crops drawn from the test-duration distribution; M3 scores training rows with the same crops</td></tr>
+<tr><td>Container / codec</td><td>real = FLAC or 22 kHz WAV, fakes include MP3, test = 16 kHz PCM with one FFmpeg tag (also on PlayHT)</td><td><code>load_audio</code> for everything; container detector never learned; laundering-equalized compression training</td></tr>
+<tr><td>7.2 kHz low-pass on the test set</td><td>1,602 of 1,671 test files drop 44 dB between 6.5 and 7.5 kHz; no training corpus does</td><td><code>band_limit</code> in both paths (<code>prepare_segment</code> since Sat ~04:20); v2 deep embeddings predate it and are being re-extracted</td></tr>
+<tr><td>Mains hum</td><td>stable hum in 36% of LJ, 21% of LibriSpeech, &lt;0.5% of nine generators</td><td>ENF never learned; low-frequency features checked LJ-vs-LibriSpeech</td></tr>
+<tr><td>Crop edges</td><td>training crops start mid-word, test clips are whole utterances</td><td>no onset/offset features</td></tr>
+<tr><td>LJ single speaker</td><td>one voice on both sides of every fold</td><td>folds group LJ by chapter; stacker to be fit on non-LJ real rows</td></tr>
+<tr><td>Double low-pass stopband (found Sat 13:00, channel-robustness rung)</td><td>test files already carry their own ~7.2 kHz wall, so after the pipeline's <code>band_limit</code> their 7–8 kHz stopband is far deeper than any training clip's (whole-spectrogram 1st percentile −157 dB vs −138 dB for holdout real; −118 dB as delivered). Band matching removes the &gt;7 kHz <em>energy</em> difference but not the <em>depth</em> of the stopband, because the test files are filtered twice</td><td><strong>closed, measured, no response</strong> (Sat 14:41, <code>docs/specs/2026-09-26_channel-stopband.md</code>). On 500 holdout clips, one extra <code>band_limit</code> pass (which matches the test files' floor depth) moves no detector past a pre-declared threshold: the 95th-percentile |Δlogit| is at most 53% of 10% of the detector's inner-OOF logit IQR (the largest single-clip move is 97%, handcrafted). The fused holdout minDCF goes 0.012 → 0.016 (limit 0.037); 0 verdict flips at P 0.5. <strong>Residual, unprobed:</strong> the extra pass does not reproduce the test wall's shape. On 20 clips each, the 6.8–7.25 kHz transition band sits about 9 dB lower on test files and the 7.5–8 kHz stopband about 11 dB deeper, partly content. Features that read the whole spectrum (percentiles, floors) must still be computed below 7 kHz: this cue drove the withdrawn λ̂ = 0.947 (<code>docs/reports/2026-09-26_channel-robustness.md</code>, A)</td></tr>
+<tr><td>Non-speech</td><td>silence and a chord score ~1.0 with M1</td><td><code>speech_gate</code> + <code>apply_default_answer</code> (decision 4); 0 of 1,671 test files gated</td></tr>
+</tbody>
+</table></div>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/architecture.md</code> <span class="hash">af0e31ba983b</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

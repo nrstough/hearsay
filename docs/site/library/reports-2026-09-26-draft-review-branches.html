@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft-review reaction branches (pre-computed Sat Sep 26, ~09:30) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_draft-review-branches.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_draft-review-branches.md</code>; the markdown file is the record.</p>
+
+<h1 id="draft-review-reaction-branches-pre-computed-sat-sep-26-0930">Draft-review reaction branches (pre-computed Sat Sep 26, ~09:30)</h1>
+<p><strong>Sent for review (12:03, superseding the 09:25 plan):</strong> <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (sha256 <code>fb783076…</code>), copied as <code>~/Downloads/CrossExam_predictions.tsv</code> (team Cross Exam).</p>
+<ul>
+<li><strong>Rule:</strong> A3 w0.2 + E. M1b v3 60% + handcrafted v5 20% + M5 20% in rank space, with M3 used only to suppress false alarms. Ratified by Nathan at 12:20 (GO A3) after NSA said the Docker image is not required; the pre-declared rule said replace. The runner's default is <code>models/fusion_v2/constants.json</code> since 12:35 and reproduces this file (exports: 7e-16; live: Spearman 1.0, max 9.3e-4). <em>The 09:25 plan sent the 08:13 <code>e_on_a</code> file (<code>096f3f0c…</code>); that file is the fallback, loadable via <code>--fusion models/fusion_v1/constants.json</code>.</em></li>
+<li><strong>Ask NSA for:</strong> minDCF, P_FA, P_miss and EER.</li>
+</ul>
+<p>Every branch is already a logged TSV in 1,671-row template order, so reacting to NSA's number is a file copy.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>NSA's returned minDCF</th><th>Meaning</th><th>Final TSV to submit (copy, rename to <code>TeamName_predictions.tsv</code>)</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>0.00–0.20</strong></td><td>Our score direction; the test set behaves like our holdout.</td><td><code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (the file sent at 12:03; unchanged). <em>Until 12:20 this row pointed at the 08:13 <code>e_on_a</code> file.</em></td></tr>
+<tr><td><strong>0.20–0.45</strong></td><td>Our direction; the test set is more like In-the-Wild or out of family.</td><td>The same A3 file. "Most FA-robust" means lowest ITW brief-cost minDCF, the false-alarm-weighted, threshold-swept metric the rules were chosen on; A3 w0.2 + E has the best ITW brief (0.228) and averse (0.239) of every ratified rule.</td></tr>
+<tr><td><strong>0.45–0.90</strong></td><td>Ambiguous. Do <strong>not</strong> flip.</td><td><code>submissions/20260926-0928_BRANCH_C_M1b_alone_our_direction.tsv</code> (M1b v3 alone, same 0.001 + 0.999·p map; unchanged).</td></tr>
+<tr><td><strong>0.95–1.00</strong></td><td>NSA's code is reading our scores inverted.</td><td><code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_FLIPPED_only_if_NSA_scores_inverted.tsv</code>.</td></tr>
+</tbody>
+</table></div>
+<p><strong>If NSA returns EER instead:</strong> 2–5% means our direction, so use the first row. 95–98% means their code's polarity, so use the last row.</p>
+<p><strong>Also pre-computed, not tied to a band:</strong></p>
+<ul>
+<li><code>…BRANCH_C_M1b_alone_FLIPPED.tsv</code>, for the case where NSA's number points to inversion and M1b alone is still preferred.</li>
+<li><code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_*.tsv</code>: the A3 candidate (positive result, not shipped).</li>
+</ul>
+<p>All of these files are archived at <code>/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/submissions/</code>.</p>
+<p><strong>Docker / runner (12:35):</strong> the runner points at <code>models/fusion_v2/constants.json</code> (A3 w0.2 + E) by default; the image (not a graded deliverable, NSA ~12:00) stays on <code>e_on_a</code> as reproducibility evidence. It already supports <code>--flip</code> (since <code>9614c18</code>: <code>scripts/run_pipeline.py</code>, <code>pipeline.py</code>), which maps 1 − p through the same determinate map and keeps the gate block at the bottom, and the Docker smoke test covers it. So an inversion verdict changes only which TSV is sent.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_draft-review-branches.md</code> <span class="hash">e1eadc39936c</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+flowchart LR
+  E1["m1b_v3 · logit"]
+  E2["handcrafted_v5 · logit"]
+  E3["spectra_aasist · synth_logit"]
+  E4["m5_xlsr_ft · logit<br/>exported column; live under fusion_v2 only (not shipped)"]
+  R1["rank against inner out-of-fold references<br/>from models/fusion_v1/constants.json"]
+  E1 --> R1
+  E2 --> R1
+  BL["base = 0.8 · rank(M1b) + 0.2 · rank(handcrafted)<br/>alpha chosen by the pre-declared sweep"]
+  R1 --> BL
+  SUP["M3 suppression only<br/>if Spectra margin below −3 and base above 0.5, halve base<br/>never promotes; nothing fit on M3"]
+  E3 --> SUP
+  BL --> SUP
+  PL["Platt at the 0.3 prior<br/>p = sigmoid(a · base + b + logit 0.3)"]
+  SUP --> PL
+  GATE["default-answer policy<br/>determinate scores in [0.001, 1]; gated and failed files below 0.001<br/>ordered by weak signal, hash tie-jitter"]
+  PL --> GATE
+  TSV["teamName_predictions.tsv<br/>plus the pre-flipped twin"]
+  GATE --> TSV
+  RB["container · enf · splice · speaker drift · compression<br/>routing facts and evidence only"]
+  EXP["explanation JSON per file<br/>every detector's evidence · fusion inputs · routing log"]
+  RB --> EXP
+  GATE --> EXP
+  E4 -.-> R1
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class E1,E2,E3,R1,BL,SUP,PL,GATE,TSV,RB,EXP built
+  class E4 flight

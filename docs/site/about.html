@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About this site · HEARSAY</title>
+<meta name="description" content="How these pages are made, what is hand-written and what is rendered, and the rules every number follows.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="about" data-search-index="search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="library/index.html">The library</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">About this site</p>
+<h1>About this site</h1>
+<p class="lead">How these pages are made, what is hand-written and what is rendered, and the rules every number follows.</p>
+
+<h2 id="what-is-here">What is here</h2>
+<p>Four sections. <strong>The story</strong> and <strong>Systems and subsystems</strong> are written by hand for this site, in plain English, and every figure on them carries a source link. <strong>The library</strong> is every markdown document in the repository (README, CLAUDE.md, the plan, architecture, status, code map, the NSA brief, and every report, run spec, audit, handoff, consult record, working-method skill and review rubric), rendered as it is. The markdown files are the record; these pages are a copy with navigation, diagrams and explainers.</p>
+<h2 id="numbers">The rule for numbers</h2>
+<p>A number on a story or spec page is never typed from memory. Each one is written as a citation to a file and, where the file has one, a section; <code>--check-citations</code> fails if the literal number is not found there (the plain build only warns). Decimals, percentages, thousands-grouped numbers and integers of 100 or more must be cited; small counts (ten detectors, 12 layers) may stand alone. The README wins where two documents disagree, and each disagreement is listed below rather than resolved here. Where no document states a number, the page leaves it out.</p>
+<h2 id="hashes">Footers and versions</h2>
+<p>Every page's footer names its source file(s) with the first 12 characters of the SHA-256 of that file's bytes. The hash identifies the exact version of the markdown a page was built from; a later commit that changes the file changes the hash, which is how the freshness check notices. Pages carry no commit hash, because a document edited in the same commit as the site cannot know that commit's hash before it exists. The report for this site (<code>docs/reports/2026-09-26_docs-site.md</code>) records the commit each build came from.</p>
+<h2 id="build">How it is built</h2>
+<p>One standard-library Python script, <code>scripts/build_site.py</code>, reads the markdown corpus and the hand-written sources under <code>docs/site/source/</code> and writes everything else under <code>docs/site/</code>. The output is committed, so nothing needs building to read the site; it works opened from a checkout (<code>docs/site/index.html</code>), from <code>python3 -m http.server</code> in <code>docs/site</code>, and as a GitHub Pages site from <code>main</code> / <code>docs</code>. There is no runtime dependency: no CDN, no webfont, no library. Diagrams are Mermaid sources pre-rendered to SVG in light and dark by <code>docs/site/source/render-diagrams.js</code> (Node, Playwright, Mermaid 11.17.2); the manifest beside them records each source's hash, and <code>--strict</code> and <code>--check</code> refuse a diagram whose source changed since it was rendered.</p>
+<pre><code>uv run python scripts/build_site.py --strict          # rebuild
+uv run python scripts/build_site.py --check           # is the committed site fresh?
+uv run python scripts/build_site.py --check-citations # is every number where its citation says?
+npm pack mermaid@11 && tar xzf mermaid-11*.tgz        # once, anywhere
+node docs/site/source/render-diagrams.js --mermaid package/dist/mermaid.min.js
+node docs/site/source/verify-pages.js --out /tmp/site-shots   # every page, two widths, two themes</code></pre>
+<h2 id="cost-constants">The cost constants</h2>
+<p>The cost function shown on the home page and the metric page is built from the constants in <code>src/hearsay/metrics.py</code> at build time: C<sub>FA</sub> = 4, C<sub>miss</sub> = 1, π<sub>synth</sub> = 0.3, normalizer 0.3, so the weight on the false-alarm rate is 9.33. The interactive explorer evaluates <code>(4*pfa*(1-0.3) + 1*pmiss*0.3) / 0.3</code>.</p>
+<h2 id="not-here">What is not here</h2>
+<p>No 404 page (it would live outside this site's folder). Code links point at GitHub and assume the repository is public and the branch merged to <code>main</code>; document links stay inside this site and work offline. Paths under <code>models/</code>, <code>outputs/</code>, <code>data/</code>, <code>weights/</code> and the submission TSVs are not in the repository and are shown as plain text.</p>
+<h2 id="routed">Discrepancies found while building, routed to the maintainers</h2>
+<p>These were found while building this site and are recorded here rather than fixed, because the source documents belong to other lanes. Each is routed to the oversight chat; the markdown stays the record until it is corrected there.</p>
+<ul>
+<li><strong>The architecture and status documents are dated ~04:40 Saturday.</strong> <code>docs/architecture.md</code> §9 and the committed flow diagram still show the previous fusion rule (0.8 / 0.2, "M5 not shipped"); the README and the library's newer reports state the shipped rule. The story pages follow the README and redraw those diagrams; the library renders the documents as they are.</li>
+<li><strong>The gated-file mapping.</strong> <code>docs/architecture.md</code> §7 states an older formula for the score of a gated file; the code and the gate report record the current one (a block below 0.001, failures below that, a small jitter). The spec page cites the code.</li>
+<li><strong>Ratification time.</strong> The README says the shipped rule was ratified at 12:03; the status document says ~12:05; the sweep report and the decoding table say 12:20 with the runner's default switched at 12:35. The site shows the README's time and cites each document where it uses its own.</li>
+<li><strong>Two roundings of one figure.</strong> M1b's In-the-Wild minDCF is 0.342 in the README's detector table and 0.343 in its results table and the sweep; the test share above 0.5 is 27.4% in the README's numbers table and 27.5% in the orchestration ablation (a different readout). Each is cited to its own table.</li>
+<li><strong>Stale comments and defaults in code.</strong> A pipeline comment, the Docker build script and the Docker entrypoint still name the previous rule or an older default; the orchestration-ablation script defaults to the previous constants file; the Docker build does not stage the M5 checkpoint that the runner's current default needs, so a rebuild as-is would refuse to start (the recorded evidence image ran the previous rule, as the README states). The runner's team default is not our team name, so the team must always be passed.</li>
+<li><strong>Docstring versus constant.</strong> The speech gate's docstring says "a tenth" of frames voiced where the constant is five percent (the reports and the architecture document agree with the constant).</li>
+<li><strong>The role label of Spectra-AASIST in code</strong> is "fused" while the rule only lets it suppress; the reports and this site say "suppressor".</li>
+<li><strong>Stale line references and file claims</strong> in the code map (line numbers for the embedding module; a claim that the Spectra test file does not exist) and in the frontend contract (the verdict rule and a line reference into the speech gate).</li>
+<li><strong>A test title</strong> says "all five" engineered detectors where it asserts seven registered names.</li>
+<li><strong>Five links in the audit records</strong> use absolute paths from the Mac; the site rewrites them to the repository paths they point at.</li>
+</ul>
+
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>scripts/build_site.py</code> <span class="hash">8563007a09b1</span>. The markdown is the record. <a href="about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

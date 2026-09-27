@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handcrafted v6: noise twins did not make the handcrafted model noise-robust (Sat Sep 26, 2026, evening) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_post-draft-hc-noise.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_post-draft-hc-noise.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#recipe">Recipe</a></li><li><a href="#results">Results</a></li><li><a href="#reading">Reading</a></li><li><a href="#gate">Gate</a></li><li><a href="#files">Files</a></li></ul></details>
+<h1 id="handcrafted-v6-noise-twins-did-not-make-the-handcrafted-model-noise-robust-sat-sep-26-2026-evening">Handcrafted v6: noise twins did not make the handcrafted model noise-robust (Sat Sep 26, 2026, evening)</h1>
+<p><strong>Question.</strong> The channel lane found that 20 dB white noise breaks the handcrafted model: AUC 0.998 → 0.64 on 500 holdout clips (<code>docs/reports/2026-09-26_channel-robustness.md</code>, §E). The handoff's fix was to train on noisy copies of both classes. Does that recover the noise lane without costing clean rows?</p>
+<p><strong>Answer: no.</strong> Noise AUC rises only to 0.77, against a pre-declared bar of 0.90. The clean holdout gets worse, 0.137 → 0.227. v6 is recorded as a measured negative, and <code>models/hc_selected</code> stays on v5b.</p>
+<p>Run by the post-draft CPU lane on Nathan's 19:00 instruction, relayed by the orchestrator. The recipe and pass bar are from <code>docs/handoffs/2026-09-26_post-draft-cpu-handoff.md</code>, written before any v6 number existed.</p>
+<h2 id="recipe">Recipe</h2>
+<p>v6 is v5b with one more augmentation. Nothing else changed.</p>
+<p><strong>Extraction.</strong> <code>scripts/extract_handcrafted.py</code> gained <code>--noise-frac</code> / <code>--noise-snr-db</code>:</p>
+<ul>
+<li><strong>The noise.</strong> White Gaussian noise at exactly the stated SNR (<code>hearsay.handcrafted.white_noise</code>). It is the same recipe as the channel probe's <code>noise20</code>.</li>
+<li><strong>The draw.</strong> It comes from the same per-row <code>default_rng(seed + row)</code> as launder and tilt. It is recorded in <code>hc_augment</code> as <code>noise:&lt;snr&gt;:&lt;seed&gt;</code> and applied before band match, trim and crop, to both classes.</li>
+<li><strong>Draws unchanged.</strong> The noise draw comes after the launder and tilt draws, so every row keeps its v5 launder/tilt draw. This was checked on all 20,000 rows. A test pins it, together with the SNR (<code>tests/test_hc_augment.py::test_noise_draw_keeps_v5_draws_and_hits_the_snr</code>).</li>
+</ul>
+<pre><code class="language-bash">uv run python scripts/extract_handcrafted.py --manifest outputs/manifests/nsa_train_sample.csv \
+  --name nsa_train_sample_v6aug --crop test --seed 0 \
+  --families lfcc,phase,cqcc,modulation,breath,jitter \
+  --launder-frac 0.35 --tilt-frac 0.35 --noise-frac 0.35 --noise-snr-db 20 --workers 4</code></pre>
+<ul>
+<li>20,000 rows, 0 failures, 1,358 s.</li>
+<li>14,436 rows augmented (v5: 11,550).</li>
+<li>6,901 rows noised: 3,422 real, 3,479 fake.</li>
+</ul>
+<p><strong>Training.</strong> Exactly v5b: the clean v4 rows, plus the augmented twins of the inner rows as fit-only extras (11,614, against v5b's 9,300). Every readout and the export stay on clean rows.</p>
+<pre><code class="language-bash">uv run python scripts/train_handcrafted.py --train nsa_train_sample_v4 --folds splits/nsa_folds.csv \
+  --test nsa_test_v4 --extra-rows-from outputs/handcrafted/nsa_train_sample_v6aug.csv --out-name handcrafted_v6</code></pre>
+<p>The bundle is <code>models/hc_lgbm_20260926-191630</code>. It is not pinned; the runner still loads v5b through <code>models/hc_selected</code>.</p>
+<p><strong>In-the-Wild.</strong></p>
+<ul>
+<li><code>_itw_handcrafted_v6.csv</code> scores the seed-200 v4 In-the-Wild features with the bundle. Applied to v5b, the same code reproduces <code>_itw_handcrafted_v5.csv</code> to 1.8e-15.</li>
+<li><code>scripts/eval_bundle.py</code> gives the readout.</li>
+</ul>
+<p><strong>Noise diagnostic.</strong> <code>scripts/hc_noise_probe.py</code> imports the channel lane's own cohort and perturbation code from <code>scripts/m3_probes.py</code>: 500 outer-holdout clips, one seeded crop each, with <code>none</code> and <code>noise20</code>. Features go through the runtime path, and both bundles score the same rows.</p>
+<p>Self-check: its v5b logits match the channel lane's cached <code>m3_perturb.csv</code> values on all 1,000 rows (max |Δ| = 0.0).</p>
+<h2 id="results">Results</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>v5b (shipped)</th><th>v6 (noise twins)</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Noise cohort, 20 dB white noise: AUC</strong> (bar ≥ 0.90)</td><td>0.640</td><td><strong>0.772: fails</strong></td></tr>
+<tr><td>Noise cohort, 20 dB: minDCF brief / averse</td><td>0.996 / 1.000</td><td>0.869 / 0.844</td></tr>
+<tr><td><strong>Noise cohort, clean: AUC</strong> (bar: within 0.005 of 0.998)</td><td>0.998</td><td>0.993: passes by 0.0001</td></tr>
+<tr><td>Noise cohort, clean: minDCF brief / averse</td><td>0.048 / 0.084</td><td>0.163 / 0.140</td></tr>
+<tr><td>Inner OOF minDCF (EER)</td><td>0.469 (13.1%)</td><td>0.474 (14.0%)</td></tr>
+<tr><td>LibriSpeech real, inner</td><td>0.588</td><td>0.566</td></tr>
+<tr><td>Outer holdout minDCF (EER)</td><td><strong>0.137</strong> (3.1%)</td><td><strong>0.227</strong> (4.6%)</td></tr>
+<tr><td>Holdout, LibriSpeech real</td><td>0.155</td><td>0.298</td></tr>
+<tr><td>Holdout, augmented twins</td><td>0.486 (n 2,250)</td><td>0.762 (n 2,822)</td></tr>
+<tr><td>In-the-Wild AUC</td><td>0.768</td><td>0.722</td></tr>
+<tr><td>In-the-Wild P_FA / P_miss at the inner threshold</td><td>0.40% / 96.3%</td><td>0.30% / 96.8%</td></tr>
+<tr><td>Test files above 0.5</td><td>45.1%</td><td>47.6%</td></tr>
+</tbody>
+</table></div>
+<p>Per generator, inner OOF (v5b → v6):</p>
+<ul>
+<li>Got worse: pro_diff 0.63 → 0.77, ElevenLabs 0.67 → 0.72.</li>
+<li>Got better: OpenVoice 0.43 → 0.35, unit_speech 0.087 → 0.053, your_tts 0.105 → 0.085.</li>
+<li>grad_tts stays at 1.00.</li>
+</ul>
+<p>Sources: the two bundles' <code>meta.json</code> and <code>eval_itw_stress.json</code>, and <code>outputs/channel/hc_noise.json</code> (all gitignored; the numbers above are the record).</p>
+<h2 id="reading">Reading</h2>
+<ul>
+<li><strong>The noise lane recovers only a little.</strong> AUC goes from 0.64 to 0.77, and minDCF under noise stays near 0.87. The bar was 0.90 AUC.</li>
+<li><strong>Clean rows pay for it.</strong> Clean-cohort minDCF more than triples (0.048 → 0.163), and the outer holdout goes from 0.137 to 0.227, mostly on LibriSpeech real speech (0.155 → 0.298). A model at 0.227 would not have been picked for fusion over v5b's 0.137.</li>
+<li><strong>Why.</strong> The 234 columns are envelope and fine-structure statistics: spectral flatness and contrast, LFCC/CQCC variability, phase coherence, jitter, the between-speech frames. At 20 dB, white noise fills exactly the low-energy regions most of these cues are read from. The model can't find a noise-invariant version of those cues in these columns. It learns to weaken them instead, which blurs clean rows too. The holdout's own augmented twins show it: 0.486 → 0.762.</li>
+<li><strong>What it would take.</strong> Noise robustness for this detector would need noise-robust features (e.g. voiced-frame-only statistics or denoising before extraction), not more training rows. That is future work.</li>
+<li><strong>Probably not a test-set problem.</strong> In the channel lane's per-feature table (<code>docs/reports/2026-09-26_channel-robustness.md</code>, §A), the test set's lowest noise-floor percentiles (p2, p10) sit beyond the <em>clean</em> end of our two validation sets. Broadband additive noise at 20 dB would raise them. Its floor stationarity (1.08) and flatness (1.74) sit beyond the wild end, though, so the test floor is unusual, not simply clean. Both outside opinions read this as no additive noise on the test set, and we agree, with that caveat.</li>
+</ul>
+<h2 id="gate">Gate</h2>
+<p>H_noise (the shipped rule with <code>handcrafted_v6</code> in the handcrafted seat) goes to the gate chat's <code>scripts/fuse_sweep_v3.py</code> under the manifest's rule (<code>docs/reports/2026-09-26_post-draft-manifest.md</code>). The evidence sent was <code>--hnoise-evidence 0.7716,0.9931</code>. The noise AUC is below 0.90, so H_noise fails rule 5 regardless of its fused numbers.</p>
+<p><strong>Result (gate run 2, 19:17): FAIL.</strong> In the fused rule, every cell is slightly worse than the shipped rule. Δ against CURRENT, brief / averse:</p>
+<ul>
+<li>inner −0.0015 / −0.0061</li>
+<li>holdout −0.0005 / −0.0016</li>
+<li>In-the-Wild −0.0003 / −0.0020</li>
+</ul>
+<p>It fails rules 2a, 3a, 3b and 5 (both costs and the diagnostic). Its test ranking has Spearman 0.9953 against the shipped file, with one file crossing 0.5. All four post-draft candidates failed, and the shipped file stays final (<code>docs/reports/2026-09-26_post-draft-sweep.md</code>, "Run 2").</p>
+<h2 id="files">Files</h2>
+<ul>
+<li><strong>Tracked:</strong> <code>src/hearsay/handcrafted.py</code> (<code>white_noise</code>, the <code>noise</code> part in <code>draw_augment</code> / <code>apply_augment</code>), <code>scripts/extract_handcrafted.py</code> (the two options, recorded in the meta), <code>scripts/hc_noise_probe.py</code>, <code>tests/test_hc_augment.py</code> (one test), this report.</li>
+<li><strong>Gitignored:</strong>
+<ul>
+<li><code>outputs/handcrafted/nsa_train_sample_v6aug.csv</code> (~23 min to regenerate at 4 workers; not archived)</li>
+<li><code>models/hc_lgbm_20260926-191630/</code> (not archived; 17 s to retrain from the feature file)</li>
+<li><code>outputs/detector_scores/{handcrafted_v6,_itw_handcrafted_v6}.csv</code></li>
+<li><code>outputs/channel/hc_noise{.json,_features.csv,_scores.csv}</code></li>
+</ul></li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_post-draft-hc-noise.md</code> <span class="hash">a03769cbb0e9</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

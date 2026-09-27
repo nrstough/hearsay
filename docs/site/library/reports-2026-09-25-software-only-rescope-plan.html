@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: software-only rescope (deep mode) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-25_software-only-rescope-plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-25_software-only-rescope-plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#step-0-pre-flight">Step 0. Pre-flight</a></li><li><a href="#step-1-detector-contract-srchearsaydetectors__init__py-and-basepy-new">Step 1. Detector contract: src/hearsay/detectors/init.py and base.py (new)</a></li><li><a href="#step-2-teststest_detector_contractpy-new-about-22-tests">Step 2. tests/testdetectorcontract.py (new; about 22 tests)</a></li><li><a href="#step-3-mp4-fixture-teststest_audio_and_submissionpy">Step 3. MP4 fixture: tests/testaudioandsubmission.py</a></li><li><a href="#step-4-rewrite-docsplanmd-full-replacement-of-all-168-lines">Step 4. Rewrite docs/plan.md (full replacement of all 168 lines)</a></li><li><a href="#step-5-claudemd-edit-keep-the-pre-event-work-and-ai-disclosure-sections">Step 5. CLAUDE.md (edit; keep the Pre-event work and AI disclosure sections)</a></li><li><a href="#step-6-readmemd">Step 6. README.md</a></li><li><a href="#step-7-claudeskillsplan-reviewskillmd">Step 7. .claude/skills/plan-review/SKILL.md</a></li><li><a href="#step-8-codex-rubrics">Step 8. Codex rubrics</a></li><li><a href="#step-9-other-project-skills-hearsay-localized-lines-only-generic-text-left-alone">Step 9. Other project skills (HEARSAY-localized lines only; generic text left alone)</a></li><li><a href="#step-10-banners-one-added-line-each-nothing-else-changes">Step 10. Banners (one added line each; nothing else changes)</a></li><li><a href="#step-11-teststest_docs_consistencypy-new">Step 11. tests/testdocsconsistency.py (new)</a></li><li><a href="#step-12-doc-sync-sweep-before-commit">Step 12. Doc-sync sweep (before commit)</a></li><li><a href="#step-13-verify">Step 13. Verify</a></li><li><a href="#step-14-commit-no-push-without-approval">Step 14. Commit (no push without approval)</a></li><li><a href="#step-15-post-commit">Step 15. Post-commit</a></li><li><a href="#risks-and-mitigations-for-this-change">Risks and mitigations (for this change)</a></li><li><a href="#critique-amendments-fable-critique-these-supersede-the-steps-above">Critique amendments (Fable critique; these supersede the steps above)</a></li><li><a href="#codex-plan-review-amendments-docsreports2026-09-25_software-only-rescope-plan-reviewmd-supersede-everything-above">Codex plan-review amendments (docs/reports/2026-09-25software-only-rescope-plan-review.md; supersede everything above)</a></li></ul></details>
+<h1 id="plan-software-only-rescope-deep-mode">Plan: software-only rescope (deep mode)</h1>
+<p>Run spec: <code>docs/specs/2026-09-25_software-only-rescope.md</code>.
+Base: <code>main</code> @ <code>e1a1e88</code>, worktree <code>~/Projects/hearsay</code>.
+Inputs: architecture, file-impact and risk exploration agents (Opus) and a critique agent (Fable). <strong>The "Critique amendments" section at the end supersedes any step it conflicts with.</strong>
+Time box: about 1 h. The TSV path is not touched (no code under <code>submission.py</code>/<code>audio.py</code> changes), so the "always a valid TSV" rule is not at risk from this change.</p>
+<h2 id="step-0-pre-flight">Step 0. Pre-flight</h2>
+<ul>
+<li><code>git branch --show-current</code> must be <code>main</code>; <code>pwd</code> must be <code>~/Projects/hearsay</code>.</li>
+<li><code>git status --short</code>: the only untracked files should be the run spec and this plan.</li>
+</ul>
+<h2 id="step-1-detector-contract-srchearsaydetectors__init__py-and-basepy-new">Step 1. Detector contract: <code>src/hearsay/detectors/__init__.py</code> and <code>base.py</code> (new)</h2>
+<p>Idiom to match:</p>
+<ul>
+<li><code>from __future__ import annotations</code>, and a module docstring citing the brief.</li>
+<li><code>@dataclass</code>.</li>
+<li><code>ValueError</code> for validation.</li>
+<li><code># noqa: BLE001 - &lt;reason&gt;</code> on the one broad except, following <code>submission.py:60</code>.</li>
+<li>Import <code>REPO</code> from <code>hearsay.submission</code> rather than re-deriving <code>parents[3]</code>.</li>
+</ul>
+<h3 id="11-clipcontext-dataclass">1.1 <code>ClipContext</code> (<code>@dataclass</code>)</h3>
+<ul>
+<li>Fields:
+<ul>
+<li><code>path: Path</code></li>
+<li>private <code>_audio: np.ndarray | None</code>, <code>_audio_err: DecodeError | None</code>, <code>_probe: dict | None</code></li>
+<li><code>cache: dict[str, Any]</code></li>
+</ul></li>
+<li><code>.audio</code>
+<ul>
+<li>Calls <code>hearsay.audio.load_audio</code> once.</li>
+<li>Marks the array <code>flags.writeable = False</code>, so one detector cannot mutate another's input.</li>
+<li>Caches a <code>DecodeError</code> and re-raises it on later accesses; there is no second ffmpeg call.</li>
+</ul></li>
+<li><code>.probe</code>: calls <code>probe_audio</code> once. <code>probe_audio</code>'s return shape is unchanged (the loader test and <code>scripts/inventory.py</code> depend on it).</li>
+<li><code>.memo(key, fn)</code>: per-clip shared cache, so detectors share expensive intermediates such as XLS-R windows.</li>
+<li><code>ClipContext.from_array(x, probe=None, path="&lt;array&gt;")</code>: for tests; no ffmpeg.</li>
+<li>Threading: documented as "decode before fan-out"; there is no lock.</li>
+</ul>
+<h3 id="12-detectorresult-dataclassfrozentrue">1.2 <code>DetectorResult</code> (<code>@dataclass(frozen=True)</code>)</h3>
+<ul>
+<li>Fields:
+<ul>
+<li><code>name: str</code></li>
+<li><code>score: float</code></li>
+<li><code>evidence: str</code></li>
+<li><code>features: dict[str, float] = field(default_factory=dict)</code></li>
+<li><code>status: Literal["ok", "skipped", "error"] = "ok"</code></li>
+<li><code>error: str | None = None</code></li>
+</ul></li>
+<li><code>__post_init__</code> raises <code>ValueError</code> when:
+<ul>
+<li><code>name</code> is not a non-empty str.</li>
+<li><code>score</code> is a <code>bool</code>/<code>np.bool_</code>, is not a <code>numbers.Real</code>, is non-finite, or is outside [0, 1]. The value is coerced to a Python <code>float</code> and stored via <code>object.__setattr__</code>.</li>
+<li><code>evidence</code> is not a str, or is empty after <code>.strip()</code>.</li>
+<li><code>features</code> is not a Mapping; a key is not a non-empty str; or a value is a bool, not <code>numbers.Real</code>, or non-finite. Ints and numpy scalars are coerced to float. A plain <code>dict</code> copy is stored (picklable, for joblib/multiprocessing fan-out).</li>
+<li><code>status</code> is not one of the three values.</li>
+<li>The error field doesn't match the status: <code>ok</code> requires <code>error is None</code>; <code>error</code> requires a non-empty str; <code>skipped</code> requires <code>error is None</code>.</li>
+</ul></li>
+<li>The docstring states the direction: <strong>score increases with synthetic likelihood</strong>.</li>
+</ul>
+<h3 id="13-detector-runtime_checkable-protocol">1.3 <code>Detector</code> (<code>@runtime_checkable Protocol</code>)</h3>
+<ul>
+<li><code>name: str</code></li>
+<li><code>applies(self, ctx) -&gt; bool</code></li>
+<li><code>run(self, ctx) -&gt; DetectorResult</code></li>
+<li>Load heavy models lazily in <code>run</code>.</li>
+</ul>
+<h3 id="14-safe_rundet-ctx---detectorresult">1.4 <code>safe_run(det, ctx) -&gt; DetectorResult</code></h3>
+<p>Never raises <code>Exception</code>; <code>KeyboardInterrupt</code>/<code>SystemExit</code> still propagate.</p>
+<ul>
+<li><code>name = getattr(det, "name", type(det).__name__)</code>.</li>
+<li><code>applies()</code> is evaluated first:
+<ul>
+<li>False: return <code>status="skipped"</code>, score 0.5, evidence <code>"not applicable: &lt;name&gt;"</code>. <code>run</code> is not called.</li>
+<li>Raises: status <code>error</code>.</li>
+</ul></li>
+<li>Otherwise call <code>run</code>. It is an error if the return is not a <code>DetectorResult</code>, or if <code>result.name != name</code>.</li>
+<li>The error result has score 0.5, empty features, and <code>error=f"{type(e).__name__}: {e}"</code>. Its evidence is built from the type name so it is never empty (<code>str(ValueError())</code> is <code>""</code>).</li>
+<li>Wall time is recorded in <code>result.features</code>? <strong>No.</strong> Features are for fusion. Instead, <code>safe_run</code> returns the result unchanged, and timing is the pipeline's job (M4); this keeps the contract minimal.</li>
+</ul>
+<h3 id="15-registry-class">1.5 <code>Registry</code> class</h3>
+<ul>
+<li><code>register(det) -&gt; det</code>: usable as a decorator on instances. A duplicate name raises <code>ValueError</code>.</li>
+<li><code>get(name)</code>: raises <code>KeyError</code>.</li>
+<li><code>names()</code>: sorted, giving a stable fusion column order independent of import order.</li>
+<li><code>all_detectors()</code>: in sorted-name order.</li>
+<li>A module-level <code>REGISTRY = Registry()</code> plus the function aliases <code>register</code>, <code>get</code> and <code>all_detectors</code>.</li>
+</ul>
+<h3 id="16-__init__py">1.6 <code>__init__.py</code></h3>
+<p>Re-exports:</p>
+<ul>
+<li><code>ClipContext</code></li>
+<li><code>DetectorResult</code></li>
+<li><code>Detector</code></li>
+<li><code>safe_run</code></li>
+<li><code>Registry</code></li>
+<li><code>REGISTRY</code></li>
+<li><code>register</code></li>
+<li><code>get</code></li>
+<li><code>all_detectors</code></li>
+</ul>
+<h2 id="step-2-teststest_detector_contractpy-new-about-22-tests">Step 2. <code>tests/test_detector_contract.py</code> (new; about 22 tests)</h2>
+<ul>
+<li>A fixture snapshots and restores <code>REGISTRY</code> so no test leaks global state. Most tests use a fresh <code>Registry()</code>.</li>
+</ul>
+<p><strong>B1: invalid scores</strong></p>
+<ul>
+<li><code>score ∈ {nan, inf, -0.01, 1.01, np.float32("nan")}</code> → <code>ValueError</code>.</li>
+<li><code>True</code> and <code>np.bool_(True)</code> → <code>ValueError</code>.</li>
+<li><code>"0.5"</code> → <code>ValueError</code>.</li>
+<li><code>np.float32(0.25)</code> is accepted and stored as a Python <code>float</code>.</li>
+<li>0.0 and 1.0 are accepted (boundaries).</li>
+</ul>
+<p><strong>B2: direction</strong></p>
+<ul>
+<li>A toy <code>EnergyTailDetector</code> scores the fraction of energy above 4 kHz. A white-noise "synthetic-marked" array scores higher than a 200 Hz tone "real-marked" array.</li>
+<li>Direction comes from the fixture definition, and the docstring states the convention. This pins that the contract carries the direction rule. It is not a claim about real audio.</li>
+</ul>
+<p><strong>B3: errors</strong></p>
+<ul>
+<li>A detector that raises <code>RuntimeError("boom")</code> → <code>safe_run</code> gives <code>status="error"</code>, score 0.5, <code>"RuntimeError: boom"</code> in <code>error</code>, and empty features.</li>
+<li>Counterfactual: calling <code>det.run(ctx)</code> directly raises.</li>
+<li><code>raise ValueError()</code> with an empty message still gives a valid error result.</li>
+<li><code>run</code> returning <code>None</code>, a dict, or a result with the wrong name → error.</li>
+<li><code>applies</code> raising → error.</li>
+<li><code>KeyboardInterrupt</code> propagates.</li>
+</ul>
+<p><strong>B4: evidence</strong></p>
+<ul>
+<li><code>""</code>, <code>"   "</code> and <code>None</code> → <code>ValueError</code>.</li>
+</ul>
+<p><strong>B5: features</strong></p>
+<ul>
+<li>Nested dict, str value, bool value, NaN, empty-string key, non-str key → <code>ValueError</code>.</li>
+<li>An int value is coerced to float.</li>
+<li>Mutating the caller's source dict afterwards does not change the result.</li>
+</ul>
+<p><strong>B6: registry</strong></p>
+<ul>
+<li>A duplicate name raises.</li>
+<li><code>get</code> of an unknown name raises <code>KeyError</code>.</li>
+<li><code>names()</code> is sorted regardless of registration order.</li>
+</ul>
+<p><strong>B7: determinism</strong></p>
+<ul>
+<li>The same <code>ClipContext</code> scored twice gives equal results.</li>
+<li><code>ctx.audio</code> is read-only: an in-place write raises <code>ValueError</code>.</li>
+<li><code>ClipContext</code> decodes once: <code>load_audio</code> is monkeypatched to count calls, and a real file's <code>.audio</code> is accessed twice → exactly 1 call.</li>
+<li>A failing decode raises <code>DecodeError</code> on both accesses, with 1 call.</li>
+</ul>
+<p><strong>B8: skipped</strong></p>
+<ul>
+<li><code>applies()</code> False → <code>status="skipped"</code>, and a <code>run</code> that would raise is never called.</li>
+</ul>
+<p><strong>Status/error coherence</strong></p>
+<ul>
+<li><code>status="ok", error="x"</code> → <code>ValueError</code>.</li>
+<li><code>status="error", error=None</code> → <code>ValueError</code>.</li>
+<li><code>status="bogus"</code> → <code>ValueError</code>.</li>
+</ul>
+<h2 id="step-3-mp4-fixture-teststest_audio_and_submissionpy">Step 3. MP4 fixture: <code>tests/test_audio_and_submission.py</code></h2>
+<ul>
+<li>Add <code>("aac.mp4", 48_000, 2, ("-c:a", "aac", "-f", "mp4"))</code> after line 35 (the <code>opus.ogg</code> case) in the parametrize at lines 25–36.</li>
+<li><code>ffmpeg_sine</code> (lines 18–22) puts <code>args</code> before the output path, and the aac encoder and mp4 muxer are present.</li>
+</ul>
+<h2 id="step-4-rewrite-docsplanmd-full-replacement-of-all-168-lines">Step 4. Rewrite <code>docs/plan.md</code> (full replacement of all 168 lines)</h2>
+<p>Sections, in order. The A2, A3 and A5 tests key on the exact headings.</p>
+<ol>
+<li><p><strong>Title and one-paragraph version.</strong> A software-only, multi-detector audio authentication system; deliverables are the TSV, Docker and README; hardware line <code>(cut)</code>.</p></li>
+<li><p><strong><code>## Scoring and deliverables</code></strong></p>
+<ul>
+<li>60% MinDCF (<code>C_FA = 4</code>, <code>C_miss = 1</code>, <code>π_synth = 0.3</code>; normalized 9.33·P_FA + P_miss).</li>
+<li>20% diversity; 20% documentation.</li>
+<li><code>teamName_predictions.tsv</code> (<code>filename&lt;TAB&gt;cm-score</code>).</li>
+<li>Docker image, README, one-time draft review.</li>
+<li>Final DM by 8 AM Sunday.</li>
+<li>Metric-reading risk: every candidate logs normalized minDCF under three readings (π = 0.3 standard, π = 0.5, and the slide-literal form) plus EER. A decision that flips between readings is flagged. This is implemented in <code>hearsay.metrics</code> by the next M1/M4 change, not in this one.</li>
+</ul></li>
+<li><p><strong><code>## Architecture</code></strong>: ingest → orchestrator → detectors (contract in <code>src/hearsay/detectors/base.py</code>) → fusion → TSV + explanation report.</p>
+<ul>
+<li>Fusion reads each detector's logit/LLR-type features and missing indicators, not raw feature dumps. It uses L2 logistic regression, imputes with the train mean (never safe_run's 0.5 placeholder), and reports per-source minDCF.</li>
+</ul></li>
+<li><p><strong><code>## Forensic techniques</code></strong>: exactly one bullet per brief category, each with its owner, one-line method and time box:</p>
+<ul>
+<li>container/metadata</li>
+<li>spectral</li>
+<li>prosody</li>
+<li>ENF</li>
+<li>compression</li>
+<li>speaker-embedding consistency</li>
+<li>deep anti-spoofing</li>
+<li>splice/discontinuity</li>
+<li>orchestration bonus</li>
+</ul>
+<p>Rules:</p>
+<ul>
+<li>Metadata uses embedded ffprobe/ExifTool tags only, never filesystem MAC times or filenames (git, Docker and unzip rewrite them).</li>
+<li>Forensic detectors may read audio at its native rate via <code>ctx.memo</code>; this is the only exception to 16 kHz.</li>
+</ul></li>
+<li><p><strong><code>## Ladder</code></strong>: table M0, M1, D-track, M3, M5, M4, ORCH, K, DOC, with owner, time box and gate. Teammates own the D-track. <strong>K (Docker) is owned by a teammate from Saturday morning</strong> (risk H1), with the M1 model as its first payload.</p></li>
+<li><p><strong><code>## Data</code></strong></p>
+<ul>
+<li>NSA train is primary.</li>
+<li><strong>Fold file:</strong> <code>splits/nsa_folds.csv</code>, published within 1 h of the data arriving. Every learned detector and fusion must use it, or stacking leaks. Grouping falls back from speaker to generator to near-duplicate cluster.</li>
+<li>MLAAD English (6,390 pulled) plus a multi-speaker bona fide source (LibriSpeech/VCTK, not yet downloaded). Public-data numbers for engineered features are confounded by corpus.</li>
+<li>ASVspoof is baseline only; In-the-Wild is stress only.</li>
+<li>Augmentation for both classes: codec/telephony, noise, RIR/replay, band-limit, random ffmpeg round-trips, which also neutralize container shortcuts.</li>
+<li>Leakage hashing.</li>
+<li>ECAPA weights to download (speaker drift and Docker).</li>
+</ul></li>
+<li><p><strong><code>## Timeline</code></strong>: gates from the risk report, all relative to data arrival (T0) with absolute backstops:</p>
+<ul>
+<li>T0+1 h: inventory (including container-field AUCs; above 0.85 counts as a shortcut), fold file, constant TSV.</li>
+<li>T0+3 h: M1 NSA TSV.</li>
+<li>Sat 09:00: H100 run 1, pending approval. If NSA data hasn't arrived by 09:00, cut M5 to one run and shift every gate by the delay.</li>
+<li>Sat 10:00: Docker skeleton (teammate).</li>
+<li>Sat 14:00–18:00: draft TSV sent for the one-time review.</li>
+<li>Sat 16:00: teammate detectors pass the contract tests and deliver OOF scores on the fold file.</li>
+<li>Sat 20:00: fusion frozen.</li>
+<li>Sat 22:00: no new detectors.</li>
+<li>Sun 00:00: final Docker build, then an amd64 smoke test on 3 files, and a CPU-vs-MPS parity check on 50 files.</li>
+<li>Sun 05:00: final TSV, with the silence/tone/music/noise preflight (flag any score above 0.8).</li>
+<li>Sun 05:00–07:30: README, leave-one-detector-out ablation table, AI disclosure.</li>
+<li>Before 08:00: DM sent by a named person.</li>
+</ul></li>
+<li><p><strong><code>## Cut order</code></strong></p>
+<ul>
+<li>Cut order: ENF → splice → speaker drift → M5 to one run → orchestrator to static routing → fusion to mean.</li>
+<li><code>Never cut:</code> a valid TSV at all times; generator- and speaker-grouped validation; the deep SSL detector; Docker; README.</li>
+</ul></li>
+<li><p><strong><code>## Docker</code></strong>:</p>
+<ul>
+<li>Base <code>python:3.12-slim-bookworm</code> + apt ffmpeg.</li>
+<li>CPU torch 2.14.0 / torchaudio 2.11.0 from the PyTorch CPU index. The lockfile's CUDA wheels are skipped with <code>--no-install-package</code>.</li>
+<li>Editable install; <code>HF_HUB_OFFLINE=1</code>.</li>
+<li>Weights: XLS-R + Spectra (both needed) + the probe joblib. The fine-tune goes on the HF Hub or a GitHub release, not git LFS.</li>
+<li>One model loaded at a time (memory).</li>
+<li>Per-file resumable cache; new output file per run.</li>
+<li><code>.dockerignore</code> excludes the WavLM weights, <code>.venv</code>, <code>data/</code>, <code>outputs/</code> and <code>.cache</code>.</li>
+<li>Tested with <code>--network none</code>.</li>
+</ul></li>
+<li><p><strong><code>## Risks</code></strong>: from the risk agent, High and Medium, one line each with the mitigation.</p></li>
+<li><p><strong><code>## Rules that never move</code></strong></p>
+<ul>
+<li>Always a valid TSV; never overwrite one; log every TSV.</li>
+<li>Validate by generator/speaker, not by clip.</li>
+<li>Never train on In-the-Wild or the validation split, including scalers, calibration and stacking folds.</li>
+<li>Fine-tune on the H100 only; ask before renting.</li>
+<li>Time-box every rung.</li>
+<li>Freeze Sunday morning.</li>
+<li>Scoring path offline, no hosted API or LLM.</li>
+<li>Credit every model and dataset.</li>
+<li>README in our own words.</li>
+<li>Before every TSV: silence/music/noise preflight, schema, row order, duplicate basenames.</li>
+</ul></li>
+</ol>
+<h2 id="step-5-claudemd-edit-keep-the-pre-event-work-and-ai-disclosure-sections">Step 5. <code>CLAUDE.md</code> (edit; keep the Pre-event work and AI disclosure sections)</h2>
+<ul>
+<li><strong>Lines 3–5, "What HEARSAY is":</strong> rewrite as software-only; TSV; new ladder.</li>
+<li><strong>Lines 7–16, team table:</strong>
+<ul>
+<li>Nathan: deep detectors, fusion, orchestrator, TSV, M5.</li>
+<li>Three teammates (names to fill in): engineered-feature detectors (D-track), with one taking K (Docker) from Saturday.</li>
+</ul></li>
+<li><strong>Lines 18–24:</strong> replace <code>## Data contract</code> with <code>## Detector contract</code>, summarizing D3 and pointing to <code>src/hearsay/detectors/base.py</code>.</li>
+<li><strong>Lines 26–28:</strong> new ladder and model rules; "valid TSV"; "log every TSV". The clean-only rule is reworded to "keep a clean-only score beside any augmented one".</li>
+<li><strong>Line 32:</strong> state <code>C_FA = 4</code>, <code>C_miss = 1</code>, <code>π_synth = 0.3</code> explicitly (A3).</li>
+<li><strong>Line 34:</strong> "CSV path" → "submission path". The column name <code>csv_path</code> stays; it is code-owned (<code>submission.py:31</code>).</li>
+<li><strong>Line 35:</strong> "no hosted API or LLM on the scoring path; the Docker image runs offline".</li>
+<li><strong>Lines 37–38:</strong> TSVs; the test suite exists.</li>
+<li><strong>Lines 46 and 50:</strong> TSV; drop "demo".</li>
+<li><strong>Lines 52–58, Sources of truth:</strong>
+<ul>
+<li><code>docs/nsa-challenge.md</code> is authoritative.</li>
+<li><code>docs/plan.md</code> is the working plan.</li>
+<li><code>docs/scoping.md</code> and <code>docs/master-doc.md</code> are historical (pre-rescope).</li>
+</ul></li>
+<li><strong>Line 71</strong> (historical "firmware"): keep, marked <code>(cut)</code>.</li>
+<li><strong>Line 85:</strong> WavLM Base becomes a "bake-off/speed spare".</li>
+<li><strong>Line 97:</strong> "per component (each detector, fusion, orchestrator, Docker)".</li>
+<li><strong>Add to the disclosure:</strong> MLAAD English (6,390 clips, gated HF, non-commercial notice), the kickoff-slide rules, and Claude Code/Codex use in this rescope. ECAPA and LibriSpeech/VCTK go in when they are used.</li>
+<li><strong>Lines 107–113:</strong> "/test-runner (suite exists)"; "/zoom-out … someone else's detector".</li>
+</ul>
+<h2 id="step-6-readmemd">Step 6. <code>README.md</code></h2>
+<ul>
+<li><strong>Line 3:</strong> a two-sentence approach summary.</li>
+<li><strong>Line 5:</strong> "detector contract".</li>
+<li><strong>Line 14:</strong> tests exist.</li>
+<li><strong>Lines 18 and 27:</strong> TSVs.</li>
+<li><strong>New section <code>## Docker</code>:</strong> placeholder run command (<code>docker run --network none -v &lt;test_dir&gt;:/data:ro -v &lt;out&gt;:/out hearsay ...</code>), marked "planned; see docs/plan.md".</li>
+<li>The README narrative is to be rewritten by the team in their own words before submission; noted in <code>plan.md</code> DOC.</li>
+</ul>
+<h2 id="step-7-claudeskillsplan-reviewskillmd">Step 7. <code>.claude/skills/plan-review/SKILL.md</code></h2>
+<ul>
+<li><strong>Lines 30–50, HEARSAY localization:</strong>
+<ul>
+<li>Ladder names.</li>
+<li>A 33 h budget to 8 AM Sun.</li>
+<li>Always a valid TSV + log row.</li>
+<li>The detector contract replaces the data contract; a change to <code>DetectorResult</code> fields must name the affected detector owners.</li>
+<li>Sources of truth: <code>nsa-challenge.md</code> + <code>plan.md</code>.</li>
+<li>Cloud GPU: ask first.</li>
+</ul></li>
+<li><strong>Lines 126–143, standing failure modes</strong>, rewritten:
+<ol>
+<li><strong>Replay/laundering/telephony in the test set:</strong> keep a clean-only score beside the augmented one; measure on an augmented validation slice.</li>
+<li><strong>Generator/speaker overfit:</strong> hold out whole groups via the fold file.</li>
+<li><strong>Class prior / metric reading:</strong> π = 0.3, and check the three-reading flip.</li>
+<li><strong>Shortcuts:</strong> metadata/format/silence; per-field AUC; clean-vs-transcoded.</li>
+<li><strong>Loader format errors:</strong> fixtures per format, including MP4.</li>
+</ol></li>
+<li><strong>Line 121</strong> ("models/hardware", generic compute sense): leave. The A1 term list doesn't include "hardware".</li>
+</ul>
+<h2 id="step-8-codex-rubrics">Step 8. Codex rubrics</h2>
+<ul>
+<li><strong><code>.claude/codex-review-prompt.md</code>:</strong>
+<ul>
+<li>Lines 30–32: TSV.</li>
+<li>Lines 33–34: timeline.</li>
+<li>Lines 35–36: detector contract.</li>
+<li>Lines 40–41: scoring path / Docker offline.</li>
+<li>Lines 42–44: the standing failure modes, mirrored from Step 7.</li>
+</ul></li>
+<li><strong><code>.claude/codex-audit-prompt.md</code>:</strong>
+<ul>
+<li>Lines 59–61: TSV.</li>
+<li>Lines 62–63: detector contract; scoring path offline.</li>
+</ul></li>
+</ul>
+<h2 id="step-9-other-project-skills-hearsay-localized-lines-only-generic-text-left-alone">Step 9. Other project skills (HEARSAY-localized lines only; generic text left alone)</h2>
+<ul>
+<li><strong>consult:</strong>
+<ul>
+<li>Lines 24–25: sources.</li>
+<li>Lines 39–48: the project summary.</li>
+<li>Line 68: generic, keep.</li>
+</ul></li>
+<li><strong>diagnose, lines 12–15:</strong> "ingest → orchestrator → detector → fusion". Line 32 ("replay a captured trace") is generic; keep.</li>
+<li><strong>doc-sync, lines 19–25:</strong> doc set + detector contract. Line 77 ("issue tracker") is generic; keep.</li>
+<li><strong>zoom-out, line 9:</strong> pipeline stages.</li>
+<li><strong>p3:</strong>
+<ul>
+<li>Lines 47–49: TSV.</li>
+<li>Lines 52–53: budget.</li>
+<li>Line 54: "TSV-breaking fixes".</li>
+<li>Lines 55–56: detector contract.</li>
+</ul></li>
+<li><strong>handoff:</strong>
+<ul>
+<li>Lines 23–26: TSV; <code>submissions/*</code> ignore rule.</li>
+<li>Lines 34–38: ladder / TSV / detector contract.</li>
+<li>Lines 77–79: template fields.</li>
+</ul></li>
+<li><strong>validate-training-data, line 39:</strong> replay/laundering augmentation.</li>
+<li><strong>test-runner, lines 42–46:</strong> the suite exists (stale text; doc-sync sweep item).</li>
+</ul>
+<h2 id="step-10-banners-one-added-line-each-nothing-else-changes">Step 10. Banners (one added line each; nothing else changes)</h2>
+<ul>
+<li><strong><code>docs/scoping.md</code>:</strong> new line 1 <code>&gt; **Historical (pre-rescope, Fri Sep 25):** the working plan is docs/plan.md; the spec is docs/nsa-challenge.md.</code> Line 1 is currently a base64 image, and the banner goes before it.</li>
+<li><strong><code>docs/master-doc.md</code>:</strong> the same banner as a new line 2, after the title.</li>
+</ul>
+<h2 id="step-11-teststest_docs_consistencypy-new">Step 11. <code>tests/test_docs_consistency.py</code> (new)</h2>
+<p><strong>Setup</strong></p>
+<ul>
+<li><code>LIVING</code> is the explicit list: <code>CLAUDE.md</code>, <code>README.md</code>, <code>docs/plan.md</code>, plus a glob of <code>.claude/skills/*/SKILL.md</code> and <code>.claude/codex-*.md</code>.</li>
+<li>Assert that every named file exists and the glob returns at least 9 skill files, so the test can't pass vacuously.</li>
+</ul>
+<p><strong>A1: hardware terms</strong></p>
+<ul>
+<li>Word-boundary regex, case-insensitive: <code>listening head|pan-tilt|servo|mic array|4-mic|head driver|direction finding|laser|grandma|live demo|replay capture|firmware|puck|gauge</code>, plus the case-sensitive <code>\bLED\b</code>.</li>
+<li>A line is exempt only if it contains the exact token <code>(cut)</code>.</li>
+<li>Cap: at most 6 exempt lines per file, so the exemption can't absorb everything.</li>
+<li>Self-test: an inline string with "pan-tilt servo" must be flagged; "header, labeled, microsoft, issue tracker, demonstrates" must not.</li>
+</ul>
+<p><strong>A2: plan coverage</strong>
+Within the <code>## Forensic techniques</code> section of <code>plan.md</code> (section text sliced between headings):</p>
+<ul>
+<li>Each of 8 regexes must match:
+<ul>
+<li><code>metadata|container</code></li>
+<li><code>spectral</code></li>
+<li><code>prosod</code></li>
+<li><code>ENF</code></li>
+<li><code>compression</code></li>
+<li><code>speaker[- ]embedding</code></li>
+<li><code>anti-spoof</code></li>
+<li><code>splice</code></li>
+</ul></li>
+<li>Plus <code>orchestrat</code>.</li>
+</ul>
+<p>The whole file must match <code>Docker</code>, <code>README</code>, <code>TSV</code>, <code>MinDCF</code> and <code>8 AM</code>.</p>
+<p><strong>A3: metric constants</strong></p>
+<ul>
+<li><code>metrics.C_FA == 4</code>, <code>C_MISS == 1</code>, <code>PI_SYNTH == 0.3</code>.</li>
+<li><code>CLAUDE.md</code> and <code>plan.md</code> each match <code>C_FA\s*=\s*4(\.0)?\b</code> and <code>π_synth\s*=\s*0\.3\b</code>.</li>
+<li>No living doc matches <code>(π|pi)_?synth\s*=\s*0\.5</code> except on a line containing <code>reading</code>, which is where the three-reading rule names 0.5 deliberately.</li>
+</ul>
+<p><strong>A4: CSV wording</strong></p>
+<ul>
+<li>Case-sensitive regex <code>\bCSVs?\b</code> in <code>CLAUDE.md</code>, <code>README.md</code> and <code>plan.md</code>, excluding lines that contain <code>log.csv</code>, <code>csv_path</code>, <code>.csv</code> or <code>(cut)</code>.</li>
+</ul>
+<p><strong>A5: never-cut set</strong></p>
+<ul>
+<li>The <code>## Cut order</code> section of <code>plan.md</code> contains a <code>Never cut:</code> line mentioning <code>TSV</code>, <code>grouped</code>, <code>SSL</code>, <code>Docker</code> and <code>README</code>.</li>
+</ul>
+<p><strong>A7: historical docs</strong></p>
+<ul>
+<li>Uses <code>git</code>. Skipped with a reason if <code>.git</code> or <code>git</code> is absent (Docker).</li>
+<li>The handoff file's blob at <code>HEAD</code> equals its blob at <code>e1a1e88</code>.</li>
+<li>For <code>scoping.md</code> and <code>master-doc.md</code>: <code>git diff e1a1e88 -- &lt;file&gt;</code> has exactly one added line and zero removed lines.</li>
+</ul>
+<h2 id="step-12-doc-sync-sweep-before-commit">Step 12. Doc-sync sweep (before commit)</h2>
+<ul>
+<li>Reconcile the P2 doc list against the diff.</li>
+<li><code>docs/reports/2026-09-25_sponsor-questions.md</code>, "What this changes" (says π = 0.5 implemented): add a dated correction line. The report is a record, so annotate it rather than rewrite it. The A3 negative regex only scans living docs, so this is hygiene.</li>
+<li><code>.env.example:2</code>: "live demo path" → "scoring path". <code>.gitignore:9</code>: comment CSVs → TSVs. These are one-word fixes found by file-impact; they're outside A1 scope.</li>
+<li>Grep the living docs for <code>M6</code>, <code>data contract</code>, <code>valid CSV</code>, <code>wired fallback</code> and <code>replay capture</code>; fix any hits.</li>
+<li>Leave <code>.py</code> docstrings saying "CSV" (<code>embed.py:2</code>, <code>submission.py:8</code>, …) for the next code change; not in scope.</li>
+</ul>
+<h2 id="step-13-verify">Step 13. Verify</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run pytest -q</code></pre>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv run ruff check .</code></pre>
+<ul>
+<li>Expected: 35 existing tests plus about 22 contract tests, plus the docs tests, plus 1 MP4 test, all passing.</li>
+<li><code>git diff --stat e1a1e88</code> touches only the files listed here.</li>
+</ul>
+<h2 id="step-14-commit-no-push-without-approval">Step 14. Commit (no push without approval)</h2>
+<p><code>docs: rescope HEARSAY to software-only multi-detector system; add detector contract</code></p>
+<h2 id="step-15-post-commit">Step 15. Post-commit</h2>
+<ol>
+<li>Claude critique loop against <code>.claude/codex-audit-prompt.md</code>.</li>
+<li>Then the Codex audit: <code>bash .claude/review-audit.sh docs/specs/2026-09-25_software-only-rescope.md</code>.</li>
+<li>Record both results in the run spec's Results section; fix and re-audit.</li>
+</ol>
+<h2 id="risks-and-mitigations-for-this-change">Risks and mitigations (for this change)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Risk</th><th>Mitigation</th>
+</tr></thead>
+<tbody>
+<tr><td>The doc tests false-positive on generic words</td><td>Word-boundary phrases, no bare "head", "demo" or "led"; self-test fixture</td></tr>
+<tr><td>The doc tests pass vacuously</td><td>File-existence and glob-count asserts; section slicing for A2/A5; exemption cap</td></tr>
+<tr><td>The rewrite drops a rule that must survive</td><td>Step 4 §11 lists them; the critique agent checks the old plan's "Rules that never move" and the AI disclosure against the new text</td></tr>
+<tr><td><code>DetectorResult</code> too strict for real detectors (e.g. an int feature)</td><td>Ints and numpy scalars are coerced; only bool, non-numeric and non-finite values are rejected</td></tr>
+<tr><td>Registry state leaks across tests</td><td>Snapshot/restore fixture; a fresh <code>Registry()</code> in most tests</td></tr>
+<tr><td>A7 breaks inside Docker</td><td>Skipped with a reason when <code>.git</code> is absent; the Docker plan excludes <code>tests/</code></td></tr>
+</tbody>
+</table></div>
+<h2 id="critique-amendments-fable-critique-these-supersede-the-steps-above">Critique amendments (Fable critique; these supersede the steps above)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Severity</th><th>Amendment</th>
+</tr></thead>
+<tbody>
+<tr><td>C1</td><td>Blocker</td><td><code>features</code> uses <code>field(default_factory=dict)</code>; a <code>{}</code> default fails at import. Applied in Step 1.2.</td></tr>
+<tr><td>C2</td><td>Major</td><td>No <code>MappingProxyType</code>: it's unpicklable, and it breaks the frozen dataclass <code>__hash__</code>. Store a <code>dict(features)</code> copy. Set <code>eq=True</code> and <code>unsafe_hash=False</code>, so results are not hashable (documented). The B5 "mutation raises" test is dropped; the caller-dict isolation test stays.</td></tr>
+<tr><td>C3</td><td>Major</td><td>Ruff defaults enable TRY004, BLE001 and RUF100. Each <code>isinstance</code> → <code>ValueError</code> branch gets <code># noqa: TRY004 - contract (D3) mandates ValueError</code>. <code>safe_run</code> wraps <code>applies</code> and <code>run</code> in <strong>one</strong> <code>try</code> with a single <code># noqa: BLE001</code>.</td></tr>
+<tr><td>C4</td><td>Major</td><td><code>base.py</code> uses <code>import hearsay.audio as audio</code> and calls <code>audio.load_audio</code> / <code>audio.probe_audio</code>. The B7 test patches <code>hearsay.audio.load_audio</code>, so the call counter works. <code>np.bool_</code> is already rejected by the <code>numbers.Real</code> check (no special branch), but the test stays. <code>from hearsay.submission import REPO</code> is dropped (unused).</td></tr>
+<tr><td>C5</td><td>Major</td><td>Step 4 §11 "Rules that never move" adds five rules. (a) Keep a clean-only validation score beside any augmented one. (b) Never denoise or loudness-normalize test audio. (c) Submit calibrated probabilities, never saturated 0/1, and never be confidently wrong on a whole subpopulation. (d) Assert the exported score direction on known clips before any TSV ships (Spectra index 0 = spoof). (e) GPU spend cap about $75, and ask before renting.</td></tr>
+<tr><td>C6</td><td>Major</td><td>A4 runs over the same <code>LIVING</code> list as A1 (skills and codex rubrics included). The allowlist is lines containing <code>log.csv</code>, <code>csv_path</code>, <code>.csv</code> or <code>(cut)</code>. Steps 8–9 must therefore replace "valid CSV" and "submitted CSV" wording in p3, plan-review, handoff and both codex rubrics.</td></tr>
+<tr><td>C7</td><td>Major</td><td>New A8 test: slice the plan-review SKILL.md block that starts at its standing-failure-modes heading. It must contain <code>launder\|telephony</code>, <code>fold file\|grouped</code>, <code>π\|prior</code>, <code>shortcut</code> and <code>MP4</code>, and must not contain <code>if unknown</code>.</td></tr>
+<tr><td>C8</td><td>Major</td><td>A7: first <code>git cat-file -e e1a1e88^{commit}</code>, and skip with a reason if that fails (shallow clone or no git). Assert that the file text, with the one banner line removed, equals <code>git show e1a1e88:&lt;path&gt;</code>. The handoff file must equal <code>git show e1a1e88:&lt;path&gt;</code> exactly. The docstring says historical docs are frozen by design.</td></tr>
+<tr><td>C9</td><td>Major</td><td>A1 regex uses plural and hyphen variants: <code>servos?</code>, <code>mic[- ]arrays?</code>, <code>live[- ]demo</code>, <code>listening[- ]head</code>, <code>replay[- ]capture</code>, <code>head[- ]driver</code>, <code>pan[- ]tilt</code>, <code>lasers?</code>, <code>4[- ]mic</code>. Section slicing for A2, A5 and A8 splits on <code>^##</code> with <code>re.MULTILINE</code>, so <code>###</code> subsections stay inside.</td></tr>
+<tr><td>C10</td><td>Major</td><td>Timeline, Step 4 §7. (a) Sleep blocks for Nathan: Sat 02:00–06:00 and Sun 01:00–04:30. (b) If NSA data hasn't arrived by Sat 12:00, the draft review uses the public-data M1 TSV, the OOF gate moves to 19:00, the fusion freeze to 22:00, and ENF and splice are cut immediately. (c) First full amd64 Docker image (M1 payload) by Sat 14:00, built by the teammate on an amd64 machine or via buildx; Sun 00:00 is only a rebuild. (d) The leave-one-detector-out ablation runs on the stored OOF columns at Sat 22:00. (e) The draft TSV is sent by Sat 14:00; NSA's turnaround time is unknown.</td></tr>
+<tr><td>C11</td><td>Minor</td><td>Step 9 edits to the other skills are <strong>required by A1/A4</strong> (the glob covers all skills). <code>.env.example</code>, <code>.gitignore</code> and the sponsor-questions annotation are <strong>conditional hygiene</strong>: done in the doc-sync sweep and listed in the run spec's Results as hygiene.</td></tr>
+<tr><td>C12</td><td>Minor</td><td>D3 skipped and error results have <code>features == {}</code>. Fusion keys on <code>status == "ok"</code> and imputes missing values with the train mean; it never feeds the 0.5 placeholder in as a score (stated in <code>plan.md</code> §3).</td></tr>
+<tr><td>C13</td><td>Minor</td><td><code>ClipContext</code> private fields use <code>field(default=None, init=False, repr=False)</code>.</td></tr>
+<tr><td>C14</td><td>Minor</td><td><code>CLAUDE.md</code> pre-event line 71 is reworded to "no application code (loader, pipeline, model, scoring) was written before the event". No <code>(cut)</code> token in text that will be copied to Devpost.</td></tr>
+<tr><td>C15</td><td>Minor</td><td>A3 positive regexes gain a self-test string. <code>CLAUDE.md</code> and <code>plan.md</code> write the literal <code>π_synth = 0.3</code> and <code>C_FA = 4</code>. The three-reading line writes <code>π = 0.5</code>, not <code>π_synth = 0.5</code>, so the negative regex never fires on it; the <code>reading</code> exemption is dropped. A2 matches <code>8 AM</code> case-insensitively.</td></tr>
+<tr><td>C16</td><td>Minor</td><td><code>safe_run</code>: a <code>run()</code> result whose <code>status != "ok"</code> is converted to <code>status="error"</code> (<code>"run returned status=&lt;x&gt;"</code>), so a detector can't smuggle a score through an error status. Test added in B3.</td></tr>
+<tr><td>C17</td><td>Minor</td><td>The A6 verdict (timeline feasibility, from the critique and Codex) is written into the run spec's Results.</td></tr>
+</tbody>
+</table></div>
+<p>Test count estimate after the amendments: about 24 contract tests plus about 9 doc tests plus 1 MP4 test.</p>
+<h2 id="codex-plan-review-amendments-docsreports2026-09-25_software-only-rescope-plan-reviewmd-supersede-everything-above">Codex plan-review amendments (<code>docs/reports/2026-09-25_software-only-rescope-plan-review.md</code>; supersede everything above)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Codex</th><th>Amendment</th>
+</tr></thead>
+<tbody>
+<tr><td>X1</td><td>Critical: fold fallback leaks generators</td><td><strong>Group key = connected components</strong> of the graph linking clips that share a generator (spoof), a speaker, or a near-duplicate hash. Folds then hold out whole generators <strong>and</strong> whole speakers at once. The fold-file builder reports which links were available (e.g. "no speaker IDs in NSA labels"), so any guarantee that doesn't hold is stated, not assumed. This replaces the "speaker → generator → cluster" fallback in Step 4 §6.</td></tr>
+<tr><td>X2</td><td>Critical: stacking validation not clean</td><td><strong>Nested scheme</strong> in <code>plan.md</code> §3/§6. The fold file assigns an untouched <strong>outer holdout</strong> (about 20% of groups) plus 5 inner folds over the rest. Every learned piece (detector training, layer choice, calibration, imputation means, scaler, fusion) is fitted fold-locally on inner training folds. Exported stacking features are inner-fold OOF predictions. Fusion is fitted on inner OOF rows and scored <strong>once</strong> on the outer holdout, where detectors are refit on all inner rows. The logged <code>validation_score</code> is the outer-holdout minDCF.</td></tr>
+<tr><td>X3</td><td>Critical: <code>safe_run</code> can raise</td><td><code>Registry.register</code> rejects names that aren't non-empty str. <code>safe_run</code> resolves the name <strong>inside</strong> the single protected <code>try</code>. The fallback name is <code>"&lt;" + type(det).__name__ + "&gt;"</code>, which is always valid. New tests: a name property that raises, <code>name=None</code>, and <code>name=""</code> each give a valid <code>status="error"</code> result; registering <code>name=""</code> raises.</td></tr>
+<tr><td>X4</td><td>Critical: native-rate path bypasses the loader</td><td><strong>Deferred.</strong> No native-rate exception in this change. "16 kHz mono everywhere" stays in <code>CLAUDE.md</code> and <code>plan.md</code> unchanged. <code>plan.md</code> lists "native-rate loader API (<code>hearsay.audio</code>, with conversion tests)" as a separate follow-up change for the spectral and compression detectors, going through its own review. Step 4 §4's native-rate sentence is removed.</td></tr>
+<tr><td>X5</td><td>Critical: fusion input unspecified</td><td><strong>Fusion input convention (D3 docstring and <code>plan.md</code> §3).</strong> Fusion v1 uses exactly one column per detector: <code>&lt;name&gt;.logit = logit(clip(score, 1e-4, 1 − 1e-4))</code> for <code>status == "ok"</code>. Otherwise the value is missing, imputed with the fold-local train mean, plus a <code>&lt;name&gt;.missing</code> indicator column. Columns are ordered by detector name, logit then missing. <code>features</code> is used for explanations and logs only in v1. If every detector is missing for a clip, it gets the constant prior-decision score and a flag. Teammates only need a meaningful, direction-correct <code>score</code>.</td></tr>
+<tr><td>X6</td><td>Critical: no TSV artifact</td><td>This change doesn't modify any scoring or writer code. <strong>Blocker: the NSA test set hasn't been downloaded yet</strong>, so no real TSV can be made. Step 13 adds a smoke run of the existing learned-TSV path (<code>scripts/make_probe_csv.py</code> with the public M1 probe) on 4 scratch files, then removes the output and the log row. It proves the path still works without logging a non-NSA submission. This is recorded in the run spec's Results.</td></tr>
+<tr><td>X7</td><td>Suggestion: imbalance vs prior; replay</td><td>Standing failure mode 3 becomes "<strong>class imbalance and prior</strong>". The fold builder checks class counts, requires at least 30 clips per class in every inner fold and in the outer holdout (else fewer folds, reported), and requires class-balanced training (<code>class_weight="balanced"</code> or a weighted sampler). Failure mode 1 says <strong>physical replay is not covered</strong>: hardware is gone, so the only replay coverage is simulated RIR plus an optional ReplayDF subset. This is a named residual risk in <code>plan.md</code> Risks.</td></tr>
+<tr><td>X8</td><td>Suggestion: hashing</td><td><code>DetectorResult</code> sets <code>__hash__ = None</code> explicitly. Test: <code>hash(result)</code> raises <code>TypeError</code>.</td></tr>
+<tr><td>X9</td><td>Suggestion: post-construction mutation</td><td><code>safe_run</code> re-validates the returned result with <code>dataclasses.replace(res)</code>, which re-runs <code>__post_init__</code> and copies the features. Test: a detector that mutates <code>result.features["x"] = nan</code> after construction → <code>safe_run</code> gives <code>status="error"</code>.</td></tr>
+<tr><td>X10</td><td>Suggestion: owners and gates</td><td><code>CLAUDE.md</code> and <code>plan.md</code> name owners as "Nathan" plus "Teammate A/B/C (fill in names)", with the split proposed to Nathan: A = metadata + compression, B = spectral + prosody, C = speaker drift + splice + Docker from Sat. <strong>Moving vs fixed gates:</strong> gates relative to data arrival (inventory, fold file, M1 TSV) move with the data. <strong>Hard cutoffs never move:</strong> Sat 14:00 draft sent (public M1 TSV if there is no NSA data), Sat 19:00 teammate OOF, Sat 22:00 fusion freeze, Sun 00:00 Docker rebuild, Sun 05:00 final TSV, Sun 08:00 DM. The "shift every gate by the delay" wording is deleted.</td></tr>
+</tbody>
+</table></div>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-25_software-only-rescope-plan.md</code> <span class="hash">e7edcf71b578</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

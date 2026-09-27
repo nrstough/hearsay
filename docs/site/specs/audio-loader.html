@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audio loader and probe · HEARSAY</title>
+<meta name="description" content="One decode path for every file: FFmpeg turns any container or codec into 16 kHz mono float32, once, and the header is read separately. Nothing downstream ever s">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html" aria-current="page">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">Systems and subsystems</p>
+<h1>Audio loader and probe</h1>
+<p class="lead">One decode path for every file: FFmpeg turns any container or codec into 16 kHz mono float32, once, and the header is read separately. Nothing downstream ever sees the original format.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Parameters and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>Every audio file, whatever it is, becomes the same thing before any detector looks at it: a single channel of samples at <span class="num" data-src="README.md#how-it-decides">16 kHz</span><a class="src" href="../library/readme.html#how-it-decides" title="Source: README.md, section how-it-decides"><span class="sr">source: README.md, section how-it-decides</span></a>, as floating-point numbers, with silence trimmed where a detector asks for it. The header (codec, rate, tags) is read on its own and never mixed into the audio. This is what closes the <span class="term" tabindex="0" data-term="container" aria-describedby="tip-1">container<span class="tip-body" role="tooltip" id="tip-1">What the file header says: codec, sample rate, bit depth, encoder tags. Read for routing; never learned from, because on our training data the container is the label.</span></span> <span class="term" tabindex="0" data-term="shortcut" aria-describedby="tip-2">shortcut<span class="tip-body" role="tooltip" id="tip-2">A difference between training and test data that a model can exploit instead of listening to the voice: peak level, leading silence, clip length, container fields, a missing high band. Each one found was closed before it could be learned.</span></span>: training real speech is FLAC or 22 kHz WAV and some training fakes are MP3, while every test file is 16 kHz PCM, so a model that could see the format would learn the format.</p>
+<h2 id="io">What goes in and comes out</h2>
+<ul>
+<li><code>load_audio(path)</code> → a 1-D float32 array at 16 kHz mono.</li>
+<li><code>probe_audio(path)</code> → a dict of header facts: format, codec, sample rate, channels, duration, bit rate; on failure an <code>error</code> entry, never an exception.</li>
+<li><code>trim_silence(x)</code> → the array with quiet edges removed, relative to its loudest frame.</li>
+<li><code>windows(x, win, hop)</code> → fixed-length windows, tiling clips shorter than one window.</li>
+</ul>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/audio.py" title="src/hearsay/audio.py (GitHub; assumes main is public)">src/hearsay/audio.py</a>: <code>DecodeError</code>, <code>load_audio</code>, <code>probe_audio</code>, <code>windows</code>, <code>trim_silence</code>. The sample rate constant is in <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/__init__.py#L3" title="src/hearsay/__init__.py line 3 (GitHub; assumes main is public)">the package's __init__</a>.</p>
+<h2 id="params">Parameters and where each is set</h2>
+<ul>
+<li><strong>The FFmpeg command</strong> takes the first audio stream, downmixes to mono and resamples to 16 kHz, emitting little-endian float32 (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/audio.py#L31" title="src/hearsay/audio.py line 31 (GitHub; assumes main is public)">audio.py, lines 31–36</a>). Empty output raises <code>DecodeError</code> with FFmpeg's last line; a partial decode is kept; non-finite samples are zeroed.</li>
+<li><strong>No denoising and no loudness normalization</strong> anywhere on the path; a test pins it. Level is normalized per detector, later.</li>
+<li><strong>Silence trim:</strong> threshold <span class="num" data-src="src/hearsay/audio.py#L90">35</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/audio.py#L90" title="Source: src/hearsay/audio.py line 90 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/audio.py line 90 (GitHub; assumes main is public)</span></a> dB below the loudest 20 ms frame, and the result is never shorter than <span class="num" data-src="src/hearsay/audio.py#L91">1.0</span><a class="src" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/audio.py#L91" title="Source: src/hearsay/audio.py line 91 (GitHub; assumes main is public)"><span class="sr">source: src/hearsay/audio.py line 91 (GitHub; assumes main is public)</span></a> s; with fewer than two frames or nothing above the threshold the clip is returned unchanged (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/audio.py#L90" title="src/hearsay/audio.py line 90 (GitHub; assumes main is public)">audio.py, lines 90–107</a>).</li>
+<li><strong>Windows:</strong> the hop defaults to half a window; a clip shorter than one window is tiled; the last window is flush with the end (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/audio.py#L73" title="src/hearsay/audio.py line 73 (GitHub; assumes main is public)">audio.py, lines 73–87</a>). Windows are the v1 path; the deep detectors now use segment mode (see <a href="segment-preparation.html">segment preparation</a>).</li>
+<li><strong>Probe:</strong> <code>ffprobe</code> with <code>-show_format -show_streams -select_streams a:0</code>; returns the fields above and never raises (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/audio.py#L44" title="src/hearsay/audio.py line 44 (GitHub; assumes main is public)">audio.py, lines 44–70</a>).</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built and tested; unchanged since the M0 rung. Invariant 1 of the architecture document ("one audio path").</p>
+<h2 id="numbers">Numbers</h2>
+<p>None of its own. Its effect shows up as the closed container shortcut on <a href="../what-worked.html#did-not-work">What did not work</a>.</p>
+<h2 id="limits">Known limits</h2>
+<p>FFmpeg's channel downmix averages channels; a stereo file with out-of-phase channels would lose signal. The loader keeps a partial decode of a truncated file rather than failing it, so a damaged file scores on what could be read (and the runner flags decode failures separately).</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_audio_and_submission.py</code>: any format to 16 kHz mono float32 (stereo 44.1k WAV, 8k mono, 22 kHz, CBR and VBR MP3, AAC in m4a and mp4, FLAC, Opus), determinism, empty and garbage files raise, a truncated WAV decodes what it can, NaN samples are sanitized, silence loads as zeros, no loudness normalization, windows cover the clip, silence trim is level-independent. <code>tests/test_detector_contract.py</code> pins that a clip is decoded once and that a decode failure is cached.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/architecture.html#4-invariants-the-rules-the-code-enforces" title="docs/architecture.md, section 4-invariants-the-rules-the-code-enforces">Architecture, invariant 1</a>; <a class="srclink" href="../library/architecture.html#11-shortcut-ledger" title="docs/architecture.md, section 11-shortcut-ledger">the shortcut ledger</a>; <a class="srclink" href="../library/code-map.html" title="docs/code-map.md">the code map</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="next" rel="next" href="detector-contract.html">Detector contract and safe runner →</a></nav>
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/site/source/specs/audio-loader.frag</code> <span class="hash">5ce820c9db6d</span>, <code>src/hearsay/audio.py</code> <span class="hash">36ef4857b640</span>, <code>docs/architecture.md</code> <span class="hash">af0e31ba983b</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

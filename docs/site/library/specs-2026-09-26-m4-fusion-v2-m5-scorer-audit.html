@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 m4 fusion v2 m5 scorer (audit) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_m4-fusion-v2-m5-scorer-audit.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/specs/2026-09-26_m4-fusion-v2-m5-scorer-audit.md</code>; the markdown file is the record.</p>
+
+<h3 id="scorecard">Scorecard</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td>Fail</td><td>A5 forbids copying/logging the PARITY artifact when acceptance fails; both remain.</td></tr>
+<tr><td>Scope discipline</td><td>Excellent</td><td>Capability added without switching the default or changing the detector contract.</td></tr>
+<tr><td>Test coverage</td><td>Fail</td><td>A5’s full-set M5-logit tolerance is exceeded on five rows.</td></tr>
+<tr><td>Review compliance</td><td>Acceptable</td><td>Plan-review fixes implemented; prior audit blockers remain unresolved below.</td></tr>
+<tr><td>Freeze integrity</td><td>Acceptable</td><td>Skipped: no P1/P2/P3 freeze hashes found.</td></tr>
+<tr><td>Regression check</td><td>Acceptable</td><td>Final-code suite reports 510 passed; six focused tests independently passed. Draft TSV hash matches.</td></tr>
+<tr><td>Documentation</td><td>Excellent</td><td>Scoped docs describe the implementation, unchanged default, and outstanding deviation. M5 is already disclosed.</td></tr>
+<tr><td><strong>Overall</strong></td><td><strong>Fail</strong></td><td>A5 remains unmet and unwaived.</td></tr>
+</tbody>
+</table></div>
+<h3 id="commentary">Commentary</h3>
+<ol>
+<li><p><strong>Test coverage — downgrade to Fail.</strong> Independently recomputing M5 live-versus-export differences across 1,671 cached rows gives <strong>maximum 0.0350065</strong>, with <strong>five rows exceeding 0.02</strong>. Probability parity and zero flips do not satisfy the separate logit gate. Meet the existing gate, or obtain Nathan’s explicit acceptance of a documented amendment; the proposed replacement thresholds are not yet approved.</p></li>
+<li><p><strong>Plan adherence — downgrade to Fail.</strong> <a href="specs-2026-09-26-m4-fusion-v2-m5-scorer.html">A5</a> explicitly requires no PARITY copy or log row upon failure. The artifact and <code title="not in the repository">log row</code> remain. Relabelling them “validation evidence” does not resolve that requirement. Pending an authorized amendment, retain evidence under <code>outputs/</code>, remove the submission-directory copy, and withdraw its log entry with an audit trail.</p></li>
+<li><p><strong>Regression check / Test coverage — no additional downgrade.</strong> Independent verification passed six focused tests covering constants identity, both candidate TSV polarities, v1 arithmetic, strict E boundaries, and error thresholds. The full-suite result of <strong>510 passed</strong> is recorded evidence, not independently rerun here. Repository lint still reports three issues solely in the unrelated <code>src/hearsay/analyzer.py</code>; these are not attributed to this change.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-26_m4-fusion-v2-m5-scorer-audit.md</code> <span class="hash">01bfa38cdce9</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

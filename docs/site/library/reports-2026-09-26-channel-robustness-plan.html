@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: channel robustness (A, E, B; C gated) — Sat Sep 26, 2026, 12:35 · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_channel-robustness-plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_channel-robustness-plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#ground-truth-read-before-writing">Ground truth read before writing</a></li><li><a href="#steps">Steps</a></li><li><a href="#time-budget-from-1235">Time budget (from 12:35)</a></li><li><a href="#risks">Risks</a></li></ul></details>
+<h1 id="plan-channel-robustness-a-e-b-c-gated--sat-sep-26-2026-1235">Plan: channel robustness (A, E, B; C gated) — Sat Sep 26, 2026, 12:35</h1>
+<p>Run spec: <code>docs/specs/2026-09-26_channel-robustness.md</code> (design decisions D1–D10, acceptance criteria, failure-mode table). Hard stop 16:00.</p>
+<h2 id="ground-truth-read-before-writing">Ground truth read before writing</h2>
+<ul>
+<li><code>hearsay.compression.features(x, crop_s, seed, crop_mode, band_match)</code> (<code>src/hearsay/compression.py:46</code>) calls <code>hearsay.handcrafted._crop</code> → <code>band_limit</code> (<code>handcrafted.py:43</code>) → <code>prepare_segment</code> (<code>embed.py:80</code>: band match off since already filtered, <code>trim_silence</code>, optional crop, 8 s cap) → RMS normalize; returns 19 features incl. <code>bw_hz</code>, four band levels, <code>hf_slope_db_per_khz</code>, hole statistics, <code>floor_p2_db</code>.</li>
+<li><code>hearsay.compression.launder(x, codec, kbps, sr_enc)</code> (<code>compression.py:105</code>): FFmpeg encode/decode, 16 kHz float32 out, raises <code>DecodeError</code>.</li>
+<li><code>hearsay.audio.trim_silence</code> (<code>audio.py:90</code>), <code>load_audio</code> (<code>audio.py:22</code>).</li>
+<li><code>hearsay.pipeline.Models</code> (<code>pipeline.py:~390</code>): CPU only; <code>m1_logit(x)</code> = <code>prepare_segment</code> → <code>embed_segment</code> → fp16 round → <code>Probe.llr</code>; <code>spectra_logit(x)</code> = <code>prepare_input</code> → <code>score_clip(zero pad, 16 windows)</code> → spoof − bonafide; <code>m5_logit(x)</code> with <code>load_m5=True</code>. Loading its handcrafted detector is part of the constructor (harmless, no LightGBM import).</li>
+<li>Exports <code>outputs/detector_scores/{m1b_v3,spectra_aasist,m5_xlsr_ft}.csv</code>: <code>path, fold, split ∈ {inner_oof, holdout, test, stress/itw}, score, logit</code>.</li>
+<li>Manifests: <code>splits/nsa_folds.csv</code> (path, label, generator, speaker, source, group, fold), <code>outputs/manifests/itw_stress.csv</code> (path relative, label, speaker), <code>outputs/manifests/nsa_test.csv</code> (filename, path), <code>outputs/manifests/mlaad_en.csv</code> (path, label, generator, model_name, …).</li>
+<li>Shipped draft TSV: <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (log row 12:03).</li>
+<li>Test pattern for scripts: <code>importlib.util.spec_from_file_location</code> (as <code>tests/test_spectra.py:115</code>).</li>
+</ul>
+<h2 id="steps">Steps</h2>
+<ol>
+<li><strong>Codex plan review in the background</strong> on this file (<code>.claude/review-plan.sh</code>); findings folded in when they land, without blocking A.</li>
+<li><strong><code>scripts/channel_lambda.py</code> (A).</strong> Pure functions: <code>channel_stats(x) -&gt; dict</code> (D1: calls <code>compression.features(x, None, None, "segment", True)</code> and adds the six statistics on the same prepared signal, obtained by the same <code>_crop</code> call); <code>grouped_oof(X, y, groups, k=5, seed=0)</code>; <code>lambda_mean_posterior(p)</code>; <code>lambda_acc(q, tpr, fpr)</code> (NaN below a 0.2 margin); <code>feature_position(med_test, med_clean, med_wild)</code>; <code>bootstrap_ci(fn, *arrays, n=1000, seed=0)</code>. <code>main()</code>: build the three row sets, extract with a 6-process pool (resumable cache at <code>outputs/channel/lambda_features.csv</code>), fit, estimate, write <code>outputs/channel/lambda.json</code> and print the readout.</li>
+<li><strong>Tests for A</strong> in <code>tests/test_channel_robustness.py</code> (the A rows of the spec's failure-mode table). Run them.</li>
+<li><strong>Run A</strong> (~5 min extraction). <strong>Send λ̂ to the oversight chat immediately.</strong></li>
+<li><strong><code>scripts/m3_probes.py</code> (E).</strong> Pure: <code>perturb(x, kind, rng)</code> for <code>none | mp3 | noise20 | speed+2 | speed-2 | shift1</code>; <code>delta_auc(...)</code>; <code>spearman_gap(a_hold, b_hold, a_test, b_test, n=1000)</code>; <code>m3_verdict(m3_dauc, m1_dauc, gap, gap_lo, mlaad_below)</code> (D9). <code>main()</code> with subcommands <code>perturb</code>, <code>agreement</code>, <code>mlaad</code>; each loads <code>Models(device="cpu", load_m5=True, threads=3)</code> where needed, caches rows to <code>outputs/channel/m3_*.csv</code> (resumable), writes a JSON summary. The <code>perturb</code> and <code>mlaad</code> runs go in the background, two processes at 3 threads each.</li>
+<li><strong>Tests for E</strong> (the E rows of the table). Run them.</li>
+<li><strong><code>scripts/channel_codec.py</code> (B)</strong> while E runs. Pure: <code>highband_stats(x) -&gt; dict</code> (D4 statistics, no filtering of its own); <code>variant_grid()</code>; <code>match_distance(var_stats, test_stats)</code>; <code>codec_match(table, kaiser_row)</code> (D5). <code>main()</code>: 100 inner clips × grid, 1,671 test files, writes <code>outputs/channel/codec_grid.csv</code> and <code>codec_match.json</code>.</li>
+<li><strong>Tests for B.</strong> Run them.</li>
+<li><strong>Gate C.</strong> If B matches, message Nathan here with the time left and what C would cost (local MPS ~60 min extraction vs a vast box), and stop there for his answer. If B is negative, record C as not run.</li>
+<li><strong>Report</strong> <code>docs/reports/2026-09-26_channel-robustness.md</code>: A, E, B tables with sources, C and D dispositions, verdicts. <code>docs/STATUS.md</code> row, <code>CLAUDE.md</code> disclosure bullet. Spec "Results" section filled. Doc-sync grep for anything this resolves (e.g. "M3 leakage probes" as open, "λ unmeasured").</li>
+<li><strong>Regression:</strong> <code>uv run pytest -q</code>, <code>uv run ruff check .</code>, <code>uv run pytest -q tests/test_docs_consistency.py</code>.</li>
+<li><strong>Commit</strong> only this rung's files (<code>git add &lt;paths&gt;</code>), conventional prefix, no push.</li>
+<li><strong>Claude critique</strong> against <code>.claude/codex-audit-prompt.md</code> (loop until Acceptable), then <strong>Codex audit</strong> (<code>.claude/review-audit.sh docs/specs/2026-09-26_channel-robustness.md</code>); record both in the spec; fix and re-commit.</li>
+<li><strong>Report to the oversight chat</strong> at each milestone (λ̂; E verdict; B verdict; done).</li>
+</ol>
+<h2 id="time-budget-from-1235">Time budget (from 12:35)</h2>
+<p>A code + tests 30 min, run 10 → λ̂ ~13:15. E code + tests 35 min, runs ~40 min in the background → ~14:30. B code + tests 25 min during E's run, run 10 → ~14:15. Report, docs, commit, audits 14:30–15:45. Slack 15 min.</p>
+<h2 id="risks">Risks</h2>
+<ul>
+<li><strong>Domain classifier learns content, not channel</strong> (LJ is one speaker; ITW is celebrities): the per-feature positions and the grouped CV make it visible; the report states it.</li>
+<li><strong>E runtime on CPU</strong> (three deep models, ~3,600 clips): capped by sampling; if it runs long, MLAAD drops to 300 clips and the report says so.</li>
+<li><strong>Shared working tree:</strong> other lanes have uncommitted files; stage by path only.</li>
+<li><strong>External drive</strong>: remounted 12:15; a dropout fails extraction loudly (resumable caches).</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_channel-robustness-plan.md</code> <span class="hash">5e03ecb66ba4</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

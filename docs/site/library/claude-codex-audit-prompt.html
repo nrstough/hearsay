@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codex audit prompt · HEARSAY</title>
+<meta name="description" content="Rendered from .claude/codex-audit-prompt.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>.claude/codex-audit-prompt.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#seven-audit-dimensions">Seven audit dimensions</a></li><li><a href="#documentation-grading-severity-calibration">Documentation grading (severity calibration)</a></li><li><a href="#hearsay-specific-checks-this-project">HEARSAY-specific checks (this project)</a></li><li><a href="#output-format">Output format</a></li></ul></details>
+<p>You are auditing a completed change made by Claude Code to the project whose directory
+is available to you. Read <code>CLAUDE.md</code> / <code>AGENTS.md</code> / <code>README.md</code> first to learn what the
+project is, its language and stack, and its documentation conventions — then read whatever
+source files you need for context.</p>
+<p>Your job is to grade the completed work against the plan and specs.</p>
+<h2 id="seven-audit-dimensions">Seven audit dimensions</h2>
+<p>Grade each dimension as <strong>Excellent</strong>, <strong>Acceptable</strong>, or <strong>Fail</strong>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>What to check</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Plan adherence</strong></td><td>Did the implementation follow the plan described in the <strong>run spec</strong> (the per-change design doc supplied to you — commonly under <code>docs/specs/</code>)? The run spec is the persistent record of what was planned — there is no separate saved plan file. Check implementation against the run spec's solution description, file list, and acceptance criteria. Are deviations justified?</td></tr>
+<tr><td><strong>Scope discipline</strong></td><td>Was anything added that wasn't asked for? Extra features, unnecessary refactoring, unrequested documentation, over-engineering?</td></tr>
+<tr><td><strong>Test coverage</strong></td><td>Do test results satisfy the acceptance criteria? Were all specified tests actually run?</td></tr>
+<tr><td><strong>Review compliance</strong></td><td>Were Codex review findings addressed? The review artifact is embedded in or referenced from the <strong>run spec</strong> — do NOT look for a separate plan file. If no review findings section exists in the run spec, grade Acceptable (review may not have produced findings).</td></tr>
+<tr><td><strong>Freeze integrity</strong></td><td>If P1/P2/P3 hashes exist, are they still valid? Was frozen text modified? (Skip if no hashes present.)</td></tr>
+<tr><td><strong>Regression check</strong></td><td>Any new test failures introduced by this change?</td></tr>
+<tr><td><strong>Documentation</strong></td><td>Do doc updates match the changes made? Are new features/behaviors documented? <strong>Severity-calibrated — see Documentation grading below.</strong></td></tr>
+</tbody>
+</table></div>
+<h2 id="documentation-grading-severity-calibration">Documentation grading (severity calibration)</h2>
+<p>The Documentation dimension is <strong>scoped to the change under audit</strong>, not a
+global doc-tree lint. Grade by <em>impact on a reader</em>, not string-count:</p>
+<ul>
+<li><strong>Fail</strong> — only for <em>substantive</em> doc defects: the change's NEW
+behavior/flags are undocumented or <strong>contradicted</strong> by docs a developer
+or operator would rely on; a doc actively <strong>misleads</strong> about the changed
+system (wrong default, wrong command, wrong result that would cause a
+user to do the wrong thing); or a doc-impact item the run spec explicitly
+committed to is missing.</li>
+<li><strong>Acceptable (with noted findings)</strong> — cosmetic / low-impact staleness:
+an outdated version string or count in a tangential comment/docstring,
+wording drift that doesn't change what a reader would <em>do</em>, or stale text
+in files outside this change's declared doc-impact scope. List these as
+findings but they do <strong>not</strong>, individually or collectively, force
+Documentation to Fail.</li>
+<li><strong>Pre-existing staleness unrelated to this change is out of scope</strong> —
+note it once as a minor observation; never a downgrade.</li>
+</ul>
+<p>Do not recurse the whole repo hunting unrelated stale strings. Check the
+docs in the run spec's declared doc-impact list plus docs directly
+describing the changed behavior. Do not flag the generated
+<code>*-audit.md</code> artifact itself (it is a per-round output, not a deliverable).
+If the only Documentation issues are cosmetic, grade Documentation
+<strong>Acceptable</strong> and record the nits as findings.</p>
+<p><strong>Overall grade</strong> = the worst grade across all dimensions. One Fail =
+overall Fail. (Per the calibration above, cosmetic-only documentation
+issues are Acceptable, so they cannot by themselves make the overall Fail.)</p>
+<h2 id="hearsay-specific-checks-this-project">HEARSAY-specific checks (this project)</h2>
+<p>Fold these into the dimensions above:</p>
+<ul>
+<li><strong>Plan adherence / Test coverage</strong> — validation is by held-out generator and speaker
+groups (fold file); any augmented score is reported next to a clean-only score; the
+validation split was never trained on (including scalers, calibration, imputation,
+stacking folds).</li>
+<li><strong>Regression check</strong> — if the change touched a detector or the submission path, a valid
+TSV was produced and <code>submissions/log.csv</code> gained a row (timestamp, rung, validation
+score, submission path), or the run spec names the blocker. An overwritten submitted TSV
+is a Fail.</li>
+<li><strong>Scope discipline</strong> — changes to the detector contract (<code>src/hearsay/detectors/base.py</code>)
+without naming affected owners, hosted APIs or LLMs on the scoring path, or secrets
+outside <code>.env</code> are Fails unless the run spec called for them.</li>
+<li><strong>Documentation</strong> — any new pretrained model, checkpoint, or public dataset must appear
+in the CLAUDE.md "AI use disclosure" section (it is copied into Devpost).</li>
+</ul>
+<h2 id="output-format">Output format</h2>
+<h3 id="scorecard">Scorecard</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td></td><td></td></tr>
+<tr><td>Scope discipline</td><td></td><td></td></tr>
+<tr><td>Test coverage</td><td></td><td></td></tr>
+<tr><td>Review compliance</td><td></td><td></td></tr>
+<tr><td>Freeze integrity</td><td></td><td></td></tr>
+<tr><td>Regression check</td><td></td><td></td></tr>
+<tr><td>Documentation</td><td></td><td></td></tr>
+<tr><td><strong>Overall</strong></td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<h3 id="commentary">Commentary</h3>
+<p>Numbered list of specific findings. Each finding has:</p>
+<ul>
+<li><strong>Dimension</strong> it affects</li>
+<li><strong>Grade impact</strong>: whether it caused a downgrade</li>
+<li><strong>Brief explanation</strong> and what to do about it (if Fail)</li>
+</ul>
+<p>No praise, no preamble. Just the scorecard and findings. If everything is clean,
+say "No findings." after the scorecard.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>.claude/codex-audit-prompt.md</code> <span class="hash">c0e689054010</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

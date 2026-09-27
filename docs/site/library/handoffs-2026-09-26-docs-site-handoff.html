@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff: the documentation site (Sat Sep 26, 2026, ~13:10) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_docs-site-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_docs-site-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff-the-documentation-site-sat-sep-26-2026-1310">Handoff: the documentation site (Sat Sep 26, 2026, ~13:10)</h1>
+<p><strong>Purpose of this chat:</strong> turn HEARSAY's documentation into a beautiful, self-contained HTML site inside the repo, with flowcharts and plain-language explainers, without changing a single number or claim. Documentation is 20% of the score ("in your own words: approach, architecture, what worked, what didn't"), and diversity/depth is another 20% that the docs have to make visible. The markdown stays the source of truth; the site is a faithful, better-looking copy of it plus diagrams and explainers.</p>
+<p>Read first: <code>README.md</code> (397 lines; the judge-facing story), <code>docs/architecture.md</code> (five Mermaid diagrams already), <code>docs/STATUS.md</code> (the running record with today's decisions), then this file. Skim <code>docs/reports/2026-09-26_worked-examples.md</code> (eight test files walked through) and <code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code> (how the rule was chosen).</p>
+<h2 id="context">Context</h2>
+<ul>
+<li>The system is done and the draft went to NSA at 12:30. The shipped rule is A3 w0.2 + E (<code>models/fusion_v2/constants.json</code>): ranks 0.6 XLS-R probe (M1b v3) + 0.2 handcrafted spectral/prosody (v5) + 0.2 M5 (fine-tuned-head XLS-R), then Spectra-AASIST used only to pull files toward real, Platt map, undetermined files pinned at the bottom. Ten detectors run per file; four are fused, the rest are evidence and routing. Numbers: holdout 0.0065, In-the-Wild 0.228, inner 0.135.</li>
+<li>The README already tells the story well and is being polished by its own chat until ~05:00 Sunday. <code>docs/architecture.md</code> has the component table and the diagrams. <code>docs/STATUS.md</code> has the day's findings, including the honest negatives (equal-weight fusion rejected, M5 failed its gate and ships only as a minority vote, four detectors dead by mechanism, the codec hunt negative, a λ̂ estimate that was withdrawn and corrected). All of that is material for the site.</li>
+<li><strong>The repo is private, on a free GitHub plan.</strong> That means: no GitHub Pages, and no judge can see anything until Nathan makes the repo public (or adds the judges as collaborators). So the site must work as plain files opened from the repo (<code>docs/site/index.html</code> double-clicked, or <code>python3 -m http.server</code> in <code>docs/site</code>), and become a Pages site with zero changes once the repo is public (Settings → Pages → deploy from <code>main</code>, folder <code>/docs</code>; URL <code>https://nrstough.github.io/hearsay/site/</code>). Making the repo public before Sunday 08:00 is on Nathan's list; the README chat will add the URL once it exists.</li>
+<li>A separate frontend (Hrushi's Next.js app at the repo root and a static site in <code>web/</code>) exists and is being rewired to the real pipeline. <strong>The docs site is not that.</strong> Do not touch <code>web/</code>, <code>src/app/</code>, <code>src/components/</code> or <code>package.json</code>.</li>
+<li>GitHub renders Mermaid inside markdown natively, so the markdown diagrams already display on GitHub. The site's job is presentation, navigation, explainers and new diagrams, not replacing what GitHub already renders.</li>
+</ul>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p><code>main</code> in <code>~/Projects/hearsay</code>, shared by several chats. This lane owns <strong><code>docs/site/</code></strong> only (plus, if you write a generator, <code>scripts/build_site.py</code>). Never edit <code>README.md</code>, <code>docs/STATUS.md</code>, <code>docs/architecture.md</code>, <code>CLAUDE.md</code> or anything under <code>src/</code>, <code>scripts/</code> (other than your own), <code>web/</code>; if the site needs a change in a source document, message the oversight chat ("Oversight handoff execution") and it routes it. Stage only your files (<code>git add docs/site scripts/build_site.py</code>), never <code>git add -A</code> (the repo root now carries a JS tree that would come along). Ask Nathan before pushing; the oversight chat pushes on his standing instruction, so tell it the commit hash.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; uv sync</code></pre>
+<p>No new Python or Node dependencies in the repo, please: <code>uv.lock</code> and <code>package.json</code> are shared with lanes that are mid-work. Tooling you may use without touching the repo's dependency files: hand-written HTML/CSS/JS; Mermaid from the jsDelivr CDN (<code>https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js</code>) for live diagrams, with the committed <code>docs/img/architecture-flow.svg</code> as the offline fallback for the main flow; <code>npx -y @mermaid-js/mermaid-cli</code> in your scratchpad if you want static SVGs of the other diagrams (it downloads a headless Chromium once, ~300 MB, fine on the internal disk with 30 GB free); the built-in browser to check rendering. If you decide a generator is faster than hand HTML, write it as a single dependency-free Python script (<code>scripts/build_site.py</code>, standard library plus what <code>uv sync</code> already installed, e.g. <code>markdown</code> is <strong>not</strong> installed; check with <code>uv run python -c "import markdown"</code> before assuming) and commit its output under <code>docs/site/</code>, so the site works with no build step.</p>
+<p>Preview:</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay/docs/site &amp;&amp; python3 -m http.server 8080</code></pre>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li><strong>Design first, ten minutes, on paper.</strong> One palette, one type scale, light and dark, phone width. Every page: a left nav (or top nav on phone), a title, a one-paragraph "in plain words" lead, then the detail. Every number carries a small source link to the markdown file and section it came from. Every page footer says "Generated from <code>&lt;file&gt;</code> at commit <code>&lt;sha&gt;</code>; the markdown is the record."</li>
+<li><strong>Build these pages, in this order</strong> (the first four carry the grade):
+<ol>
+<li><strong>Home</strong>: what HEARSAY is in three sentences; the verdict numbers (holdout 0.0065, In-the-Wild 0.228, the sponsor-cost twin 0.239; the draft's returned minDCF once NSA sends it, blank until then); one big pipeline flowchart; links.</li>
+<li><strong>How it decides</strong>: audio → decode/band-match/trim → router → ten detectors → four fused by rank → Spectra false-alarm step → Platt → pinned block → TSV. A flowchart for the pipeline, a second one for the router (what facts route what: container, speech gate, disagreement), a third for the fusion rule as arithmetic on a worked file. Use one of the eight worked examples with its real evidence sentences from <code>docs/reports/2026-09-26_worked-examples.md</code>.</li>
+<li><strong>The metric and the default answer</strong>: what minDCF is, why false alarms cost 4× (NSA's "analyst scenario"), why only ranking matters, why the operating threshold is near 0.9 and not 0.5, and the game-theory hint from NSA's brief answered by the pinned block, with the little table showing the block is right under both readings of the score (consult item 5). A diagram of the score line with the block at the bottom.</li>
+<li><strong>What worked / what did not</strong>: the honest log, one card each with the number and the mechanism: shortcuts found and removed (7.2 kHz wall, loudness, leading silence, tiling, container = label); the domain shift in the handcrafted features and the augmented v5 fix; equal-weight fusion rejected (doubles wild misses); M5 gate not passed, ships as a minority vote; Spectra kept out of the vote because its training data is undisclosed, even though a full vote scores better on our proxies; the four dead detectors (container, ENF, splice, compression) with the reason each cannot work on this test set; the codec hunt (negative); λ̂ estimated, withdrawn, corrected to 0.51. Judges reward this page.</li>
+<li><strong>Detectors</strong>: ten cards, each: technique (rubric name), what it measures, role (fused / evidence / routing / gate), its numbers, one real evidence sentence, source link. Map each to the rubric's list so the diversity score is easy to award.</li>
+<li><strong>Validation</strong>: the fold scheme as a diagram (generator- and speaker-grouped, inner folds, outer holdout, In-the-Wild never trained on, the test set unlabeled), pre-declared sweeps as a timeline (08:13 rule, 09:14 M5 candidate, 12:03 switch, the acceptance rules written before results), the draft-review decoding table as a graphic.</li>
+<li><strong>Reproduce</strong>: the commands from the README verbatim (runner with <code>--team CrossExam</code>, the Docker evidence line), the repository layout.</li>
+<li><strong>Credits and AI use</strong>: the disclosure from <code>CLAUDE.md</code> and the README, unchanged in substance.</li>
+</ol></li>
+<li><strong>Diagrams</strong>: reuse the five Mermaid blocks in <code>docs/architecture.md</code> where they fit; add the router tree, the fusion arithmetic, the fold scheme, the score line with the pinned block, the decision timeline. Keep every diagram legible on a phone (split rather than shrink).</li>
+<li><strong>Sync pass</strong> at the end and again late tonight: re-read <code>README.md</code> and <code>docs/STATUS.md</code> and copy any changed number. Expected changes before Sunday: the returned draft minDCF, the channel lane's Spectra-probe verdict (~14:00), possibly a final-rule note. Do the last sync after 04:00 Sunday, before the README's final polish window (05:00–07:30), and tell the README chat what the site says so the two agree.</li>
+<li><strong>Check</strong>: open every page in the built-in browser at desktop and phone widths, light and dark; click every internal link; confirm every number against its source. Then commit under <code>docs/site/</code> and message the oversight chat with the hash.</li>
+</ol>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test: <code>uv run pytest -q tests/test_docs_consistency.py</code> → 52 passed. It pins <code>README.md</code>, <code>CLAUDE.md</code>, <code>docs/plan.md</code> (and STATUS/architecture wording): it does not look at <code>docs/site/</code>, but run it anyway after any sync so you notice if a source document changed under you.</li>
+<li>Link check (no dependency): <code>cd docs/site &amp;&amp; uv run python -c "import re,pathlib,sys; bad=[(p,l) for p in pathlib.Path('.').rglob('*.html') for l in re.findall(r'href=\"([^\"#:]+)', p.read_text()) if not (p.parent/l).exists()]; print(bad or 'links OK'); sys.exit(bool(bad))"</code>.</li>
+<li>Numbers to reproduce on the Home page, all from <code>README.md</code> "Results at a glance" and <code>docs/STATUS.md</code>: shipped rule inner 0.135 / holdout 0.0065 / In-the-Wild 0.228 brief, 0.239 miss-averse; previous rule 0.140 / 0.014 / 0.260 / 0.267; M1b v3 alone holdout 0.072, ITW 0.343; Spectra ITW 0.065; test share above 0.5 27.4% (0.2735); 1,671 files; 0 gated. If your copy disagrees with the README, the README wins and you tell the oversight chat.</li>
+<li>At-risk: nothing regenerable belongs to this lane; everything you make is committed under <code>docs/site/</code>. Do not put the site's images under <code>outputs/</code> (gitignored) or <code>web/</code>.</li>
+<li>In flight, other lanes: the README chat (polish until ~05:00 Sunday; address <code>local_326aa380-ab14-4eaa-bb59-5ee0cbbbb1ae</code> for SendMessage); the channel lane's Spectra probes (~14:00; their verdict goes into STATUS and the "what did not work" story); NSA's returned draft minDCF (unknown time; placeholder until then); Hrushi's frontend rewire (separate; not yours).</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>Score direction: 1.0 = synthetic everywhere. If any diagram shows a score line, synthetic is at the top and the pinned block sits below 0.001.</li>
+<li>Costs: NSA's brief says false alarm ×4, ~70% real; normalized minDCF = 9.33·P_FA + P_miss. The sponsor's shipped script uses a 50/50 prior and reads higher as bona fide; we report both. Don't explain this at length on the Home page; the metric page carries it.</li>
+<li>The ten detectors and their roles: fused: <code>m1b_v3</code> (deep SSL probe), <code>handcrafted_v5</code> (spectral + prosody), <code>m5_xlsr_ft</code> (fine-tuned-head SSL), <code>spectra_aasist</code> (deep anti-spoofing, suppression only, weight 0). Evidence: compression, ENF, splice, speaker_drift. Routing: container. Gate: speech_gate.</li>
+<li>Rubric mapping (for the Detectors page): container/metadata → container; spectral → handcrafted, Spectra; prosody → handcrafted; ENF → enf; compression → compression; speaker-embedding consistency → speaker_drift; deep anti-spoofing → M1b, M5, Spectra; splice → splice; orchestration → router + gate + the ablation table (router on vs off: holdout 0.0065 vs 0.020, In-the-Wild 0.229 vs 0.274).</li>
+<li>Tone: plain English, short sentences, no marketing. The README's voice is the model. Never invent a number, a claim or a result; if a page needs a number that does not exist in the markdown, leave it out.</li>
+<li>Time: it is Saturday ~13:10. The final TSV freezes Sunday ~05:00; nothing in this lane touches it. A first complete version of the site by ~19:00 lets the README chat and Nathan review it in the evening; the sync pass is the only work after that.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<ul>
+<li><code>README.md</code>: the story, the tables, the run lines, the disclosure.</li>
+<li><code>docs/architecture.md</code> and <code>docs/img/architecture-flow.{mmd,svg}</code>: component table and the five diagrams.</li>
+<li><code>docs/STATUS.md</code>: today's findings and decisions, with times.</li>
+<li><code>docs/reports/2026-09-26_worked-examples.md</code>: eight real files walked through (best material for "how it decides").</li>
+<li><code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>: the pre-declared sweeps, the M5 addendum, the acceptance rules.</li>
+<li><code>docs/reports/2026-09-26_draft-review-branches.md</code>: the decoding table.</li>
+<li><code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>: items 4 and 5, the decoding table's origin and the pinned-block argument.</li>
+<li><code>docs/reports/2026-09-26_cpu-detectors.md</code>, <code>2026-09-26_gate-and-drift.md</code>, <code>2026-09-26_handcrafted-v4.md</code>, <code>2026-09-26_m3-spectra.md</code>, <code>2026-09-26_m5-xlsr-finetune.md</code>, <code>2026-09-26_channel-robustness.md</code>: per-detector detail and the negatives.</li>
+<li><code>docs/nsa-challenge.md</code>: the brief; <code>docs/reports/2026-09-25_sponsor-questions.md</code>: NSA's answers, including today's.</li>
+<li><code>docs/code-map.md</code>: where each module lives, if a page needs a code link.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_docs-site-handoff.md</code> <span class="hash">b6efaaf834c5</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

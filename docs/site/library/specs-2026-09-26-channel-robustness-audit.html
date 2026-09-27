@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 channel robustness (audit) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_channel-robustness-audit.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/specs/2026-09-26_channel-robustness-audit.md</code>; the markdown file is the record.</p>
+
+<h3 id="scorecard">Scorecard</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td>Excellent</td><td>Amended design implemented; deviations recorded. Reproduced λ̂, its interval, codec verdict, and all saved E readouts.</td></tr>
+<tr><td>Scope discipline</td><td>Excellent</td><td>Diagnostic scripts, tests, and documentation only; protected scoring and training paths unchanged.</td></tr>
+<tr><td>Test coverage</td><td>Acceptable</td><td>Spec records 584 passing. Independently obtained 118 targeted passes, including all 52 documentation tests; sandbox restrictions prevented complete verification.</td></tr>
+<tr><td>Review compliance</td><td>Excellent</td><td>Recorded findings addressed, including error-only caches returning “inconclusive.”</td></tr>
+<tr><td>Freeze integrity</td><td>Acceptable</td><td>Skipped: no P1/P2/P3 hashes supplied.</td></tr>
+<tr><td>Regression check</td><td>Acceptable</td><td>No change-induced regression identified. Changed files lint clean; repository-wide lint retains three unrelated findings. No TSV required under the explicit diagnostic disposition.</td></tr>
+<tr><td>Documentation</td><td>Acceptable</td><td>Required deliverables and disclosure present; minor codec-summary wording inconsistency.</td></tr>
+<tr><td><strong>Overall</strong></td><td><strong>Acceptable</strong></td><td></td></tr>
+</tbody>
+</table></div>
+<h3 id="commentary">Commentary</h3>
+<ol>
+<li><p><strong>Documentation — downgrade to Acceptable.</strong> The <a href="reports-2026-09-26-channel-robustness.html">report</a> calls Kaiser the “closest reproduction,” although AAC + Kaiser has the smaller distance (1.045 versus 1.081). Say “no codec satisfies D5” instead. The table and gating decision are correct, so this does not change the reader’s action or warrant Fail.</p></li>
+<li><p><strong>Test coverage / Regression check — verification limited to Acceptable.</strong> The read-only sandbox blocked <code>uv</code> cache initialization. Direct virtualenv execution yielded 118 passes, seven failures from cache/temporary-file restrictions, and one temporary-directory setup error. These are environmental failures, not demonstrated regressions; the recorded 584-pass full-suite result was not independently reproduced.</p></li>
+<li><p><strong>Regression check — no additional downgrade.</strong> Repository-wide Ruff reports the three documented findings in <code>src/hearsay/analyzer.py</code>, introduced by unrelated commit <code>19925a3</code>. Ruff passes on all four changed Python files.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-26_channel-robustness-audit.md</code> <span class="hash">49fc4d4956b9</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

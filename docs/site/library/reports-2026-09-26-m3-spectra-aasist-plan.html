@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan: M3, Spectra-AASIST score stream (Sat Sep 26, 2026) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_m3-spectra-aasist-plan.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_m3-spectra-aasist-plan.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#amendments-to-the-run-spec-recorded-here-and-dated-in-the-spec-before-commit">Amendments to the run spec (recorded here and, dated, in the spec before commit)</a></li><li><a href="#step-0-pre-flight">Step 0. Pre-flight</a></li><li><a href="#step-1-srchearsaymetricspy-add-by_group-additive">Step 1. src/hearsay/metrics.py: add bygroup (additive)</a></li><li><a href="#step-2-srchearsayspectrapy-extend-current-63-lines">Step 2. src/hearsay/spectra.py: extend (current 63 lines)</a></li><li><a href="#step-3-scriptsscore_spectrapy-new">Step 3. scripts/scorespectra.py (new)</a></li><li><a href="#step-4-teststest_spectrapy-new-hermetic-and-build-order">Step 4. tests/testspectra.py (new, hermetic) and build order</a></li><li><a href="#step-5-lint-and-tests">Step 5. Lint and tests</a></li><li><a href="#step-6-cpu-pilot-while-mps-is-held">Step 6. CPU pilot (while MPS is held)</a></li><li><a href="#step-7-gpu-work-after-the-main-chat-releases-mps">Step 7. GPU work, after the main chat releases MPS</a></li><li><a href="#step-8-report-and-docs">Step 8. Report and docs</a></li><li><a href="#step-9-commit">Step 9. Commit</a></li><li><a href="#risks-and-mitigations">Risks and mitigations</a></li><li><a href="#verification">Verification</a></li></ul></details>
+<h1 id="plan-m3-spectra-aasist-score-stream-sat-sep-26-2026">Plan: M3, Spectra-AASIST score stream (Sat Sep 26, 2026)</h1>
+<p>Run spec: <code>docs/specs/2026-09-26_m3-spectra-aasist.md</code> (P1/P2 frozen, deep mode). Handoff: <code>docs/handoffs/2026-09-26_m3-spectra-aasist-handoff.md</code>. Worktree: <code>main</code> in <code>~/Projects/hearsay</code>, shared. Stage only the files in step 9; never <code>git add -A</code>.</p>
+<p>Deep-mode inputs: an architecture survey, a file-impact survey with current line numbers, a risk analysis (24 items), a critique pass (13 findings, 6 critical) on the first draft of this plan, and the Codex plan review (<code>docs/reports/2026-09-26_m3-spectra-aasist-plan-review.md</code>, 9 findings, 6 critical) on the second draft. All are folded in; the ones that changed the design are listed under "Amendments to the run spec" (13–20 are the Codex resolutions).</p>
+<h2 id="amendments-to-the-run-spec-recorded-here-and-dated-in-the-spec-before-commit">Amendments to the run spec (recorded here and, dated, in the spec before commit)</h2>
+<ol>
+<li><strong>Chunked decode pool.</strong> <code>ThreadPoolExecutor.map</code> over all rows submits every task eagerly; decode (~20 ms) outruns the model (~0.2 s), so up to 20,000 float32 segments would sit in RAM on an 18 GB box already running the main chat's XLS-R job. Map per 500-row chunk, aligned with the checkpoint cadence, the way <code>scripts/extract_embeddings.py:78-102</code> maps per shard.</li>
+<li><strong>Raw companion moves to <code>outputs/spectra/&lt;out-name&gt;_raw.csv</code></strong>, five base columns first. A second header shape inside <code>outputs/detector_scores/</code> would break any future <code>glob("detector_scores/*.csv")</code> consumer.</li>
+<li><strong>Pilot scores all pad modes in one decode pass</strong> (<code>--pad-modes repeat,zero,whole</code>): each pilot clip is decoded and prepared once; clips at or above one window get one forward shared by all modes, short clips one forward per mode. Model loaded once. <strong>Pilot rows are inner rows and test rows only</strong>: holdout rows inside the head-N slice are skipped (the holdout is read once, after the full run). Fold side <code>--limit 400</code> (322 inner rows, 171 bona fide / 151 spoof), test side <code>--test-limit 200</code>; at 200 fold rows one bona fide false alarm would move normalized minDCF by 0.106, five times the tie band. <strong>Tie-break order:</strong> inner minDCF, then inner AUC, then <code>zero</code>.</li>
+<li><strong>Abort on 25 consecutive decode errors</strong> with a mount hint (the fold audio is on the external drive; an unmount would otherwise be discovered 75 min later at the 5% gate). <code>decode_error</code> and <code>model_error</code> are counted separately.</li>
+<li><strong>M1 comparator rule.</strong> The newest <code>models/m1_*</code> (0348) trained on <code>splits/nsa_folds_plus_asv19.csv</code>; the comparable run is the newest meta with <code>folds == "splits/nsa_folds.csv"</code>, a single <code>train</code> set and a <code>val_min_dcf</code> key (today: <code>m1_wav2vec2-xls-r-300m_L7_20260926-0347</code>, holdout 0.1458; a band-matched v3 directory landing during the run is picked by the same rule). Holdout keys are <code>val_min_dcf</code>, <code>val_eer</code>, <code>val_by_generator</code>, <code>val_by_bonafide_source</code>.</li>
+<li><strong>Secondary tripwire.</strong> Primary test readout: share of <code>synth_logit &gt; 0</code> (score &gt; 0.5). Secondary: share with <code>logit_bonafide ≤ −1.0625009</code>, the model card's <code>classify</code> threshold (<code>weights/Spectra-AASIST/model.py:785</code>; the README text says −1.140625, discrepancy noted).</li>
+<li><strong>Forward guard.</strong> <code>forward_windows</code> raises <code>ValueError</code> when <code>w.shape[1] &gt; 128,000</code>: the AASIST positional table covers 400 SSL frames, frame 401 appears at 128,400 samples, and the 8 s cap leaves 80 samples of slack. (<code>ValueError</code>, not <code>assert</code>: <code>python -O</code> strips asserts.)</li>
+<li><strong>Resume.</strong> Config hash covers sha256 of the fold file, test manifest, <strong>training manifest (its row order is the crop recipe)</strong>, durations file, the stress manifest in manifest mode, the sources of <code>hearsay/spectra.py</code>, <code>hearsay/embed.py</code>, <code>hearsay/audio.py</code>, <code>hearsay/handcrafted.py</code> (the input path belongs to the main chat and changed tonight), <code>scripts/score_spectra.py</code> itself, and <code>weights/Spectra-AASIST/model.py</code> + <code>config.json</code>; pad mode, band match, max windows, seed, crop policy, device, torch and torchaudio versions, <code>model.safetensors</code> size and mtime. Partial files are written to <code>.tmp</code> then <code>os.replace</code>. pandas 3 reads an empty <code>flag</code> cell as NaN: <code>fillna("")</code> before comparing. <strong>Resumed rows reuse their stored <code>synth_logit</code> verbatim</strong> (never recomputed from the parsed float64 columns; <code>synth_logit</code> is a float32 subtraction). <strong>On completion the partial and its sidecar are deleted</strong>; <code>--resume</code> with no partial exits 2 ("nothing to resume") so a finished run is never silently re-exported under a new stamp. <code>--limit</code> and <code>--manifest</code> runs keep any checkpoint inside their own output directory and never touch <code>outputs/spectra/&lt;out-name&gt;_partial.csv</code>.</li>
+<li><strong><code>--repo-root PATH</code></strong> (default the repo). Every output path and every relative-path resolution derive from it, so the hermetic tests run against a fake repo in <code>tmp_path</code> and can never write into the real <code>outputs/</code> or <code>models/</code> (the post-commit audit runs the test suite while the real export may be running).</li>
+<li><strong>Stress thresholds are an explicit sweep</strong> (see step 2, <code>stress_readout</code>), and <code>--stress</code> is accepted in pilot mode too, labeled provisional, so an In-the-Wild readout exists before the full run's inner rows do.</li>
+<li><strong>Direction outside the full run is recorded, never gated:</strong> per mode in the pilot table, and in manifest mode.</li>
+<li><strong>Build box.</strong> The frozen P2 test list is a 2–3 h build, not 45 min. Build order (step 4) puts the gates first so the box can close with a scorer that refuses to ship a bad file; diagnostics (<code>platt_diagnostic</code>, <code>level_shortcut</code>, the band-off run, W1) are last and are computable post hoc from the raw companion. Whatever is cut is recorded in the spec's Results.</li>
+<li><strong>Non-finite model outputs are failures</strong> (Codex 2). <code>score_clip</code> validates the forward output: shape <code>(n, 2)</code>, every logit finite, and the derived <code>synth_logit</code> finite; anything else is flag <code>model_error</code>, NaN in the export, and counted. A NaN-returning fake model is a test (B8).</li>
+<li><strong>One finite-row mask for every readout</strong> (Codex 3). A helper <code>finite_rows(y, s, frame)</code> returns the mask, <code>n_used</code> and <code>n_dropped</code>; every readout (<code>report</code>, <code>by_group</code>, <code>direction_check</code>, <code>sweep_thresholds</code>, <code>platt_diagnostic</code>, <code>level_shortcut</code>, <code>stress_readout</code>) applies it first and records the two counts, with <code>{"status": "skipped_one_class"}</code> / <code>{"status": "empty"}</code> instead of an exception. Tests plant a decode failure in an inner, a holdout, a test and a stress row (D11).</li>
+<li><strong>Per-split failure gate and coverage</strong> (Codex 7). The 5% gate applies to inner, holdout and test separately (and to the stress set in manifest mode); meta records failures per split and, on fold rows, per class and per generator, so selectively missing hard rows cannot flatter a readout. C8 plants 10% failures inside the test rows with the overall rate under 5% and expects exit 3.</li>
+<li><strong>Publication order and run identity</strong> (Codex 4). Everything is computed into the stamped run directory first: <code>models/m3_spectra_&lt;stamp&gt;/{raw.csv, fusion.csv, meta.json}</code> (immutable run artifacts). Only after the gates and the meta succeed is the fusion file published to <code>outputs/detector_scores/&lt;out-name&gt;.csv</code> by <code>.tmp</code> + <code>os.replace</code>, together with <code>outputs/detector_scores/&lt;out-name&gt;_summary.json</code> (stamp, config hash, git sha, counts, holdout minDCF; the same sidecar pattern as <code>container_summary.json</code>). The raw companion under <code>outputs/spectra/</code> is a copy of the run directory's <code>raw.csv</code>. A failed rerun therefore never half-writes the shared file, and the summary sidecar names the run that produced it.</li>
+<li><strong>Readout-only mode</strong> (Codex 5). <code>--readout inner=&lt;scores.csv&gt; stress=&lt;name&gt;=&lt;scores.csv&gt; [--out PATH]</code> computes <code>stress_readout</code> (thresholds from the given inner scores) and writes a JSON, no inference. Step 7 uses it with the pilot's selected-mode scores and the In-the-Wild scores to post the provisional P_FA before the full export; the full run's meta then recomputes it from the full inner rows. D9 exercises exactly this workflow on saved fake files.</li>
+<li><strong><code>--max-chunks N</code></strong> (Codex 8): stop after N chunks, keep the partial, return 5. It is how C14 makes an interrupted run without a test-only hook, and it doubles as a dry run. C10 asserts the set of paths this scorer creates under <code>--repo-root</code> (and that <code>detector_scores/</code>, <code>models/</code> and the full-run partial are absent after a pilot); it no longer snapshots the real repo trees, which other chats legitimately write to.</li>
+<li><strong>Completion condition</strong> (Codex 6). M3 produces no TSV by design (handoff: TSVs and <code>submissions/</code> belong to the main chat). The rung is complete when the published file, its summary sidecar, the run stamp, the holdout numbers and the "fusion reads <code>logit</code>" note have been sent to the main chat and recorded in the run spec's Results with the time; if the export cannot finish by the hard stop, the Results name that as the blocker.</li>
+<li><strong>Laundering checks are deferred</strong> (Codex 9). Band match and the In-the-Wild readout do not establish robustness to codec laundering, telephony or simulated replay; nothing is trained here, so there is no augmented-versus-clean pair to report. The report lists this next to physical replay as a limitation of a scoring rung, and points at M5's laundering augmentation as where it is measured.</li>
+</ol>
+<h2 id="step-0-pre-flight">Step 0. Pre-flight</h2>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; git branch --show-current &amp;&amp; pwd
+git status --short        # today: docs/reports/2026-09-26_handcrafted-v4.md (CPU chat, untracked) plus the M3 spec and plan; hc_v4 and M5 were committed (9288d73, 982aa11)
+uv run pytest -q 2&gt;&amp;1 | tail -3   # baseline: 301 collected at last look; record the pass count and any pre-existing failures
+uv run ruff check .</code></pre>
+<p>Record the baseline in the run spec's Results (the spec's "215 passing" predates tonight's commits). Do not touch <code>src/hearsay/embed.py</code>, <code>src/hearsay/audio.py</code>, <code>src/hearsay/handcrafted.py</code>, <code>scripts/spectra_direction.py</code>, <code>scripts/train_handcrafted.py</code>, <code>splits/*</code>, <code>submissions/*</code>, or anything under another chat's lane.</p>
+<h2 id="step-1-srchearsaymetricspy-add-by_group-additive">Step 1. <code>src/hearsay/metrics.py</code>: add <code>by_group</code> (additive)</h2>
+<p>Current state: 106 lines, ends with <code>report()</code> at lines 95-106. Imports at 18-23 (<code>annotations</code>, <code>math</code>, <code>numpy</code>, <code>roc_curve</code>); pandas is not imported. The file is imported by the CPU trainer and the M5 scripts, so the change is strictly additive.</p>
+<ul>
+<li><p>After line 23 add a type-only import so ruff does not flag the annotation:</p>
+<pre><code class="language-python">from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd</code></pre></li>
+<li><p>Append after line 106, copied from <code>scripts/train_handcrafted.py:83-96</code> (the function moved down after the hc_v4 commit; 75-81 is now <code>decision()</code>), with the signature <code>by_group(dv: pd.DataFrame, yv: np.ndarray, s: np.ndarray, pi: float = PI_SYNTH) -&gt; tuple[dict, dict]</code>; the only change is the default for <code>pi</code>. Docstring keeps "minDCF/EER per generator (its spoofs vs every bona fide clip) and per bona fide source (its bona fide clips vs every spoof)" and adds "Copied here from scripts/train_handcrafted.py for M3; the trainer keeps its own copy."</p></li>
+<li><p><code>min_cost</code> and <code>eer</code> are already in scope. No LightGBM anywhere near this file.</p></li>
+</ul>
+<h2 id="step-2-srchearsayspectrapy-extend-current-63-lines">Step 2. <code>src/hearsay/spectra.py</code>: extend (current 63 lines)</h2>
+<p>Keep lines 1-50 (<code>load_spectra</code>) and 62-63 (<code>synth_logit</code>) as they are. Replace lines 53-59 (<code>spectra_logits</code>) with the block below and add the new helpers. Update the module docstring (lines 1-10) to describe the three pad modes, the shared input path and the raw export.</p>
+<p>New imports: <code>from hearsay import SR</code>, <code>from hearsay.embed import prepare_segment, test_duration_sampler</code> (this pulls <code>transformers</code> at import time via <code>embed.py:16</code>; acceptable for a scorer, a few seconds for the test suite), <code>from hearsay.metrics import C_FA, C_MISS, PI_SYNTH, eer, min_cost, sigmoid</code>, <code>import pandas as pd</code>, <code>from sklearn.metrics import roc_auc_score, roc_curve</code>.</p>
+<p>New constants after line 27:</p>
+<pre><code class="language-python">PAD_MODES = ("repeat", "zero", "whole")
+MAX_INPUT_SAMPLES = 128_000   # AASIST pos_T covers 400 SSL frames; frame 401 appears at 128,400
+MIN_WHOLE_SAMPLES = SR        # 1 s floor for whole mode (Encoder max_pool2d(3,3) needs &gt;= 3 frames)</code></pre>
+<p>Functions, in file order:</p>
+<pre><code class="language-python">def prepare_input(x, crop_s=None, seed=None, band_match=True):
+    """The shared M1 path: band match -&gt; trim -&gt; optional crop -&gt; cap 8 s (hearsay.embed.prepare_segment)."""
+    return prepare_segment(x, crop_s, seed, band_match=band_match)
+
+
+def pad_windows(x, pad_mode="repeat", max_windows=16):
+    """(n, L) float32 windows. Clips &gt;= WIN: 50%-hop windows, identical in every mode.
+    Shorter clips: repeat = tile to WIN (model-card pad_random; the tiling seam),
+    zero = zero-pad to WIN, whole = the clip at its own length with a 1 s zero-pad floor."""
+    if pad_mode not in PAD_MODES:
+        raise ValueError(f"pad_mode must be one of {PAD_MODES}, got {pad_mode!r}")
+    x = np.asarray(x, dtype=np.float32)
+    if x.size &gt;= WIN or pad_mode == "repeat":
+        return windows(x, WIN, HOP)[:max_windows]          # today's path, byte-identical (B5; verified for empty, 1-sample, short, long, int16 inputs)
+    if pad_mode == "zero":
+        return np.pad(x, (0, WIN - x.size))[None]
+    if x.size &lt; MIN_WHOLE_SAMPLES:
+        x = np.pad(x, (0, MIN_WHOLE_SAMPLES - x.size))
+    return np.ascontiguousarray(x[None])
+
+
+def pad_samples(n_samples, pad_mode) -&gt; int:
+    """Samples added by pad_windows for a clip of n_samples in this mode (0 for clips &gt;= WIN)."""
+    if n_samples &gt;= WIN:
+        return 0
+    return WIN - n_samples if pad_mode in ("repeat", "zero") else max(0, MIN_WHOLE_SAMPLES - n_samples)
+
+
+@torch.inference_mode()
+def forward_windows(model, w):
+    """(n, 2) logits for equal-length windows. Pre-emphasis on CPU before .to(device): the order
+    scripts/spectra_direction.py's ASVspoof numbers were produced with."""
+    if w.shape[1] &gt; MAX_INPUT_SAMPLES:
+        raise ValueError(f"{w.shape[1]} samples exceed the 400-frame AASIST positional table (8 s)")
+    device = next(model.parameters()).device
+    t = torchaudio.functional.preemphasis(torch.from_numpy(np.ascontiguousarray(w, dtype=np.float32)))
+    return model(t.to(device)).float().cpu().numpy()
+
+
+@torch.inference_mode()
+def spectra_logits(model, x, max_windows=16, pad_mode="repeat"):
+    """Window-averaged (logit_spoof, logit_bonafide) for one 16 kHz mono clip."""
+    return forward_windows(model, pad_windows(x, pad_mode, max_windows)).mean(axis=0)
+
+
+def score_clip(model, x, pad_modes=("repeat",), max_windows=16) -&gt; dict:
+    """Per-mode logits for one prepared clip: {"n_samples", "n_windows", "&lt;mode&gt;": (2,) logits,
+    "n_pad_samples_&lt;mode&gt;": int}. Clips &gt;= WIN forward once and every mode gets the same logits."""
+
+
+def crop_plan(manifest_csv, seed) -&gt; dict[str, tuple[float, int]]:
+    """path -&gt; (crop_s, offset seed): one test-duration draw per manifest row in order from
+    test_duration_sampler(seed), offset seed = seed + row index. Reproduces
+    extract_embeddings --segment --crop test --seed &lt;seed&gt; and extract_handcrafted exactly.
+    Draws for every row before any --limit so a pilot crops each file as the full run does.
+    (nsa_train_sample.csv has 20,000 unique paths in the fold file's order; verified.)"""
+
+
+def direction_check(y, s) -&gt; dict:
+    """AUC and class medians on finite rows; ok iff AUC &gt; 0.5 and spoof median &gt; bona fide median.
+    One class or no finite rows -&gt; {"status": "skipped_one_class", "ok": None}."""
+
+
+def resolve_path(p, repo) -&gt; str:      # score_detector.py:54 idiom; `repo` is always passed explicitly (--repo-root)
+    return p if Path(p).is_absolute() else str(Path(repo) / p)
+
+
+def fusion_frame(path, fold, split, synth) -&gt; pd.DataFrame:
+    """path, fold, split, score = sigmoid(synth), logit = synth. No calibration (spec D6).
+    with np.errstate(over="ignore"); NaN stays NaN in both columns; raises on duplicate paths."""
+
+
+def sweep_thresholds(y, s) -&gt; dict:
+    """Thresholds from inner rows only: fpr, tpr, thr = roc_curve(y, s);
+    c = C_FA*fpr*(1-PI_SYNTH) + C_MISS*(1-tpr)*PI_SYNTH; thr_dcf = thr[argmin(c)];
+    thr_eer = thr[argmin(|fnr - fpr|)] (scripts/spectra_direction.py:38-42).
+    sklearn sets thr[0] = inf and min_cost clamps to the constant decision, so an argmin at index 0
+    or a sweep that never beats the constant decision yields None plus a flag, never Infinity in JSON."""
+
+
+def stress_readout(inner_y, inner_s, y, s, frame) -&gt; dict:
+    """minDCF, EER, AUC, by_group where the frame has &gt;1 generator or &gt;1 bona fide source, and
+    P_FA = mean(s_bona &gt;= thr), P_miss = mean(s_spoof &lt; thr) at thr_dcf and thr_eer from
+    sweep_thresholds(inner_y, inner_s) (sklearn's &gt;= convention, as hearsay.metrics.cost_at)."""
+
+
+def platt_diagnostic(y, s) -&gt; dict:    # class-balanced LogisticRegression on finite inner rows only; {"in_sample_diagnostic": True, a, b, ...}
+def level_shortcut(peak, s, y) -&gt; dict:   # within-class Spearman(peak, synth_logit) on inner rows, scipy.stats.spearmanr, lazy import
+def git_sha() -&gt; str:                    # the scripts/m5_build_bundle.py:61-65 pattern, "unknown" on failure</code></pre>
+<p>The loop with the checkpoint files lives in the script (step 3); the pure per-clip pieces above are what the hermetic tests hit directly.</p>
+<h2 id="step-3-scriptsscore_spectrapy-new">Step 3. <code>scripts/score_spectra.py</code> (new)</h2>
+<p>Docstring: purpose, the three modes of use (full export, <code>--limit</code> pilot, <code>--manifest</code> stress), output files, a <code>Usage:</code> block in the repo style. Tests load this file with <code>importlib.util.spec_from_file_location</code> and call <code>run(argv, loader=fake_loader)</code>; nothing in the repo imports <code>scripts/</code> (the cloud tests insert <code>scripts/cloud</code> on <code>sys.path</code> for the same reason), and this stays that way.</p>
+<p>Arguments (<code>argparse</code>, booleans via <code>argparse.BooleanOptionalAction</code>):
+<code>--repo-root</code> (default <code>Path(__file__).resolve().parents[1]</code>), <code>--folds</code> (<code>splits/nsa_folds.csv</code>), <code>--test-manifest</code> (<code>outputs/manifests/nsa_test.csv</code>), <code>--train-manifest</code> (<code>outputs/manifests/nsa_train_sample.csv</code>, the crop-draw order), <code>--device</code> (default <code>hearsay.embed.default_device()</code>; tests pass <code>cpu</code>), <code>--pad-mode</code> (choices <code>PAD_MODES</code>, default <code>zero</code>), <code>--pad-modes</code> (comma list, pilot only), <code>--band-match/--no-band-match</code> (default on), <code>--max-windows 16</code>, <code>--seed 0</code>, <code>--limit N</code> (fold rows), <code>--test-limit N</code> (test rows, default <code>--limit</code>), <code>--manifest PATH --name NAME --stress-seed 200</code>, <code>--stress name=path</code> (append), <code>--out-name spectra_aasist</code>, <code>--resume</code>, <code>--max-chunks N</code>, <code>--readout inner=PATH stress=NAME=PATH [--out PATH]</code>, <code>--prefetch 4</code>, <code>--chunk 500</code>, <code>--threads 4</code> (CPU: <code>torch.set_num_threads</code>), <code>--consecutive-decode-abort 25</code>. Relative defaults resolve under <code>--repo-root</code>.</p>
+<p><code>run(argv=None, loader=load_spectra) -&gt; int</code>, exit codes: 0 ok; 2 usage/config (missing label column, path not in the crop plan, stale or missing partial); 3 failure-rate gate (per split) or consecutive-decode abort; 4 direction gate; 5 stopped by <code>--max-chunks</code> (partial kept).</p>
+<ol>
+<li><strong>Rows.</strong> Default mode: <code>f = pd.read_csv(folds)</code>, <code>t = pd.read_csv(test_manifest)</code>; <code>rows = concat([f.assign(split=where(fold=="holdout","holdout","inner_oof")), t.assign(fold="test", split="test", label=nan, generator=nan, source=nan)])</code> (<code>score_detector.py:50-53</code>). <code>--limit</code> takes <code>f.iloc[:N]</code> and <code>t.iloc[:test_limit]</code> after the crop plan is built, and in pilot mode drops holdout rows. Manifest mode: <code>m = pd.read_csv(manifest)</code>; no <code>label</code> column → return 2; labels <code>.str.lower().str.replace("-", "")</code> (<code>spectra_direction.py:53-54</code>); <code>fold = split = "stress"</code>. <code>resolved = [resolve_path(p, root) for p in rows.path]</code>; exported <code>path</code> stays verbatim (existing exports mix absolute fold paths and relative test paths).</li>
+<li><strong>Crops.</strong> Default mode: <code>plan = crop_plan(train_manifest, seed)</code>; every fold row must be in the plan (else return 2 naming the first missing path); test rows <code>None</code>. Manifest mode: <code>plan = crop_plan(manifest, stress_seed)</code>.</li>
+<li><strong>Config hash and output dirs.</strong> Pilot: <code>outputs/spectra/pilot/&lt;stamp&gt;_&lt;name&gt;/</code> (checkpoint inside it). Manifest mode: <code>outputs/spectra/&lt;name&gt;/</code> (checkpoint inside it). Full run: <code>outputs/detector_scores/&lt;out-name&gt;.csv</code>, <code>outputs/spectra/&lt;out-name&gt;_raw.csv</code>, <code>outputs/spectra/&lt;out-name&gt;_partial.csv</code> + <code>.json</code> sidecar with the hash, <code>models/m3_spectra_&lt;stamp&gt;/meta.json</code>. All under <code>--repo-root</code>. Stamp: <code>datetime.now().astimezone().strftime("%Y%m%d-%H%M")</code>.</li>
+<li><strong>Model.</strong> <code>model = loader(device)</code>; <code>band_limit(np.zeros(SR, np.float32))</code> once on the main thread (warms <code>hearsay.handcrafted._FIR</code>, whose two-statement lazy init races across decode threads and would yield a float64 filter for a few rows); <code>torch.set_num_threads(threads)</code> when device is cpu.</li>
+<li><strong>Resume.</strong> With <code>--resume</code>: no partial → return 2; sidecar hash mismatch → return 2 ("stale partial: delete it or drop --resume"); else read it, <code>flag = flag.fillna("")</code>, keep rows whose flag is <code>""</code> or <code>decode_error</code> with their stored values verbatim, re-score <code>model_error</code>.</li>
+<li><strong>Loop</strong> in chunks of <code>--chunk</code> over the rows still to score: <code>with ThreadPoolExecutor(prefetch) as pool: for r, x, peak, flag in pool.map(prep, chunk_rows)</code>, where <code>prep</code> does <code>load_audio</code> → <code>peak = float(abs(x).max())</code> → <code>prepare_input(x, crop_s, seed, band_match)</code>, returning flag <code>decode_error</code> on <code>DecodeError</code>; the main thread calls <code>score_clip</code> inside <code>try/except RuntimeError</code> → flag <code>model_error</code>; a forward whose output is not <code>(n, 2)</code> or not finite (logits or <code>synth_logit</code>) is also <code>model_error</code> (amendment 13). A run of <code>--consecutive-decode-abort</code> decode errors aborts with the mount hint (return 3, partial kept). After each chunk: append raw rows, write the partial (<code>.tmp</code> + <code>os.replace</code>), print <code>done/total  elapsed  s/clip  eta</code> (<code>extract_embeddings.py:110</code> style plus ETA).</li>
+<li><strong>Gates.</strong> Failure rate per split (<code>inner_oof</code>, <code>holdout</code>, <code>test</code>; <code>stress</code> in manifest mode): any split above 5% → raw file written into the run directory, counts printed per split, return 3, nothing published. Every readout goes through <code>finite_rows</code> first (amendment 14). Direction (full run only, inner rows only): <code>direction_check(y_inner, synth_inner)</code>; <code>ok</code> is <code>False</code> or <code>None</code> → raw file kept under <code>outputs/spectra/</code>, return 4, nothing under <code>detector_scores/</code> or <code>models/</code>. Pilot: direction recorded per mode; manifest mode: recorded. Neither gates.</li>
+<li><strong>Outputs.</strong> Full run, in this order (amendment 16): <code>models/m3_spectra_&lt;stamp&gt;/raw.csv</code> (five base columns then <code>logit_spoof, logit_bonafide, synth_logit, n_windows, n_samples, n_pad_samples, crop_s, peak, flag, seconds</code>), the gates, <code>models/m3_spectra_&lt;stamp&gt;/fusion.csv</code> via <code>fusion_frame</code> (row count equals folds + test rows; unique paths; header exact), <code>meta.json</code>; then publish: copy <code>fusion.csv</code> to <code>outputs/detector_scores/&lt;out-name&gt;.csv</code> and write <code>&lt;out-name&gt;_summary.json</code> next to it, both by <code>.tmp</code> + <code>os.replace</code>; copy <code>raw.csv</code> to <code>outputs/spectra/&lt;out-name&gt;_raw.csv</code>; finally delete the partial and its sidecar. Pilot: per-mode <code>scores_&lt;mode&gt;.csv</code> (base columns + raw columns with <code>n_pad_samples_&lt;mode&gt;</code>) and <code>meta.json</code> with the pilot table (per mode: inner minDCF, EER, AUC, direction, test share above half, whole-mode floor hits) and the rule's pick with the granularity note (one bona fide false alarm = 4·(1/n_bona)·0.7/0.3 in normalized minDCF). Manifest mode: <code>scores.csv</code> + <code>meta.json</code> (report, by_group where applicable, direction, timing).</li>
+<li><strong>Meta</strong> (<code>json.dumps(indent=2)</code>): <code>rung: "M3"</code>, model path and safetensors size, config (pad mode, band match, max windows, seed, crop policy text, device, torch/torchaudio versions, git sha, config hash), counts (<code>rows, ok, decode_error, model_error</code>, each per split, plus fold-row failures per class and per generator), timing (<code>seconds, sec_per_clip</code>), <code>holdout</code> = <code>report(y, synth)</code> + <code>auc</code> + <code>by_generator</code> + <code>by_source</code> (<code>by_group</code>), <code>inner</code> = the same (diagnostic), <code>test</code> = <code>n, frac_above_half (synth &gt; 0), frac_bonafide_le_card_threshold, score_mean, score_std, distinct</code>, <code>direction</code>, <code>thresholds</code> (<code>sweep_thresholds</code> on inner rows), <code>platt_diagnostic</code>, <code>level_shortcut</code>, and for each <code>--stress name=path</code>: <code>stress_readout</code> on that scores file (<code>provisional: true</code> when computed from pilot inner rows).</li>
+</ol>
+<h2 id="step-4-teststest_spectrapy-new-hermetic-and-build-order">Step 4. <code>tests/test_spectra.py</code> (new, hermetic) and build order</h2>
+<p>Fixtures and helpers at the top of the file (no conftest in this repo):</p>
+<ul>
+<li><code>_wav(path, x)</code> writes 16 kHz mono float32 WAVs with <code>soundfile</code> (a direct dependency; ffmpeg decodes them through <code>load_audio</code> as every other test does).</li>
+<li><code>_clip(seconds, seed, amp)</code> white noise; <code>_tone(seconds, hz)</code> for A2.</li>
+<li><code>FakeSpectra(torch.nn.Module)</code>: one parameter (<code>forward_windows</code> reads the device from it); <code>forward(x)</code> asserts <code>x.ndim == 2</code>, <code>x.dtype == torch.float32</code>, <code>x.device == self.w.device</code>, <code>not torch.is_grad_enabled()</code>, <code>not self.training</code>; records <code>x.shape</code> and a copy of <code>x</code> in <code>self.calls</code>; returns <code>torch.stack([gain * m, 0.1 * m], dim=1)</code> with <code>m = x.abs().mean(1)</code>, so louder = more spoof and the two logits are not exactly representable as a difference (that is what lets C14 catch a recomputed <code>synth_logit</code>); <code>gain=-1</code> flips direction for C9; a <code>raise_on_len</code> attribute raises <code>RuntimeError</code> for B6.</li>
+<li><code>_load_script()</code> loads <code>scripts/score_spectra.py</code> via <code>importlib.util.spec_from_file_location</code>; every run passes <code>--repo-root &lt;tmp_path&gt; --device cpu</code>.</li>
+<li>A fake repo in <code>tmp_path</code>: <code>splits/nsa_folds.csv</code> (8 rows: folds 0, 1 and holdout, both labels, generators <code>g1</code>, <code>g2</code>, sources <code>src_a</code>, <code>src_b</code>, absolute paths), <code>outputs/manifests/nsa_test.csv</code> (4 rows, relative paths, <code>filename,path</code>), <code>outputs/manifests/nsa_train_sample.csv</code> (same 8 paths, same order), <code>splits/nsa_test_durations.csv</code> (a few values; <code>hearsay.embed.TEST_DURATIONS</code> monkeypatched to it). C10 snapshots the mtimes of the real <code>outputs/</code> and <code>models/</code> trees before a run and asserts nothing changed.</li>
+</ul>
+<p>Tests by stage (IDs from the run spec plus the Codex additions): A1–A13, B1–B8, C1–C16, D1–D11, W1, about 52 plus W1. Notes on the non-obvious ones:</p>
+<ul>
+<li>A2: 7.8 kHz tone through <code>prepare_input</code> drops by more than 40 dB in RMS with defaults and is unchanged (bitwise) with <code>band_match=False</code>; <code>hearsay.handcrafted._FIR.dtype == np.float32</code> after a warm-up call.</li>
+<li>A4: <code>crop_plan</code> on the fake manifest with seed 0 gives lengths equal to <code>test_duration_sampler(0)</code> draws in order and seeds <code>0..n-1</code>; with the real <code>splits/nsa_test_durations.csv</code> present, the first five seed-0 draws are pinned to <code>3.552688, 3.25075, 3.041875, 3.1115, 3.3205</code> (skip if missing); a fake <code>--limit 2</code> run and a full fake run write identical <code>crop_s</code> for the shared rows; the In-the-Wild plan uses seed 200 and differs from seed 0.</li>
+<li>A5/A6/A7: 2 s clip; repeat → length WIN and autocorrelation at lag 32,000 above 0.9; zero → length WIN, tail zeros, autocorrelation below 0.05; whole → length 32,000; 0.3 s clip in whole → length 16,000; <code>pad_samples</code> per mode: 32,600 / 32,600 / 0 for the 2 s clip, 11,200 for whole on the 0.3 s clip; 128,000 samples pass <code>forward_windows</code>, 128,400 raise <code>ValueError</code>.</li>
+<li>A8/A9: 4.5 s, 6 s and 8 s clips give identical windows in all modes; counts <strong>2, 2, 3</strong> (6 s = 96,000 samples: starts <code>[0]</code> plus the flush window at 31,400) with the last window flush; <code>max_windows=1</code> caps.</li>
+<li>B3: a 40 s array fed straight to <code>spectra_logits</code> (bypassing the cap; 19 windows) → the fake sees exactly 16; a 12 s array with <code>max_windows=2</code> → exactly 2.</li>
+<li>A10: the captured model input equals <code>torchaudio.functional.preemphasis</code> of the windows; a DC step differs from the raw windows.</li>
+<li>A11: all-zeros 3 s, 0.1 s, and a float WAV with NaN samples → finite logits in all modes.</li>
+<li>B5: a frozen copy of the pre-change <code>spectra_logits</code> in the test file; equality on a 2 s (tiled) and a 6 s (two-window) clip; positional call <code>(model, x, 4)</code> still works.</li>
+<li>C8: 20 fake rows with 2 undecodable (10%) → exit 3 and no fusion file; 1 undecodable (5%) → exit 0; 40 rows with 2 undecodable both inside the 4 test rows (overall 5%, test 50%) → exit 3 (per-split gate).</li>
+<li>B8: a fake whose forward returns NaN for a marker clip → that row is NaN with flag <code>model_error</code>, counted, run continues; a fake returning shape <code>(n, 3)</code> → the same.</li>
+<li>C16: reorder two rows of the fake training manifest between a run and <code>--resume</code> → exit 2 (the crop recipe is in the hash).</li>
+<li>D11: one decode failure planted in an inner, a holdout, a test and a stress row → every readout still exists in meta with <code>n_used</code>/<code>n_dropped</code> matching; no exception.</li>
+<li>C9: <code>FakeSpectra(gain=-1)</code> → exit 4, no <code>detector_scores</code> file, raw file present under the fake repo; default gain → exit 0 and the file exists.</li>
+<li>C10: <code>--limit</code> run creates files only under <code>&lt;root&gt;/outputs/spectra/pilot/</code> (the created set is enumerated); <code>&lt;root&gt;/outputs/spectra/&lt;out-name&gt;_partial.csv</code>, <code>&lt;root&gt;/outputs/detector_scores/</code> and <code>&lt;root&gt;/models/</code> do not exist afterwards. The real repo is protected by construction (<code>--repo-root</code>), not by a snapshot.</li>
+<li>C14: fake full run (chunk 2) → fusion file A and summary sidecar; a second fake run with <code>--max-chunks 1</code> returns 5 and leaves a partial; <code>--resume</code> → fusion file B byte-equal to A; after completion the partial is gone and <code>--resume</code> returns 2; <code>--pad-mode</code> changed against a fresh <code>--max-chunks 1</code> partial → 2. Also: the published file appears only after <code>meta.json</code> exists in the run directory (a fake that fails on the last chunk leaves no published file).</li>
+<li>C15: after importing <code>hearsay.spectra</code> and loading the script, <code>"lightgbm" not in sys.modules</code>; no line of <code>scripts/score_spectra.py</code> or <code>tests/test_spectra.py</code> starts with the LightGBM import (the <code>tests/test_trees.py:69-75</code> rule extended to the script).</li>
+<li>D9: <code>--readout inner=&lt;pilot scores&gt; stress=itw=&lt;manifest-mode scores&gt;</code> on saved fake files (no inference); <code>thr_dcf</code> equals the hand-computed argmin; P_FA/P_miss recomputed by hand match; an inner set whose argmin is index 0 yields <code>None</code> and the flag, and the JSON has no <code>Infinity</code>.</li>
+<li>W1: <code>needs_weights</code> + <code>slow</code>; skip if <code>weights/Spectra-AASIST/model.safetensors</code> is missing; <code>load_spectra("cpu")</code>; 2 s and 6 s sines; finite <code>(2,)</code> logits in all three modes; the 2 s clip's modes differ from each other.</li>
+</ul>
+<p><strong>Build order</strong> (so the box can close with gates in place): (1) <code>metrics.by_group</code> + D1–D3; (2) <code>pad_windows</code>, <code>pad_samples</code>, <code>forward_windows</code>, <code>spectra_logits</code>, <code>score_clip</code>, <code>crop_plan</code>, <code>direction_check</code>, <code>fusion_frame</code> + A4–A9, A13, B1–B5, C4–C6; (3) the script: rows, crops, chunked loop, the per-split failure gate, non-finite outputs, the direction gate, the run directory and publication order, <code>--limit</code>/<code>--pad-modes</code>/<code>--test-limit</code>, <code>--repo-root</code> + C1–C3, C7–C10, C12, C13, B6–B8; (4) manifest mode + C11; (5) resume, hash, <code>--max-chunks</code> + C14–C16; (6) <code>finite_rows</code>, <code>sweep_thresholds</code>, <code>stress_readout</code>, <code>--readout</code>, <code>platt_diagnostic</code>, <code>level_shortcut</code> + D4–D11; (7) A1–A3, A10–A12, W1. Steps 6–7 are computable post hoc from the raw companion if the box closes first.</p>
+<h2 id="step-5-lint-and-tests">Step 5. Lint and tests</h2>
+<pre><code class="language-bash">uv run ruff check .
+uv run pytest -q tests/test_spectra.py
+uv run pytest -q</code></pre>
+<p>Fix until the new file is green and the full run shows no failure that was not in the step-0 baseline.</p>
+<h2 id="step-6-cpu-pilot-while-mps-is-held">Step 6. CPU pilot (while MPS is held)</h2>
+<p>Direction-check manifest for the untouched script (150 per class, inner rows only, seed 0):</p>
+<pre><code class="language-bash">uv run python -c "
+import pandas as pd
+f = pd.read_csv('splits/nsa_folds.csv'); f = f[f.fold != 'holdout']
+s = pd.concat([f[f.label == l].sample(150, random_state=0) for l in ('spoof', 'bonafide')])
+s[['path', 'label']].to_csv('outputs/manifests/nsa_inner_direction300.csv', index=False)"</code></pre>
+<p>Pilot, three modes in one pass, inner and test rows only, at low priority, logged:</p>
+<pre><code class="language-bash">nice -n 10 uv run python scripts/score_spectra.py --limit 400 --test-limit 200 --pad-modes repeat,zero,whole --device cpu --threads 4 2&gt;&amp;1 | tee outputs/spectra/pilot.log</code></pre>
+<p>About 600 decodes and 1,560 forwards; 15–25 min under the current load (0.24 s per clip unloaded for XLS-R on this Mac, 3–5× under load). Apply the rule: inner minDCF, then inner AUC, then <code>zero</code>; a test share above 0.6 flags. Record the pilot table, the granularity note and the pick in the run spec.</p>
+<h2 id="step-7-gpu-work-after-the-main-chat-releases-mps">Step 7. GPU work, after the main chat releases MPS</h2>
+<p>Check first: <code>pgrep -fl "extract_embeddings|train_probe"</code> must be empty and the main chat must have said so.</p>
+<pre><code class="language-bash">uv run python scripts/spectra_direction.py --manifest outputs/manifests/nsa_inner_direction300.csv --name nsa_inner300
+nice -n 10 uv run python scripts/score_spectra.py --manifest outputs/manifests/itw_stress.csv --name itw_stress --pad-mode &lt;pick&gt; --device mps</code></pre>
+<p>Provisional P_FA/P_miss at the pilot's inner thresholds, without rerunning inference (amendment 17):</p>
+<pre><code class="language-bash">uv run python scripts/score_spectra.py --readout inner=outputs/spectra/pilot/&lt;dir&gt;/scores_&lt;pick&gt;.csv stress=itw=outputs/spectra/itw_stress/scores.csv --out outputs/spectra/itw_stress/readout_provisional.json</code></pre>
+<p>Post the In-the-Wild numbers (minDCF, EER, per generator, the provisional P_FA/P_miss) to Nathan and the main chat. Then, by default:</p>
+<pre><code class="language-bash">nohup nice -n 10 uv run python scripts/score_spectra.py --pad-mode &lt;pick&gt; --device mps --stress itw=outputs/spectra/itw_stress/scores.csv &gt; outputs/spectra/score_spectra.log 2&gt;&amp;1 &amp;</code></pre>
+<p>About 75 min at 0.2 s per clip. Watch the log's ETA line; <code>--resume</code> restarts it if killed. The <code>--no-band-match</code> diagnostic run on the pick (<code>--limit 200</code>) goes last, on MPS, only if time allows.</p>
+<h2 id="step-8-report-and-docs">Step 8. Report and docs</h2>
+<ul>
+<li><code>docs/reports/2026-09-26_m3-spectra.md</code>: what M3 is, the input path and crop parity, the pilot table and the pick (noting <code>repeat</code> is the in-distribution choice and <code>zero</code>/<code>whole</code> are out of distribution for the model), the direction baseline, holdout numbers against the comparable M1 (amendment 5) per generator and per source, the test-set share above half against the 0.30 prior (both thresholds), the In-the-Wild readout flagged "possibly optimistic, training data undisclosed", the level-shortcut measurement, timing per device, what Spectra is blind to, and that fusion reads <code>logit</code> directly (commit 944380c). Write <code>.csv</code>, never the bare word; write "π = 0.5" for the secondary prior, never "π_synth = 0.5".</li>
+<li><code>docs/STATUS.md</code>: the oversight chat already replaced line 40 with an "In flight" M3 row (commit 9288d73); replace it with the shipped row (numbers, file name) and update the test-count row (line 44) to the post-change count. Keep the header timestamp (main chat's snapshot).</li>
+<li><code>CLAUDE.md</code>: line 124 area, add a Claude Code sub-bullet for M3 (Sat Sep 26): the Spectra-AASIST score stream, its tests and report; line 134: Spectra-AASIST "how used" → "M3 score stream (<code>outputs/detector_scores/spectra_aasist.csv</code>), scored through the shared band-matched input path; license still unclear (repo header Apache-2.0, card text MIT)".</li>
+<li>Run spec: Results (baseline test count, pilot table, pick, direction, In-the-Wild, holdout, test share, timing, deviations, anything cut) and the dated amendments above.</li>
+<li><code>docs/plan.md</code>: no change expected; confirm.</li>
+<li>Completion handoff (amendment 19): message the main chat with the published file name, the run stamp and config hash, the holdout numbers, the test share, and the "fusion reads <code>logit</code>" note; record the time in the run spec's Results. The report lists codec laundering, telephony and simulated replay as untested here (amendment 20).</li>
+</ul>
+<h2 id="step-9-commit">Step 9. Commit</h2>
+<pre><code class="language-bash">git add src/hearsay/spectra.py src/hearsay/metrics.py scripts/score_spectra.py tests/test_spectra.py \
+  docs/specs/2026-09-26_m3-spectra-aasist.md docs/reports/2026-09-26_m3-spectra-aasist-plan.md \
+  docs/reports/2026-09-26_m3-spectra-aasist-plan-review.md docs/reports/2026-09-26_m3-spectra.md \
+  docs/STATUS.md CLAUDE.md
+# plus docs/handoffs/2026-09-26_m3-spectra-aasist-handoff.md if Nathan confirms
+git commit -m "feat(M3): Spectra-AASIST score stream through the shared input path; pad-mode pilot, direction gate, raw-logit export"</code></pre>
+<p>No push. Then the post-commit audits (Claude critique loop, Codex audit) per the skill.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Risk</th><th>Mitigation in this plan</th>
+</tr></thead>
+<tbody>
+<tr><td>Hermetic tests write into the real <code>outputs/</code> or <code>models/</code> during the post-commit audit</td><td><code>--repo-root</code>; every test uses <code>tmp_path</code>; C10 snapshots the real trees</td></tr>
+<tr><td>Decode pool holds thousands of clips in RAM</td><td>Chunked map (amendment 1)</td></tr>
+<tr><td><code>_FIR</code> lazy-init race across decode threads</td><td>Warm once on the main thread; A2 asserts the float32 FIR</td></tr>
+<tr><td>pos_T 400-frame limit</td><td><code>ValueError</code> guard in <code>forward_windows</code>; A7 pins 128,000 passes and 128,400 raises</td></tr>
+<tr><td>Zero padding unmasked, out of distribution</td><td>Pilot decides; <code>n_pad_samples_&lt;mode&gt;</code> recorded; report states <code>repeat</code> is in-distribution</td></tr>
+<tr><td>No level normalization in Spectra</td><td>Level-shortcut measurement in meta (D10); no normalization added</td></tr>
+<tr><td>MPS not bit-comparable with CPU</td><td>Device and versions in the config hash; byte-identity tests use the fake model on CPU; W1 uses <code>allclose</code></td></tr>
+<tr><td>Recomputed <code>synth_logit</code> on resume breaks byte identity</td><td>Stored value reused verbatim; the fake's second logit makes C14 sensitive to it</td></tr>
+<tr><td>Crop desync under sampling</td><td><code>crop_plan</code> draws all rows first, keyed by path; A4 pins draws</td></tr>
+<tr><td>Pilot too coarse for the 0.02 tie band</td><td>322 inner rows, holdout rows skipped, AUC tie-breaker, granularity note in the table</td></tr>
+<tr><td>Sigmoid overflow warnings, saturated scores</td><td><code>errstate(over="ignore")</code>; fusion reads <code>logit</code> (944380c)</td></tr>
+<tr><td>Raw companion picked up by a glob</td><td>Lives under <code>outputs/spectra/</code></td></tr>
+<tr><td>One-class, all-NaN or index-0 threshold</td><td><code>direction_check</code> and <code>sweep_thresholds</code> report <code>None</code> plus a flag; no <code>Infinity</code> in JSON</td></tr>
+<tr><td>External drive unmount mid-run</td><td>25 consecutive decode errors abort with a hint</td></tr>
+<tr><td>Stale partial merged on resume, or a finished run re-exported</td><td>Config hash sidecar; pandas <code>fillna("")</code>; partial deleted on completion; <code>--resume</code> without a partial exits 2</td></tr>
+<tr><td>Wrong M1 comparator</td><td>Rule: newest with <code>folds == splits/nsa_folds.csv</code>, single train set, <code>val_min_dcf</code> present</td></tr>
+<tr><td>Others' uncommitted files swept into the commit</td><td>Explicit <code>git add</code> paths</td></tr>
+<tr><td>LightGBM next to torch</td><td>C15, plus the existing <code>test_trees</code> scan</td></tr>
+<tr><td>GPU released later than 05:15</td><td>CPU pilot first; the export waits; hard stop 08:00 in the spec</td></tr>
+<tr><td>Box closes before the test list is done</td><td>Build order in step 4; diagnostics post hoc from the raw companion; cuts recorded</td></tr>
+<tr><td>Non-finite forward output passes as ok</td><td>Output validated in <code>score_clip</code>; B8</td></tr>
+<tr><td>NaN rows crash a readout</td><td><code>finite_rows</code> in every readout with counts; D11</td></tr>
+<tr><td>Concentrated failures hide behind a global 5%</td><td>Per-split gate; per-class and per-generator coverage in meta; C8</td></tr>
+<tr><td>Half-written or stale shared export</td><td>Run directory first, publish last by <code>os.replace</code>, summary sidecar with the stamp; C14</td></tr>
+<tr><td>Training manifest reordered between runs</td><td>Its sha is in the resume hash; C16</td></tr>
+<tr><td>Provisional stress readout impossible before the export</td><td><code>--readout</code> mode on saved scores; D9</td></tr>
+</tbody>
+</table></div>
+<h2 id="verification">Verification</h2>
+<ul>
+<li>AC1–AC8 from the run spec, checked in order at the end of steps 7 and 8, with AC1 read as "no failure absent from the step-0 baseline".</li>
+<li><code>head -1 outputs/detector_scores/spectra_aasist.csv</code> is exactly <code>path,fold,split,score,logit</code>; <code>wc -l</code> is 21,672; a pandas check of split counts 16,142 / 3,858 / 1,671 and unique paths.</li>
+<li><code>git status --short</code> after the commit shows only others' files.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_m3-spectra-aasist-plan.md</code> <span class="hash">2c6165aa8948</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

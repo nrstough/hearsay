@@ -1,0 +1,21 @@
+%% The fusion rule as arithmetic on one real test file, HGT1046947.wav, under the shipped rule.
+%% cites: README.md#how-it-decides, docs/reports/2026-09-26_worked-examples.md#addendum-sat-1230-the-same-eight-files-under-fusion_v2-a3_w02_e, docs/reports/2026-09-26_worked-examples.md#worked-examples-eight-real-test-files-through-the-shipped-pipeline
+flowchart TB
+  A["HGT1046947.wav · 7.15 s"] --> D1["M1b probe: LLR −5.78<br/>real-like, P = 0.00"]
+  A --> D2["handcrafted: P = 0.16<br/>real-like"]
+  A --> D3["M5 head: logit +5.64<br/>synthetic-like, P = 1.00"]
+  A --> D4["Spectra-AASIST: margin +9.50<br/>synthetic-like"]
+  D1 --> R["each score → its rank among the<br/>detector's own training scores"]
+  D2 --> R
+  D3 --> R
+  R --> B["base = 0.6 · rank(M1b) + 0.2 · rank(handcrafted) + 0.2 · rank(M5)<br/>= 0.319"]
+  D4 --> S{"margin below −3<br/>and base above 0.5?"}
+  B --> S
+  S -->|"no: margin is +9.50, and Spectra<br/>could only lower a score anyway"| P["Platt map at the 0.3 prior<br/>probability = 0.0348 → real"]
+  N["under the rejected equal-weight rule<br/>Spectra's full vote took it to 0.686"] -.-> P
+  classDef fusedC fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef suppC fill:#fff3d1,stroke:#c37530,color:#101a2b
+  classDef note fill:#ffffff,stroke:#c37530,color:#101a2b,stroke-dasharray:4
+  class D1,D2,D3,R,B fusedC
+  class D4,S suppC
+  class N note

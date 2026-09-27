@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 post draft heads (audit) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_post-draft-heads-audit.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/specs/2026-09-26_post-draft-heads-audit.md</code>; the markdown file is the record.</p>
+
+<h3 id="scorecard">Scorecard</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td>Acceptable</td><td>Outputs and diagnostics match; calibration deviation explicitly reconciled with the unchanged M1b recipe.</td></tr>
+<tr><td>Scope discipline</td><td>Excellent</td><td>Changes confined to the experiment, repair tooling, tests, and associated documentation.</td></tr>
+<tr><td>Test coverage</td><td>Acceptable</td><td>Recorded suite: 775 passed, 1 skipped. Independent full rerun blocked by read-only environment.</td></tr>
+<tr><td>Review compliance</td><td>Excellent</td><td>Prior findings addressed, including both architecture calibration statements.</td></tr>
+<tr><td>Freeze integrity</td><td>Acceptable</td><td>Skipped: no P1/P2/P3 hashes supplied.</td></tr>
+<tr><td>Regression check</td><td>Acceptable</td><td>No regression identified; diagnostics reproduce, experiment logged, shipped TSV hash unchanged.</td></tr>
+<tr><td>Documentation</td><td>Excellent</td><td>Report, disclosure, and calibration corrections describe the completed change.</td></tr>
+<tr><td><strong>Overall</strong></td><td><strong>Acceptable</strong></td><td></td></tr>
+</tbody>
+</table></div>
+<h3 id="commentary">Commentary</h3>
+<ol>
+<li><p><strong>Plan adherence — Acceptable downgrade.</strong> Platt calibration uses pooled inner-OOF labels rather than being fold-local as originally specified. The post-run correction explains this inherited M1b behavior. The saved positive slope preserves ranking metrics; outer-holdout, stress, and test labels remain excluded from fitting.</p></li>
+<li><p><strong>Test coverage / Regression check — Acceptable verification limitation.</strong> The recorded full-suite result could not be independently repeated: uv cache access and pytest temporary/cache writes were blocked by the read-only sandbox, with four collection errors. Using Python 3.12.13 directly, the documentation tests passed <strong>52/52</strong>, and <code>ruff check . --no-cache</code> passed. Independent checks reproduced the reported diagnostics, export counts and path sets, finite scores, and identical shipped/final TSV hashes. These environment errors are not evidence of a change-induced regression.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-26_post-draft-heads-audit.md</code> <span class="hash">0ec690033e56</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

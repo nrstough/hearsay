@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Channel robustness on the frozen deep path (Sat Sep 26, 2026) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_channel-robustness.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_channel-robustness.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#a-how-wild-is-the-test-set-λ̂">A. How wild is the test set? (λ̂)</a></li><li><a href="#e-is-m3-memorising-and-what-does-its-suppression-step-cost">E. Is M3 memorising, and what does its suppression step cost?</a></li><li><a href="#b-is-the-72-khz-wall-a-codec">B. Is the 7.2 kHz wall a codec?</a></li><li><a href="#follow-up-does-the-double-low-pass-stopband-move-any-detector-1441">Follow-up: does the double low-pass stopband move any detector? (14:41)</a></li><li><a href="#c-and-d">C and D</a></li></ul></details>
+<h1 id="channel-robustness-on-the-frozen-deep-path-sat-sep-26-2026">Channel robustness on the frozen deep path (Sat Sep 26, 2026)</h1>
+<p><strong>Summary.</strong></p>
+<ul>
+<li><strong>λ̂</strong> (how wild the test set is) = 0.51 (95% CI 0.12–0.64), and 0.36–0.57 across consistent variants. It is <strong>indeterminate</strong> against the 0.32 crossover. The fusion_v2 choice does not depend on it.</li>
+<li><strong>The 7.2 kHz wall</strong> is a smooth low-pass, not an MP3 or AAC round-trip, so the codec refit (C) did not run.</li>
+<li><strong>M3's false-alarm suppression is kept</strong> under the pre-declared rule:
+<ul>
+<li>its AUC and minDCF barely move under perturbation (but its rank order moves the most of the deep models)</li>
+<li>it has the lowest miss rate on MLAAD</li>
+<li>its step never raised the fused minDCF</li>
+</ul></li>
+<li><strong>New:</strong> 20 dB additive noise breaks handcrafted v5 and turns fakes into misses. The shipped rule's holdout minDCF rises from 0.012 to 0.269.</li>
+<li>The first λ̂ (0.947) was wrong and is kept below as a documented mistake.</li>
+</ul>
+<p>Run spec: <code>docs/specs/2026-09-26_channel-robustness.md</code>. Plan: <code>docs/reports/2026-09-26_channel-robustness-plan.md</code> (Codex plan review: <code>docs/reports/2026-09-26_channel-robustness-plan-review.md</code>). Handoff: <code>docs/handoffs/2026-09-26_channel-robustness-handoff.md</code>. Diagnostic only: this rung produces no TSV and changes no shipped rule.</p>
+<h2 id="a-how-wild-is-the-test-set-λ̂">A. How wild is the test set? (λ̂)</h2>
+<p><strong>Answer: indeterminate. λ̂ = 0.51 (95% CI 0.12–0.64), an interval that contains the fusion consult's 0.32 crossover. Consistent variants range from 0.36 (duration-matched) to 0.57.</strong> The test set sits between our clean holdout and In-the-Wild on about half the channel statistics and outside both on the rest. That is not strong enough to say which validation set represents it. For the shipped rule this does not matter: fusion_v2 beats fusion_v1 on both the holdout (0.0065 vs 0.014) and In-the-Wild (0.228 vs 0.260), so the choice is robust to λ. Source: <code>outputs/channel/lambda.json</code>, <code>scripts/channel_lambda.py</code>.</p>
+<p><strong>Method.</strong></p>
+<ul>
+<li>Every clip is prepared the same way (band match → silence trim → 8 s cap → RMS normalize), then described by label-free channel statistics:
+<ul>
+<li>band levels up to 7 kHz</li>
+<li>the compression detector's spectral-hole and noise-floor statistics (3–7 kHz)</li>
+<li>noise-floor level and stationarity</li>
+<li>a decay (reverberation) proxy</li>
+<li>flatness, loudness spread and pause fraction</li>
+</ul></li>
+<li>Columns that read above 7 kHz are dropped, because the test files pass two low-passes and everything else one.</li>
+<li>A logistic classifier separates holdout real speech (1,858 clips: LJ and LibriSpeech) from In-the-Wild real speech (2,000 clips, 54 speakers). Out-of-fold scores come from 5-fold CV grouped by speaker, with LJ as a single speaker.</li>
+<li>λ̂ is adjusted classify-and-count, (q − FPR)/(TPR − FPR). Its interval resamples test files and reference speakers. The mean posterior is descriptive only: it is biased toward 0.5 when the domains overlap (pinned by a test).</li>
+</ul>
+<p><strong>Result.</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Readout</th><th>Value</th>
+</tr></thead>
+<tbody>
+<tr><td>Domain classifier, grouped out-of-fold AUC</td><td>0.84 pooled; per fold 0.68 / 0.82 / 0.70 / 0.92 (fold 0 holds the single LJ speaker: one class, no AUC)</td></tr>
+<tr><td><strong>λ̂</strong> (adjusted classify-and-count, TPR 0.84 / FPR 0.28)</td><td><strong>0.51</strong> (95% CI 0.12–0.64)</td></tr>
+<tr><td>Rate-consistent variants: q from the fold models / TPR and FPR in-sample</td><td>0.48 / 0.57</td></tr>
+<tr><td><strong>Duration-matched</strong> (reference clips cropped to test lengths)</td><td><strong>0.36</strong> (AUC 0.81)</td></tr>
+<tr><td>LJ removed from the clean side</td><td>0.54</td></tr>
+<tr><td>λ̂ on the 1,170 files the shipped rule calls real</td><td>0.58</td></tr>
+<tr><td>Mean posterior P(wild) (descriptive; biased toward 0.5)</td><td>0.56 (95% CI 0.55–0.58, test files resampled)</td></tr>
+<tr><td>Without all floor and hole features</td><td>0.80, but the classifier is weak (per-fold AUC 0.32–0.74)</td></tr>
+<tr><td>Without the top feature (<code>local_hole_runs</code>)</td><td>refused: pooled TPR − FPR is 0.13, but per-fold AUC stays 0.63–0.89. The refusal comes from the LJ fold (see below), not a collapse</td></tr>
+<tr><td>Test files outside both domains (Mahalanobis p99)</td><td>1.0% (1% expected)</td></tr>
+</tbody>
+</table></div>
+<p><strong>Why the pooled rates are pessimistic.</strong></p>
+<ul>
+<li>LJ is one speaker, so grouped CV puts all 885 LJ clips in one fold. That fold's model has never seen LJ and calls much of it "wild", which inflates the pooled FPR (0.28) that the adjusted estimate divides by.</li>
+<li>Meanwhile the test posteriors come from the full fit, which has seen LJ.</li>
+<li>The two rate-consistent variants (0.48 and 0.57) bracket the point estimate, so it holds, but the pooled AUC and FPR understate the classifier.</li>
+</ul>
+<p><strong>Controls, never trained on (share read as "wild"):</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Control</th><th>Share</th>
+</tr></thead>
+<tbody>
+<tr><td>Inner-fold real clips</td><td>10%</td></tr>
+<tr><td>Inner real after one MP3 64 kbps round-trip</td><td>9%</td></tr>
+<tr><td>DiffSSD spoof</td><td>19%</td></tr>
+<tr><td>VCTK clean read speech</td><td>24.7%</td></tr>
+</tbody>
+</table></div>
+<p>The pre-declared identifiability rule passes, but only just: VCTK sits at 24.7% against a 25% limit.</p>
+<p><strong>Per-feature positions</strong> (0 = the clean median, 1 = the wild median; <code>lambda.json</code> <code>per_feature</code>):</p>
+<ul>
+<li><strong>Between the two domains (11 of 21):</strong> band levels at 4–7 kHz (0.54–0.70), local-hole statistics (0.35–0.69), valley depth (0.57), pause fraction (0.65), noise-floor level (0.59), deep-hole runs (0.14).</li>
+<li><strong>Beyond the wild end:</strong> noise-floor stationarity (1.08) and flatness (1.74).</li>
+<li><strong>Beyond the clean end:</strong> loudness spread (−3.5), deep-hole fraction (−0.74), floor p10 (−0.70), floor p2 (−0.51), decay slope (−0.45), deep-hole flicker and persistence (−0.2), low-band floor (−0.14).</li>
+<li>So the test set is not a blend of the two reference domains on every axis. It is its own recording population, and that is why λ̂ carries a wide interval.</li>
+</ul>
+<p><strong>What went wrong first, and why it matters for the README.</strong> The first full run reported λ̂ = 0.947 with AUC 0.99 and read "wild" as "codec-processed", because one MP3 round-trip moved our clean clips to 91% "wild". That run was driven by <code>clip_floor_db</code>, a 1st percentile over the whole spectrogram, which lands in the 7–8 kHz stopband. Action B measured the test files at −118 dB as delivered and −157 dB after the pipeline's second low-pass. So the feature measured the double filtering (and In-the-Wild's own band limits), not the recording channel. Dropping it under the rule already declared for &gt;7 kHz columns gave the numbers above, and the codec reading disappeared (MP3 control 91% → 9%). The 0.947 figure came from the run at ~12:36 and its JSON was overwritten by the corrected run; the retained <code>outputs/channel/lambda_run.log</code> holds an earlier, pre-review run of the same feature set (AUC 0.999, λ̂ 0.945). It is now an entry in the shortcut ledger (<code>architecture.md</code> §11, "Double low-pass stopband"), left open: whether the detectors respond to it is unmeasured. It is the same class of shortcut as the 7.2 kHz wall: a band no training clip has, read through a feature that did not look like a band feature.</p>
+<p><strong>Limits.</strong></p>
+<ul>
+<li>In-the-Wild stands in for "wild"; telephony and physical replay are not represented.</li>
+<li>LJ is one speaker, which leaves one validation fold with a single class (see above).</li>
+<li>λ̂ is a weak, single-method estimate: the interval is wide, and the duration-matched variant (0.36) sits near the crossover.</li>
+</ul>
+<h2 id="e-is-m3-memorising-and-what-does-its-suppression-step-cost">E. Is M3 memorising, and what does its suppression step cost?</h2>
+<p><strong>Verdict under the pre-declared rule (run spec D9, revised, computed by <code>verdict_from</code>): kept.</strong> None of the three triggers fires, and both probes are complete (500 and 572 clips). What the verdict does and does not show is spelled out below. Source: <code>outputs/channel/m3_perturb.json</code>, <code>m3_mlaad.json</code>, <code>m3_agreement.json</code>, <code>m3_verdict.json</code>; <code>scripts/m3_probes.py</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Trigger</th><th>Measured</th><th>Limit</th>
+</tr></thead>
+<tbody>
+<tr><td>(a) M3 mean |ΔAUC| over 4 perturbations vs M1b</td><td>0.0008 vs 0.0041</td><td>&gt; 2× M1b and &gt; 0.02</td></tr>
+<tr><td>(c) MLAAD spoof damped by the shipped rule</td><td>1.2% (7 of 572)</td><td>&gt; 5%</td></tr>
+<tr><td>(d) largest rise in fused holdout minDCF from the M3 step, any perturbation</td><td>0.000 (it lowers minDCF in 4 of 5)</td><td>&gt; 0.01</td></tr>
+</tbody>
+</table></div>
+<p><strong>1. Perturbation probe.</strong></p>
+<ul>
+<li><strong>Cohort:</strong> 500 outer-holdout clips (250 real: LJ and LibriSpeech; 250 spoof: playht and wavegrad2). These are out of sample for M1b, M5 and handcrafted v5.</li>
+<li><strong>Scoring:</strong> each clip is cropped once to a test length and scored through the runner's own paths (<code>hearsay.pipeline.Models</code>, CPU). It is fused by <code>FusionConstants.fuse</code> with the shipped constants (<code>models/fusion_v2/constants.json</code>).</li>
+<li><strong>Perturbations:</strong> MP3 64 kbps at 16 kHz (aligned back to the input), white noise at 20 dB SNR, ±2% speed, and a one-sample shift.</li>
+<li><strong>Scale:</strong> with 250 real clips, one false alarm is worth 0.037 minDCF, so differences below that are single files.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Detector</th><th>Clean</th><th>MP3</th><th>Noise 20 dB</th><th>Speed ±2%</th><th>Shift 1</th><th>Mean |ΔAUC|</th>
+</tr></thead>
+<tbody>
+<tr><td>M1b v3</td><td>0.056</td><td>0.085</td><td><strong>0.271</strong></td><td>0.052</td><td>0.048</td><td>0.0041</td></tr>
+<tr><td>Handcrafted v5</td><td>0.048</td><td>0.088</td><td><strong>0.996</strong> (AUC 0.64)</td><td>0.089</td><td>0.048</td><td>0.0899</td></tr>
+<tr><td>M5 (fine-tune)</td><td>0.433</td><td>0.432</td><td>0.487</td><td>0.425</td><td>0.428</td><td>0.0037</td></tr>
+<tr><td>M3 (Spectra-AASIST)</td><td>0.000</td><td>0.008</td><td>0.116</td><td>0.000</td><td>0.000</td><td>0.0008</td></tr>
+<tr><td>Fused base (fusion_v2 without the M3 step)</td><td>0.020</td><td>0.048</td><td>0.269</td><td>0.020</td><td>0.028</td><td>0.0029</td></tr>
+<tr><td><strong>Fused, shipped rule</strong></td><td><strong>0.012</strong></td><td><strong>0.037</strong></td><td><strong>0.269</strong></td><td><strong>0.000</strong></td><td><strong>0.008</strong></td><td>0.0029</td></tr>
+</tbody>
+</table></div>
+<p>(Cells are holdout minDCF under the brief cost.)</p>
+<p>The M3 step fires on 4.0–5.2% of real clips and on no spoof clip under any perturbation. Under noise it fires on nothing, because noise pushes M3 out of its "strongly bona fide" region (logit &lt; −3).</p>
+<p><strong>Two stability readings, and they disagree.</strong></p>
+<ul>
+<li><p><strong>Margin:</strong> M3's AUC and minDCF barely move (mean |ΔAUC| 0.0008). AUC counts only whether each spoof clip outscores each real clip. A perturbation can reorder clips within each class, or shift every score, and leave that separation intact. So a stable AUC says the classes stay apart, not that individual scores stay put.</p></li>
+<li><p><strong>Rank order:</strong> Spearman between each detector's clean and perturbed scores. M3 has the lowest rank stability of the three deep models under every perturbation:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Perturbation</th><th>M3</th><th>M1b</th><th>M5</th>
+</tr></thead>
+<tbody>
+<tr><td>MP3</td><td>0.987</td><td>0.997</td><td>0.999</td></tr>
+<tr><td>Noise</td><td>0.875</td><td>0.913</td><td>0.939</td></tr>
+<tr><td>Speed</td><td>0.962</td><td>0.989</td><td>0.992</td></tr>
+<tr><td>Shift</td><td>0.992</td><td>0.999</td><td>0.999</td></tr>
+</tbody>
+</table></div></li>
+<li><p>So M3 keeps its decisions under perturbation, but its fine ordering is the least stable. That is not the collapse a lookup would show, and it is not strong evidence of generalisation either.</p></li>
+</ul>
+<p><strong>At each detector's fixed inner-OOF threshold</strong> (<code>at_inner_threshold</code> in the JSON):</p>
+<ul>
+<li>Noise shows up as misses, not false alarms: M1b P_miss 0.07 → 0.88 and handcrafted 0.05 → 0.99, both at P_FA ≤ 0.4%. M3 P_miss 0.008 → 0.32.</li>
+<li>MP3, speed and shift move P_FA by at most 0.4 points for any detector.</li>
+</ul>
+<p><strong>2. MLAAD probe</strong> (unseen by M1b and handcrafted v5; seen by M5; unknown for M3, whose training data is undisclosed).</p>
+<ul>
+<li><strong>Cohort:</strong> 572 MLAAD English spoof clips, 4 per model across 143 models, each cropped to a test length.</li>
+<li><strong>Readout:</strong> miss rate at each detector's own inner-OOF brief-cost threshold.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Detector</th><th>Miss rate on MLAAD spoof</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>M3</strong> (MLAAD exposure unknown)</td><td><strong>14.9%</strong></td></tr>
+<tr><td>M1b v3</td><td>22.7%</td></tr>
+<tr><td>M5 (trained on MLAAD, in-sample)</td><td>28.7%</td></tr>
+<tr><td>Handcrafted v5</td><td>56.1%</td></tr>
+</tbody>
+</table></div>
+<ul>
+<li>M3 falls below −3 on 1.75% of these clips.</li>
+<li>The shipped rule's actual conjunction (M3 &lt; −3 <strong>and</strong> base rank &gt; 0.5) damps 1.2% (7 files).</li>
+<li>Those 7 files come from seven models, one clip each: MiniMax-Speech-2.8-Turbo, GPA-v1.0, dots.tts (two variants), DeepGram and MOSS-TTS (two sizes).</li>
+</ul>
+<p><strong>3. Agreement (descriptive only, per the Codex plan review).</strong> Spearman(M1b v3, M3) is 0.796 on holdout rows and 0.620 on test rows (gap 0.175, 95% CI 0.141–0.214). The two sets differ in class mix and generators, so the gap is not evidence of memorisation by itself. It says the two models disagree more on the test audio.</p>
+<p><strong>What remains unknown.</strong> M3's training data is still undisclosed; the model card does not settle it (see below). Its perfect clean holdout score (AUC 1.000, minDCF 0.000) is consistent with M3 having seen DiffSSD-like data, and its best MLAAD miss rate is consistent with having seen MLAAD. The probes show that the <em>suppression step</em> is safe on these cohorts: it fires on no holdout spoof clip under any perturbation, damps 1.2% of MLAAD spoof, and never raised the fused minDCF. They do not show that M3 generalises.</p>
+<p><strong>Model card check</strong> (<code>weights/Spectra-AASIST/README.md</code>, the local copy of <code>lab260/Spectra-AASIST</code>):</p>
+<ul>
+<li>The card reports evaluation EERs on ASVspoof 2019 LA (0.159%), ASVspoof 2021 LA and DF, ASVspoof5, ADD2022, <strong>In-the-Wild</strong> and several ADD tracks.</li>
+<li>It names <strong>no training set</strong>.</li>
+<li>Its In-the-Wild entry means our earlier "0 of 2,000 In-the-Wild false alarms" for M3 comes from a set its authors evaluated on and may have tuned against. That is another reason the probes above, not M3's In-the-Wild number, carry the verdict.</li>
+</ul>
+<p><strong>New finding for the fusion lane: additive noise is the shipped rule's weak spot.</strong></p>
+<ul>
+<li>At 20 dB SNR white noise, handcrafted v5 loses almost all discrimination (AUC 0.998 → 0.640), and noise turns fakes into misses: at the inner threshold, M1b misses 88% of spoof and handcrafted 99%, with no rise in false alarms.</li>
+<li>M1b's minDCF rises from 0.056 to 0.271, and the shipped rule's from 0.012 to 0.269.</li>
+<li>M3 is the best of the four under noise (minDCF 0.116, AUC 0.997; P_miss 0.32 at its inner threshold), but its step never fires under noise, so it cannot help there.</li>
+<li>Nothing here changes the shipped rule. It is a README "what did not work" entry and a pointer for any later robustness work. Noise-augmented training of the handcrafted features is the obvious next step, symmetric across classes.</li>
+</ul>
+<h2 id="b-is-the-72-khz-wall-a-codec">B. Is the 7.2 kHz wall a codec?</h2>
+<p><strong>Answer: no codec satisfies the pre-declared match rule.</strong> The nearest codec (AAC 64k at 16 kHz, then our Kaiser pass) is only 3% closer to the test files than the Kaiser low-pass alone (<code>hearsay.handcrafted.band_limit</code>). The rule needs 20% and closer hole statistics, and it is worse on deep holes. Source: <code>outputs/channel/codec_match.json</code>, <code>outputs/channel/codec_grid.csv</code>, <code>scripts/channel_codec.py</code>.</p>
+<p><strong>Grid.</strong></p>
+<ul>
+<li>100 inner-fold real clips (50 LJ, 50 LibriSpeech).</li>
+<li>Variants:
+<ul>
+<li>raw</li>
+<li>Kaiser alone</li>
+<li>MP3 at 24/32/48/64/96 kbps and AAC at 32/48/64 kbps, encoded at 16 and 44.1 kHz, each alone and followed by Kaiser (34 variants)</li>
+</ul></li>
+<li>Statistics are compared with all 1,671 test files as delivered:
+<ul>
+<li>band levels at 6.5–7.75 kHz relative to 1–3 kHz, and the 7.5-vs-6.5 kHz drop</li>
+<li>roll-off slope over 6.5–8 kHz and 6–7 kHz flatness</li>
+<li>hole and floor statistics</li>
+</ul></li>
+<li>Distance = mean |median difference| in test-IQR units.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Variant</th><th>Distance</th><th>7.5 vs 6.5 kHz drop (dB)</th><th>Deep-hole frac</th><th>Local-hole frac</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Test files (target)</strong></td><td>—</td><td>−44.4</td><td>0.400</td><td>0.003</td></tr>
+<tr><td>AAC 64k @16k + Kaiser (closest codec)</td><td>1.045</td><td>−47.5</td><td>0.331</td><td>0.011</td></tr>
+<tr><td><strong>Kaiser alone</strong></td><td><strong>1.081</strong></td><td>−47.5</td><td>0.348</td><td>0.012</td></tr>
+<tr><td>AAC 48k @16k + Kaiser</td><td>1.085</td><td>−47.8</td><td>0.319</td><td>0.013</td></tr>
+<tr><td>MP3 96k @16k</td><td>1.947</td><td>−66.1</td><td>0.345</td><td>0.011</td></tr>
+<tr><td>MP3 32k @16k</td><td>4.142</td><td>−65.7</td><td>0.397</td><td>0.094</td></tr>
+<tr><td>Raw</td><td>2.639</td><td>−1.8</td><td>0.348</td><td>0.012</td></tr>
+</tbody>
+</table></div>
+<p><strong>Pre-declared rule (D5):</strong> a codec matches if its distance is at least 20% below Kaiser's and it is closer on both hole statistics.</p>
+<ul>
+<li>The best codec is 3% better on distance and worse on deep holes, so there is no match.</li>
+<li>MP3 encoded at 16 kHz makes the wall far too steep (LAME's own low-pass).</li>
+<li>Encodes at 44.1 kHz leave no wall until our Kaiser adds one.</li>
+<li>No variant reaches the test files' near-zero local-hole rate.</li>
+</ul>
+<p><strong>Sensitivity.</strong> Without <code>clip_floor_db</code> (a whole-spectrogram percentile that reads the stopband, the column A had to drop), Kaiser scores 0.660 and the best codec (AAC 64k @16k + Kaiser) 0.647. That is 2%, still no match (<code>codec_match.json</code> <code>without_clip_floor_db</code>).</p>
+<p><strong>The full grid</strong> (34 variants, sorted by distance; test medians: drop −44.4 dB, roll-off −44.7 dB/kHz, deep-hole 0.400, local-hole 0.003, flatness 0.485):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Variant</th><th>Distance</th><th>7.5 vs 6.5 kHz drop (dB)</th><th>Roll-off (dB/kHz)</th><th>Deep-hole frac</th><th>Local-hole frac</th><th>6–7 kHz flatness</th>
+</tr></thead>
+<tbody>
+<tr><td>aac-64k@16000+kaiser</td><td>1.045</td><td>-47.5</td><td>-47.9</td><td>0.331</td><td>0.011</td><td>0.448</td></tr>
+<tr><td>kaiser</td><td>1.081</td><td>-47.5</td><td>-47.9</td><td>0.348</td><td>0.012</td><td>0.444</td></tr>
+<tr><td>aac-48k@16000+kaiser</td><td>1.085</td><td>-47.8</td><td>-47.9</td><td>0.319</td><td>0.013</td><td>0.442</td></tr>
+<tr><td>aac-32k@16000+kaiser</td><td>1.123</td><td>-48.0</td><td>-48.0</td><td>0.301</td><td>0.015</td><td>0.444</td></tr>
+<tr><td>aac-48k@44100+kaiser</td><td>1.309</td><td>-53.4</td><td>-55.3</td><td>0.334</td><td>0.009</td><td>0.480</td></tr>
+<tr><td>mp3-96k@44100+kaiser</td><td>1.371</td><td>-53.0</td><td>-53.9</td><td>0.346</td><td>0.013</td><td>0.443</td></tr>
+<tr><td>aac-64k@44100+kaiser</td><td>1.378</td><td>-53.3</td><td>-56.2</td><td>0.330</td><td>0.010</td><td>0.458</td></tr>
+<tr><td>aac-32k@44100+kaiser</td><td>1.395</td><td>-53.4</td><td>-54.6</td><td>0.344</td><td>0.013</td><td>0.444</td></tr>
+<tr><td>mp3-64k@44100+kaiser</td><td>1.576</td><td>-53.0</td><td>-54.0</td><td>0.349</td><td>0.021</td><td>0.425</td></tr>
+<tr><td>mp3-96k@16000</td><td>1.947</td><td>-66.1</td><td>-65.1</td><td>0.345</td><td>0.011</td><td>0.444</td></tr>
+<tr><td>aac-48k@44100</td><td>2.084</td><td>-8.8</td><td>-12.8</td><td>0.334</td><td>0.009</td><td>0.480</td></tr>
+<tr><td>aac-64k@44100</td><td>2.102</td><td>-8.3</td><td>-14.1</td><td>0.330</td><td>0.010</td><td>0.458</td></tr>
+<tr><td>aac-32k@44100</td><td>2.140</td><td>-9.1</td><td>-12.3</td><td>0.344</td><td>0.013</td><td>0.443</td></tr>
+<tr><td>mp3-96k@16000+kaiser</td><td>2.147</td><td>-67.6</td><td>-67.2</td><td>0.345</td><td>0.011</td><td>0.444</td></tr>
+<tr><td>mp3-48k@44100+kaiser</td><td>2.159</td><td>-53.3</td><td>-54.4</td><td>0.360</td><td>0.037</td><td>0.375</td></tr>
+<tr><td>mp3-64k@16000</td><td>2.182</td><td>-66.2</td><td>-65.4</td><td>0.340</td><td>0.020</td><td>0.412</td></tr>
+<tr><td>mp3-96k@44100</td><td>2.302</td><td>-7.7</td><td>-10.5</td><td>0.346</td><td>0.013</td><td>0.443</td></tr>
+<tr><td>mp3-64k@16000+kaiser</td><td>2.386</td><td>-67.9</td><td>-67.5</td><td>0.340</td><td>0.020</td><td>0.412</td></tr>
+<tr><td>mp3-64k@44100</td><td>2.414</td><td>-7.6</td><td>-10.7</td><td>0.349</td><td>0.021</td><td>0.425</td></tr>
+<tr><td>aac-64k@16000</td><td>2.630</td><td>-1.8</td><td>-2.8</td><td>0.331</td><td>0.011</td><td>0.448</td></tr>
+<tr><td>mp3-48k@16000</td><td>2.633</td><td>-64.4</td><td>-64.2</td><td>0.344</td><td>0.037</td><td>0.365</td></tr>
+<tr><td>raw</td><td>2.639</td><td>-1.8</td><td>-2.8</td><td>0.348</td><td>0.012</td><td>0.444</td></tr>
+<tr><td>aac-48k@16000</td><td>2.658</td><td>-1.8</td><td>-2.8</td><td>0.319</td><td>0.013</td><td>0.442</td></tr>
+<tr><td>aac-32k@16000</td><td>2.661</td><td>-2.1</td><td>-2.8</td><td>0.301</td><td>0.015</td><td>0.444</td></tr>
+<tr><td>mp3-48k@44100</td><td>2.752</td><td>-7.7</td><td>-10.8</td><td>0.360</td><td>0.037</td><td>0.375</td></tr>
+<tr><td>mp3-48k@16000+kaiser</td><td>2.833</td><td>-66.2</td><td>-65.7</td><td>0.344</td><td>0.037</td><td>0.365</td></tr>
+<tr><td>mp3-32k@16000</td><td>4.142</td><td>-65.7</td><td>-64.6</td><td>0.397</td><td>0.094</td><td>0.219</td></tr>
+<tr><td>mp3-32k@16000+kaiser</td><td>4.306</td><td>-66.5</td><td>-65.8</td><td>0.397</td><td>0.094</td><td>0.219</td></tr>
+<tr><td>mp3-32k@44100+kaiser</td><td>4.688</td><td>-52.4</td><td>-53.9</td><td>0.471</td><td>0.135</td><td>0.180</td></tr>
+<tr><td>mp3-32k@44100</td><td>5.901</td><td>-7.4</td><td>-12.1</td><td>0.471</td><td>0.135</td><td>0.180</td></tr>
+<tr><td>mp3-24k@44100+kaiser</td><td>9.162</td><td>-10.9</td><td>-7.0</td><td>0.504</td><td>0.215</td><td>0.062</td></tr>
+<tr><td>mp3-24k@44100</td><td>9.171</td><td>-10.9</td><td>-7.0</td><td>0.504</td><td>0.215</td><td>0.062</td></tr>
+<tr><td>mp3-24k@16000</td><td>10.621</td><td>-0.6</td><td>-0.5</td><td>0.567</td><td>0.293</td><td>0.401</td></tr>
+<tr><td>mp3-24k@16000+kaiser</td><td>10.622</td><td>-0.8</td><td>-0.7</td><td>0.567</td><td>0.293</td><td>0.400</td></tr>
+</tbody>
+</table></div>
+<p><strong>Reading.</strong> The test set's wall is a smooth low-pass, like a resampler's anti-alias filter, not the signature of these codecs. The band match already in the pipeline is the right treatment, and a symmetric codec round-trip of the training data (C) has no measured target. B also exposed the stopband artifact in A's first run (see A).</p>
+<h2 id="follow-up-does-the-double-low-pass-stopband-move-any-detector-1441">Follow-up: does the double low-pass stopband move any detector? (14:41)</h2>
+<p><strong>Answer: no. Measured, no response on any detector or on the fused rule.</strong> Run spec: <code>docs/specs/2026-09-26_channel-stopband.md</code>. Script: <code>scripts/channel_stopband.py</code>. Output: <code>outputs/channel/stopband.json</code>.</p>
+<p><strong>Setup.</strong></p>
+<ul>
+<li>Test files are low-passed twice (their own ~7.2 kHz wall, then each detector's <code>band_limit</code>); training clips are low-passed once.</li>
+<li>On the same 500 outer-holdout clips and crops as E, each clip was scored as-is (<code>once</code>) and after one extra <code>band_limit</code> pass (<code>twice</code>), which approximates the test condition. Scoring used the runner's own paths, fused with fusion_v2. The <code>once</code> scores equal E's clean scores exactly (maximum difference 0.0 on all four detectors).</li>
+<li>Pre-declared rule: a detector responds if its 95th-percentile |Δlogit| exceeds 10% of its inner-OOF logit IQR; the fused rule responds if its holdout minDCF moves by more than 0.037.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Detector</th><th>Mean Δlogit (real / spoof)</th><th>95th pct |Δ|</th><th>Max |Δ|</th><th>Threshold</th><th>Holdout minDCF once → twice</th>
+</tr></thead>
+<tbody>
+<tr><td>M1b v3</td><td>−0.035 / −0.031</td><td>0.139</td><td>0.265</td><td>0.992</td><td>0.056 → 0.060</td></tr>
+<tr><td>Handcrafted v5</td><td>+0.113 / +0.055</td><td>0.466</td><td>0.860</td><td>0.886</td><td>0.048 → 0.056</td></tr>
+<tr><td>M5</td><td>−0.023 / −0.025</td><td>0.099</td><td>0.467</td><td>0.732</td><td>0.433 → 0.429</td></tr>
+<tr><td>M3</td><td>−0.012 / −0.085</td><td>0.301</td><td>0.905</td><td>1.684</td><td>0.000 → 0.000</td></tr>
+<tr><td><strong>Fused (P)</strong>¹</td><td>−0.0007 / −0.0002</td><td>0.011</td><td>0.048</td><td>—</td><td><strong>0.012 → 0.016</strong> (limit 0.037)</td></tr>
+</tbody>
+</table></div>
+<p>¹ The fused row's deltas are in probability, not logit.</p>
+<ul>
+<li><strong>Verdict flips:</strong> 0 of 500 at P = 0.5, and 2 of 500 at the <code>once</code> scores' brief-cost argmin threshold (0.795).</li>
+<li><strong>The M3 step</strong> fires on 2.0% of clips under both conditions.</li>
+<li><strong>Reading.</strong> The decision-level evidence comes first: 0 verdict flips at P 0.5, and fused minDCF moves by 0.004, one miss.</li>
+<li>Per detector, the 95th-percentile shift is at most 53% of the threshold (handcrafted v5). The largest single-clip moves go higher: handcrafted 97%, M5 64%, M3 54%.</li>
+<li>Handcrafted v5 also drifts slightly upward on real clips (+0.11 logit, toward "synthetic").</li>
+<li>The threshold (10% of an inner-OOF IQR that is mostly class separation, about 1 logit) is lenient, but it was declared before the run.</li>
+<li><strong>What was and was not tested.</strong>
+<ul>
+<li>The extra pass reproduces the test files' <strong>floor depth</strong>: the whole-spectrogram 1st percentile is −159 dB for the extra pass against −157 dB for test files (20 clips each, relative to 300–3,000 Hz).</li>
+<li>It does <strong>not</strong> reproduce the wall's shape: the 6.8–7.25 kHz transition band is −14.8 dB against −23.9 dB, and the 7.5–8 kHz band −88 dB against −99 dB (partly content, since these are different clips).</li>
+</ul></li>
+<li><strong>Conclusion.</strong> For stopband <em>depth</em>, the ledger entry closes as "measured, no response", and no refit is needed for it. The transition-band shape is recorded as an unprobed residual in the same ledger row.</li>
+</ul>
+<h2 id="c-and-d">C and D</h2>
+<ul>
+<li><strong>C (symmetric codec refit of M1b): not run.</strong> B found no codec match, and the frozen P1 runs C only on a match. No refit M1b column comes from this rung. The laundering and re-extraction path was prepared and smoke-tested (aligned, length-preserving round-trips mapped back to the original fold paths) and then removed unused.</li>
+<li><strong>D (a wild bona fide corpus): not attempted.</strong> Dropped for the time box at the 12:16 P1 revision: a download, extraction and refit would not fit before 16:00.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_channel-robustness.md</code> <span class="hash">03f8bbd67b08</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

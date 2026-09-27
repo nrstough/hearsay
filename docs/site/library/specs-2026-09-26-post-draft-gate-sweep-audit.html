@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026-09-26 post draft gate sweep (audit) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_post-draft-gate-sweep-audit.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+<h1></h1>
+<p class="lead">Rendered from <code>docs/specs/2026-09-26_post-draft-gate-sweep-audit.md</code>; the markdown file is the record.</p>
+
+<h3 id="scorecard">Scorecard</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th><th>Notes</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td>Excellent</td><td>Implements the governing manifest and amendments; final report records KEEP.</td></tr>
+<tr><td>Scope discipline</td><td>Excellent</td><td>No detector-contract, scoring-path, or shipped-artifact changes.</td></tr>
+<tr><td>Test coverage</td><td>Acceptable</td><td>Independently ran 92 tests successfully; 1 skipped, 15 filesystem-dependent cases deselected. Ruff passes.</td></tr>
+<tr><td>Review compliance</td><td>Acceptable</td><td>Previous fixes are present; model/export identity remains an explicitly accepted limitation.</td></tr>
+<tr><td>Freeze integrity</td><td>Acceptable</td><td>No P1/P2/P3 hashes present; original manifest text remains intact, with appended amendments.</td></tr>
+<tr><td>Regression check</td><td>Acceptable</td><td>Data self-checks pass. Both TSV hashes and fusion_v2 constants match recorded values; no fusion_v3 exists. Full-suite rerun unavailable.</td></tr>
+<tr><td>Documentation</td><td>Acceptable</td><td>Final outcome and WavLM disclosure updated; minor historical wording remains.</td></tr>
+<tr><td><strong>Overall</strong></td><td><strong>Acceptable</strong></td><td></td></tr>
+</tbody>
+</table></div>
+<h3 id="commentary">Commentary</h3>
+<ol>
+<li><p><strong>Test coverage / Regression check — downgrade to Acceptable.</strong> The read-only sandbox blocks <code>uv</code> cache writes and filesystem test fixtures. Independent verification produced <strong>92 passed, 1 skipped, 15 deselected</strong>, including the available data self-checks. The recorded <strong>107 passed, 1 skipped</strong> targeted run and earlier <strong>722 passed</strong> full-suite run were not independently reproduced in full.</p></li>
+<li><p><strong>Review compliance — downgrade to Acceptable.</strong> The supplied model directory is not cryptographically tied to the evaluated export; <code>precheck_write</code> checks for <code>meta.json</code>, whose hash is recorded only when writing. This is the explicitly accepted C6 residual risk. No candidate passes, so it does not affect this KEEP decision.</p></li>
+<li><p><strong>Documentation — downgrade to Acceptable, cosmetic only.</strong> The script’s opening describes H_noise as “withdrawn,” and the sweep report’s historical “Decision rule applied” paragraph still says “unless H_noise passes at ~20:30.” The opening and final Run 2 section clearly establish that H_noise failed. Update or mark those remaining sentences as historical.</p></li>
+<li><p><strong>Regression check / Documentation — no additional downgrade.</strong> The conditional KEEP log row is absent, but this audit occurred before the specified 19:30 ruling window. Append it after Nathan’s ruling or the applicable cutoff. The existing final TSV remains byte-identical to the shipped file.</p></li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-26_post-draft-gate-sweep-audit.md</code> <span class="hash">830ed043b2da</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post-draft sweep: the locked table and the packet (Sat Sep 26, 2026, 19:08 EDT) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_post-draft-sweep.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_post-draft-sweep.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#the-locked-table">The locked table</a></li><li><a href="#verdicts">Verdicts</a></li><li><a href="#decision-rule-applied">Decision rule applied</a></li><li><a href="#what-goes-in-the-readme-for-the-readme-chat">What goes in the README (for the README chat)</a></li><li><a href="#pending-at-1908-superseded-by-run-2-below">Pending at 19:08 (superseded by Run 2 below)</a></li><li><a href="#run-2-1917-h_noise-and-the-final-report">Run 2 (19:17): Hnoise, and the final report</a></li><li><a href="#ruling-nathan-1935-keep">Ruling (Nathan, ~19:35): KEEP</a></li></ul></details>
+<h1 id="post-draft-sweep-the-locked-table-and-the-packet-sat-sep-26-2026-1908-edt">Post-draft sweep: the locked table and the packet (Sat Sep 26, 2026, 19:08 EDT)</h1>
+<p><strong>Recommendation: KEEP.</strong> None of the four candidates (T2, W4, P_wl, H_noise) passes its pre-declared test. <code>submissions/CrossExam_predictions.tsv</code> (sha256 <code>fb783076…</code>, the file NSA scored at minDCF 0.0733) stays final. H_noise was judged in Run 2 (19:17, final report <code>354502ca…</code>; section "Run 2" below). The "Pending" section below is the 19:08 state, kept for the record.</p>
+<p><strong>Provenance:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th></th>
+</tr></thead>
+<tbody>
+<tr><td>Pre-declaration</td><td><code>docs/reports/2026-09-26_post-draft-manifest.md</code>: <code>141b254</code> (17:39), clarifications <code>b877760</code>, the P_wl "with room" amendment <code>ae9c4c4</code>, the H_noise note <code>43916ee</code>. Every one was committed before the number it governs was computed. The refit-seat line in <code>43916ee</code> came about a minute after <code>wavlm_l.csv</code> existed but before it was read; it is a diagnostic only (see the manifest's erratum).</td></tr>
+<tr><td>Script</td><td><code>scripts/fuse_sweep_v3.py</code> at <code>43916ee</code>, run once at 19:08, a minute after <code>wavlm_l.csv</code> landed</td></tr>
+<tr><td>Locked report</td><td><code>outputs/fusion/sweep_v3_report.json</code>, sha256 <code>c2b6bc22d69f67acb037cb1f5e1c11e0762f2b66d34ce1a8a60139c376ed69ad</code>; also archived as <code>sweep_v3_report_20260926-190836.json</code>. <code>--write</code> requires this hash.</td></tr>
+<tr><td>WavLM export</td><td><code>outputs/detector_scores/wavlm_l.csv</code> (sha256 <code>cef08ea6…</code>; 16,142 / 3,858 / 1,671 / 3,000 rows)</td></tr>
+<tr><td>WavLM probe</td><td><code>models/m1_wavlm-large_L9_20260926-1906</code> (heads chat, commit <code>e611d1b</code>; report <code>docs/reports/2026-09-26_post-draft-heads.md</code>; its 57-of-158 count is at the ITW argmin, while this report's 41 of 122 is at the inner-OOF threshold)</td></tr>
+<tr><td>Self-check</td><td>CURRENT reproduces the shipped numbers on every field; Spearman against the shipped file is 1.0000000 over all 1,671 rows (the pinned block is empty)</td></tr>
+</tbody>
+</table></div>
+<h2 id="the-locked-table">The locked table</h2>
+<p>Every cell is minDCF (lower is better). "Brief" is the brief's cost, 9.33·P_FA + P_miss; "averse" is the sponsor code's convention, P_FA + 4·P_miss. Spearman and 0.5-crossings are measured on the test set against the shipped file.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Rule</th><th>Inner brief / averse</th><th>Holdout brief / averse</th><th>ITW brief / averse</th><th>Holdout argmin [FA, miss]</th><th>ITW P_FA / P_miss at inner thr</th><th>Test Spearman</th><th>0.5-crossings</th><th>Verdict</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>CURRENT</strong> (shipped A3 w0.2 + E)</td><td>0.1351 / 0.2997</td><td>0.0065 / 0.0087</td><td>0.2280 / 0.2385</td><td>[0, 13]</td><td>1.3% / 12.2%</td><td>1.0000</td><td>0</td><td>shipped</td></tr>
+<tr><td>T2 (second M3 tier)</td><td>0.1351 / 0.2997</td><td>0.0065 / 0.0087</td><td>0.2280 / 0.2385</td><td>[0, 13]</td><td>1.3% / 12.2%</td><td>0.9857</td><td>0</td><td><strong>FAIL</strong> (gate)</td></tr>
+<tr><td>W4 (M5 weight 0.4, post hoc)</td><td>0.1373 / 0.3366</td><td>0.0065 / 0.0088</td><td>0.1997 / 0.2075</td><td>[0, 13]</td><td>1.0% / 11.7%</td><td>0.9702</td><td>4</td><td><strong>BAKEOFF FAIL</strong></td></tr>
+<tr><td>P_wl (WavLM as a fourth column)</td><td>0.1557 / 0.3330</td><td>0.0030 / 0.0071</td><td>0.2047 / 0.2300</td><td>[0, 6]</td><td>1.3% / 10.0%</td><td>0.9667</td><td>9</td><td><strong>FAIL</strong> (gate and room)</td></tr>
+<tr><td>H_noise (handcrafted v6)</td><td>0.1366 / 0.3058</td><td>0.0070 / 0.0103</td><td>0.2283 / 0.2405</td><td>[0, 14]</td><td>1.25% / 11.9%</td><td>0.9953</td><td>1</td><td><strong>FAIL</strong> (gate; run 2, 19:17)</td></tr>
+</tbody>
+</table></div>
+<h2 id="verdicts">Verdicts</h2>
+<p><strong>T2 fails the gate</strong> (rules 2a, 3a and 5). Its six cells are identical to CURRENT's, as the Round 2 verification predicted. The mechanism diagnostic passes: the deeper tier fires on 0 spoof rows in every split and every perturbation kind. It fires only on bona fide rows (inner 133, holdout 34, ITW 2, perturbation 0–5), which are already below the threshold region. It reorders files without moving any metric, so it has nothing to offer.</p>
+<p><strong>W4 fails its fresh-evidence bake-off</strong> (Nathan's 17:40 ruling):</p>
+<ul>
+<li><p>Part 1, the standing rule: passes.</p></li>
+<li><p>Part 2, perturbation robustness: fails. Δ is CURRENT − W4 per kind, brief / averse; three cells fall below −0.010. The tripwire held at 1.1e-16.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Kind</th><th>Δ brief</th><th>Δ averse</th>
+</tr></thead>
+<tbody>
+<tr><td>none</td><td>−0.012</td><td>0.000</td></tr>
+<tr><td>mp3</td><td>−0.004</td><td>−0.004</td></tr>
+<tr><td>noise20</td><td>+0.051</td><td>+0.020</td></tr>
+<tr><td>speed</td><td>−0.004</td><td>−0.012</td></tr>
+<tr><td>shift1</td><td>−0.016</td><td>−0.004</td></tr>
+</tbody>
+</table></div></li>
+<li><p>Part 3, the ITW speaker-cluster bootstrap (54 speakers, 2,000 replicates, seed 0): fails. The 5th percentile is +0.0044 under brief and <strong>−0.0023 under averse</strong>.</p></li>
+</ul>
+<p>Raising M5's weight buys noise robustness and some In-the-Wild misses. It pays for them on clean, speed-changed and shifted audio, and its In-the-Wild gain under the sponsor's convention cannot be told apart from zero. For the record, it would also fail the stricter gate (rules 2a and 3a doubled, 3b, 5).</p>
+<p><strong>P_wl fails both the gate and the room.</strong></p>
+<ul>
+<li><strong>Gate, with thresholds doubled</strong> because the test Spearman is 0.9667, below 0.974:
+<ul>
+<li>2a: ITW brief Δ +0.0233, below the doubled 0.040. It clears the undoubled 0.020, but the doubled bar governs.</li>
+<li>3a: inner brief Δ <strong>−0.0206</strong>, worse; 3b: inner averse Δ <strong>−0.0333</strong>, worse.</li>
+<li>Diagnostic: fails. The corrective share on inner OOF is 0.31, not above 0.5.</li>
+<li>Rules 2b, 4a, 4b and 5 (both costs) pass: the holdout improves (Δ +0.0035 / +0.0016; argmin misses 13 → 6).</li>
+</ul></li>
+<li><strong>Room:</strong> ITW Δ is +0.0233 brief and +0.0085 averse, against the 0.030 required under each.</li>
+<li><strong>Mechanism (diagnostic numbers):</strong>
+<ul>
+<li>Catches: of CURRENT's 122 ITW misses at the inner-OOF threshold, <code>wavlm_l</code> alone flags <strong>41</strong>. That clears both the gate's 16 and the room's 19, against M1b 1, M5 19 and Spectra-AASIST 79.</li>
+<li>Corrective share: 0.80 on ITW, but 0.31 on inner OOF.</li>
+<li>Spearman against M1b: 0.86 on holdout, 0.79 on test.</li>
+<li>Reading: WavLM carries real new information about In-the-Wild's miss tail. On the NSA-domain inner folds, though, it pushes more of the shipped rule's errors the wrong way than the right way.</li>
+</ul></li>
+</ul>
+<p><strong>Refit seat, diagnostic only (not a candidate; Nathan, 19:10).</strong> <code>wavlm_l</code> in M1b's seat (<code>scripts/fuse_sweep_m5.py --refit-m1b wavlm_l</code>):</p>
+<ul>
+<li>inner 0.1922, holdout 0.0035 / 0.0045, ITW 0.275 / 0.2665;</li>
+<li>ITW P_FA / P_miss at the inner threshold: <strong>5.3%</strong> / 6.1%.</li>
+</ul>
+<p>Replacing M1b halves the ITW misses but quadruples the ITW false alarms, and a false alarm costs 9.33 times a miss. The fourth-column entry was the right one to pre-declare. Outputs: <code>outputs/fusion/sweep_refit_report_wavlm_l.json</code>. The earlier refit report was preserved as <code>sweep_refit_report_before_wavlm.json</code>.</p>
+<h2 id="decision-rule-applied">Decision rule applied</h2>
+<p>There are no passers, so rule 7 does not arise. The decision is <strong>KEEP</strong>: <code>submissions/CrossExam_predictions.tsv</code>, sha256 <code>fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607</code>, was final unless H_noise passed (the 19:08 state; H_noise failed in Run 2, below). Nothing was tuned after the table: no weight, threshold or seat changed after 19:08.</p>
+<h2 id="what-goes-in-the-readme-for-the-readme-chat">What goes in the README (for the README chat)</h2>
+<ul>
+<li><strong>Second backbone (WavLM Large).</strong> In the blend at 0.2 it catches 41 of the shipped rule's 122 In-the-Wild misses. It still fails the pre-declared gate: inner CV worse by 0.021 (brief) and 0.033 (averse), with the ITW gain +0.023 / +0.009 short of the bar. In M1b's seat it quadruples In-the-Wild false alarms (5.3%). Not shipped.</li>
+<li><strong>M5 at weight 0.4</strong> failed a pre-declared fresh-evidence bake-off: −0.016 on one-sample-shifted audio, and a sponsor-cost ITW gain whose 5th percentile is below zero.</li>
+<li><strong>Second M3 suppression tier:</strong> inert. Identical metrics, and it never fires on a fake.</li>
+</ul>
+<h2 id="pending-at-1908-superseded-by-run-2-below">Pending at 19:08 (superseded by Run 2 below)</h2>
+<ul>
+<li><strong>H_noise:</strong> judged by the frozen gate. Its diagnostic uses the CPU chat's noise-AUC numbers via <code>--hnoise-evidence</code>; without them it fails.</li>
+<li><strong>Nathan's ruling window:</strong> the packet is ready now. With no passers there is nothing to ratify. His word confirms KEEP, or waits for H_noise.</li>
+</ul>
+<h2 id="run-2-1917-h_noise-and-the-final-report">Run 2 (19:17): H_noise, and the final report</h2>
+<p>The CPU chat's v6 export arrived at 19:16, earlier than the expected 20:30. It came with its noise-AUC evidence in <code>outputs/channel/hc_noise.json</code> (sha256 <code>2d4b4455…</code>; bundle <code>models/hc_lgbm_20260926-191630</code>; CPU chat commits <code>0065641</code> and <code>04f5391</code>, report <code>docs/reports/2026-09-26_post-draft-hc-noise.md</code>). The run:</p>
+<p><code>uv run python scripts/fuse_sweep_v3.py --hnoise-evidence 0.7716,0.9931 --hnoise-evidence-source outputs/channel/hc_noise.json</code></p>
+<p>The <strong>final report</strong> has sha256 <code>354502ca559118fb3f785ce04986b80a53c3e73453636dbc8b3e7b57c4bbddff</code>, archived as <code>sweep_v3_report_20260926-191752.json</code>. This is the hash <code>--write</code> would require. The 19:08 report (<code>c2b6bc22…</code>) is kept as <code>sweep_v3_report_20260926-190836.json</code>. T2, W4 and P_wl are unchanged cell for cell between the two runs.</p>
+<p><strong>H_noise fails the gate</strong> on 2a, 3a, 3b, 5-brief, 5-averse and 5-diagnostic.</p>
+<ul>
+<li><strong>Metrics:</strong> every cell is a little worse than CURRENT.
+<ul>
+<li>inner Δ −0.0015 / −0.0061</li>
+<li>holdout −0.0005 / −0.0016</li>
+<li>ITW −0.0003 / −0.0020</li>
+</ul></li>
+<li><strong>Diagnostic:</strong> it fails. The v6 AUC under 20 dB white noise is <strong>0.7716</strong>, below the 0.90 bar (v5b: 0.6403). Its clean AUC is 0.9931, within 0.005 of 0.998.</li>
+</ul>
+<p>The noise twins recover part of the 20 dB lane, but not enough to reach the bar. They also cost the clean holdout: the column alone goes from 0.137 to 0.227, per the CPU chat.</p>
+<p><strong>Decision: KEEP</strong>, with all four candidates judged. <code>submissions/CrossExam_predictions.tsv</code> (sha256 <code>fb783076…</code>) is final.</p>
+<p>After the Codex audit (19:17), the gate code now requires the full five-kind perturbation cohort and all ten bake-off cells. A partial cohort is INVALID. Re-running with that code reproduces <code>354502ca…</code> byte for byte.</p>
+<h2 id="ruling-nathan-1935-keep">Ruling (Nathan, ~19:35): KEEP</h2>
+<p>Nathan ratified KEEP. The <code>submissions/log.csv</code> row records it, with the final-name copy re-verified at sha256 <code>fb783076…</code>. <code>submissions/CrossExam_predictions.tsv</code> is the file for NSA. No <code>models/fusion_v3/</code> was written, and the lane is closed.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_post-draft-sweep.md</code> <span class="hash">4b2f86e6bcdb</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

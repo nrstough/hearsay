@@ -172,7 +172,7 @@ Nathan first held it (09:25) because the previous rule was the file planned for 
 - **The holdout has a resolution floor.** With two held-out generators its noise is about ±0.07–0.10, so we treat any gap under 0.15 as noise. It can tell a good detector from a bad one, not a good fusion rule from a slightly better one.
 - **In-the-Wild is the stress test.** 3,000 clips (2,000 real from 54 speakers, 1,000 fake), evaluation only, never trained on. For each model we report minDCF and the false-alarm rate at the threshold chosen on inner folds. From the fusion sweep on we report it under both cost weightings: the brief's, and the sponsor code's, where the 4× lands on a missed fake.
 - **The test set as a smoke alarm.** We track the share of test files scored above 0.5 against the ~30% the brief states. It flagged the band mismatch (below). It is never a selection signal: any monotone rescaling changes it without changing minDCF.
-- **The draft review.** NSA scores one early submission for us and returns minDCF only. We sent the exact artifact we ship and decided in advance what each returned number means:
+- **The draft review.** NSA scored one early submission for us and returned minDCF and EER. We sent the exact artifact we ship and decided in advance what each minDCF band would mean:
 
 | Returned minDCF | What it means | What we do |
 |---|---|---|

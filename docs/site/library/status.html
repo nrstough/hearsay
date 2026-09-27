@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HEARSAY: current state (Sat Sep 26, ~20:05; the file is final unless a ratified candidate replaces it) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/STATUS.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/STATUS.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-were-building">What we're building</a></li><li><a href="#where-things-stand">Where things stand</a></li><li><a href="#data">Data</a></li><li><a href="#findings-so-far-the-what-worked--what-didnt-log-starts-here">Findings so far (the "what worked / what didn't" log starts here)</a></li><li><a href="#how-to-help-right-now">How to help right now</a></li><li><a href="#open-questions-ask-in-the-nsa-discord-hearsay-channel">Open questions (ask in the NSA Discord HEARSAY channel)</a></li></ul></details>
+<h1 id="hearsay-current-state-sat-sep-26-2005-the-file-is-final-unless-a-ratified-candidate-replaces-it">HEARSAY: current state (Sat Sep 26, ~20:05; the file is final unless a ratified candidate replaces it)</h1>
+<p>A snapshot for teammates joining now. The plan, with its rules and timeline, is <a href="plan.html">docs/plan.md</a>. The architecture, with diagrams, is <a href="architecture.html">docs/architecture.md</a>. The NSA brief is <a href="nsa-challenge.html">docs/nsa-challenge.md</a>. Setup and repo rules are in <a href="claude-md.html">CLAUDE.md</a>.</p>
+<h2 id="what-were-building">What we're building</h2>
+<p>HEARSAY is software only; the hardware idea was dropped Friday night. It's an <strong>audio authentication system</strong> that takes any audio file and outputs the probability that it's synthetic (1.0 = synthetic), plus a plain-English reason.</p>
+<p>The design:</p>
+<ul>
+<li>A rule-based orchestrator decides which forensic detectors to run on each file.</li>
+<li>Each detector returns a score and evidence.</li>
+<li>A logistic stacker fuses the scores.</li>
+</ul>
+<p><strong>How we're graded</strong> (NSA instructions, <code>data/nsa/HEARSAY_HackGT2026_Instructions.pdf</code>):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Weight</th><th>What</th>
+</tr></thead>
+<tbody>
+<tr><td>60%</td><td><strong>MinDCF</strong> on NSA's 1,671-file test set. False alarms (real called synthetic) cost 4× a miss, and about 70% of files are real. Points = (1 − ours)/(1 − best) × 60.</td></tr>
+<tr><td>20%</td><td><strong>Diversity and depth</strong>: points for each distinct technique actually used. Metadata/container, spectral, prosody, ENF, compression, speaker-embedding consistency, deep anti-spoofing, splice, plus a bonus for choosing which analyses to run per file.</td></tr>
+<tr><td>20%</td><td><strong>Documentation</strong> in this GitHub repo, <strong>in our own words</strong>: approach, architecture, what worked, what didn't.</td></tr>
+</tbody>
+</table></div>
+<p><strong>Deliverables</strong> (final DM <strong>before 8 AM Sunday</strong>):</p>
+<ul>
+<li><code>teamName_predictions.tsv</code>: header <code>filename&lt;TAB&gt;cm-score</code>, all 1,671 rows in the template's order.</li>
+<li>A Docker image that runs inference offline. <strong>Not required</strong> (NSA to Nathan in person, Sat Sep 26 ~12:00: the submission is the TSV alone); ours is built and verified anyway (<code>hearsay:20260926-0916</code>) and stays in the README as reproducibility evidence.</li>
+<li>This repo's README.</li>
+<li>One optional early "draft" submission for feedback. <strong>Used:</strong> sent Sat 12:30 (<code>CrossExam_predictions.tsv</code>, the A3 w0.2 + E file, sha256 <code>fb783076…</code>); <strong>NSA returned minDCF 0.0733, EER 3.534%</strong> at ~15:30 (minDCF and EER only). Decoding: the 0.00–0.20 band, our direction (EER 3.5%, not 96.5%), ship unchanged. Field, per NSA at ~16:15: one team ahead at 0.0584 / EER 2.5%, a 0.95-point gap on the 60-point detection score under points = (1 − ours)/(1 − best) × 60. Record: <code>docs/reports/2026-09-26_sponsor-questions.md</code>, <code>submissions/log.csv</code> (15:40 row).</li>
+</ul>
+<h2 id="where-things-stand">Where things stand</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Area</th><th>State</th>
+</tr></thead>
+<tbody>
+<tr><td>Loader and submission writer</td><td>Done and tested. One FFmpeg path to 16 kHz mono; the writer enforces the TSV format, never overwrites, and logs to <code>submissions/log.csv</code>.</td></tr>
+<tr><td>Rollback submission</td><td>Done: <code>submissions/20260926-0036_M0_constant.tsv</code>, all 0.0 ("always real"). Valid, but minDCF 1.0 by definition.</td></tr>
+<tr><td>Detector contract</td><td>Done: <code>src/hearsay/detectors/base.py</code>. <strong>Build against this</strong> (see below).</td></tr>
+<tr><td>Metric</td><td>Done: <code>hearsay.metrics</code>, plus an exact re-implementation of NSA's own scoring code (<code>sponsor_min_dcf</code>).</td></tr>
+<tr><td>Validation split</td><td>Done: <code>splits/nsa_folds.csv</code>. Whole generators and speakers are held out; the outer holdout is the <code>playht</code> and <code>wavegrad2</code> generators plus 26 real-speech groups.</td></tr>
+<tr><td>Deep detector (XLS-R probe, M1)</td><td>Done: first learned TSV logged (<code>submissions/20260926-0308_M1_*.tsv</code>, holdout minDCF 0.146, EER 2.5%). M1b (+ASVspoof 2019 real speakers, inner folds only) reaches holdout 0.079 but raises In-the-Wild false alarms (report: <code>docs/reports/2026-09-26_m1b-asv19-bonafide.md</code>). The deep path is band-matched since commit <code>133e536</code>; the v3 re-extraction is running and its numbers replace these.</td></tr>
+<tr><td>Handcrafted spectral and prosody detector (75 interpretable features)</td><td>Done: <code>hearsay.detectors.handcrafted</code>. Holdout minDCF 0.25, EER 4.3% (v3: test-length crops + band match, LightGBM). Blind to grad_tts, pro_diff and ElevenLabs. Export <code>outputs/detector_scores/handcrafted.csv</code>. <strong>v4 feature families</strong> (LFCC, phase, CQCC, modulation, breath, jitter/shimmer; all implemented and gated, see <code>docs/reports/2026-09-26_handcrafted-v4.md</code>) are opt-in via <code>--families</code> in <code>hearsay.hc_v4</code>; the teammate brief is <code>docs/handoffs/2026-09-26_handcrafted-v4-brief.md</code>. <strong>v4 result:</strong> inner OOF minDCF 0.434 (v3 0.614), pro_diff 1.00 → 0.32, LibriSpeech real 0.77 → 0.54, holdout 0.170; grad_tts still 1.00; In-the-Wild P_FA 0.65% at the inner threshold but minDCF 1.0 (does not transfer). The first fusion run found a test-domain shift (v4 alone calls 56% of the test set synthetic under a 0.3-prior Platt map; v3 49%; the envelope of the test recordings is darker, codec-like, across nearly every column). <strong>v5b</strong> (same columns + augmented fit-only training rows: codec round-trips, random tilt + low-pass) is the recommended fusion column: clean holdout 0.137, calibrated test share 51%, holdout-real false alarms 6.3% vs 9.1%. Exports <code>handcrafted_v4.csv</code> and <code>handcrafted_v5.csv</code>; bundle <code>models/hc_selected</code> = v5b; fusion decides.</td></tr>
+<tr><td>Compression, container, ENF, splice detectors</td><td>Done against the contract (<code>hearsay.detectors.{compression,container,enf,splice}</code>; <code>import hearsay.detectors.engineered</code> registers all five). Container is rule-based (constant on this test set, by design); ENF and splice are mild rule-based scores plus evidence. Exports in <code>outputs/detector_scores/</code>. Report: <code>docs/reports/2026-09-26_cpu-detectors.md</code>.</td></tr>
+<tr><td>Spectra-AASIST (M3, second deep detector)</td><td><strong>Done (Sat 06:00).</strong> Off-the-shelf Spectra-AASIST scored through the shared band-matched input path with the same test-length crops as M1 and the handcrafted detector; zero-pad for short clips (chosen on inner rows). Outer holdout minDCF <strong>0.012</strong>, EER 0.16% (playht 0.010, wavegrad2 0.012, LibriSpeech real 0.011, LJ real 0.008); In-the-Wild minDCF 0.065, EER 3.2%, real P_FA 0.0% at its own threshold (possibly optimistic: training data undisclosed); 29.3% of test files above a zero margin (prior ~30%); disagrees with M1 v3 on 154 test files (Spearman 0.57). Export <code>outputs/detector_scores/spectra_aasist.csv</code> (<code>logit</code> = raw margin, read it directly). Report: <code>docs/reports/2026-09-26_m3-spectra.md</code>.</td></tr>
+<tr><td>Fine-tuned XLS-R (M5)</td><td>Done; <strong>gate not passed</strong>, and the shipped arm is head-only: the runs that actually fine-tuned the 12 kept layers (<code>train_top=12</code>, six runs) were worse or equal on the hardest folds (ElevenLabs fold: 0.38–0.41 vs 0.31 frozen; grad_tts fold: 0.52 vs 0.52), so the frozen-backbone arm (learned layer weights + attentive pooling + linear head, 3,000 steps, <code>arm=nsa_extra</code>) was shipped. Holdout 0.363 (playht 0.05, wavegrad2 0.58; LibriSpeech real 0.42; clips ≤ 4 s 0.60) vs M1 v3 0.159; pooled inner OOF 0.302 vs 0.257; In-the-Wild false alarms 0.45% vs 0.7% (the one axis it wins). Ships only as a stacker column (<code>outputs/detector_scores/m5_xlsr_ft.csv</code>); since 8316e50 (11:01) the runner can also score it live under <code>models/fusion_v2/constants.json</code> (<code>--m5</code>, loaded only when the constants file weights it), still not the shipped rule. Spend $5.09 over seven rentals plus a ~$0.25 checkpoint-restore probe; all boxes destroyed. Spec <code>docs/specs/2026-09-26_m5-xlsr-finetune.md</code>; hand-off report to follow.</td></tr>
+<tr><td>Fusion (M4)</td><td><strong>Rule frozen by pre-declared sweep at 08:13</strong> (<code>docs/reports/2026-09-26_fusion-sweep-predeclared.md</code>, constants <code>models/fusion_v1/constants.json</code>): rank blend 0.8·M1b v3 + 0.2·handcrafted v5, M3 (Spectra) used only to suppress false alarms, Platt at the 0.3 prior, determinate scores in [0.001, 1], gated block below. Readout: inner 0.140, holdout 0.014, In-the-Wild 0.260 (0.267 under the sponsor code's cost), all better than M1b alone (0.301 / 0.072 / 0.343 / 0.296). Draft-review payload: <code>submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv</code>, with a pre-flipped twin ready if NSA's returned number says their code scores inverted. Consult record: <code>docs/consults/2026-09-26_fusion-strategy_RESPONSE.md</code>. The runner and the Docker image are being re-pointed to this rule. <strong>Candidate, not shipped (Nathan, 09:25: rule stays frozen; revisit only after NSA's draft-review number, if time allows):</strong> the pre-declared M5 sweep (addendum in the same report) found that A3 w0.2 + E (rank 0.6 M1b v3 + 0.2 handcrafted v5 + 0.2 M5, same M3 suppression) qualifies on crop-fair In-the-Wild scores: ITW 0.228 / 0.239 (both costs) vs 0.260 / 0.267, holdout 0.0065, inner 0.135; Spearman 0.974 against the current TSV, 3 files cross 0.5. Artifacts: <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_*.tsv</code>, sweep constants under <code>outputs/fusion/fusion_v2_candidate/</code>, and the runner's file <code>models/fusion_v2/constants.json</code> (written by <code>scripts/fuse_sweep_m5.py --write</code>). The pipeline half of shipping it is done (8316e50, "build now, switch later", approved ~10:20; the frozen path reproduces the draft file to 1.1e-16 on the new code); the image is no longer a deliverable (NSA, Sat ~12:00), so a switch is a file copy plus a README line. <strong>Ratified by Nathan at ~12:05: A3 w0.2 + E is the shipped rule.</strong> The draft went to NSA as <code>CrossExam_predictions.tsv</code> = <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code> (sha256 <code>fb783076…</code>, log row 12:03); the runner's default is <code>models/fusion_v2/constants.json</code> since cc6670c (12:35; <code>scripts/run_pipeline.py --team CrossExam</code> with no flags reproduces the submitted file: 50 files Spearman 1.0, max 2.6e-4; suite 510); <code>e_on_a</code> / <code>fusion_v1</code> is the documented <code>--fusion</code> fallback and what the evidence Docker image reproduces. <strong>NSA's draft review scored this file at minDCF 0.0733 / EER 3.534% (~15:30): our direction, band 0.00–0.20, ship unchanged; one team ahead at 0.0584.</strong> <strong>Post-draft sweep (pre-declared manifest and gate, <code>docs/reports/2026-09-26_post-draft-manifest.md</code>, <code>docs/reports/2026-09-26_post-draft-sweep.md</code>): four candidates, none passed.</strong> T2 (a second Spectra tier) reproduced CURRENT's cells exactly; W4 failed its fresh-evidence bake-off (Nathan, 17:40); P_wl (a frozen WavLM Large probe as a fourth column, <code>docs/reports/2026-09-26_post-draft-heads.md</code>: level with M1b on the holdout at 0.0717, 0.752 vs 0.342 on In-the-Wild) improved the holdout to 0.0030 and In-the-Wild to 0.2047 but failed the gate and the room; H_noise (handcrafted v6, noise-augmented) failed the gate. <strong>Nathan ratified KEEP at ~19:35.</strong> <code>submissions/CrossExam_predictions.tsv</code> (byte copy of the 09:14 A3 file, sha256 <code>fb783076…</code>, logged 17:33 as final) is the file for NSA; no <code>fusion_v3</code> exists; the fusion lane is closed. Handoff <code>docs/handoffs/2026-09-26_m4-fusion-handoff.md</code>; run spec <code>docs/specs/2026-09-26_m4-fusion-v2-m5-scorer.md</code>.</td></tr>
+<tr><td>End-to-end runner + API</td><td>Built (frozen path at 9614c18; 8316e50 added the opt-in fusion_v2 path with <code>--m5</code> and <code>--fusion models/fusion_v2/constants.json</code>, default unchanged; suite 504): <code>scripts/run_pipeline.py</code> takes an audio directory and writes the TSV plus one explanation JSON per file (all detectors, M1b, Spectra, the frozen fusion rule <code>e_on_a</code> from <code>models/fusion_v1/constants.json</code>, the pinned-block policy applied exactly once), resumable, 0.78 s/file on the Mac; <code>--flip</code> writes the pre-flipped twin. Reproduces the 08:13 draft TSV from exported logits to 4e-16 on all 1,671 rows and live from audio on 50 files to 2.7e-5. <code>hearsay.api</code> serves POST /analyze and GET /results for the frontend. Report: <code>docs/reports/2026-09-26_runner-docker.md</code>.</td></tr>
+<tr><td>Docker</td><td><strong>Shipped-rule image built and verified (09:41)</strong>: <code>hearsay:20260926-0916</code> = <code>hearsay:latest</code> (linux/amd64, 7.5 GB in the image store, ~4.5 GB unpacked; torch 2.14.0+cpu), built from source <code>37c26b8</code>, default rule <code>e_on_a</code> from <code>models/fusion_v1/constants.json</code> (v0 and the unused v2 candidate staged beside it); entrypoint = the runner with <code>--require-offline</code> and a six-thread cap; ships the M1b v3 probe (0521), the selected handcrafted bundle, the compression bundle, fusion constants and all three weight sets with a 72-file sha manifest verified at start. In-image checks with <code>--network none</code>: 50-file parity vs <code>submissions/20260926-0813_M4_sweep_E_on_A_alpha0.2_our_direction.tsv</code> Spearman 1.0, max diff 2.02e-4, mean 9.1e-6, 0 gated; decoded audio identical to the Mac on 50/50; smoke exit 0 (WAV/MP3/FLAC, reversed template, two runs byte-identical, offline refusal on real input, <code>--flip</code> twin with determinate rows reversed and gating identical); preflight silence and music land in the pinned block as <code>undetermined</code>. 4.0 s/file on an idle VM, 7.0 when the Mac is busy. The full in-image run stopped at 664/1,671 on the old rule and stands as a partial timing record only (~2 h extrapolated). K commits through 00a717c; spec <code>docs/specs/2026-09-26_k-docker-image.md</code>. Rebuild needed only if the rule changes or the frozen path moves; 8316e50 is backward compatible and the Docker chat agreed no rebuild is needed until a switch.</td></tr>
+<tr><td>README</td><td>Draft committed (ec4c65b, README chat): how it decides with a real per-file trace, results at a glance, architecture, validation, what worked and what did not with mechanisms, numbers tables with a source file per row, reproduce, AI use and credits. Pending placeholders: orchestration ablation and worked examples, the draft-review number, the M5 re-sweep outcome, the Docker rebuild parity. Polish Sun 05:00–07:30.</td></tr>
+<tr><td>Channel robustness (consult items 3, 7, 8)</td><td><strong>Done (Sat 13:20); diagnostic only, no TSV, no rule change.</strong> λ̂ (test set's wild-domain weight) = 0.51 (95% CI 0.12–0.64); the first 0.947 was withdrawn (its main feature read the 7–8 kHz stopband). The 7.2 kHz wall is a smooth low-pass, not MP3/AAC, so the codec refit (C) did not run. M3's false-alarm suppression is <strong>kept</strong> under the pre-declared rule: its AUC and minDCF barely move under perturbation (mean |ΔAUC| 0.0008 vs M1b 0.0041), though its rank order moves the most of the deep models; it has the lowest MLAAD miss rate (14.9% vs M1b 22.7%; M3's own MLAAD exposure is unknown); the step damps 1.2% of MLAAD spoof and never raised the fused holdout minDCF. This shows the step is safe, not that M3 generalises. New weak spot: 20 dB white noise turns fakes into misses (M1b P_miss 0.07 → 0.88 at the inner threshold, handcrafted v5 AUC 0.64); the shipped rule's holdout minDCF rises from 0.012 to 0.269. Follow-up (14:41): the double low-pass stopband (test files filtered twice, training once) moves no detector beyond a pre-declared threshold; fused holdout minDCF 0.012 → 0.016, 0 flips at P 0.5. The ledger entry is closed for stopband depth (no refit); the test wall's transition-band shape (~9 dB different at 6.8–7.25 kHz) remains unprobed (<code>docs/specs/2026-09-26_channel-stopband.md</code>). Report <code>docs/reports/2026-09-26_channel-robustness.md</code>; run spec <code>docs/specs/2026-09-26_channel-robustness.md</code>.</td></tr>
+<tr><td>Tests</td><td>351 passing over the tracked test files at ed31cb9 (<code>uv run pytest -q</code>; M3's <code>tests/test_spectra.py</code> has 40; other chats' untracked tests add more), ruff clean.</td></tr>
+<tr><td>Orchestration credit (ablation, worked examples)</td><td><strong>Done (Sat, CPU chat).</strong> <code>scripts/orchestration_ablation.py</code> re-fuses the exported scores with each routing rule on and off (<code>outputs/fusion/orchestration_ablation.{json,md}</code>): M3 suppression halves the holdout cost (0.030 → 0.014) and takes In-the-Wild from 0.322 to 0.258 while touching only real files (123 holdout, 34 In-the-Wild); the gate touches 31 holdout rows, 9 In-the-Wild rows and 0 test files; fusing everything equally is better on the holdout (0.0085) and worse on In-the-Wild under the brief's cost (0.276). Eight real test files with their routing logs and every evidence sentence, reproduced live with the frozen rule to four decimals of the shipped TSV: <code>docs/reports/2026-09-26_worked-examples.md</code>. <code>CLAUDE.md</code> disclosure extended to every lane and "what we built vs. what AI did" filled per component.</td></tr>
+</tbody>
+</table></div>
+<h2 id="data">Data</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Data</th><th>What</th><th>Where</th>
+</tr></thead>
+<tbody>
+<tr><td>NSA test set</td><td>1,671 WAVs, 16 kHz mono PCM, 3.0–13.6 s (median 3.4 s), ~70% real</td><td>NSA Challenge Google Drive folder → <code>HackGTHearsayTesting.zip</code>, unpacked to <code>data/nsa/HackGTHearsayTesting/</code></td></tr>
+<tr><td>Answer template</td><td>Row order for the TSV</td><td>Drive → <code>HearsayScoreKey4TeamX.tsv</code>, copied to <code>data/nsa/</code></td></tr>
+<tr><td>DiffSSD (synthetic training)</td><td>70,000 clips from 10 TTS generators, including ElevenLabs and PlayHT; 21.5 GB</td><td>Drive → <code>DiffSSD.zip</code>, or the HexLabs environment</td></tr>
+<tr><td>LJ Speech (real training)</td><td>13,100 clips, one speaker</td><td>keithito.com (see the NSA instructions), or the HexLabs environment</td></tr>
+<tr><td>LibriSpeech dev+test (real training)</td><td>5,323 clips, about 80 speakers</td><td>openslr.org/12</td></tr>
+<tr><td>NSA scoring code</td><td>ASVspoof5 evaluation package</td><td>Drive → <code>HackGTMinDCF.zip</code>, unpacked to <code>data/nsa/HackGTMinDCF/</code></td></tr>
+</tbody>
+</table></div>
+<p>Data is gitignored. Put it under <code>data/</code> with the same paths as above (<code>data/nsa/...</code>, <code>data/ljspeech</code>, <code>data/librispeech</code>), or ask Nathan for a copy from his external drive.</p>
+<h2 id="findings-so-far-the-what-worked--what-didnt-log-starts-here">Findings so far (the "what worked / what didn't" log starts here)</h2>
+<ul>
+<li><strong>The NSA scoring code runs "backwards" from their instructions.</strong> It's ASVspoof5 code that treats a higher score as <em>real</em>; the instructions say 1.0 = synthetic.
+<ul>
+<li>Our decision: follow the instructions (1.0 = synthetic) and never flip.</li>
+<li>We log how our scores would come out under their code both ways. The draft submission will show which one they actually use.</li>
+</ul></li>
+<li><strong>Shortcuts we found and removed:</strong>
+<ul>
+<li><strong>Loudness.</strong> Test clips peak near full scale, while training real speech peaks around 0.5, so loudness alone predicted the label (AUC 0.66). Fixed by normalizing each input.</li>
+<li><strong>Leading silence.</strong> LibriSpeech real clips start with about 0.37 s of silence; test clips have about 0.06 s. Fixed with the same silence trim on train and test.</li>
+<li><strong>Clip length and tiling.</strong> Training clips are 5–9 s and test clips about 3.4 s. The old 4 s window repeat-padded short test clips, which put a splice seam only in test data. Fixed by embedding each clip at its real length, and training on crops drawn from the test length distribution.</li>
+</ul></li>
+<li><strong>Container format is a trap.</strong> Some training fakes are MP3 or 22 kHz, while every test file is 16 kHz WAV. Any metadata or compression detector must be trained on clips converted to 16 kHz WAV first, or it will learn "MP3 = fake".</li>
+<li><strong>The container <em>is</em> the label on the training data</strong> (measured): LibriSpeech = FLAC, LJ = 22 kHz WAV, DiffSSD = WAV or MP3, and PlayHT's MP3s carry the same FFmpeg encoder tag (<code>Lavf58.29.100</code>) as all 1,671 test files. So the container detector is never learned; it returns routing facts and a constant score here.</li>
+<li><strong>The test set is low-passed at about 7.2 kHz</strong> and no training corpus is (not even the sponsor's resampled LJ clips). Everything above 7 kHz was a train-vs-test fingerprint; the handcrafted detector called 90% of the test set synthetic until <code>hearsay.handcrafted.band_limit</code> (a 71-tap Kaiser low-pass matching the roll-off) was applied to every clip, train and test. Now 42% of test files score above 0.5. The deep path got the same band match on Sat ~04:20 (commit <code>133e536</code>: <code>prepare_segment</code> calls <code>band_limit</code> first), and M1's embeddings are being re-extracted; details and numbers in <code>docs/reports/2026-09-26_cpu-detectors.md</code>.</li>
+<li><strong>The 7.2 kHz wall is not an MP3/AAC codec (Sat ~12:50, channel-robustness lane, action B).</strong> On 100 inner real clips, MP3 at 24–96 kbps and AAC at 32–64 kbps, at 16 and 44.1 kHz, alone or followed by our Kaiser low-pass, none reproduces the test set's edge: none satisfies the pre-declared match rule (distance to the test medians: our Kaiser low-pass 1.081; best codec, AAC 64 k + Kaiser, 1.045, 3% better where the pre-declared rule required 20%). MP3 at 16 kHz makes the wall far too steep (−66 dB vs the test's −44), 44.1 kHz encodes leave no wall, and no variant matches the test's near-zero local-hole rate. <strong>So the symmetric codec refit (C) does not run</strong>, by the rule set in advance, and no refit M1b column is coming; the wall looks like a resampling low-pass, which our band match already mirrors. <code>outputs/channel/codec_match.json</code>.</li>
+<li><strong>λ̂, the test set's wild-domain weight: 0.51 (95% CI 0.12–0.64), corrected (Sat ~12:55).</strong> The first estimate (0.947) is withdrawn: its dominant feature, <code>clip_floor_db</code>, a whole-spectrogram 1st percentile, was reading the 7–8 kHz stopband that the method's own rule excludes, i.e. it measured the test files' double low-pass, not their channel. Without it: speaker-grouped domain classifier (holdout real vs In-the-Wild real) OOF AUC 0.84; λ̂ 0.51 overall, 0.58 on the 1,170 files the shipped rule calls real, 0.54 without LJ on the clean side; novelty share 1%. Controls (share read as wild): VCTK 24.7%, DiffSSD spoof 19%, inner real 10%, the same inner real after an MP3 round-trip 9%, so the "wild = codec-processed" reading is withdrawn too. Per feature the test set sits between the two domains on 11 of 21 statistics, beyond the wild end on noise-floor stationarity and flatness, and beyond the clean end on loudness spread and several floor and deep-hole statistics (<code>lambda.json</code> <code>per_feature</code>), so it is its own recording population rather than a blend. Duration-matched reference clips give 0.36, and rate-consistent variants 0.48–0.57. Reading: indeterminate, with an interval that includes the 0.32 crossover, so λ̂ cannot say which validation set represents the test set. For the shipped rule this does not matter: fusion_v2 beats fusion_v1 on both the holdout (0.0065 vs 0.014) and In-the-Wild (0.228 vs 0.260), so the choice is robust to λ. Run spec <code>docs/specs/2026-09-26_channel-robustness.md</code>; <code>scripts/channel_lambda.py</code>; <code>outputs/channel/lambda.json</code>.</li>
+<li><strong>Our holdout is optimistic about real-world audio.</strong> On the eval-only In-the-Wild set, both M1 and M1b score minDCF 0.37–0.40 against 0.08–0.15 on the NSA holdout. Adding 40 VCTK read speakers (M1b) improved every holdout slice but raised In-the-Wild false alarms at the inner threshold from 1.2% to 5.7%. Channel robustness, not more read speech or more spoof data, is the lever; every deep detector now reports In-the-Wild false alarms as a gate.</li>
+<li><strong>Leakage check is clean.</strong> No test file is an exact copy of anything in LJ Speech, the NSA LJ subset, or In-the-Wild.</li>
+<li><strong>Public-data sanity check</strong> (not an NSA number): frozen XLS-R plus logistic regression gets minDCF 0.023 on ASVspoof 2019's unseen attacks. The same model scored pure silence as 99% synthetic, which is why the silence handling above matters.</li>
+</ul>
+<h2 id="how-to-help-right-now">How to help right now</h2>
+<p><strong>1. Setup</strong></p>
+<pre><code class="language-bash">git clone https://github.com/nrstough/hearsay &amp;&amp; cd hearsay
+uv sync
+cp .env.example .env
+uv run pytest -q          # expect all passing; tests needing data/weights skip cleanly</code></pre>
+<p>Requires <code>uv</code> and <code>ffmpeg</code> (<code>brew install uv ffmpeg</code>).</p>
+<p><strong>2. Build a detector</strong> against <code>src/hearsay/detectors/base.py</code>.</p>
+<ul>
+<li>Put it in <code>src/hearsay/detectors/&lt;your_detector&gt;.py</code>.</li>
+<li><code>run(ctx)</code> returns a <code>DetectorResult</code> with:
+<ul>
+<li><code>score</code> in [0, 1], <strong>higher = more synthetic</strong></li>
+<li><code>evidence</code>: one plain-English sentence explaining the score</li>
+<li><code>features</code>: a few named numbers</li>
+</ul></li>
+<li><code>ctx.audio</code> is 16 kHz mono float32 and read-only.</li>
+<li><strong>Never use file dates or filenames.</strong> Git, zip and Docker rewrite them.</li>
+</ul>
+<p>Proposed split (see <code>CLAUDE.md</code>):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Owner</th><th>Detectors</th>
+</tr></thead>
+<tbody>
+<tr><td>A</td><td>Container/metadata and compression forensics</td></tr>
+<tr><td>B</td><td>Spectral and prosody (the handcrafted features in <code>src/hearsay/handcrafted.py</code> are a starting point)</td></tr>
+<tr><td>C</td><td>Speaker drift within a clip, and splice. C also owns the Docker image from Saturday morning.</td></tr>
+</tbody>
+</table></div>
+<p><strong>3. Validate on the shared folds.</strong></p>
+<ul>
+<li>Use <code>outputs/manifests/nsa_train_sample.csv</code> (paths and labels) and <code>splits/nsa_folds.csv</code>.</li>
+<li>Fit only on inner folds <code>0</code>–<code>4</code> and report the outer holdout. Never train on holdout rows.</li>
+<li>Score with <code>hearsay.metrics.report(y, scores)</code>.</li>
+<li>Export scores as <code>outputs/detector_scores/&lt;name&gt;.csv</code> with columns <code>path, fold, split (inner_oof | holdout | test), score, logit</code>, so fusion can use them.</li>
+</ul>
+<p><strong>4. Deadlines</strong> (from <code>docs/plan.md</code>):</p>
+<ul>
+<li>Detector scores due <strong>Sat 19:00</strong>.</li>
+<li>Fusion freezes <strong>Sat 22:00</strong>.</li>
+<li>Final TSV <strong>Sun 05:00</strong>.</li>
+<li>DM sent <strong>before 08:00</strong>.</li>
+</ul>
+<p><strong>5. Working in the repo</strong></p>
+<ul>
+<li>Small commits.</li>
+<li><code>git add</code> only your own files.</li>
+<li>Keep <code>uv run pytest -q</code> green.</li>
+<li>Write down what didn't work too; it's graded.</li>
+</ul>
+<h2 id="open-questions-ask-in-the-nsa-discord-hearsay-channel">Open questions (ask in the NSA Discord HEARSAY channel)</h2>
+<ul>
+<li>Does the HexLabs environment have GPUs, and where are the data paths? That would decide whether we rent a cloud GPU for fine-tuning.</li>
+<li>Which prior and cost model will they actually score with? Their code uses Pspoof 0.5 with the 4× cost on accepted spoofs, which isn't the brief's "false alarm ×4 at 70% real".</li>
+<li>Team name for the TSV filename.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/STATUS.md</code> <span class="hash">9e6f741e5da7</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

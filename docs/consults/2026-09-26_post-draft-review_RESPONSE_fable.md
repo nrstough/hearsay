@@ -4,7 +4,7 @@ Requested by Nathan as a comparison to the VeriLM memo. The agent read `2026-09-
 
 ---
 
-# Independent opinion: after the draft review, what (if anything) moves the test number
+## Independent opinion: after the draft review, what (if anything) moves the test number
 
 Sat Sep 26, 17:00 EDT. Freeze Sun 05:00. Everything below is computed from the repo's exported logits (`outputs/detector_scores/*.csv`, In-the-Wild files, `outputs/channel/m3_mlaad.csv`) with the same loaders and cost functions as `scripts/fuse_sweep.py`; the shipped rule reproduces exactly (inner 0.1351, holdout 0.0065 [0 FA, 13 miss], ITW 0.228 [15 FA, 158 miss], averse 0.2385). I did not read the RESPONSE files.
 

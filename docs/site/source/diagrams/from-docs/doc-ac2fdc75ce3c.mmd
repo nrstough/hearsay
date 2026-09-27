@@ -1,0 +1,35 @@
+flowchart TB
+  W["prepared waveform · 16 kHz<br/>band_limit → trim → crop or 8 s cap → zero-mean unit-variance"]
+
+  subgraph cnn["CNN feature encoder · frozen in every rung"]
+    K["7 conv layers · 512 channels<br/>kernels 10,3,3,3,3,2,2 · strides 5,2,2,2,2,2,2<br/>one 512-d frame per 20 ms"]
+  end
+  PJ["feature projection 512 → 1024<br/>+ convolutional positional embedding"]
+
+  subgraph tf["Transformer encoder · 24 layers · 1024-d · 16 heads · FFN 4096"]
+    T1["layers 1 – 7"]
+    T2["layers 8 – 12"]
+    T3["layers 13 – 24"]
+  end
+  W --> K --> PJ --> T1 --> T2 --> T3
+
+  subgraph m1["M1 probe · frozen backbone"]
+    H7["hidden state h7<br/>time-mean over frames → 1024-d"]
+    SC["StandardScaler → logistic regression<br/>C = 1 · class-balanced · fit fold-locally"]
+    PL["Platt map on out-of-fold scores<br/>→ prior-neutral LLR"]
+  end
+  T1 -->|"read h7 (layer chosen by inner CV: 6 and 8 close, 20+ poor)"| H7 --> SC --> PL
+
+  subgraph m5["M5 head · layers 1 – 12 trainable, 13 – 24 dropped"]
+    LW["softmax layer weights<br/>over h0 … h12 (13 states)"]
+    AP["masked attentive statistics pooling<br/>tanh bottleneck 128 → mean ‖ std → 2048-d"]
+    HD["linear head → 1 logit<br/>high = synthetic"]
+  end
+  T2 -->|"same 12 layers, fine-tuned<br/>LLRD 0.85 · backbone 1e-5 · head 5e-4"| LW --> AP --> HD
+
+  classDef frozen fill:#e8eaf6,stroke:#3949ab,color:#111
+  classDef built fill:#e6f4ea,stroke:#1e8e3e,color:#111
+  classDef flight fill:#fff4e5,stroke:#e37400,color:#111
+  class W,K,PJ,T1,T2,T3 frozen
+  class H7,SC,PL built
+  class LW,AP,HD flight

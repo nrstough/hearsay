@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What did not work after the draft review (Sat Sep 26, 2026, evening) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_post-draft-negatives.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_post-draft-negatives.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#1-more-heads-on-the-same-backbone-are-dead-on-arrival">1. More heads on the same backbone are dead on arrival</a></li><li><a href="#2-re-weighting-the-same-three-scores-has-a-measured-ceiling">2. Re-weighting the same three scores has a measured ceiling</a></li><li><a href="#3-the-handcrafted-score-is-the-readable-column-not-a-vote">3. The handcrafted score is the readable column, not a vote</a></li><li><a href="#4-the-excluded-detector-could-shrink-the-miss-tail-and-stays-excluded">4. The excluded detector could shrink the miss tail, and stays excluded</a></li><li><a href="#5-the-cost-convention-cant-be-read-from-the-returned-pair">5. The cost convention can't be read from the returned pair</a></li><li><a href="#6-how-far-our-proxies-were-from-the-one-measurement">6. How far our proxies were from the one measurement</a></li><li><a href="#7-a-heavier-m5-weight-did-not-survive-fresh-evidence">7. A heavier M5 weight did not survive fresh evidence</a></li><li><a href="#8-noise-twins-did-not-make-the-handcrafted-model-noise-robust">8. Noise twins did not make the handcrafted model noise-robust</a></li><li><a href="#not-run-tonight-and-why">Not run tonight, and why</a></li></ul></details>
+<h1 id="what-did-not-work-after-the-draft-review-sat-sep-26-2026-evening">What did not work after the draft review (Sat Sep 26, 2026, evening)</h1>
+<p>NSA returned minDCF 0.0733, EER 3.53% on our draft file. We then asked what could still move that number. Two outside opinions and our own checks gave mostly negative answers. This report writes them down, each with its number, its mechanism and its source, so the README can cite them.</p>
+<p><strong>Sources.</strong> The consult prompt and its addenda: <code>docs/consults/2026-09-26_post-draft-review_CONSULTATION.md</code>. The VeriLM memo and the Round 2 comparison: <code>…_RESPONSE.md</code> (verbatim: <code>…_RESPONSE_verbatim.md</code>). The Fable agent's memo: <code>…_RESPONSE_fable.md</code>. The Fable agent computed on our exported scores with the sweep's own loaders. The consult chat then re-checked two of its claims from the exports: the M5-weight rows and the second-tier row (Round 2 table in <code>…_RESPONSE.md</code>). It did <strong>not</strong> re-run the layer probes, the stackers or the M3 promotion; those numbers are the Fable agent's alone, and each one is marked below.</p>
+<p><strong>Costs.</strong> "Brief" is our selection cost, 9.33·P_FA + P_miss (π_synth = 0.3, C_FA = 4). "Averse" is the sponsor script's cost, P_FA + 4·P_miss (item 5 explains why it differs). The shipped rule is A3 w0.2 + E: inner 0.1351 / 0.2997, holdout 0.0065 / 0.0087, In-the-Wild 0.228 / 0.2385 (brief / averse).</p>
+<hr>
+<h2 id="1-more-heads-on-the-same-backbone-are-dead-on-arrival">1. More heads on the same backbone are dead on arrival</h2>
+<p><strong>What we tried.</strong> Probes on other XLS-R layers, trained with M1b's recipe on the embeddings we already had. <em>(Fable memo, option 10; not re-run by the consult chat.)</em></p>
+<p><strong>The numbers.</strong> The layer-7 baseline reproduces M1b exactly: inner 0.2649, holdout 0.0717, In-the-Wild 0.342. Averaging layers 5–9 improves the holdout to 0.052. But In-the-Wild gets worse, 0.368, and its false-alarm rate doubles, from 0.8% to 1.55%. Concatenating layers 6–8, layers 5/7/9 and layers 5–9 gives In-the-Wild 0.353, 0.430 and 0.399.</p>
+<p><strong>Why.</strong> At the threshold that minimizes its In-the-Wild cost, the shipped rule misses 158 fakes there. Each detector alone, at its own inner threshold, would catch these many of them: M1b 1, the handcrafted model 2, M5 33 and Spectra-AASIST 107. At the rule's inner-OOF threshold, the one the gate reads, it misses 122, of which M5 would catch 19 and Spectra-AASIST 79 (correction in <code>…_RESPONSE.md</code>, commit 589e9f2). So M1b's backbone does not see these fakes at any layer, and a new head on that backbone has the same blind spot. Only a different backbone can see them. That is why the one head experiment we ran tonight is a WavLM Large probe.</p>
+<p><strong>The different backbone, measured.</strong> WavLM Large, probed exactly like M1b, is level with M1b on the holdout (0.0717 both). It is not a clone: its test-set Spearman with M1b is 0.79. And it does reach the miss tail. Alone, it flags 41 of the shipped rule's 122 In-the-Wild misses at the inner-OOF threshold, against M1b's 1 and M5's 19. But it pays with false alarms on wild real speech (7.05% against M1b's 0.8%). As a fourth column at weight 0.2 it failed the pre-declared gate:</p>
+<ul>
+<li>inner CV got worse by 0.021 (brief) and 0.033 (averse)</li>
+<li>its In-the-Wild gain (+0.023 / +0.009) was short of the bar</li>
+</ul>
+<p>In M1b's seat it quadruples In-the-Wild false alarms. Not shipped (<code>docs/reports/2026-09-26_post-draft-heads.md</code>; <code>docs/reports/2026-09-26_post-draft-sweep.md</code>, commit 57b9c90).</p>
+<h2 id="2-re-weighting-the-same-three-scores-has-a-measured-ceiling">2. Re-weighting the same three scores has a measured ceiling</h2>
+<p><strong>What we tried.</strong> Every way of re-slicing the three scores we trust: M1b, handcrafted and M5.</p>
+<p><strong>The numbers.</strong></p>
+<ul>
+<li><strong>Cheating on purpose.</strong> We chose weights on In-the-Wild itself, (0.3, 0.2, 0.5). That reaches In-the-Wild 0.186, a gain of 0.04. It costs the holdout two false alarms. No honest rule can beat a rule tuned on the test set it is scored on, so 0.04 is the ceiling. <em>(Fable memo, §2.)</em></li>
+<li><strong>A stacker fit on In-the-Wild.</strong> A logistic stacker on the three logits, fit on In-the-Wild, scores 0.257 there. That is worse than the shipped rank blend. <em>(Fable memo, §2.)</em></li>
+<li><strong>An admissible stacker.</strong> A non-negative stacker fit on inner rows without LJ Speech gives weights (0.66, −0.04, 0.37) for M1b, handcrafted and M5. It scores In-the-Wild 0.222, under our 0.01 bar, and holdout 0.029, which is worse. <em>(Fable memo, option 5.)</em></li>
+<li><strong>A second M3 suppression tier.</strong> Quartering files with Spectra margin below −6, on top of halving below −3, gives identical numbers on every split: inner 0.1351 / 0.2997, holdout 0.0065 / 0.0087, In-the-Wild 0.228 / 0.2385 <em>(verified, Round 2 table)</em>. Halving already puts every touched file below every untouched file above 0.5, so quartering only reorders files inside the suppressed set.</li>
+<li><strong>Calibration.</strong> Platt or isotonic maps keep the order of scores. minDCF depends only on the order, so calibration cannot move it at all.</li>
+<li><strong>A length-gated mixture.</strong> More M5 weight on clips of 4 s or less scores In-the-Wild 0.207. It rested on a wrong premise: M5 is the <em>weaker</em> detector on short clips (holdout, ≤ 4 s: M5 0.344, M1b 0.066). Its gain comes from M5's lower wild-domain false-alarm rate, not from clip length, and raising M5's weight everywhere does the same (item 7). <em>(Fable memo, §1 and option 4.)</em></li>
+</ul>
+<p><strong>Why.</strong> The three scores agree on most of the test set. Our analysis of the unlabeled test scores found 117 files called synthetic by all four detectors and 976 called real by all four; the uncertain files are about 187 with a base score between 0.45 and 0.65 <em>(Fable memo, §2)</em>. Re-weighting only reorders that middle band, and the ceiling above says how much that can buy on In-the-Wild. The test set is about three times easier than In-the-Wild, so maybe 0.01 of that 0.04 would carry over, decided by a handful of files.</p>
+<h2 id="3-the-handcrafted-score-is-the-readable-column-not-a-vote">3. The handcrafted score is the readable column, not a vote</h2>
+<p><strong>The numbers.</strong> The admissible stacker in item 2 gives the handcrafted score a coefficient of −0.04. Its rank correlation (Spearman) with M1b is 0.79 on the holdout but only 0.21 on the test set <em>(Fable memo, §1)</em>.</p>
+<p><strong>Why.</strong> The README already describes the test-domain offset: even band-matched, the test recordings have a darker, codec-like spectral envelope, and the 234 handcrafted columns tell train from test at AUC 0.99. On the test set the handcrafted model is reading that shift more than it is reading the class. That is why its correlation with M1b collapses there. Its 20% seat in the shipped rule stays as it is. Its value is that it explains a file in physical terms. It is not an independent vote.</p>
+<h2 id="4-the-excluded-detector-could-shrink-the-miss-tail-and-stays-excluded">4. The excluded detector could shrink the miss tail, and stays excluded</h2>
+<p><strong>The numbers</strong> <em>(Fable memo, options 3 and 9; not re-run by the consult chat)</em>.</p>
+<ul>
+<li><strong>Promotion.</strong> Raising files with Spectra-AASIST margin above 6.9 and base score below 0.5 recovers 76 of the 158 In-the-Wild misses (counted at the In-the-Wild argmin; see item 1) with no added false alarms (In-the-Wild 0.152 under both costs). On the holdout it promotes two real files, [2 FA, 11 misses] against the shipped [0, 13].</li>
+<li><strong>Looser suppression.</strong> Moving the suppression threshold from −3 to −1.5 improves every proxy: inner 0.123, holdout 0.003 [0, 6], In-the-Wild 0.188, averse 0.233. The cost is that more MLAAD fakes fall below the threshold: 2.10% against 1.75% at −3.</li>
+</ul>
+<p><strong>Why we skip both.</strong> Spectra-AASIST's authors report results on In-the-Wild and name no training set. The evidence for both changes is In-the-Wild, a set the model's authors may have tuned on. We set the suppression-only rule before any of these numbers existed. Changing it now because the numbers look good is the kind of post hoc choice the rule exists to prevent. So this is the measured ceiling of what the excluded detector could do, not a change.</p>
+<h2 id="5-the-cost-convention-cant-be-read-from-the-returned-pair">5. The cost convention can't be read from the returned pair</h2>
+<p><strong>The code and the spoken rule disagree.</strong> The sponsor's scorer (<code>data/nsa/HackGTMinDCF/asvspoof5/evaluation-package/calculate_metrics.py</code>) was edited from ASVspoof5's defaults (Pspoof 0.05, Cfa 10) to Pspoof 0.5, Cmiss 1, Cfa 4. In that code, Cfa multiplies the rate at which <em>spoofs are accepted as bona fide</em>, i.e. a fake called real. At the kickoff NSA said a <em>false alarm</em> (a real voice called synthetic) costs 4× a miss. NSA must have adapted the scorer outside the package, and how they did it decides where the 4× lands: negating our scores puts it on misses, swapping the labels puts it on false alarms.</p>
+<p><strong>The EER limits both readings.</strong> At any single threshold, the larger of P_FA and P_miss is at least the EER, 3.53% (VeriLM memo, "What the number means" item 3). With about 1,170 real and 500 synthetic files:</p>
+<ul>
+<li><strong>Brief cost:</strong> P_FA must be at most 0.41% and P_miss 3.5–7.3%. That means 0–4 false alarms plus 18–37 misses, for example 3 false alarms and 25 misses.</li>
+<li><strong>Averse cost:</strong> it inverts. P_FA is 3.5–7.3% and P_miss at most 0.95%. That means 42–86 false alarms plus 0–4 misses, for example 67 false alarms and 2 misses.</li>
+</ul>
+<p>The two profiles cannot both hold. The pair fits either one, so it can't tell us which convention NSA used. Two corrections followed:</p>
+<ul>
+<li>The decomposition we wrote in the consult prompt (1.3% false alarms plus 1.5% misses under the averse cost) was impossible, because both rates sit below the EER.</li>
+<li>The Fable memo's averse example of "5 misses + 40 false alarms" is also just outside the feasible range: 40 of about 1,170 is 3.4%, and 5 of about 500 is 1.0%.</li>
+</ul>
+<p><strong>What we do about it.</strong> We work on the reading that the error is a miss tail, because NSA said "false alarm" out loud. We hedge by requiring every candidate to improve under <strong>both</strong> costs.</p>
+<h2 id="6-how-far-our-proxies-were-from-the-one-measurement">6. How far our proxies were from the one measurement</h2>
+<p>The shipped rule, recomputed from the exported scores (CONSULTATION, "Added to 'anything else' (Sat ~16:05)"):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Split</th><th>Rows (real / synthetic)</th><th>minDCF (brief)</th><th>EER</th><th>P_FA / P_miss at the minDCF threshold</th>
+</tr></thead>
+<tbody>
+<tr><td>Outer holdout</td><td>1,858 / 2,000</td><td>0.0065</td><td>0.21%</td><td>0.00% / 0.65% (0 FA, 13 misses)</td></tr>
+<tr><td>Inner OOF</td><td>8,142 / 8,000</td><td>0.135</td><td>6.83%</td><td>0.25% / 11.2%</td></tr>
+<tr><td>In-the-Wild</td><td>2,000 / 1,000</td><td>0.228</td><td>5.80%</td><td>0.75% / 15.8%</td></tr>
+<tr><td><strong>NSA test (returned)</strong></td><td>~1,170 / ~500</td><td><strong>0.0733</strong></td><td><strong>3.53%</strong></td><td>not given</td></tr>
+</tbody>
+</table></div>
+<p><strong>What the gaps say.</strong></p>
+<ul>
+<li>The holdout was optimistic by 11× on minDCF and 17× on EER.</li>
+<li>In-the-Wild was pessimistic by 3× on minDCF but only 1.6× on EER.</li>
+<li>Inner OOF was pessimistic by 2× on both.</li>
+</ul>
+<p>On a log scale between the holdout and In-the-Wild, the test sits at 0.68 for minDCF and 0.85 for EER, further toward the wild end than our λ̂ = 0.51 suggested. The test's minDCF held up better than its EER. That fits a system with few false alarms and a tail of missed fakes, but it is an inference, not a measurement.</p>
+<p><strong>Lessons.</strong></p>
+<ul>
+<li>Our holdout (two generators, clean read speech) cannot measure a change: one false alarm on it is worth 0.005, and its noise is ±0.07–0.10.</li>
+<li>A "0.0065 → 0.0060" is not evidence.</li>
+<li>On the brief's cost, one false alarm on the test set is worth about 0.008 and one miss about 0.002. So gains under about 0.008 are single-file effects.</li>
+</ul>
+<h2 id="7-a-heavier-m5-weight-did-not-survive-fresh-evidence">7. A heavier M5 weight did not survive fresh evidence</h2>
+<p><strong>What we tried.</strong> The pre-declared M5 sweep stopped at weight 0.2 on the expectation that more M5 would hurt. After the draft review, the Fable agent extended it. The consult chat re-checked the numbers from the exports (Round 2 table):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Rule</th><th>Inner (brief / averse)</th><th>Holdout</th><th>In-the-Wild</th><th>Test Spearman vs shipped</th>
+</tr></thead>
+<tbody>
+<tr><td>Shipped A3 w0.2 + E</td><td>0.1351 / 0.2997</td><td>0.0065 / 0.0087</td><td>0.228 / 0.2385</td><td>1.000</td></tr>
+<tr><td>A3 w0.3 + E</td><td>0.1374 / 0.3139</td><td>0.0060 / 0.0091</td><td>0.2113 / 0.2310</td><td>0.993</td></tr>
+<tr><td>A3 w0.4 + E</td><td>0.1373 / 0.3366</td><td>0.0065 / 0.0088</td><td>0.1997 / 0.2075</td><td>0.970</td></tr>
+</tbody>
+</table></div>
+<p><strong>What it shows.</strong> Weight 0.4 improves In-the-Wild by 0.028 (brief) and 0.031 (averse) with the holdout unchanged, and makes inner worse by 0.002 (brief) and 0.037 (averse). The mechanism is M5's lower false-alarm rate on wild audio. It passes our standing four-condition rule. It fails the stricter gate adopted tonight: rule 3 requires inner to improve by 0.010 with no averse regression. It is post hoc, because its numbers were seen before it became a candidate.</p>
+<p><strong>The bake-off.</strong> Nathan ruled at about 17:40 that, because its proxy numbers were already seen, W4 must pass a bake-off on fresh evidence, declared before any of it was computed (<code>docs/reports/2026-09-26_post-draft-manifest.md</code>, "The W4 bake-off", commit 141b254). To be ratifiable it has to pass all three tests:</p>
+<ul>
+<li><strong>The standing rule.</strong> It already passes.</li>
+<li><strong>Perturbation robustness.</strong> The cohort is the channel lane's 500 holdout clips under five kinds of change: none, MP3 64 kbps, 20 dB white noise, ±2% speed, and a one-sample shift. In each of the 10 kind × cost cells, W4 may be no more than 0.010 worse than the shipped rule.</li>
+<li><strong>A gain that is not noise.</strong> We resample In-the-Wild by speaker, 2,000 times with seed 0. The 5th percentile of W4's gain must be above zero under each cost separately.</li>
+</ul>
+<p>If it fails any of the three, it becomes a measured negative: post hoc, and it did not survive fresh evidence.</p>
+<p><strong>Result: it failed two of the three</strong> (<code>scripts/fuse_sweep_v3.py</code>, commit 20a0d04; re-run here with identical output).</p>
+<ul>
+<li><p><strong>Standing rule:</strong> passes.</p></li>
+<li><p><strong>Perturbation robustness:</strong> fails. Below is the shipped rule's minDCF minus W4's, per kind of change, brief / averse. A negative number means W4 is worse.</p>
+<ul>
+<li>no change: −0.012 / 0.000</li>
+<li>MP3: −0.004 / −0.004</li>
+<li>20 dB noise: +0.051 / +0.020</li>
+<li>speed: −0.004 / −0.012</li>
+<li>one-sample shift: −0.016 / −0.004</li>
+</ul>
+<p>Three cells are below the −0.010 bar. W4 helps a lot under noise, where M5 holds up better than M1b, but it costs on the clean, speed and shift cells.</p></li>
+<li><p><strong>Bootstrap:</strong> fails. Across 54 In-the-Wild speakers and 2,000 replicates, the 5th percentile of W4's gain is +0.0044 under the brief cost but −0.0023 under the averse cost. Its In-the-Wild gain under the sponsor's cost can't be told apart from zero once clips of the same speaker are treated as one unit.</p></li>
+</ul>
+<p><strong>Why it matters.</strong> A gain of 0.028 on In-the-Wild looked like the one cheap win left. It came from about 54 speakers, and it reversed on clean audio the rule had not been tuned on. Seeing the numbers first and then testing on new evidence is what caught it. W4 is not in the ratifiable set, and the shipped rule stays.</p>
+<hr>
+<h2 id="8-noise-twins-did-not-make-the-handcrafted-model-noise-robust">8. Noise twins did not make the handcrafted model noise-robust</h2>
+<p><strong>What we tried.</strong> The shipped rule's known weak spot is additive noise: at 20 dB white noise the handcrafted AUC falls from 0.998 to 0.64 (README). We retrained it exactly like v5b, adding a 20 dB white-noise copy of 35% of the training rows in both classes.</p>
+<p><strong>The numbers</strong> (<code>docs/reports/2026-09-26_post-draft-hc-noise.md</code>), on the channel lane's 500 holdout clips:</p>
+<ul>
+<li><strong>Under noise:</strong> AUC 0.64 → 0.77. The pre-declared bar was 0.90.</li>
+<li><strong>On clean clips:</strong> minDCF 0.048 → 0.163.</li>
+<li><strong>Outer holdout:</strong> 0.137 → 0.227, mostly on LibriSpeech real speech (0.155 → 0.298).</li>
+<li><strong>In-the-Wild AUC:</strong> 0.768 → 0.722.</li>
+</ul>
+<p><strong>Why.</strong> The handcrafted columns read fine spectral and phase structure in the quiet parts of the signal, and white noise fills exactly those parts. The model does not find a noise-proof version of the cues; it learns to trust them less, and that blurs clean clips too. Noise robustness for this detector would need different features (e.g. voiced-frame-only statistics), not more rows. In the fused rule (H_noise) every split got slightly worse under both costs (e.g. In-the-Wild −0.0003 / −0.0020), and it failed the gate (<code>docs/reports/2026-09-26_post-draft-sweep.md</code>, "Run 2"). <code>models/hc_selected</code> stays on v5b.</p>
+<p><strong>Outcome of the evening.</strong> Four candidates were pre-declared and judged by a frozen gate: the second M3 tier, the M5 weight, WavLM as a fourth column and the noise twins. All four failed. The file NSA scored at 0.0733 stays final.</p>
+<h2 id="not-run-tonight-and-why">Not run tonight, and why</h2>
+<ul>
+<li><strong>Delta-only handcrafted features.</strong> The earlier column-pruning experiments failed every time (README), and this is the same experiment in different clothes.</li>
+<li><strong>Averaging M5's fold models.</strong> Naive averaging leaks each out-of-fold row into its own prediction (VeriLM memo). The fold checkpoints are also not on disk (Fable memo, option 11). And M5's problem is bias, not variance.</li>
+<li><strong>New feature families</strong> (LTAS residuals, vocoder harmonics, formants, sub-band modulation). Each is a research lane. Any of them would also have to survive the train-vs-test AUC-0.99 envelope shift (item 3).</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_post-draft-negatives.md</code> <span class="hash">d90883e4f8be</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

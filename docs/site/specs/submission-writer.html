@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The submission writer and the experiment log · HEARSAY</title>
+<meta name="description" content="One function writes the TSV and refuses anything that would make it invalid: a wrong header, a duplicate file, a non-finite or out-of-range score, or an existin">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="specs" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">Systems and subsystems</a>
+<ul><li><a href="audio-loader.html">Audio loader and probe</a></li><li><a href="detector-contract.html">Detector contract and safe runner</a></li><li><a href="segment-preparation.html">Segment preparation and band match</a></li><li><a href="runner-routing.html">The runner and its routing rules</a></li><li><a href="explanation-json.html">The routing log and explanation JSON</a></li><li><a href="local-api.html">The local API</a></li><li><a href="speech-gate-policy.html">The speech gate and the default-answer policy</a></li><li><a href="xlsr-probe.html">The XLS-R probe (M1, M1b)</a></li><li><a href="spectra-aasist.html">Spectra-AASIST (M3)</a></li><li><a href="m5-head.html">The M5 head on XLS-R</a></li><li><a href="handcrafted.html">Handcrafted spectral and prosody features</a></li><li><a href="compression.html">Compression forensics</a></li><li><a href="container.html">Container and metadata</a></li><li><a href="enf.html">ENF: mains hum</a></li><li><a href="splice.html">Splice and discontinuity detection</a></li><li><a href="speaker-drift.html">Speaker drift</a></li><li><a href="fusion-rule.html">The fusion rule</a></li><li><a href="fusion-sweeps.html">The pre-declared sweeps and the orchestration ablation</a></li><li><a href="submission-writer.html" aria-current="page">The submission writer and the experiment log</a></li><li><a href="metrics.html">The metric module</a></li><li><a href="folds.html">The fold file</a></li><li><a href="stress-sets.html">The stress sets</a></li><li><a href="inventories-shortcuts.html">Inventories and the shortcut ledger</a></li><li><a href="channel-robustness.html">The channel-robustness probes</a></li><li><a href="docker-image.html">The Docker image</a></li><li><a href="frontend-contract.html">The frontend contract</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../library/index.html">The library</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">Systems and subsystems</p>
+<h1>The submission writer and the experiment log</h1>
+<p class="lead">One function writes the TSV and refuses anything that would make it invalid: a wrong header, a duplicate file, a non-finite or out-of-range score, or an existing path. Every TSV gets a row in a tracked log with its validation score. A submitted file is never overwritten.</p>
+<nav class="toc" aria-label="On this page"><h2>On this page</h2><ul><li><a href="#plain">In plain words</a></li><li><a href="#io">What goes in and comes out</a></li><li><a href="#where">Where it lives</a></li><li><a href="#params">Rules and where each is set</a></li><li><a href="#status">Status</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#limits">Known limits</a></li><li><a href="#tests">Tests that pin it</a></li><li><a href="#sources">Sources</a></li></ul></nav>
+<h2 id="plain">In plain words</h2>
+<p>The deliverable, the <span class="term" tabindex="0" data-term="TSV" aria-describedby="tip-1">TSV<span class="tip-body" role="tooltip" id="tip-1">The tab-separated submission: a header line, then one row per test file with the filename and the probability that it is synthetic, in the sponsor's template order.</span></span>, is a text file with a header and one row per test file, in the sponsor's order. The cheapest way to lose the weekend would be a malformed file, so the writer checks everything it can and reads the file back to confirm it. The log exists so that every number ever submitted can be traced to a file and a validation score; the project rule is that a submitted TSV is never renamed or overwritten.</p>
+<h2 id="io">What goes in and comes out</h2>
+<p>In: the ordered file ids and their scores. Out: <code>&lt;team&gt;_predictions.tsv</code> with header <code>filename&lt;TAB&gt;cm-score</code>, and a row appended to <code>submissions/log.csv</code>.</p>
+<h2 id="where">Where it lives</h2>
+<p><a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/submission.py" title="src/hearsay/submission.py (GitHub; assumes main is public)">src/hearsay/submission.py</a>: <code>score_files</code>, <code>write_submission</code>, <code>append_log</code>, <code>preflight</code>, and the accepted audio extensions.</p>
+<h2 id="params">Rules and where each is set</h2>
+<ul>
+<li><code>write_submission</code> refuses, in order: an existing path, a length mismatch between ids and scores, an empty submission, duplicate ids, non-finite scores, scores outside [0, 1]; then it writes with exclusive-create and reads the file back to assert the header, order and exact values (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/submission.py#L73" title="src/hearsay/submission.py line 73 (GitHub; assumes main is public)">submission.py, lines 73–110</a>).</li>
+<li>The log columns are <code>timestamp, rung, validation_score, validation_score_clean_only, csv_path, notes</code>; the clean-only column defaults to the validation score when no augmentation was used; the path is stored relative to the repository (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/submission.py#L29" title="src/hearsay/submission.py line 29 (GitHub; assumes main is public)">submission.py, lines 29–31</a> and <a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/submission.py#L113" title="src/hearsay/submission.py line 113 (GitHub; assumes main is public)">lines 113–133</a>). The column named <code>csv_path</code> is a historical name for the submission path.</li>
+<li><code>score_files</code> never loses a row: a decode error, a scorer exception or a non-finite score yields the fallback score plus a flag (<a class="srclink" href="https://github.com/nrstough/hearsay/blob/main/src/hearsay/submission.py#L44" title="src/hearsay/submission.py line 44 (GitHub; assumes main is public)">submission.py, lines 44–70</a>).</li>
+<li>The library's <code>preflight</code> scores silence and a chord twice and requires exact equality; the runner uses its own tolerant version.</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Built in the first hour and unchanged. The constant "always real" rollback TSV existed before any model did.</p>
+<h2 id="numbers">Numbers</h2>
+<p>The log is the source of truth on numbers where documents disagree (a project rule). The shipped TSV's row is timestamped 12:03 on Saturday; the file was sent at 12:30.</p>
+<h2 id="limits">Known limits</h2>
+<p>The writer validates format, not content: a valid file with a bad ranking is still valid.</p>
+<h2 id="tests">Tests that pin it</h2>
+<p><code>tests/test_audio_and_submission.py</code>: one finite score per file in order, a scorer exception is survived, the exact TSV bytes, never overwrites, rejects a length mismatch, a duplicate, <code>NaN</code>, <code>1.5</code>, <code>−0.1</code> and an empty submission leaving no file behind, and the log row.</p>
+<h2 id="sources">Sources</h2>
+<p><a class="srclink" href="../library/claude-md.html#conventions" title="CLAUDE.md, section conventions">CLAUDE.md, "Conventions"</a>; <a class="srclink" href="../library/readme.html#where-each-artifact-lives" title="README.md, section where-each-artifact-lives">README, "Where each artifact lives"</a>.</p>
+
+</article>
+<nav class="prev-next" aria-label="Previous and next"><a class="prev" rel="prev" href="fusion-sweeps.html">← The pre-declared sweeps and the orchestration ablation</a><a class="next" rel="next" href="metrics.html">The metric module →</a></nav>
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/site/source/specs/submission-writer.frag</code> <span class="hash">52f4ac4a7924</span>, <code>src/hearsay/submission.py</code> <span class="hash">1d09e9134fc9</span>, <code>CLAUDE.md</code> <span class="hash">e7bf425534d7</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

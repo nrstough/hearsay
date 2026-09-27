@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run spec: post-draft gate sweep (scripts/fusesweepv3.py) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_post-draft-gate-sweep.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/specs/2026-09-26_post-draft-gate-sweep.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#problem">Problem</a></li><li><a href="#solution">Solution</a></li><li><a href="#acceptance-criteria">Acceptance criteria</a></li><li><a href="#test-inventory-failure-mode--test">Test inventory (failure mode → test)</a></li><li><a href="#documentation">Documentation</a></li><li><a href="#pre-data-clarifications-and-review-resolutions-1825">Pre-data clarifications and review resolutions (18:25)</a></li><li><a href="#out-of-scope">Out of scope</a></li><li><a href="#results-execution-18401845-before-the-wavlm-export">Results (execution, 18:40–18:45; before the WavLM export)</a></li><li><a href="#post-commit-audit-round-1-claude-pre-audit-1900-overall-fail-on-test-coverage">Post-commit audit, round 1 (Claude pre-audit, 19:00; Overall Fail on test coverage)</a></li><li><a href="#post-commit-audit-round-2-claude-1912-overall-needs-work">Post-commit audit, round 2 (Claude, 19:12; Overall Needs-work)</a></li><li><a href="#codex-audit-round-1-1917-overall-fail-and-fixes">Codex audit, round 1 (19:17; Overall Fail) and fixes</a></li><li><a href="#codex-audit-round-2-1924-overall-fail-and-fixes">Codex audit, round 2 (19:24; Overall Fail) and fixes</a></li><li><a href="#codex-audit-round-3-1928-overall-acceptable">Codex audit, round 3 (19:28): Overall Acceptable</a></li></ul></details>
+<h1 id="run-spec-post-draft-gate-sweep-scriptsfuse_sweep_v3py">Run spec: post-draft gate sweep (<code>scripts/fuse_sweep_v3.py</code>)</h1>
+<p><strong>Date:</strong> Sat Sep 26, 2026, ~17:55 EDT. <strong>Owner:</strong> Nathan (gate lane). <strong>Branch:</strong> <code>main</code>.
+<strong>Pre-declaration this implements:</strong> <code>docs/reports/2026-09-26_post-draft-manifest.md</code> (committed <code>141b254</code>, 17:39, before any new candidate export existed). The manifest governs; where this spec and the manifest differ, the manifest wins.
+<strong>Plan:</strong> <code>docs/reports/2026-09-26_post-draft-gate-sweep-plan.md</code>. <strong>Handoff:</strong> <code>docs/handoffs/2026-09-26_post-draft-gate-handoff.md</code> (revised 17:25).</p>
+<h2 id="problem">Problem</h2>
+<p>NSA scored the shipped rule (A3 w0.2 + E) at minDCF 0.0733. Two outside opinions call for a few bounded candidates, judged under a gate stricter than the standing rule and frozen before any number exists. The manifest froze four candidates:</p>
+<ul>
+<li><code>T2</code>: a second M3 tier.</li>
+<li><code>W4</code>: M5 weight 0.4, post hoc, judged by a fresh-evidence bake-off.</li>
+<li><code>P_wl</code>: the WavLM Large probe as a fourth column.</li>
+<li><code>H_noise</code>: handcrafted v6. The CPU lane will not run it (message ~17:42), so it is NOT RUN.</li>
+</ul>
+<p>This change is the code that evaluates them mechanically and writes the locked table for Nathan's 19:30 decision.</p>
+<h2 id="solution">Solution</h2>
+<p>A new script, <code>scripts/fuse_sweep_v3.py</code>, is modeled on <code>scripts/fuse_sweep_m5.py</code> and reuses <code>scripts/fuse_sweep.py</code>'s loaders and cost functions. Every decision lives in pure, hermetically tested functions:</p>
+<ul>
+<li><p><strong>D1: shipped-file tripwire.</strong> At start, the script asserts that the shipped TSV's sha256 starts <code>fb783076</code>, and aborts otherwise.</p></li>
+<li><p><strong>D2: row sets.</strong> The base set is the per-split intersection of <code>m1b_v3</code>, <code>handcrafted_v5</code>, <code>spectra_aasist</code> and <code>m5_xlsr_ft</code>, as in the M5 sweep. Each candidate that adds a column is compared with CURRENT rebuilt on its own intersection, including rank references recomputed from that intersection's inner-OOF rows. Any shrink is recorded.</p></li>
+<li><p><strong>D3: missing export.</strong> A missing export gives status <code>NOT RUN</code>. It is never an error and never a pass.</p></li>
+<li><p><strong>D4: direction guard.</strong> A new column whose inner-OOF AUC is &lt; 0.5 raises. This guards against the score-direction bug class.</p></li>
+<li><p><strong>D5: fusion.</strong></p>
+<ul>
+<li>Ranks: <code>searchsorted(sorted inner-OOF logits, logit) / n</code>.</li>
+<li>Weighted sum accumulated in manifest order.</li>
+<li>E step: × 0.5 when M3 logit &lt; −3 and base &gt; 0.5.</li>
+<li>T2: × 0.25 in total when M3 logit &lt; −6 and base &gt; 0.5.</li>
+</ul></li>
+<li><p><strong>D6: readouts.</strong></p>
+<ul>
+<li>Costs: brief = <code>min_cost(y, s, 0.3)</code> and averse = <code>min_cost(y, s, 0.5, c_fa=1, c_miss=4)</code>, on inner OOF, holdout and In-the-Wild. Inner averse is new relative to the M5 sweep.</li>
+<li>Holdout: argmin [#FA, #miss] under the brief cost, plus LJ Speech and LibriSpeech brief cost.</li>
+<li>In-the-Wild: P_FA and P_miss at the inner-OOF brief threshold.</li>
+</ul></li>
+<li><p><strong>D7: test-set agreement.</strong></p>
+<ul>
+<li>Spearman of the fused test scores against the shipped TSV's <code>cm-score</code>, matched by basename, over non-pinned rows (shipped &lt; 0.001 is the pinned block).</li>
+<li>The 0.5-crossing count uses each rule's own Platt map (class-balanced logistic on inner-OOF fused, plus the prior shift log(0.3/0.7)). It is a count only; no file list is printed or written.</li>
+</ul></li>
+<li><p><strong>D8: the gate, verbatim rules 2–7</strong> as operationalized in the manifest.</p>
+<ul>
+<li>Δ = CURRENT − candidate at 4 decimals.</li>
+<li>Rule 2: ITW brief Δ ≥ 0.020 and ITW averse Δ ≥ −0.002.</li>
+<li>Rule 3: inner brief Δ ≥ 0.010 and inner averse Δ ≥ 0.</li>
+<li>Rule 4: holdout brief and averse Δ ≥ −0.010.</li>
+<li>Rule 5: Δ &gt; 0 on ≥ 2 of 3 populations under each cost, and the diagnostic passes.</li>
+<li>Rule 6: Spearman &lt; 0.974 doubles the thresholds in rules 2 and 3 (0.040 / 0.020).</li>
+<li>Rule 7: with two or more passers, ship none unless one Pareto-dominates every other passer across the six cells (≤ in all, &lt; in at least one).</li>
+</ul></li>
+<li><p><strong>D9: diagnostics.</strong></p>
+<ul>
+<li><strong>T2:</strong> zero spoof fires of the deeper tier (M3 &lt; −6 and base &gt; 0.5) on inner, holdout, ITW and all five perturbation kinds.</li>
+<li><strong>P_wl:</strong> two parts.
+<ol>
+<li>At its own inner-OOF brief threshold, <code>wavlm_l</code> alone flags ≥ 16 of CURRENT's ITW misses (CURRENT's misses taken at CURRENT's inner-OOF brief threshold).</li>
+<li>The corrected share of CURRENT's errors is &gt; 0.5 on inner OOF and on ITW. A false alarm counts as corrected if the new rank &lt; M1b's rank; a miss, if the new rank &gt; M1b's rank. Ties don't count.</li>
+</ol></li>
+<li><strong>H_noise:</strong> NOT RUN, so no diagnostic input.</li>
+</ul></li>
+<li><p><strong>D10: the W4 bake-off.</strong> All three must hold.</p>
+<ol>
+<li>The standing rule: ITW brief Δ ≥ 0.01, ITW averse Δ ≥ −0.01, holdout brief Δ ≥ −0.05, inner brief Δ ≥ −0.03.</li>
+<li>Perturbation robustness on <code>outputs/channel/m3_perturb.csv</code>, using ranks from <code>models/fusion_v2/constants.json</code>: Δ ≥ −0.010 in all 10 kind × cost cells.</li>
+<li>A speaker-cluster paired bootstrap of the ITW gain: 2,000 replicates, <code>default_rng(0)</code>, the same draws for both rules. The 5th percentile of (CURRENT − W4) must be &gt; 0 under each cost.
+<ul>
+<li>The perturbation tripwire: CURRENT recomputed on the cohort must equal that CSV's <code>fused</code> column to 1e-9. If it doesn't, the bake-off is invalid, not passed.</li>
+</ul></li>
+</ol></li>
+<li><p><strong>D11: self-check.</strong> Before any candidate verdict, CURRENT on the base set must reproduce <code>outputs/fusion/sweep_m5_report.json</code> to 4 decimals:</p>
+<ul>
+<li>inner 0.1351</li>
+<li>holdout 0.0065 / 0.0087</li>
+<li>ITW 0.228 / 0.2385</li>
+<li>ITW P_FA 0.013 and P_miss 0.122 at the inner threshold</li>
+<li>holdout argmin [0, 13]</li>
+<li>Spearman against the shipped file ≥ 0.999</li>
+</ul>
+<p>On a failure, the script prints SELF-CHECK FAIL, writes the report with every verdict <code>INVALID</code>, and exits non-zero. T2 and W4 are also checked against their known numbers (T2 identical to CURRENT; W4 at 0.1373 / 0.3366, 0.0065 / 0.0088, 0.1997 / 0.2075). A mismatch there is reported, but it does not block the run.</p></li>
+<li><p><strong>D12: outputs.</strong></p>
+<ul>
+<li>Always writes <code>outputs/fusion/sweep_v3_report.json</code>.</li>
+<li><code>--write</code> is refused unless <code>--ratified-by nathan --candidate NAME</code> is given and NAME's verdict is PASS (or, for W4, its bake-off passed).</li>
+<li>It writes only <code>models/fusion_v3/constants.json</code>, in the <code>fusion_v2</code> shape plus the new column's model identity, and refuses if that file exists.</li>
+<li>It never writes <code>models/fusion_v2/</code>, <code>submissions/</code> or the shipped TSV.</li>
+</ul></li>
+<li><p><strong>D13: import hygiene.</strong> Importing the module never imports lightgbm or torch (the macOS OpenMP rule). <code>hearsay.pipeline</code> (for <code>M5_DIR</code>) is imported only inside the <code>--write</code> path; it does not import torch either.</p></li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<ul>
+<li><strong>A1.</strong> <code>uv run pytest -q tests/test_fuse_sweep_v3.py</code> passes: the hermetic tests below, plus <code>needs_data</code> self-checks when data is present.</li>
+<li><strong>A2.</strong> <code>uv run pytest -q</code> passes everything (510 before this change, with data), and <code>uv run ruff check .</code> is clean.</li>
+<li><strong>A3.</strong> <code>uv run python scripts/fuse_sweep_v3.py</code> with no <code>wavlm_l.csv</code> behaves as follows:
+<ul>
+<li>the self-check passes and the perturbation tripwire holds;</li>
+<li>T2's six cells are expected to be identical to CURRENT's (non-blocking check), with verdict FAIL (rule 2) and a zero spoof-fire diagnostic;</li>
+<li>W4 reproduces its known numbers, its gate verdict is FAIL (rule 3), and its bake-off verdict is printed;</li>
+<li>P_wl and H_noise are NOT RUN;</li>
+<li>the report JSON is written.</li>
+</ul></li>
+<li><strong>A4.</strong> The shipped TSV's and <code>submissions/CrossExam_predictions.tsv</code>'s sha256 are unchanged, and <code>models/fusion_v2/</code> is untouched (<code>git status</code> clean there).</li>
+<li><strong>A5.</strong> Every gate rule, each diagnostic part and each bake-off part has a counterfactual test that fails when that rule is removed or inverted.</li>
+</ul>
+<h2 id="test-inventory-failure-mode--test">Test inventory (failure mode → test)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Stage</th><th>Failure mode</th><th>Test(s)</th>
+</tr></thead>
+<tbody>
+<tr><td>Costs</td><td>The sweep optimizes the sponsor's cost as if it were the brief's</td><td><code>brief</code> equals <code>min_cost(y,s,0.3)</code>; <code>averse</code> equals <code>min_cost(y,s,0.5,c_fa=1,c_miss=4)</code>; single-FA and single-miss vectors recover the 9.33 : 1 and 1 : 4 weights; an asymmetric example where brief ≠ averse</td></tr>
+<tr><td>Loading</td><td>A missing export crashes or passes</td><td>NOT RUN status from a tmp dir; the other candidates are still evaluated</td></tr>
+<tr><td></td><td>Inverted new column</td><td>AUC &lt; 0.5 raises; the correct fixture doesn't</td></tr>
+<tr><td></td><td>A candidate covers fewer rows</td><td>Intersection used for both rules; shrink recorded; base CURRENT unchanged</td></tr>
+<tr><td>Fusion</td><td>T2 tier arithmetic</td><td>Point cases (−7, 0.8) → 0.2; (−4, 0.8) → 0.4; (−7, 0.4) → 0.4; (−2, 0.8) → 0.8; (−3 exactly, 0.8) → 0.8 (strict &lt;)</td></tr>
+<tr><td></td><td>Weights</td><td>Manifest weights sum to 1 and equal P_wl 0.4/0.2/0.2/0.2, W4 0.4/0.2/0.4, CURRENT 0.6/0.2/0.2</td></tr>
+<tr><td></td><td>Rank reference</td><td>Hand-computed searchsorted fixture</td></tr>
+<tr><td>Gate</td><td>Each rule vacuous</td><td>All-pass fixture → PASS; one fixture per sub-rule (2a, 2b, 3a, 3b, 4a, 4b, 5-brief, 5-averse, 5-diagnostic) → FAIL naming it</td></tr>
+<tr><td></td><td>Boundaries and rounding</td><td>Δ = 0.020 passes, 0.0199 fails; rounding precedes comparison; inner averse equal passes, 0.0001 worse fails</td></tr>
+<tr><td></td><td>Rule 6</td><td>0.9739 doubles; 0.974 does not; doubled thresholds applied to rules 2a and 3a only</td></tr>
+<tr><td></td><td>Rule 7</td><td>Neither dominates → none; one dominates → it; all-equal → none; a single passer → it</td></tr>
+<tr><td>Diagnostics</td><td>T2 fires counted wrong</td><td>Spoof at (−7, 0.8) counts; real rows and base ≤ 0.5 don't</td></tr>
+<tr><td></td><td>P_wl new catches</td><td>15 → fail, 16 → pass; misses taken from CURRENT's threshold, catches at the column's own</td></tr>
+<tr><td></td><td>P_wl corrective share</td><td>Exactly 0.5 fails; 0.6 passes; ties don't count; must hold on both populations</td></tr>
+<tr><td>Bake-off</td><td>Bootstrap not paired or not clustered</td><td>Same seed → identical output; a speaker's rows move together (single-speaker fixture); missing speaker raises</td></tr>
+<tr><td></td><td>Parts vacuous</td><td>Standing-rule fail, perturbation −0.0101, 5th percentile ≤ 0 → each FAIL; all pass → PASS</td></tr>
+<tr><td>Test agreement</td><td>Pinned rows included, or basename mismatch</td><td>Pinned rows excluded; an unmatched filename raises</td></tr>
+<tr><td>Outputs</td><td><code>--write</code> without ratification, or overwrite</td><td>Refused without <code>--ratified-by nathan</code>; refused for a non-passing candidate; refused if <code>fusion_v3/constants.json</code> exists; target path is fusion_v3</td></tr>
+<tr><td></td><td>Shipped TSV changed</td><td>A hash mismatch aborts</td></tr>
+<tr><td>Hygiene</td><td>LightGBM or torch in the same process</td><td>Module import leaves <code>lightgbm</code> and <code>torch</code> out of <code>sys.modules</code> (run in a subprocess)</td></tr>
+<tr><td>Self-check (<code>needs_data</code>)</td><td>Drift from the shipped numbers</td><td>CURRENT = the expected dict; T2 = CURRENT; W4 = the known numbers; Spearman ≥ 0.999; perturbation tripwire ≤ 1e-9</td></tr>
+</tbody>
+</table></div>
+<h2 id="documentation">Documentation</h2>
+<ul>
+<li><strong>This run spec</strong>, frozen after commit.</li>
+<li><strong><code>docs/reports/2026-09-26_post-draft-sweep.md</code>:</strong> the locked table, verdicts and packet, written after the WavLM export lands (~19:15).</li>
+<li><strong><code>CLAUDE.md</code>:</strong> one AI-use disclosure bullet for the gate lane.</li>
+<li><strong>Conditional:</strong> a <code>submissions/log.csv</code> note row after Nathan's 19:30 ruling. <code>docs/STATUS.md</code> belongs to the oversight chat, which is told the outcome instead of this lane editing it.</li>
+</ul>
+<h2 id="pre-data-clarifications-and-review-resolutions-1825">Pre-data clarifications and review resolutions (18:25)</h2>
+<p>The manifest clarifications at <code>b877760</code> (P_wl misses at the inner-OOF threshold = 122, absolute bar 16; empty pinned block; INVALID path; rule-7 common rows; H_noise diagnostic fails without evidence; bake-off rounding) and the plan's "Review resolutions" table are part of this spec. Added design points:</p>
+<ul>
+<li><strong>D14.</strong> Export validation happens before <code>fs.load</code>'s dedup, and invalid or incomplete candidates are INVALID per candidate.</li>
+<li><strong>D15.</strong> <code>--write</code> is bound to the locked report's input hashes and decision.</li>
+<li><strong>D16.</strong> Close-out: 19:25 lock, 20:00 ruling cutoff, a KEEP log row or a ratified integration job with a 21:30 lapse.</li>
+</ul>
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>
+<li>Runner integration of a ratified candidate (handoff step 6; a separate job).</li>
+<li>Any change to <code>fusion_v2</code>, the shipped TSV or <code>hearsay.pipeline</code>.</li>
+<li>Any candidate beyond the manifest's four.</li>
+</ul>
+<h2 id="results-execution-18401845-before-the-wavlm-export">Results (execution, 18:40–18:45; before the WavLM export)</h2>
+<ul>
+<li><strong>Tests:</strong>
+<ul>
+<li><code>uv run pytest -q tests/test_fuse_sweep_v3.py</code>: 71 passed, including 4 <code>needs_data</code>.</li>
+<li><code>uv run pytest -q</code>: 722 passed (the "510" baseline was stale; other lanes have added tests since).</li>
+<li><code>uv run ruff check .</code>: clean.</li>
+</ul></li>
+<li><strong>A4, immutability:</strong> sha256 of <code>models/fusion_v2/constants.json</code> (<code>0818e83e…</code>), the shipped TSV and <code>submissions/CrossExam_predictions.tsv</code> (both <code>fb783076…</code>) are identical before and after. No <code>models/fusion_v3/</code> exists.</li>
+<li><strong>A3, <code>uv run python scripts/fuse_sweep_v3.py</code>, no <code>wavlm_l.csv</code>:</strong>
+<ul>
+<li>Self-check ok on every field (inner 0.1351, holdout 0.0065 / 0.0087, ITW 0.228 / 0.2385, P_FA / P_miss 0.013 / 0.122, argmin [0, 13]). Spearman vs shipped is 1.000000 on all 1,671 rows (the pinned block is empty). Inner averse (new) is 0.2997.</li>
+<li><strong>T2:</strong> six cells identical to CURRENT; test Spearman 0.9857; 0 crossings. Deeper tier fires on 0 spoof rows in every split and perturbation kind (bona fide: inner 133, holdout 34, ITW 2, perturbation 0–5). Gate <strong>FAIL</strong> (2a, 3a, 5-brief, 5-averse: no improvement), as pre-declared.</li>
+<li><strong>W4:</strong> known numbers reproduced exactly; test Spearman 0.9702 (doubling triggered); 4 crossings. Gate FAIL (2a/3a doubled, 3b, 5). <strong>Bake-off FAIL:</strong>
+<ul>
+<li>Part 1 (standing rule): passes.</li>
+<li>Part 2 (perturbation) fails. Δ (CURRENT − W4) per kind, brief / averse: none −0.012 / 0.000; mp3 −0.004 / −0.004; noise20 +0.051 / +0.020; speed −0.004 / −0.012; shift1 −0.016 / −0.004. Three cells are below −0.010. Tripwire 1.1e-16.</li>
+<li>Part 3 (ITW bootstrap) fails: 54-speaker cluster bootstrap, 2,000 replicates, 5th percentile brief +0.0044, averse −0.0023.</li>
+<li>W4 is a measured negative (post hoc, did not survive fresh evidence) and is not ratifiable.</li>
+</ul></li>
+<li><strong>P_wl:</strong> NOT RUN pending <code>wavlm_l.csv</code>. <strong>H_noise:</strong> NOT RUN (withdrawn).</li>
+<li>Decision so far: KEEP.</li>
+</ul></li>
+<li><strong>Deviations from the plan:</strong>
+<ul>
+<li>W4's gate record uses <code>diag_ok = True</code> ("no diagnostic under the gate"), so its gate failures list only the metric rules. W4 is governed by the bake-off alone.</li>
+<li><code>ruff format</code> was not applied: the repo's scripts carry <code># fmt: skip</code> markers and CI runs <code>ruff check</code> only.</li>
+</ul></li>
+</ul>
+<h2 id="post-commit-audit-round-1-claude-pre-audit-1900-overall-fail-on-test-coverage">Post-commit audit, round 1 (Claude pre-audit, 19:00; Overall Fail on test coverage)</h2>
+<p>Every finding below was fixed in the follow-up commit.</p>
+<ol>
+<li><strong>Exceptions could escape.</strong> <code>run_candidates</code> now catches any exception per candidate as INVALID, and the rule-7 re-score falls back to KEEP with <code>rule7_error</code>. <code>load_raw</code> refuses exports that lack <code>path</code>, <code>split</code> or <code>logit</code>, and a declared ITW file that is absent makes the candidate INVALID.</li>
+<li><strong>H_noise came out INVALID instead of FAIL.</strong> A candidate's context is now the union of CURRENT's columns and the new one, so CURRENT is rebuilt on identical rows (D2).</li>
+<li><strong>The report was not really locked.</strong> Every run writes <code>sweep_v3_report.json</code> plus a timestamped archive copy and prints its sha256. <code>--write</code> requires <code>--report-sha256</code> equal to the locked report's hash (recorded in the sweep doc), and <code>precheck_write</code> makes every cheap refusal before evaluation.</li>
+<li><strong>The separate ITW file was not picked up.</strong> <code>resolve_itw</code> now uses <code>_itw_&lt;col&gt;.csv</code> for a new column when that file is present.</li>
+<li><strong>Missing tests.</strong> 15 tests were added on a hermetic synthetic world:
+<ul>
+<li>NOT RUN with the other candidates still evaluated;</li>
+<li>the direction guard, and the catch wiring against both thresholds;</li>
+<li>a broken export becoming INVALID without ending the run;</li>
+<li>H_noise FAIL, not INVALID;</li>
+<li>a shrunk row set rebuilding its rank references;</li>
+<li>the separate ITW file;</li>
+<li>rule 7 on common rows, and its KEEP fallback;</li>
+<li>the T2 diagnostic counterfactual;</li>
+<li><code>pwl_diag_ok</code> composition;</li>
+<li>the ITW brief side of the room rule;</li>
+<li>an unmatched test name;</li>
+<li><code>clean()</code>;</li>
+<li>the <code>precheck_write</code> and <code>do_write</code> refusals;</li>
+<li><code>main</code> exiting 2 on a self-check failure.</li>
+</ul></li>
+<li><strong>Nits:</strong> the report is JSON-safe (NaN written as null, <code>allow_nan=False</code>); W4's gate record carries <code>governing: false</code>; the <code>fusion_v3</code> payload carries a <code>status</code>; <code>--new-column-model</code> is refused for candidates without a new column.</li>
+</ol>
+<p>The re-run verdicts are unchanged: T2 FAIL, W4 BAKEOFF FAIL, P_wl and H_noise NOT RUN, KEEP. Report sha256 <code>07090750…</code> (19:06, pre-WavLM). <code>tests/test_fuse_sweep_v3.py</code>: 86 passed.</p>
+<h2 id="post-commit-audit-round-2-claude-1912-overall-needs-work">Post-commit audit, round 2 (Claude, 19:12; Overall Needs-work)</h2>
+<p>10 of the 11 round-1 findings were verified resolved. The eleventh, blend order vs <code>DETECTOR_ORDER</code>, belongs to the integration job and is moot with no passer. Round 2 found:</p>
+<ul>
+<li><strong>A.</strong> <code>do_write</code> built H_noise's context from its own weights only. Now both evaluation and writing use <code>candidate_cols</code>, the union. Tested.</li>
+<li><strong>B.</strong> The clock times in the 43916ee note were wrong. An erratum was appended to the manifest, and the sweep doc's provenance line is qualified.</li>
+<li><strong>C.</strong> The H_noise evidence had no source. <code>--hnoise-evidence-source PATH</code> is now required, and that file's sha256 and the numbers go into the report's inputs.</li>
+<li><strong>D.</strong> AUCs outside [0, 1] are now rejected.</li>
+<li><strong>E.</strong> <code>parse_hnoise</code> replaces an <code>assert</code>. Tested.</li>
+<li><strong>F.</strong> H_noise's in-file ITW rows are now accepted, with coverage still enforced.</li>
+<li><strong>G.</strong> The heads report is committed (<code>e611d1b</code>).</li>
+<li><strong>H.</strong> The 20:30 H_noise run will record its new report sha256 in the sweep doc.</li>
+</ul>
+<p>A re-run with the fixed code reproduces the locked report byte for byte (sha256 <code>c2b6bc22…</code>). <code>tests/test_fuse_sweep_v3.py</code>: 102 passed.</p>
+<h2 id="codex-audit-round-1-1917-overall-fail-and-fixes">Codex audit, round 1 (19:17; Overall Fail) and fixes</h2>
+<p>The audit is <code>docs/specs/2026-09-26_post-draft-gate-sweep-audit.md</code>. Scope Excellent; Review compliance, Freeze integrity and Regression Acceptable; Plan adherence, Test coverage and Documentation Fail.</p>
+<ol>
+<li><strong>Perturbation completeness.</strong> <code>check_cohort</code> now requires exactly the five kinds × 250 bona fide + 250 spoof rows. It runs in <code>perturb_eval</code> and in T2's diagnostic, and a partial cohort makes the candidate INVALID. <code>bakeoff_verdict</code> requires exactly the ten cells.</li>
+<li><strong>Missing counterfactual.</strong> A brief-cost bootstrap p5 of ≤ 0 (0 and −0.01) now has its own test. Missing-kind and missing-cell tests were added, and T2 and W4 are tested as INVALID on a partial cohort.</li>
+<li><strong>Documentation.</strong> The CLAUDE.md disclosure and the README asset table now say WavLM Large was evaluated as a probe, failed the pre-declared gate and is not shipped.</li>
+</ol>
+<p>The results are unchanged: the re-run reproduces the final report <code>354502ca…</code> byte for byte, with KEEP. <code>tests/test_fuse_sweep_v3.py</code>: 106 passed, 1 skipped (the NOT RUN data test, skipped because <code>handcrafted_v6</code> now exists).</p>
+<h2 id="codex-audit-round-2-1924-overall-fail-and-fixes">Codex audit, round 2 (19:24; Overall Fail) and fixes</h2>
+<ol>
+<li><strong>D6.</strong> The holdout argmin now includes the "all real" threshold (+inf), as <code>inner_threshold</code> already did. Regression test: <code>test_holdout_argmin_includes_all_real</code>.</li>
+<li><strong>A5.</strong> P_wl's ITW corrective-share side is tested independently, at 0.5 and at 0.3, with the catches and the inner share passing.</li>
+<li><strong>Docs.</strong> The sweep report's opening now states the final outcome, and the 19:08 "Pending" section is marked as superseded.</li>
+<li><strong>Model-export identity.</strong> Accepted as residual risk (C6); moot because no candidate passes.</li>
+</ol>
+<p>The re-run reproduces the final report <code>354502ca…</code> byte for byte. <code>tests/test_fuse_sweep_v3.py</code>: 107 passed, 1 skipped.</p>
+<h2 id="codex-audit-round-3-1928-overall-acceptable">Codex audit, round 3 (19:28): <strong>Overall Acceptable</strong></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td>Excellent</td></tr>
+<tr><td>Scope discipline</td><td>Excellent</td></tr>
+<tr><td>Test coverage</td><td>Acceptable</td></tr>
+<tr><td>Review compliance</td><td>Acceptable</td></tr>
+<tr><td>Freeze integrity</td><td>Acceptable</td></tr>
+<tr><td>Regression check</td><td>Acceptable</td></tr>
+<tr><td>Documentation</td><td>Acceptable</td></tr>
+</tbody>
+</table></div>
+<p>Why the Acceptable grades:</p>
+<ul>
+<li><strong>Test coverage and regression:</strong> Codex's read-only sandbox could not run the temporary-write tests; 92 ran and passed.</li>
+<li><strong>Review compliance:</strong> C6 is an accepted residual risk. The model directory is not tied to the export by bytes, which is moot because nothing passes.</li>
+<li><strong>Documentation:</strong> its two cosmetic items, the script docstring's "withdrawn" and the sweep report's historical "unless H_noise passes" sentence, are fixed in the closing commit.</li>
+</ul>
+<p>Claude pre-audit: round 1 Fail, round 2 Needs-work; every finding fixed as recorded above. Full suite at close: 770 passed, 1 skipped; ruff clean. The KEEP log row follows Nathan's ruling, or the 20:00 default.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-26_post-draft-gate-sweep.md</code> <span class="hash">6d8bcf777ce8</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

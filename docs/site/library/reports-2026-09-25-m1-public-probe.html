@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M1 on public data: frozen XLS-R 300M + logistic probe (Fri Sep 25, 21:09) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-25_m1-public-probe.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-25_m1-public-probe.md</code>; the markdown file is the record.</p>
+
+<h1 id="m1-on-public-data-frozen-xls-r-300m--logistic-probe-fri-sep-25-2109">M1 on public data: frozen XLS-R 300M + logistic probe (Fri Sep 25, 21:09)</h1>
+<p>This rung runs before the NSA data arrives, to shake down the M1 pipeline end to end (<code>scripts/extract_embeddings.py</code> → <code>scripts/train_probe.py</code>). <strong>It is not an NSA number.</strong></p>
+<p><strong>Data.</strong> ASVspoof 2019 LA, class-balanced samples (<code>outputs/manifests/</code>, built from the protocol files):</p>
+<ul>
+<li>Train: <code>asv19_train_probe</code>, 5,160 clips. All 2,580 bona fide plus 430 per attack for A01–A06.</li>
+<li>Validation: <code>asv19_eval_probe</code>, 2,002 clips. 1,001 bona fide plus 77 per attack for A07–A19. These attacks are unseen in train (A16 and A19 reuse A04 and A06 by design).</li>
+</ul>
+<p><strong>Features.</strong> 4 s windows (50% hop, at most 4 per clip). Mean-pool each of the 25 hidden layers, then average over windows. Extraction takes 0.198 s per clip on the M3 Pro (MPS).</p>
+<p><strong>Probe.</strong> StandardScaler plus class-balanced logistic regression (C = 1).</p>
+<ul>
+<li>Layer chosen by generator-grouped 5-fold CV minDCF on train only (spoof grouped by attack, bona fide by speaker). Layer 7 won with CV minDCF 0.180 and EER 8.0%.</li>
+<li>Platt map fit on out-of-fold scores.</li>
+</ul>
+<p><strong>Held-out result</strong> (scored once; normalized minDCF, C_FA = 4, π = 0.5):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>minDCF</th><th>EER</th><th>AUC</th>
+</tr></thead>
+<tbody>
+<tr><td>A07–A19 pooled</td><td>0.023</td><td>0.6%</td><td>0.9998</td></tr>
+<tr><td>hardest: A10</td><td>0.067</td><td>3.6%</td><td></td></tr>
+<tr><td>A15</td><td>0.028</td><td>1.0%</td><td></td></tr>
+<tr><td>A12</td><td>0.013</td><td>0.2%</td><td></td></tr>
+</tbody>
+</table></div>
+<p>All other attacks score 0.</p>
+<p><strong>Caveats</strong></p>
+<ul>
+<li><strong>Silence shortcut.</strong> ASVspoof 2019 has a known silence shortcut. The dry-run inventory gave leading-silence AUC 0.295 and voiced-fraction AUC 0.684, so the probe may partly key on silence. The NSA set probably lacks this shortcut; expect worse numbers there.</li>
+<li><strong>CV vs. held-out.</strong> CV (leave-attack-out within A01–A06, with only 5 attacks in each training fold) is far harsher than the held-out result. Neither predicts NSA performance.</li>
+<li><strong>Next.</strong> Rerun the same pipeline on the NSA training data with a generator- or speaker-grouped split.</li>
+</ul>
+<p><strong>Model.</strong> <code>models/m1_wav2vec2-xls-r-300m_L7_20260925-2109/</code> (gitignored; <code>meta.json</code> has per-layer CV and per-attack results).</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-25_m1-public-probe.md</code> <span class="hash">0d84d0fd57da</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+%% The shipped pipeline, one file at a time. Numbers cited below.
+%% cites: README.md#how-it-decides, README.md#orchestration-what-routing-changes, README.md#the-eight-forensic-techniques
+flowchart TB
+  F["audio file · any container or codec"] --> L["probe the header, then decode once<br/>FFmpeg → 16 kHz mono float32"]
+  L --> C["ClipContext<br/>read-only audio + header facts + a per-clip cache"]
+  C --> R["router: fixed rules on measured facts<br/>every detector runs; each result is told what it may do"]
+  R --> FD["fused by rank<br/>XLS-R probe M1b · 0.6<br/>handcrafted spectral + prosody · 0.2<br/>M5 fine-tuned head · 0.2"]
+  R --> SD["suppression only<br/>Spectra-AASIST · can only halve a high score"]
+  R --> ED["evidence and routing, never scored<br/>compression · ENF hum · splice<br/>speaker drift · container"]
+  R --> G["speech gate<br/>is there speech to judge?"]
+  FD --> FU["base = 0.6 · rank(M1b) + 0.2 · rank(handcrafted) + 0.2 · rank(M5)"]
+  FU --> S["Spectra step: margin below −3 and base above 0.5 → halve"]
+  SD --> S
+  S --> PL["Platt map → probability<br/>judged files score in [0.001, 1]"]
+  G -->|"no speech, or the decode failed"| PB["pinned block · below 0.001<br/>at the real end of the ranking"]
+  PL --> T["CrossExam_predictions.tsv"]
+  PB --> T
+  ED --> X["explanation JSON per file<br/>every detector's sentence + the routing log"]
+  PL --> X
+  classDef fusedC fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef suppC fill:#fff3d1,stroke:#c37530,color:#101a2b
+  classDef evC fill:#ffffff,stroke:#c37530,color:#101a2b,stroke-dasharray:4
+  classDef gateC fill:#e9eff6,stroke:#005493,color:#101a2b
+  class FD,FU fusedC
+  class SD,S suppC
+  class ED,X evC
+  class G,PB gateC

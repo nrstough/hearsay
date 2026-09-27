@@ -1,0 +1,15 @@
+%% The two ways to be wrong, and what each one costs under the normalized cost.
+%% cites: CLAUDE.md#conventions, README.md#results-at-a-glance
+flowchart LR
+  R["a real file"] --> RA["scored above<br/>the threshold"] --> FA["false alarm<br/>counts 9.33"]
+  S["a synthetic file"] --> SB["scored below<br/>the threshold"] --> MI["miss<br/>counts 1"]
+  FA --> C["minDCF = 9.33 · P_FA + P_miss<br/>the scorer picks the threshold that minimizes it,<br/>so only the ranking of scores matters"]
+  MI --> C
+  classDef real fill:#e9eff6,stroke:#005493,color:#101a2b
+  classDef fake fill:#00254b,stroke:#00254b,color:#ffffff
+  classDef bad fill:#fff3d1,stroke:#c37530,color:#101a2b
+  classDef plain fill:#ffffff,stroke:#d6deea,color:#101a2b
+  class R real
+  class S fake
+  class FA,MI bad
+  class RA,SB plain

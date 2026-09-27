@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run spec: post-draft heads lane, frozen WavLM Large probe (Sat Sep 26, 2026, 18:15) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_post-draft-heads.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/specs/2026-09-26_post-draft-heads.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#problem">Problem</a></li><li><a href="#what-runs">What runs</a></li><li><a href="#design-decisions">Design decisions</a></li><li><a href="#acceptance-checks-fail--stop-and-report">Acceptance checks (fail → stop and report)</a></li><li><a href="#readouts-reported-no-passfail-the-gate-chat-judges">Readouts reported (no pass/fail: the gate chat judges)</a></li><li><a href="#results-1910-post-run">Results (19:10) (post-run)</a></li><li><a href="#post-run-notes-post-run-claude-pre-audit-critique-round-1-fail--fixes">Post-run notes (post-run; Claude pre-audit critique round 1, Fail → fixes)</a></li><li><a href="#post-run-notes-round-2-post-run-claude-critique-round-2-acceptable-low-items-fixed">Post-run notes, round 2 (post-run; Claude critique round 2: Acceptable, low items fixed)</a></li><li><a href="#post-run-notes-round-3-post-run-codex-audit-round-1-fail--fixes">Post-run notes, round 3 (post-run; Codex audit round 1: Fail → fixes)</a></li><li><a href="#post-run-notes-round-4-post-run-codex-audit-round-2-documentation-fail--fix">Post-run notes, round 4 (post-run; Codex audit round 2: Documentation Fail → fix)</a></li><li><a href="#review-scorecards">Review scorecards</a></li></ul></details>
+<h1 id="run-spec-post-draft-heads-lane-frozen-wavlm-large-probe-sat-sep-26-2026-1815">Run spec: post-draft heads lane, frozen WavLM Large probe (Sat Sep 26, 2026, 18:15)</h1>
+<p><strong>Rung:</strong> post-draft heads, from <code>docs/handoffs/2026-09-26_post-draft-heads-handoff.md</code> (revised ~17:25: the XLS-R layers 5–9 probe is dropped, since Fable ran it on the on-disk embeddings and it failed on In-the-Wild). P1 frozen by Nathan ~17:35 and P2 ~18:05, compressed process: no code plan, so no Codex plan review; the Claude critique and Codex audit run on this spec and the report after the export lands. The 18:50 hard stop was lifted by Nathan (~18:10); the export is due ~19:15, before the gate packet at 19:30. Nothing here touches fusion, the runner, the TSV or any shipped file.</p>
+<p>This spec was written at ~18:15, before any WavLM probe number was seen; the checks and the fallback below are pre-declared. Text added after the run is marked <strong>(post-run)</strong>: D5's diagnostics clause, the Results section and the Post-run notes section. D4's diagnostics existed before the probe ran as a scratch script (<code>heads_diag.py</code>, 18:14; its self-check against the reference counts ran at ~18:15); it was committed as <code>scripts/heads_diagnostics.py</code> after the run.</p>
+<h2 id="problem">Problem</h2>
+<p>NSA's draft review returned minDCF 0.0733 on the shipped rule (A3 w0.2 + E); one team is ahead at 0.0584. The shipped rule misses 158 of 1,000 In-the-Wild fakes at its In-the-Wild brief argmin (15 FA). Of those, M1b alone flags 1 at its inner threshold, handcrafted 2, M5 33, Spectra 107: heads on the XLS-R backbone share M1b's blind spot. A different frozen backbone is the one head experiment left. The expected test effect is near zero; a clean negative result is graded README content.</p>
+<h2 id="what-runs">What runs</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Step</th><th>What</th><th>Output</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td>WavLM Large extraction of the four v3 sets, each with its v3 twin's <code>extract_meta.json</code> flags</td><td><code>outputs/embeddings/wavlm-large/{nsa_train_sample_wl, asv19_addon_wl, nsa_test_wl, itw_stress_wl}</code></td></tr>
+<tr><td>1b</td><td>Repair of rows FFmpeg failed to decode under parallel load (new <code>scripts/repair_decode_errors.py</code>)</td><td>the same shards, flags cleared</td></tr>
+<tr><td>2</td><td><code>scripts/train_probe.py --model wavlm-large --train nsa_train_sample_wl,asv19_addon_wl --folds splits/nsa_folds_plus_asv19.csv --stress itw_stress_wl</code></td><td><code>models/m1_wavlm-large_L*_&lt;stamp&gt;/</code></td></tr>
+<tr><td>3</td><td><code>scripts/export_probe_scores.py</code> with the same sets, <code>--test nsa_test_wl</code>, <code>--name wavlm_l</code></td><td><code>outputs/detector_scores/wavlm_l.csv</code></td></tr>
+<tr><td>4</td><td>Diagnostics from exports only: Spearman vs <code>m1b_v3</code>; shipped-rule miss-tail count</td><td>report</td></tr>
+<tr><td>5</td><td>Report</td><td><code>docs/reports/2026-09-26_post-draft-heads.md</code></td></tr>
+</tbody>
+</table></div>
+<h2 id="design-decisions">Design decisions</h2>
+<ul>
+<li><strong>D1 (recipe = M1b v3).</strong> Segment mode, band match, silence trim, 8 s cap, per-input normalization (<code>hearsay.embed</code>; WavLM's own <code>do_normalize: true</code> is the same operation, so nothing differs), time-mean per layer, all 25 hidden states stored in fp16. Crops: test-length, seed 0 for the NSA train sample, <strong>seed 100</strong> for the ASV19 add-on (what <code>asv19_addon_v3/extract_meta.json</code> records; the handoff's command said 0), none for the test set, seed 200 for In-the-Wild. Probe: layer by inner-CV brief minDCF only; StandardScaler + class-balanced logistic (C = 1) + Platt, all fold-local; ASV19 rows are inner-only; holdout read once; In-the-Wild never fit on. No code in the recipe changes.</li>
+<li><strong>D2 (parallel extraction and decode repair).</strong> To fit the time box, the four sets were extracted by three concurrent processes after the serial chain was cut (the training sample resumed from its five completed shards; resumes are bit-identical because crop lengths and per-row seeds are regenerated deterministically). Under that load FFmpeg failed transiently on files that decode fine on retry (30 rows by 18:10; 0 in every v3 set; 0 in the five serial shards). <code>scripts/repair_decode_errors.py</code> re-embeds only flagged rows through the extractor's own segment path (stored crop length, seed = meta seed + row), after an identity check that re-embeds unflagged rows of the same set and refuses to write if they do not reproduce (relative error ≥ 2e-3). Run on each set only after its extraction has finished.</li>
+<li><strong>D3 (fallback, pre-declared).</strong> If the ASV19 add-on is not extracted when the training sample is, train NSA-only, call it an M1-style probe, and compare it against M1 v3 (holdout 0.159, In-the-Wild 0.380), not M1b. This restates the handoff's fallback with a different trigger. The handoff's trigger ("train sample not done by 18:10") did fire: the train sample finished at 19:04. It was waived because Nathan lifted the 18:50 hard stop (~18:10) and then asked for the full NSA + ASV19 recipe unless the add-on actually failed (relayed by the oversight chat, ~18:55).</li>
+<li><strong>D4 (diagnostics, pre-declared).</strong> (a) Spearman of <code>wavlm_l</code> vs <code>m1b_v3</code> logits on holdout, test and In-the-Wild; reference Spectra vs M1b on test (0.62 by this lane's computation; the handoff quotes 0.57). (b) Miss tail: reproduce the shipped rule on In-the-Wild from the exports (must give exactly 15 FA / 158 miss at the ITW brief argmin, else stop); each column's inner threshold = brief-cost argmin over its own inner-OOF logits; count of the 158 each column alone flags. Reference, reproduced by this lane's script: M1b 1, handcrafted 2, M5 33, Spectra 107. No fused numbers: the gate chat computes those.</li>
+<li><strong>D5 (ownership).</strong> Tracked changes: this spec, the report, <code>scripts/repair_decode_errors.py</code>, <code>tests/test_repair_decode_errors.py</code> and <strong>(post-run)</strong> <code>scripts/heads_diagnostics.py</code> (D4's diagnostics, promoted from a scratch script after the run so every reported number cites a tracked file; it reads exports only and hard-asserts the 15 / 158 reproduction). No change to <code>embed.py</code>, <code>probe.py</code>, the extraction, training or export scripts, the fold files or any fusion file. Staged by path; not pushed.</li>
+</ul>
+<h2 id="acceptance-checks-fail--stop-and-report">Acceptance checks (fail → stop and report)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Check</th><th>Pass</th>
+</tr></thead>
+<tbody>
+<tr><td>A1</td><td><code>extract_meta.json</code> of each <code>*_wl</code> set equals its v3 twin's</td><td>identical dicts</td></tr>
+<tr><td>A2</td><td>Row counts</td><td>20,000 / 7,648 / 1,671 / 3,000; manifest paths in the same order as v3</td></tr>
+<tr><td>A3</td><td>Decode errors after repair</td><td>0 per set (v3 has 0), or each remaining row named in the report</td></tr>
+<tr><td>A4</td><td>Embeddings</td><td>shape (N, 25, 1024), all finite</td></tr>
+<tr><td>A5</td><td>Repair identity check</td><td>relative error &lt; 2e-3 on the verified rows of every repaired set</td></tr>
+<tr><td>A6</td><td>Layer selection</td><td>trainer's inner-CV argmin; full CV table in the report</td></tr>
+<tr><td>A7</td><td>Direction</td><td>trainer's holdout AUC &gt; 0.5 assertion passes</td></tr>
+<tr><td>A8</td><td>Export shape</td><td>splits inner_oof 16,142 / holdout 3,858 / test 1,671 / itw 3,000; path set per split identical to <code>m1b_v3.csv</code>; no NaN</td></tr>
+<tr><td>A9</td><td>Shipped-rule reproduction before counting the miss tail</td><td>exactly 15 FA / 158 miss</td></tr>
+<tr><td>A10</td><td>Tests</td><td><code>uv run pytest -q</code> all pass; <code>uv run ruff check .</code> clean</td></tr>
+</tbody>
+</table></div>
+<p><code>tests/test_repair_decode_errors.py</code> covers D2's tool (6 tests):</p>
+<ul>
+<li>flagged rows only, with the stored crop and the row seed</li>
+<li>NaN crop for uncropped sets</li>
+<li>identity mismatch refuses and writes nothing (fails if the check is removed)</li>
+<li>a still-failing row stays flagged</li>
+<li>a no-op on clean sets</li>
+<li>windows-mode refusal</li>
+</ul>
+<h2 id="readouts-reported-no-passfail-the-gate-chat-judges">Readouts reported (no pass/fail: the gate chat judges)</h2>
+<p>CV-by-layer table; holdout minDCF, EER, act DCF, per-generator and per-source; In-the-Wild minDCF (brief) and averse cost, P_FA and P_miss at the inner threshold; Spearman (D4a); miss-tail count (D4b); timing. For the column alone, the interesting outcomes are In-the-Wild below M1b's 0.342 and a test-set Spearman with M1b well below 1.</p>
+<h2 id="results-1910-post-run">Results (19:10) (post-run)</h2>
+<p>Full readouts, CV table, diagnostics and the decode-repair incident are in <code>docs/reports/2026-09-26_post-draft-heads.md</code>. Summary:</p>
+<p><strong>Run.</strong></p>
+<ul>
+<li>Layer 9 by inner CV (0.2936).</li>
+<li>Holdout 0.0717 / EER 1.45%, level with M1b v3.</li>
+<li>In-the-Wild 0.752 brief / 0.383 averse, against M1b's 0.342 / 0.296. P_FA at the inner threshold is 7.05%, against 0.8%.</li>
+</ul>
+<p><strong>Diagnostics.</strong></p>
+<ul>
+<li>Spearman vs M1b: test 0.795, holdout 0.863, In-the-Wild 0.774.</li>
+<li>Miss tail: WavLM flags 57 of the shipped rule's 158 In-the-Wild misses. References: M1b 1, handcrafted 2, M5 33, Spectra 107.</li>
+</ul>
+<p><strong>Checks.</strong></p>
+<ul>
+<li>A1–A9 pass. 99 transiently failed rows were repaired, identity relative error 0.0, and none are still failing.</li>
+<li>A10 at e611d1b: pytest <strong>745 passed</strong> (run on the working tree at ~19:08, before other lanes' later commits). The first version of this section said repo-wide ruff failed on <code>src/hearsay/analyzer.py</code> from 19925a3. That was stale: those findings were fixed in 6a1ba6b and 1b66b56 before e611d1b, and <code>ruff check .</code> is clean there. Counts after the audit fixes are in Post-run notes.</li>
+</ul>
+<p><strong>Deviation from D2's plan.</strong> The three-process layout was abandoned at ~18:15 because of swapping, and the train-sample process was restarted clean at 18:34. Neither changes any output: resumes are deterministic, and every repaired set passed the identity check.</p>
+<p><strong>Gate verdict</strong> (gate chat, commit 57b9c90): the pre-declared entry failed both the gate and the room. WavLM does not ship; the result is recorded as a negative.</p>
+<h2 id="post-run-notes-post-run-claude-pre-audit-critique-round-1-fail--fixes">Post-run notes (post-run; Claude pre-audit critique round 1, Fail → fixes)</h2>
+<p>The critique graded e611d1b <strong>Fail</strong> on Test coverage and Documentation. Fixed in the follow-up commit:</p>
+<ul>
+<li><strong>A5 evidence was persisted for one set only, and the identity bar was lax.</strong>
+<ul>
+<li>The first bar was a whole-matrix max relative error, so a WavLM row with values near 500 allowed ~1.0 absolute error per element. It could also pass with zero rows checked.</li>
+<li><code>scripts/repair_decode_errors.py</code> now checks element-wise (|diff| ≤ 5e-3 + 5e-3·|stored|). It requires exactly <code>--verify</code> ≥ 1 unflagged rows, drawn at random from the flagged shards first and then from the others.</li>
+<li>It refuses a <code>--manifest</code> that differs from the set's <code>manifest.csv</code>, and a set whose extraction has not finished. It writes shards atomically.</li>
+</ul></li>
+<li><strong>The <code>--verify-only</code> mode</strong> replaces the untracked finish-chain validation (A1–A5). Run on all four sets after training, it re-embedded 426 rows (10 per shard plus all 99 repaired rows), all matching exactly (max abs diff 0.0). Stored crop lengths equal the v3 twins'. Evidence: <code>outputs/logs/wavlm_verify_*.json</code>.</li>
+<li><strong>D2 changed accordingly.</strong> The tool described in D2 is the tightened version; the repairs themselves were made by the first version, and the verify-only run above re-checks their output under the new bar.</li>
+<li><strong>Tests.</strong> <code>tests/test_repair_decode_errors.py</code> now has 17 tests. The new ones cover the empty pool, <code>n_verify = 0</code>, fallback to other shards, a mismatched manifest, an unfinished set, an element-wise tolerance pin at WavLM scale, no leftover temp file, <code>embed_row</code> through the real <code>prepare_segment</code> / <code>embed_segment</code> with a stub model, and verify-only pass and fail cases.</li>
+<li><strong>Documentation.</strong>
+<ul>
+<li>A10 corrected.</li>
+<li>A <code>submissions/log.csv</code> row added (no TSV; not shipped).</li>
+<li>The report: repaired-row IDs, A5 evidence, extraction start 17:19, per-shard solo rates, the inner-OOF averse gap, and the Reading section reconciled with the gate verdict.</li>
+<li>The CLAUDE.md gotcha line: 99 of 32,319 rows (0.31%), flagged rather than silent. The AI-use disclosure's WavLM entry had already been updated by other lanes (1dccb8c, cd9eb11); a heads-lane bullet was added.</li>
+</ul></li>
+<li><strong>A10 after the fixes:</strong> <code>uv run pytest -q</code> 770 passed, 1 skipped (working tree including other lanes' commits up to 1461c1f); <code>uv run ruff check .</code> clean.</li>
+<li><strong>Housekeeping.</strong> The <code>submissions/log.csv</code> row was appended in this lane but landed in the gate lane's commit cbee709, which staged the file after the append. cf11b85's message says it added the row.</li>
+</ul>
+<h2 id="post-run-notes-round-2-post-run-claude-critique-round-2-acceptable-low-items-fixed">Post-run notes, round 2 (post-run; Claude critique round 2: Acceptable, low items fixed)</h2>
+<ul>
+<li><strong>N1.</strong> The atomic write's temp file is now <code>.shard_XXXXX.npz.tmp</code>, outside the <code>shard_*.npz</code> glob, so a crash cannot leave a second copy of the rows for a loader to pick up.</li>
+<li><strong>N2.</strong> <code>verify_set</code> now reports only the explicit rows it actually re-embedded, and refuses an empty check.
+<ul>
+<li>Five tests were added: explicit rows really re-embedded, twin meta mismatch, twin path mismatch, a manifest-only flag, and a non-finite embedding. Plus a failed rename that leaves the original shard untouched.</li>
+<li><code>tests/test_repair_decode_errors.py</code> now has 22 tests. The critique's 17 single-guard mutants of the tool are all caught (6 survived before).</li>
+</ul></li>
+<li><strong>N3.</strong> The report's test count is updated.</li>
+<li><strong>N5.</strong> The report states the source of the 25 recovered row IDs.</li>
+<li><strong>N4.</strong> The CLAUDE.md lane bullet names a Codex audit; its result is recorded below once it has run.</li>
+</ul>
+<h2 id="post-run-notes-round-3-post-run-codex-audit-round-1-fail--fixes">Post-run notes, round 3 (post-run; Codex audit round 1: Fail → fixes)</h2>
+<ul>
+<li><strong>Calibration wording (Plan adherence and Documentation, Fail).</strong> D1's "StandardScaler + class-balanced logistic (C = 1) + Platt, all fold-local" copied the handoff's summary of the M1b recipe, and it is wrong for Platt.
+<ul>
+<li><code>scripts/train_probe.py:78</code> fits one Platt map on the pooled inner out-of-fold scores, and <code>scripts/export_probe_scores.py:56</code> applies it back to the inner rows. The scaler and classifier are fold-local.</li>
+<li>The run mirrored M1b exactly, which was D1's intent. The claim is corrected and the recipe is unchanged: changing it would break the like-for-like comparison with M1b and the gate's column.</li>
+<li>Platt is a positive affine map. Ranks, Spearman figures, rank-fusion inputs, argmin thresholds and every minDCF or EER in the report are unaffected; only calibrated inner logit values are in-sample.</li>
+<li>Corrected in the report's recipe section and in <code>docs/architecture.md</code>'s validation diagram, whose inner_oof edge made the same claim for every M1-family column.</li>
+</ul></li>
+<li><strong>Final suite</strong> (re-run after this round's changes, working tree at HEAD f085d89 plus this round): <code>uv run pytest -q</code> 775 passed, 1 skipped; <code>uv run ruff check .</code> clean.</li>
+</ul>
+<h2 id="post-run-notes-round-4-post-run-codex-audit-round-2-documentation-fail--fix">Post-run notes, round 4 (post-run; Codex audit round 2: Documentation Fail → fix)</h2>
+<ul>
+<li><code>docs/architecture.md</code>'s fold-discipline invariant still said every learned piece, "including … Platt maps", is fit fold-locally.
+<ul>
+<li>It now states the exception: the M1-family and fusion Platt maps are fit once on pooled inner out-of-fold scores, so ranks and metrics are unchanged and calibrated inner values are in-sample. No outer-holdout, stress or test label enters any fit.</li>
+<li>The diagram edge at the inner_oof column says the same.</li>
+</ul></li>
+<li>Docs-only change. The suite result above stands; <code>tests/test_docs_consistency.py</code> was re-run on the edit.</li>
+</ul>
+<h2 id="review-scorecards">Review scorecards</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Round</th><th>Reviewer</th><th>Overall</th><th>Resolved in</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td>Claude pre-audit critique, on e611d1b</td><td>Fail (Test coverage, Documentation)</td><td>cf11b85</td></tr>
+<tr><td>2</td><td>Claude critique, on cf11b85</td><td>Acceptable (5 low items)</td><td>f085d89</td></tr>
+<tr><td>3</td><td>Codex audit</td><td>Fail (Platt described as fold-local)</td><td>b0b76f6</td></tr>
+<tr><td>4</td><td>Codex audit</td><td>Fail (architecture.md fold-discipline invariant)</td><td>fabd87e</td></tr>
+<tr><td>5</td><td>Codex audit</td><td><strong>Acceptable</strong></td><td>none needed; <code>docs/specs/2026-09-26_post-draft-heads-audit.md</code></td></tr>
+</tbody>
+</table></div>
+<p>The round-5 dimension grades were:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dimension</th><th>Grade</th>
+</tr></thead>
+<tbody>
+<tr><td>Plan adherence</td><td>Acceptable</td></tr>
+<tr><td>Scope</td><td>Excellent</td></tr>
+<tr><td>Test coverage</td><td>Acceptable</td></tr>
+<tr><td>Review compliance</td><td>Excellent</td></tr>
+<tr><td>Freeze</td><td>Acceptable (no hashes)</td></tr>
+<tr><td>Regression</td><td>Acceptable</td></tr>
+<tr><td>Documentation</td><td>Excellent</td></tr>
+</tbody>
+</table></div>
+<p>Codex could not re-run the full suite in its read-only sandbox. It passed the docs tests (52/52) and ruff, and it reproduced the diagnostics, the export counts and the shipped TSV hash itself.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-26_post-draft-heads.md</code> <span class="hash">c224a1dddb3b</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

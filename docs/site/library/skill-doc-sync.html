@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/doc-sync — Documentation drift check · HEARSAY</title>
+<meta name="description" content="&quot;Audit the project&#x27;s documentation against the actual code and flag drift — stale CLI flags, wrong test counts, missing/renamed modules, outdated dependencies, resolved-but-still-open bugs, and stale status anchors in CLAUDE.md / auto-memory. Use when the user says &#x27;doc sync&#x27;, &#x27;check the docs&#x27;, &#x27;are the docs stale&#x27;, after a commit or merge, or before trusting a doc in a new session.&quot;">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>.claude/skills/doc-sync/SKILL.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#step-0--resolve-the-doc-set-do-this-first-dont-assume">Step 0 — Resolve the doc set (do this first, don't assume)</a></li><li><a href="#step-1--scope-to-the-diff-when-there-is-one">Step 1 — Scope to the diff when there is one</a></li><li><a href="#checks-to-perform">Checks to perform</a></li><li><a href="#output-format">Output format</a></li><li><a href="#rules">Rules</a></li></ul></details>
+<h1 id="doc-sync--documentation-drift-check">/doc-sync — Documentation drift check</h1>
+<p>You are a documentation consistency checker. You <strong>find</strong> drift and report it with exact
+edits; you do not silently rewrite docs unless the user asks you to apply the fixes.</p>
+<p>Any arguments passed to this skill scope the check (a doc, a subsystem, a commit range).
+With no arguments, run every applicable check below.</p>
+<h2 id="step-0--resolve-the-doc-set-do-this-first-dont-assume">Step 0 — Resolve the doc set (do this first, don't assume)</h2>
+<ol>
+<li>Read <code>CLAUDE.md</code> / <code>AGENTS.md</code> — if the project names its docs or ships a doc map
+(<code>docs/DOC_MAP.md</code> or similar), <strong>that list is authoritative</strong>; use it and stop guessing.
+<strong>HEARSAY:</strong> the doc set is <code>CLAUDE.md</code>, <code>docs/plan.md</code>, <code>docs/nsa-challenge.md</code>,
+<code>README.md</code>, and anything in <code>docs/</code> (<code>scoping.md</code>/<code>master-doc.md</code> are historical). Headline numbers are verified against <code>submissions/log.csv</code>, not
+against prose. Two CLAUDE.md sections are copied into Devpost and must be current:
+<strong>Pre-event work</strong> (only what was really done before 8 pm Friday) and <strong>AI use
+disclosure</strong> — every pretrained model, checkpoint, and public dataset referenced in
+code must be listed there. Also check the detector contract in CLAUDE.md against
+<code>src/hearsay/detectors/base.py</code>, and run <code>uv run pytest tests/test_docs_consistency.py</code>.</li>
+<li>Otherwise build the list yourself:
+<pre><code class="language-bash">ls README* CONTRIBUTING* CHANGELOG* 2&gt;/dev/null
+ls docs/*.md docs/**/*.md 2&gt;/dev/null
+ls *.md 2&gt;/dev/null</code></pre></li>
+<li>Add the two docs people forget:
+<ul>
+<li><strong><code>CLAUDE.md</code> / <code>AGENTS.md</code> itself</strong> — check it for drift against the code it describes.</li>
+<li><strong>This project's auto-memory</strong> <code>MEMORY.md</code>, if one exists
+(<code>~/.claude/projects/&lt;slugified-project-path&gt;/memory/MEMORY.md</code>) — status claims,
+"current" markers, branch lists and headline metrics go stale fastest there.</li>
+</ul></li>
+<li>Note which docs are <strong>frozen by convention</strong> (per-change run specs, ADRs, dated
+reports). Those get a dated correction note, never a rewrite — flag them separately.</li>
+</ol>
+<h2 id="step-1--scope-to-the-diff-when-there-is-one">Step 1 — Scope to the diff when there is one</h2>
+<pre><code class="language-bash">git diff --name-only; git diff --name-only HEAD~1</code></pre>
+<p>Prioritize checks touching the changed files. A full sweep is the no-argument fallback,
+but a diff-scoped sweep finds real drift far faster.</p>
+<h2 id="checks-to-perform">Checks to perform</h2>
+<h3 id="1-cli--public-interface-consistency">1. CLI / public-interface consistency</h3>
+<p>Read the argument parsers or command definitions of the project's entry points
+(<code>argparse</code>/<code>click</code>/<code>commander</code>/<code>clap</code>/flag packages, <code>package.json</code> <code>bin</code>, <code>Makefile</code>
+targets) and compare flag names, defaults, and choices against every usage example in the
+docs. Flag missing, renamed, removed, or default-changed options.</p>
+<h3 id="2-test-counts-and-test-inventory">2. Test counts and test inventory</h3>
+<p>Collect the real number, don't trust the doc:</p>
+<ul>
+<li>pytest: <code>pytest --co -q -o "addopts=" 2&gt;/dev/null | tail -1</code></li>
+<li>jest/vitest: <code>npx jest --listTests 2&gt;/dev/null | wc -l</code></li>
+<li>go: <code>go test ./... -list '.*' 2&gt;/dev/null | grep -c '^Test'</code></li>
+<li>cargo: <code>cargo test -- --list 2&gt;/dev/null | grep -c ': test$'</code></li>
+</ul>
+<p>Compare against the counts and test-file lists in the testing docs. A doc that names a
+count is the single most reliably stale line in any repo.</p>
+<h3 id="3-module--file-inventory">3. Module / file inventory</h3>
+<p>List the project's source files and compare against any architecture or file-inventory
+doc. Flag both directions: <strong>documented-but-missing</strong> (deleted or renamed) and
+<strong>present-but-undocumented</strong> (new module the architecture doc never learned about).</p>
+<h3 id="4-dependencies">4. Dependencies</h3>
+<p>Compare the manifest (<code>requirements.txt</code>, <code>pyproject.toml</code>, <code>package.json</code>, <code>Cargo.toml</code>,
+<code>go.mod</code>) against the setup/install docs — versions, added packages, dropped packages,
+and the language/runtime version the setup doc tells people to install.</p>
+<h3 id="5-bug-log">5. Bug log</h3>
+<p>Read the bug log (<code>BUGS.md</code>, <code>KNOWN_ISSUES.md</code>, the issue tracker if that's the
+convention). For each open entry, check whether the code it describes still behaves that
+way, and whether its <code>file:line</code> references still point at the described code. Flag
+<strong>silently fixed</strong> bugs (code changed, log never updated) and <strong>drifted line refs</strong>.</p>
+<h3 id="6-stale-status-anchors-the-highest-value-check">6. Stale status anchors (the highest-value check)</h3>
+<p>Grep the living docs, <code>CLAUDE.md</code>, and auto-memory for claims that go stale by nature,
+and verify each against reality:</p>
+<ul>
+<li><strong>Headline metrics</strong> — accuracy/AUC/latency/benchmark numbers, "current best", "SOTA",
+"baseline is X". Verify against the newest result record; flag any number the latest run
+contradicts.</li>
+<li><strong>"Current" / "active" / "pending" / "TODO" / "blocked" markers</strong> — anything the code
+now resolves. A doc that says "TODO: X" when X shipped is the most common miss;
+<strong>grep for the thing you just shipped.</strong></li>
+<li><strong>Algorithm / code-path claims</strong> — a doc naming a module or approach that has since been
+replaced or removed. Check the named symbol still exists: <code>git grep -n '&lt;symbol&gt;'</code>.</li>
+<li><strong>Debug / workflow guidance</strong> — a doc recommending a script or flag that is now the
+wrong path.</li>
+<li><strong>Branch and version lists</strong> — verify against
+<code>git branch --all --sort=-committerdate | head -20</code> and the current tags.</li>
+<li><strong>Counts of hand-curated data</strong> (label counts, dataset sizes, fixture counts) — recount
+from the source of truth; these drift between docs and disagree with each other.</li>
+<li><strong>Model / tool version pins</strong> — a commit trailer, config, or doc pinned to a superseded
+model or CLI version.</li>
+<li><strong>Superseded forward-looking guidance</strong> — old consults, plans, or predictions cited as
+current direction after their premise was settled.</li>
+</ul>
+<h2 id="output-format">Output format</h2>
+<p>One table for the whole sweep, most-load-bearing drift first:</p>
+<pre><code>| Doc | Stale reference | Current reality | Fix (old → new) |
+|-----|-----------------|-----------------|-----------------|</code></pre>
+<p>Then, separately: <strong>frozen docs needing a dated note</strong> (not a rewrite), and
+<strong>undocumented-but-present</strong> items.</p>
+<p>If nothing is stale, say so in one line: <code>✅ Docs in sync with the checked scope (&lt;scope&gt;).</code></p>
+<h2 id="rules">Rules</h2>
+<ol>
+<li><strong>Be precise</strong> — quote the exact stale text and the exact current code/output. No vague
+"may be out of date".</li>
+<li><strong>Only flag real contradictions.</strong> A doc vague enough to still be true is not drift.</li>
+<li><strong>Verify before reporting</strong> — re-check each finding against the code and drop the false
+positives. A findings table with noise in it stops getting read.</li>
+<li><strong>Skip missing docs silently.</strong> Don't report a doc that doesn't exist as a finding.</li>
+<li><strong>Find, don't fix</strong> — output the table. Apply the edits only when the user asks (then
+respect the frozen-doc convention: dated note, never a rewrite).</li>
+<li>For a large or cross-cutting sweep, launch the <code>doc-sync-checker</code> agent (the project's
+own if it has one, else the global one) and report its table.</li>
+</ol>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>.claude/skills/doc-sync/SKILL.md</code> <span class="hash">a4950c1fa857</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handcrafted v4: feature discovery for the three blind generators · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_handcrafted-v4.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_handcrafted-v4.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#summary">Summary</a></li><li><a href="#method">Method</a></li><li><a href="#gate-results-per-family">Gate results per family</a></li><li><a href="#corpus-cues-what-the-model-must-not-lean-on">Corpus cues (what the model must not lean on)</a></li><li><a href="#training-variants">Training variants</a></li><li><a href="#in-the-wild-readout-eval-only">In-the-Wild readout (eval only)</a></li><li><a href="#test-domain-shift-found-by-the-first-fusion-run">Test-domain shift (found by the first fusion run)</a></li><li><a href="#what-worked--what-had-no-effect-v4">What worked / what had no effect (v4)</a></li><li><a href="#state-for-the-next-chat">State for the next chat</a></li></ul></details>
+<h1 id="handcrafted-v4-feature-discovery-for-the-three-blind-generators">Handcrafted v4: feature discovery for the three blind generators</h1>
+<p>Sat Sep 26, 2026, 04:00–. Brief: <code>docs/handoffs/2026-09-26_handcrafted-v4-brief.md</code>. Baseline: v3 (<code>docs/reports/2026-09-26_cpu-detectors.md</code>), inner OOF minDCF 0.614, holdout 0.254, and three generators it cannot see at all: <code>grad_tts</code> 1.00, <code>pro_diff</code> 1.00, <code>elevenlabs</code> 0.80. Metric: normalized minDCF, <code>9.33 · P_FA + P_miss</code>. All gating on inner rows only; the holdout is read once per trained variant.</p>
+<h2 id="summary">Summary</h2>
+<ul>
+<li><strong>v4 wins on inner out-of-fold, the selection rule:</strong> minDCF 0.614 → <strong>0.434</strong>, LibriSpeech real (the 4×-cost side) 0.77 → <strong>0.54</strong>, pro_diff 1.00 → <strong>0.32</strong>; holdout 0.254 → 0.170 (read once; inside the noise band). Export: <code>outputs/detector_scores/handcrafted_v4.csv</code>.</li>
+<li><strong>But the first fusion run found a test-domain shift:</strong> under a Platt map at the 0.3 prior, v4 alone calls 56% of the test set synthetic (v3: 49%; deep detectors: 27%). The shift is the spectral envelope of the test recordings (darker, codec-like), spread over nearly every column; no family and no column subset removes it. <strong>v5b</strong>, the same columns trained with augmented fit-only twins (codec round-trips, random tilt + low-pass), is the recommended fusion column: clean holdout 0.137, calibrated test share 51%, holdout-real false alarms 6.3% (v4: 9.1%), In-the-Wild real 0.40%, at an inner cost of 0.418 → 0.469. Export <code>handcrafted_v5.csv</code>; bundle pinned at <code>models/hc_selected</code>.</li>
+<li><strong>Still blind:</strong> grad_tts (1.00 in every variant; its phase cue is shown by no other generator, so it cannot be learned under generator-held-out folds) and ElevenLabs (0.80 → 0.92).</li>
+<li><strong>In-the-Wild:</strong> P_FA <strong>0.65%</strong> at the inner-OOF threshold on 2,000 real clips (safe on the expensive side), but P_miss 97% and minDCF 1.0 (does not catch that domain's fakes); AUC 0.64 → 0.76 vs v3.</li>
+<li><strong>Families:</strong> all six implemented and gated; cqcc, lfcc and phase carry the gain; jitter, modulation and breath are marginal. No passing column is a codec cue. Dropping corpus-cue columns hurt every variant.</li>
+</ul>
+<h2 id="method">Method</h2>
+<p>Six feature families were added to <code>hearsay.hc_v4</code> behind <code>features(..., families=(...))</code>, each computed from what <code>features()</code> already has (complex and power STFT at 512/160, the voiced mask, the loudness envelope, the YIN track) on the shared preprocessing (band match at 7.25 kHz, trim, test-length crops, RMS normalization). Column names carry a family prefix; the trainer records the families in the bundle and the detector recomputes them at inference. Extraction with all six costs about 0.05 s per clip on top of the v3 block (0.14 → 0.20 worker-seconds per clip; the gate sample of 2,000 clips ran in 80–90 s on 4 workers).</p>
+<p><strong>Gate.</strong> 200 inner-fold clips per generator and per real source (2,000 clips, <code>outputs/manifests/hc_gate_sample.csv</code>; never the holdout). Per new column: AUC of each blind generator against all real speech, AUC of each real source against all synthetic speech, and the corpus check (LJ real vs LibriSpeech real, want 0.5). Keep rule per column: |AUC − 0.5| ≥ 0.15 on grad_tts, pro_diff or elevenlabs, corpus deviation ≤ 0.15, and the two real sources within 0.10 of each other. A family survives if any column does. Full tables: <code>outputs/handcrafted/hc_gate_all_columns.csv</code>.</p>
+<p><strong>Codec check.</strong> For every column that passed on elevenlabs (an MP3-sourced generator), 80–100 real clips were laundered through MP3 128 kbps at 44.1 kHz (<code>hearsay.compression.launder</code>) and the feature recomputed. No passing column of any family moved by more than 0.06 clean standard deviations (threshold 0.5), so nothing below is a codec cue.</p>
+<h2 id="gate-results-per-family">Gate results per family</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Family</th><th>Columns</th><th>Pass</th><th>Best blind separations (AUC; &lt; 0.5 means lower on synthetic)</th><th>Verdict</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>phase</strong> (group delay + peak phase-vs-magnitude coherence)</td><td>12</td><td>7</td><td><code>pc_frac_incoherent</code> / <code>pc_err_median</code>: grad_tts <strong>0.80</strong>, corpus 0.57, real LJ 0.42 vs Libri 0.49. <code>gd_std_p10</code>: pro_diff <strong>0.21</strong>, grad_tts 0.66, corpus 0.45. <code>gd_std_mean</code>: grad_tts 0.72, elevenlabs 0.28.</td><td><strong>Keep.</strong> The first family that sees grad_tts on a corpus-neutral cue.</td></tr>
+<tr><td><strong>cqcc</strong> (constant-Q cepstra, 65 Hz–7 kHz)</td><td>72</td><td>16</td><td><code>cqcc2_dstd</code>: pro_diff <strong>0.94</strong>, elevenlabs <strong>0.82</strong>, grad_tts 0.72, corpus 0.61. <code>cqcc1_dstd</code>: pro_diff 0.86, elevenlabs 0.87, grad_tts 0.67, corpus 0.53. <code>cqcc9_mean</code>: pro_diff 0.87.</td><td><strong>Keep.</strong> Strongest family; frame-to-frame change of the low-order coefficients carries it. Fifteen of its columns are corpus cues (see blocklist).</td></tr>
+<tr><td><strong>lfcc</strong> (linear-frequency cepstra, 0–7 kHz)</td><td>60</td><td>16</td><td><code>lfcc17_std</code> / <code>lfcc18_std</code>: pro_diff <strong>0.13</strong>, elevenlabs 0.75, grad_tts 0.33, corpus 0.50–0.52. <code>lfcc0_dstd</code>: elevenlabs 0.85, pro_diff 0.71, grad_tts 0.63.</td><td><strong>Keep.</strong> Upper-coefficient variability, the same cue as the v3 upper-MFCC stds, sharper at linear spacing. Thirty-two of its columns are corpus cues.</td></tr>
+<tr><td><strong>jitter</strong> (cycle-level jitter and shimmer)</td><td>5</td><td>2</td><td><code>jit_rap</code> / <code>jit_local</code>: grad_tts 0.63, pro_diff 0.34, corpus 0.50.</td><td>Marginal keep (0.16). Cheap.</td></tr>
+<tr><td><strong>modulation</strong> (loudness-envelope modulation spectrum)</td><td>6</td><td>3</td><td><code>mod_8_16</code>: elevenlabs 0.66; <code>mod_1_2</code>: pro_diff 0.35; <code>mod_peak_hz</code>: pro_diff 0.65.</td><td>Marginal keep (0.15–0.16), as the brief predicted for 3 s clips. Cheap.</td></tr>
+<tr><td><strong>breath</strong> (between-speech frames)</td><td>4</td><td>1</td><td><code>breath_flatness</code>: pro_diff 0.28.</td><td>Marginal keep (0.22 on one generator). Cheap.</td></tr>
+</tbody>
+</table></div>
+<p>Nothing was killed outright by the rule; the two weakest families (modulation, breath) stay only because they cost nothing and their one passing column each is corpus-neutral.</p>
+<p><strong>A note on the phase family's first version.</strong> The first instantaneous-frequency measure (per-bin temporal std of the phase advance) read the same 1.4–1.5 rad for real and synthetic speech alike, the level of random phase, because a fixed frequency bin sees every pitch movement as phase noise. Replacing it with a peak-tracking measure (the frequency implied by the phase advance against the frequency implied by the interpolated magnitude peak, per harmonic per frame) removed the pitch-movement dependence and produced the grad_tts separation above. Group-delay spread likewise had to be restricted to bins within 30 dB of each frame's peak, or the empty bins between harmonics dominated it.</p>
+<h2 id="corpus-cues-what-the-model-must-not-lean-on">Corpus cues (what the model must not lean on)</h2>
+<p>Across all 234 columns (159 new, 75 v3), 83 separate LJ real from LibriSpeech real by more than 0.25 AUC or make the two real sources disagree by more than 0.25 on how synthetic they look: 49 new columns and 34 v3 columns. The worst v3 offenders are the ones that make LibriSpeech real look synthetic and therefore drive the 4×-cost false alarms: <code>contrast0_mean</code> (LJ vs Libri 0.95; LibriSpeech real vs all synthetic 0.64), <code>mfcc2_std</code> (0.94; 0.76), <code>hf_ratio_7k_std</code> (0.89; 0.68), and the MFCC means 9, 11, 13, 14 (0.07–0.11; LJ real looks synthetic instead). Lists: <code>outputs/handcrafted/hc_gate_all_columns.csv</code>. The trainer's <code>--drop-columns</code> takes them out at training time, so variants can be compared without re-extracting.</p>
+<h2 id="training-variants">Training variants</h2>
+<p>Full run: all six families extracted for the 20,000-clip training sample (<code>--crop test --seed 0</code>, the deep detector's crops) and the 1,671 test files, 234 columns, 0 failures, 993 s at 4 workers. Four variants trained with <code>scripts/train_handcrafted.py --drop-columns</code>, each selecting logistic vs LightGBM by inner OOF (LightGBM won every time), holdout read once per variant. <strong>Selection is by inner OOF only</strong>: overall minDCF, the blind generators, and LibriSpeech real. v3 is the reference row.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Variant</th><th>Columns</th><th>Inner OOF minDCF</th><th>EER</th><th>grad_tts</th><th>pro_diff</th><th>elevenlabs</th><th>LibriSpeech real (inner)</th><th>Holdout minDCF</th><th>Holdout EER</th><th>Holdout LibriSpeech</th><th>Test share &gt; 0.5</th>
+</tr></thead>
+<tbody>
+<tr><td>v3 (reference)</td><td>75</td><td>0.614</td><td>17.6%</td><td>1.00</td><td>1.00</td><td>0.80</td><td>0.77</td><td>0.254</td><td>4.3%</td><td>0.32</td><td>42%</td></tr>
+<tr><td><strong>v4a: all columns</strong></td><td>234</td><td><strong>0.434</strong></td><td>14.1%</td><td>1.00</td><td><strong>0.32</strong></td><td>0.92</td><td><strong>0.54</strong></td><td><strong>0.170</strong></td><td>3.6%</td><td>0.22</td><td>41%</td></tr>
+<tr><td>v4b: minus the 49 new corpus-cue columns</td><td>185</td><td>0.467</td><td></td><td>1.00</td><td>0.45</td><td>0.86</td><td>0.59</td><td>0.186</td><td>3.2%</td><td>0.26</td><td>41%</td></tr>
+<tr><td>v4c: minus all 83 corpus-cue columns</td><td>151</td><td>0.528</td><td></td><td>1.00</td><td>0.67</td><td>0.95</td><td>0.61</td><td>0.275</td><td>5.2%</td><td>0.34</td><td>51%</td></tr>
+<tr><td>v3c: v3 minus its 34 corpus-cue columns</td><td>41</td><td>0.848</td><td></td><td>1.00</td><td>1.00</td><td>0.88</td><td>0.93</td><td>0.640</td><td>13.5%</td><td>0.71</td><td>60%</td></tr>
+</tbody>
+</table></div>
+<p><strong>Winner: v4a, all columns</strong> (<code>models/hc_lgbm_20260926-0438</code>, pinned as <code>models/hc_selected</code>; export <code>outputs/detector_scores/handcrafted_v4.csv</code>). Per generator, inner OOF: diffgan_tts 0.02, unit_speech 0.06, your_tts 0.09, pro_diff 0.32, openvoicev2 0.41, xtts_v2 0.46, elevenlabs 0.92, grad_tts 1.00; holdout playht 0.08, wavegrad2 0.24.</p>
+<p><strong>Reading.</strong></p>
+<ul>
+<li>The inner OOF gain is real and broad: overall 0.614 → 0.434, and LibriSpeech real, the 4×-cost side, 0.77 → 0.54 without any column pruning. The holdout moves 0.254 → 0.170, inside the ±0.15 band the consult calls noise, so it is consistent with the inner gain but not evidence on its own.</li>
+<li><strong>pro_diff is now visible</strong> (1.00 → 0.32), the CQCC frame-to-frame cues from the gate translating into out-of-fold detection when pro_diff is held out.</li>
+<li><strong>grad_tts is still invisible</strong> (1.00 in every variant). The phase family separates it from real speech at AUC 0.80 at the single-feature level, but when grad_tts is the held-out generator no other generator teaches the model that cue, so the fold-0 model never uses it. That is the honest limit of "held out by generator": a cue only one generator shows cannot be learned for that generator.</li>
+<li><strong>elevenlabs got worse</strong> (0.80 → 0.92), and it is the one commercial generator in the inner set, so fusion should know the handcrafted column is now weaker there. Fold 4 holds out ElevenLabs alone, so its OOF model is trained on the other seven generators only; the likely cause is that the new columns fit those seven more tightly and the LFCC upper-coefficient cue that separated ElevenLabs at the gate did not carry through. The variant data does not cleanly confirm the "more columns" part (185 columns gave 0.86, 151 gave 0.95), so treat the mechanism as partly unexplained; the regression itself is not in doubt.</li>
+<li><strong>Dropping corpus-cue columns hurt every time</strong>, including on LibriSpeech real (v4b 0.59, v4c 0.61 vs v4a 0.54), and stripping v3's own cue columns destroys v3 (0.614 → 0.848). Columns that separate LJ from LibriSpeech also separate real from fake in ways that generalize across held-out generators; the corpus check is a warning to read per-source readouts, not a pruning rule. The blocklists stay in <code>outputs/handcrafted/hc_gate_all_columns.csv</code> for the record.</li>
+<li>Test-set share above 0.5 is unchanged at 41% (v3 42%), against a 30% prior.</li>
+</ul>
+<p><strong>Cost, measured</strong> (worker-seconds per clip from the extraction sidecars): v3's 75 features 0.14 s (20,000 clips, 450 s on 6 workers); all 234 with the six families 0.20 s (993 s on 4 workers); so the families add about 0.06 s per clip, the CQT and the second STFT for group delay being most of it. The 0.63 s figure in the earlier handoff was a single-process measurement that included the numba warm-up. Inference through the contract detector recomputes exactly these families (<code>bundle["families"]</code>).</p>
+<h2 id="in-the-wild-readout-eval-only">In-the-Wild readout (eval only)</h2>
+<p>3,000 clips (2,000 bona fide, 1,000 spoof) from <code>outputs/manifests/itw_stress.csv</code>, features extracted with <code>--crop test --seed 200</code> (the main chat's <code>itw_stress_v3</code> crops), scored with the pinned bundle by <code>scripts/eval_bundle.py</code>; the threshold is the one that minimizes the bundle's own inner-OOF DCF (logit 1.54 for v4a). Never fitted on. v3 scored from the same feature file for reference.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>minDCF</th><th>EER</th><th>AUC</th><th>P_FA at the inner threshold (2,000 real)</th><th>P_miss at the inner threshold</th><th>Mean score, real / fake</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>v4a</strong></td><td>1.00</td><td>30.4%</td><td>0.762</td><td><strong>0.65%</strong></td><td>97.2%</td><td>0.035 / 0.106</td></tr>
+<tr><td>v3</td><td>1.00</td><td>41.5%</td><td>0.639</td><td>0.55%</td><td>98.1%</td><td></td></tr>
+</tbody>
+</table></div>
+<p><strong>Reading.</strong> The handcrafted detector does not transfer to In-the-Wild fakes at its NSA-trained threshold: it calls 97% of them real, and even the best threshold gives minDCF 1.0, no better than "always real" under the 9.33× false-alarm weight. What fails there is the threshold, not the ranking: with AUC 0.76 (v3 0.64; EER 41% → 30%) the In-the-Wild fakes sit just below the inner-fold cut (mean score 0.11 against 0.04 for real), so the logit column still orders them. Fusion refits the scale of that column, so it can use the ordering even though the fixed threshold cannot. What it does not do is false-alarm: 0.65% of the 2,000 real clips cross the threshold, against 1.2–5.7% the main chat reports for the deep detectors. For fusion that is the useful fact: the column is safe on the 4×-cost side in a domain it was never trained for, and it contributes nothing to catching In-the-Wild-style fakes. Its value stays in the NSA domain (holdout 0.17) and on generators like pro_diff. The NSA-holdout-to-ITW gap (0.17 → 1.0) is the same domain-shift headline the main chat found for M1 (0.08–0.15 → 0.37–0.40), larger here because 234 handcrafted numbers are a narrower description than XLS-R's.</p>
+<h2 id="test-domain-shift-found-by-the-first-fusion-run">Test-domain shift (found by the first fusion run)</h2>
+<p>The main chat's fusion run calibrates each column with a Platt map fit on inner OOF logits, shifted to the 0.3 prior, and thresholds at 0.5. Under that map the handcrafted v4 column alone calls <strong>56%</strong> of the NSA test set synthetic (deep detectors: 26–27%; prior 30%). Reproducing the map here gives 56.1% for v4 and <strong>48.8% for v3</strong>, so the inflation predates v4. Inner and holdout numbers show nothing of it: at the same map, 9% of holdout real clips and 99% of holdout fakes score above 0.5.</p>
+<p><strong>Where the shift is</strong> (<code>outputs/handcrafted/v4_domain_shift.csv</code>: per column, KS statistic of the 1,671 test files against inner train-real and against inner train-fake, the shift of the test median in train-real SD, and whether the test median lies beyond both classes). Flag = KS &gt; 0.3 against <em>both</em> classes with the test median beyond both, i.e. a domain shift rather than a class mix.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Family</th><th>Columns</th><th>Flagged</th><th>Train-vs-test AUC, family alone</th>
+</tr></thead>
+<tbody>
+<tr><td>v3 (75 original)</td><td>75</td><td>37</td><td><strong>0.969</strong></td></tr>
+<tr><td>lfcc</td><td>60</td><td>14</td><td>0.954</td></tr>
+<tr><td>cqcc</td><td>72</td><td>9</td><td>0.947</td></tr>
+<tr><td>breath</td><td>4</td><td>4</td><td>0.837</td></tr>
+<tr><td>phase</td><td>12</td><td>0</td><td>0.796</td></tr>
+<tr><td>jitter</td><td>5</td><td>0</td><td>0.622</td></tr>
+<tr><td>modulation</td><td>6</td><td>0</td><td>0.619</td></tr>
+<tr><td>all 234</td><td>234</td><td>64</td><td>0.991</td></tr>
+</tbody>
+</table></div>
+<p>What moves is the <strong>spectral envelope</strong>, not the dynamics: cepstral means (<code>mfcc4/5/6/10/11/13/14/16_mean</code>, <code>cqcc1/2/3_mean</code>, <code>lfcc12/13_mean</code>; 1.4–1.9 SD), and <code>centroid_mean</code>, <code>rolloff85/95_mean</code>, <code>zcr_mean</code> moving <em>down</em> (the test set is darker below 7 kHz, the codec-like signature the compression lens already read on 72% of it). <strong>84% of the flagged columns move in the fake direction</strong>, so the shift produces false alarms, the 4×-cost error. The variability columns that carry most of the class signal (stds, delta-stds, flux, contrast, pitch spread) are far less shifted, and the phase, jitter and modulation families are close to domain-neutral.</p>
+<p><strong>Leave-one-family-out</strong> (same calibrated share, computed identically for every export):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Variant</th><th>Inner OOF</th><th>LibriSpeech real</th><th>pro_diff</th><th>elevenlabs</th><th>Holdout</th><th>Calibrated test share</th><th>Raw share &gt; 0.5</th>
+</tr></thead>
+<tbody>
+<tr><td>v3</td><td>0.614</td><td>0.77</td><td>1.00</td><td>0.80</td><td>0.254</td><td>48.8%</td><td>42%</td></tr>
+<tr><td>v4a, all</td><td>0.434</td><td>0.54</td><td>0.32</td><td>0.92</td><td>0.170</td><td>56.1%</td><td>41%</td></tr>
+<tr><td>v4 − lfcc</td><td>0.561</td><td>0.72</td><td>0.77</td><td>0.68</td><td>0.343</td><td>56.4%</td><td>51%</td></tr>
+<tr><td>v4 − phase</td><td>0.435</td><td>0.53</td><td>0.30</td><td>0.91</td><td>0.175</td><td>55.3%</td><td>39%</td></tr>
+<tr><td>v4 − cqcc</td><td>0.468</td><td>0.55</td><td>0.41</td><td>0.94</td><td>0.176</td><td>53.8%</td><td>34%</td></tr>
+<tr><td>v4 − modulation</td><td>0.428</td><td>0.52</td><td>0.29</td><td>0.91</td><td>0.173</td><td>57.5%</td><td>41%</td></tr>
+<tr><td>v4 − breath</td><td>0.435</td><td>0.55</td><td>0.33</td><td>0.93</td><td>0.170</td><td>57.3%</td><td>42%</td></tr>
+<tr><td>v4 − jitter</td><td>0.436</td><td>0.54</td><td>0.32</td><td>0.92</td><td>0.163</td><td>55.6%</td><td>40%</td></tr>
+</tbody>
+</table></div>
+<p>No single family is responsible; the shift is spread over every envelope-carrying column, v3's included. Two remedies were tried next, results below: <strong>envelope-blind variants</strong> (drop all cepstral, centroid, roll-off and ZCR means; drop the 64 flagged columns) and <strong>v5, training-side augmentation</strong> (a random subset of training rows re-encoded through MP3/AAC and/or given a random spectral tilt of ±4 dB/kHz plus a 4.5–7 kHz low-pass before feature extraction, test rows untouched), so that envelope means stop being trustworthy class cues and the model leans on dynamics.</p>
+<p><strong>Envelope-blind variants: worse on every count.</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Variant</th><th>Columns</th><th>Inner OOF</th><th>LibriSpeech real</th><th>pro_diff</th><th>Holdout</th><th>Calibrated test share</th><th>Train-vs-test AUC of the kept columns</th>
+</tr></thead>
+<tbody>
+<tr><td>v4a, all</td><td>234</td><td>0.434</td><td>0.54</td><td>0.32</td><td>0.170</td><td>56.1%</td><td>0.991</td></tr>
+<tr><td>minus all cepstral / centroid / roll-off / ZCR means (78 columns)</td><td>156</td><td>0.481</td><td>0.56</td><td>0.41</td><td>0.325</td><td><strong>67.7%</strong></td><td>0.984</td></tr>
+<tr><td>minus the 64 KS-flagged columns</td><td>170</td><td>0.480</td><td>0.56</td><td>0.29</td><td>0.257</td><td>59.5%</td><td>0.982</td></tr>
+<tr><td>minus both</td><td>131</td><td>0.508</td><td>0.60</td><td>0.40</td><td>0.353</td><td>60.5%</td><td>0.976</td></tr>
+</tbody>
+</table></div>
+<p>Removing the shifted columns does not remove the shift: the remaining columns still separate train from test at AUC 0.98, and the calibrated share goes <em>up</em>, so the variability columns are shifted in the fake direction too, just less visibly per column. Column pruning is not the remedy. The domain difference is a property of the whole feature description of the test recordings (darker, codec-processed), not of a few columns.</p>
+<p><strong>v5: training-side augmentation.</strong> <code>scripts/extract_handcrafted.py --launder-frac 0.35 --tilt-frac 0.35</code> re-extracted the training sample with 11,550 of 20,000 rows augmented (MP3/AAC round-trip at 24–128 kbps and/or a random ±4 dB/kHz tilt plus a 4.5–7 kHz low-pass, drawn per row from <code>default_rng(seed + row)</code>, recorded in <code>hc_augment</code>); test and In-the-Wild rows untouched. Two ways to use those rows:</p>
+<ul>
+<li><strong>v5a, replace:</strong> train on the augmented sample as is (58% of rows altered). Its inner and holdout readouts mix clean and altered rows, so the table below re-reads its inner OOF on the 6,842 clean inner rows only, and reports the trainer's clean-only holdout.</li>
+<li><strong>v5b, extra rows</strong> (<code>--extra-rows-from</code>): train on the clean v4 rows plus the 9,300 augmented twins of the inner rows as fit-only extras (each takes its clean twin's fold, so no fold leakage); every readout and the export stay on clean rows, directly comparable with v4.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>Inner OOF (clean rows)</th><th>LibriSpeech real (inner)</th><th>pro_diff</th><th>elevenlabs</th><th>Holdout (clean)</th><th>Holdout LibriSpeech</th><th>Holdout real above 0.5, calibrated</th><th>Calibrated test share</th><th>ITW P_FA / P_miss at the inner threshold</th><th>ITW AUC</th>
+</tr></thead>
+<tbody>
+<tr><td>v3</td><td>0.614</td><td>0.77</td><td>1.00</td><td>0.80</td><td>0.254</td><td>0.32</td><td>9.5%</td><td>48.8%</td><td>0.55% / 98%</td><td>0.64</td></tr>
+<tr><td>v4a</td><td>0.418</td><td>0.51</td><td>0.30</td><td>0.88</td><td>0.170</td><td>0.22</td><td>9.1%</td><td>56.1%</td><td>0.65% / 97%</td><td>0.76</td></tr>
+<tr><td>v5a, replace</td><td>0.469</td><td>0.56</td><td>0.73</td><td>0.63</td><td>0.153</td><td>0.41*</td><td>6.5%</td><td>47.9%</td><td>0.25% / 97%</td><td>0.76</td></tr>
+<tr><td><strong>v5b, extra rows</strong></td><td>0.469</td><td>0.59</td><td>0.63</td><td>0.67</td><td><strong>0.137</strong></td><td><strong>0.16</strong></td><td><strong>6.3%</strong></td><td>50.6%</td><td><strong>0.40% / 96%</strong></td><td>0.77</td></tr>
+</tbody>
+</table></div>
+<p>*v5a's per-source holdout is on mixed rows. v4a's inner numbers here are on the same 6,842 clean inner rows as v5a's (its all-rows figure is 0.434).</p>
+<p><strong>Reading.</strong> Augmentation buys robustness on the false-alarm side at a modest inner cost. v5b keeps most of v4's inner gain (0.469 vs 0.418 on the same rows), improves the clean holdout (0.170 → 0.137, LibriSpeech 0.22 → 0.16), and lowers every false-alarm reading we have: holdout real at the calibrated threshold 9.1% → 6.3%, In-the-Wild real 0.65% → 0.40%, calibrated test share 56% → 51%. It trades pro_diff (0.30 → 0.63) for ElevenLabs (0.88 → 0.67). Neither v5 brings the test share to the 30% prior; the inflation is largely inherent to describing these test recordings with envelope statistics (v3 already sat at 49%), and augmentation removes only the part the model can learn to ignore. <strong>Recommendation for fusion: v5b</strong> (<code>outputs/detector_scores/handcrafted_v5.csv</code>, bundle <code>models/hc_lgbm_20260926-055451</code>, pinned as <code>models/hc_selected</code>), because a false alarm costs 9.3 misses in this metric and v5b is better on that side everywhere it can be measured; <code>handcrafted_v4.csv</code> stays available for the leave-one-out comparison, and a fusion-side re-centering of the logit column (an additive shift; the ranking is unaffected) remains the fallback for the residual offset.</p>
+<h2 id="what-worked--what-had-no-effect-v4">What worked / what had no effect (v4)</h2>
+<p><strong>Worked</strong></p>
+<ul>
+<li>CQCC frame-to-frame change (the <code>_dstd</code> columns) and, behind it, LFCC upper-coefficient variability: pro_diff went from invisible to 0.32 out of fold, and the overall inner OOF minDCF from 0.614 to 0.434.</li>
+<li>The corpus-neutral phase cues (peak phase-vs-magnitude coherence, group-delay spread over energetic bins) as <em>evidence</em>: they separate grad_tts from real speech at AUC 0.80 without any corpus confound, and they name a vocoder property a judge can read.</li>
+<li>Gating on a 2,000-clip inner sample with a per-column corpus check and a codec check: every family was measured in under 3 minutes, and the corpus check exposed 83 columns that would otherwise have been read as class cues.</li>
+<li>The In-the-Wild readout beside the holdout: it is what tells fusion the column is safe on real-world false alarms.</li>
+</ul>
+<p><strong>No effect or hurt</strong></p>
+<ul>
+<li>Dropping corpus-cue columns: worse on every readout, including LibriSpeech real. The check is a warning to read per-source results, not a pruning rule.</li>
+<li>Modulation, breath and jitter: marginal at the gate (0.15–0.22 on one generator each) and not distinguishable inside the full model; kept because they cost nothing.</li>
+<li>Anything for grad_tts out of fold: a cue shown by one generator only cannot be learned for that generator under generator-held-out validation. It stays at 1.00.</li>
+<li>The first phase-jitter measure (fixed-bin instantaneous frequency): pitch movement, not synthesis.</li>
+<li>ElevenLabs: slightly worse (0.80 → 0.92); nothing in v4 targets it.</li>
+</ul>
+<h2 id="state-for-the-next-chat">State for the next chat</h2>
+<ul>
+<li><strong>Tracked:</strong> <code>src/hearsay/hc_v4.py</code>, the <code>families</code> plumbing in <code>handcrafted.py</code>, <code>extract_handcrafted.py</code>, <code>train_handcrafted.py</code> (<code>--drop-columns</code>, second-resolution stamps), <code>_learned.py</code> (<code>&lt;prefix&gt;_selected</code>), <code>scripts/eval_bundle.py</code>, <code>tests/test_hc_v4.py</code>, this report.</li>
+<li><strong>Not tracked (gitignored, regenerable):</strong> <code>outputs/handcrafted/{nsa_test_v4,nsa_train_sample_v4,itw_stress_v4,hc_gate_*}.csv</code> (about 20 minutes at 4 workers), <code>models/hc_lgbm_20260926-0438</code> (the winner, pinned by <code>models/hc_selected</code>), <code>outputs/detector_scores/handcrafted_v4.csv</code> and the per-variant exports.</li>
+<li><strong>Fusion:</strong> <code>handcrafted.csv</code> is still v3; the main chat decides among <code>handcrafted_v4.csv</code> (max inner gain, 56% calibrated test share) and <code>handcrafted_v5.csv</code> (v5b, recommended: fewer false alarms, 51%); <code>handcrafted_v5a_replace.csv</code> is the replace-style run for the record. All have the same 21,671 rows and format.</li>
+<li><strong>Open:</strong> grad_tts and ElevenLabs remain the blind spots; speaker-embedding drift (rubric technique 6) is not started; the three losing variants' bundles were re-trained with second-resolution stamps only for their <code>meta.json</code> records.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_handcrafted-v4.md</code> <span class="hash">da6e132a94de</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

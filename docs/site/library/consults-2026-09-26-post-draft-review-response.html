@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Response: after the draft review — what to build in the last hours (received Sat Sep 26, 2026, ~16:50) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/consults/2026-09-26_post-draft-review_RESPONSE.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/consults/2026-09-26_post-draft-review_RESPONSE.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#verdict-the-memos-one-line">Verdict (the memo's, one line)</a></li><li><a href="#what-the-number-means-adopted">What the number means (adopted)</a></li><li><a href="#what-to-do-adopted">What to do (adopted)</a></li><li><a href="#what-to-ignore-and-why">What to ignore (and why)</a></li><li><a href="#where-the-experts-disagreed">Where the experts disagreed</a></li><li><a href="#failure-modes-the-memo-named-that-we-had-not">Failure modes the memo named that we had not</a></li><li><a href="#unmeasured">Unmeasured</a></li><li><a href="#our-own-reading-added">Our own reading, added</a></li><li><a href="#round-2-an-independent-claude-fable-51-opinion-and-what-it-changes-sat-1720">Round 2: an independent Claude Fable 5.1 opinion, and what it changes (Sat ~17:20)</a></li></ul></details>
+<h1 id="response-after-the-draft-review--what-to-build-in-the-last-hours-received-sat-sep-26-2026-1650">Response: after the draft review — what to build in the last hours (received Sat Sep 26, 2026, ~16:50)</h1>
+<p><strong>Source:</strong> VeriLM "Deep Think" memo, Frontier tier: two experts (GPT-5.6 Sol at extra-high effort, Gemini 3.1 Pro at high) with a synthesis; confidence stated as medium. Verbatim copy with figures: <code>2026-09-26_post-draft-review_RESPONSE_verbatim.md</code>. Prompt and our scope answers: <code>2026-09-26_post-draft-review_CONSULTATION.md</code>. (The panel's third seat, a Claude model, did not appear in the delivered memo.)</p>
+<p><strong>Read this first.</strong> Two things the memo did not have:</p>
+<ul>
+<li><strong>The field.</strong> NSA's feedback puts one team ahead at minDCF 0.0584 / EER 2.5%. Under points = (1 − ours)/(1 − best) × 60 the gap is <strong>0.95 of 60 points</strong> today (2.7 if the leader reaches 0.03). Matching 0.0584 means removing 0.015 minDCF: about 2 false alarms or 7 misses under the brief's cost. The memo's "stop by 20:15" advice only strengthens with this: the largest expected gain it names (WavLM, EV −0.002) is worth about 0.13 points.</li>
+<li><strong>The clock.</strong> The memo's schedule starts at 15:40; it arrived at 16:50. Every time in its table shifts by about 75 minutes (see the adopted plan below).</li>
+</ul>
+<h2 id="verdict-the-memos-one-line">Verdict (the memo's, one line)</h2>
+<p>The (minDCF, EER) pair cannot identify NSA's cost convention, but under the brief's cost the optimum is forced to ≤ 5 false alarms plus 18–37 misses; NSA's spoken statement of the analyst scenario, not the numbers, makes the few-false-alarm / miss-tail read the working hypothesis. One aggregate readout cannot validate any fusion change; stop all fusion redesign. Keep the shipped TSV as presumptive final and run only three or four bounded, pre-declared experiments under a gate stricter than the standing rule; if nothing clears by the decision window, freeze and sleep.</p>
+<h2 id="what-the-number-means-adopted">What the number means (adopted)</h2>
+<ol>
+<li><strong>Direction:</strong> the file was read with a polarity compatible with our ranking; the 0.00–0.20 branch of the decoding table is correctly triggered; no flip, no fallback. "Direction is ours" is slightly too strong (NSA may have inverted into the ASVspoof convention themselves), and operationally moot.</li>
+<li><strong>Regime:</strong> not "holdout-like". At 11× the holdout's minDCF and 17× its EER, the test set is its own moderately shifted domain whose low-false-alarm tail held up far better than In-the-Wild's.</li>
+<li><strong>Error profile, forced by the EER</strong> (Gemini's feasibility argument, kept; its "definitive" claim rejected): at any single threshold, max(P_FA, P_miss) ≥ EER. So under the brief's cost the minimum must have P_FA ≤ 0.41% (0–5 real files) and P_miss 3.5–7.3% (18–37 fakes); under the sponsor's cost it inverts to P_FA 3.5–7.3% (42–86 real files) and P_miss ≤ 0.95%. The two profiles are mutually exclusive; which one holds depends on the convention, which the numbers cannot settle. Working read: miss tail, at roughly 80–85% confidence, because NSA said "false alarm 4× a miss" in person.</li>
+<li><strong>Our own decomposition in the prompt was wrong:</strong> the sponsor-cost example (1.3% FA, 1.5% miss) is impossible because both are below the EER.</li>
+<li><strong>Evidentiary weight:</strong> improvements below about 0.008 are one expensive-file quantum; fixed-threshold standard errors run 0.008–0.024 before correlation and oracle-threshold effects; effective sample size is well below 1,671 (shared speakers, generators, one recording pipeline). <strong>We are optimizing proxies only.</strong> The only defensible changes inject new discriminative information (a new representation or new feature physics), never a re-slicing of the same three score columns.</li>
+<li><strong>Three corrections to our premises</strong> (GPT-5.6): M5 is not a short-clip expert (holdout 0.60 on clips ≤ 4 s, worse than M1b), so the mixture-of-experts idea was backwards; order-preserving calibration (Platt, isotonic) cannot move an oracle-threshold minDCF, so calibration work is worth zero; M3 restricted to suppression can only move files toward real and cannot repair a miss tail no matter how good it is at unseen generators.</li>
+</ol>
+<h2 id="what-to-do-adopted">What to do (adopted)</h2>
+<p><strong>Gate, frozen before any candidate's numbers are seen</strong> (GPT-5.6's, adopted whole; strictly tighter than the standing rule, whose "holdout may worsen by 0.05" both experts called indefensible for one shot):</p>
+<ol>
+<li>Each candidate's definition, weights and preprocessing go in a manifest before its proxy table exists; candidates are never combined tonight.</li>
+<li>In-the-Wild brief-cost improvement ≥ 0.020; sponsor-cost regression ≤ 0.002.</li>
+<li>Inner-OOF brief-cost improvement ≥ 0.010; no sponsor-cost regression at printed precision.</li>
+<li>Holdout degradation ≤ 0.010 under either convention (a safety constraint, not evidence).</li>
+<li>Both costs must improve on at least two of the three proxy populations, and the candidate's mechanism diagnostic must pass (noise twins must recover the 20 dB lane; a new probe must correct baseline errors rather than clone M1b's ranks).</li>
+<li>If the candidate's test-ranking Spearman against the shipped file falls below 0.974, the required gains double; 0.5-crossings are counted for disclosure only.</li>
+<li>If two candidates pass, ship neither unless one Pareto-dominates across all six split × cost cells. Nathan ratifies exactly one candidate from one consolidated packet; the runner must then reproduce the exact ordering and pinned block. Nothing auto-ships.</li>
+</ol>
+<p><strong>Candidates, ranked</strong> (the memo's table, with our repo facts added):</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Candidate</th><th>Verdict</th><th>Expected test ΔminDCF</th><th>Repo status</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>WavLM Large frozen probe</strong>, M1b recipe exactly (band match, segment mode, test crops, time-mean, fold-local scaler + logistic + Platt, ASV19 rows inner-only)</td><td>do first</td><td>EV −0.002; range −0.015 to +0.020</td><td><code>scripts/extract_embeddings.py --model wavlm-large</code> loads through <code>AutoModel</code> with <code>output_hidden_states</code>, so no code change; four extractions on MPS (train sample 20k ≈ 22 min, ASV19 add-on 7.6k ≈ 8 min, test 1.7k, In-the-Wild 3k) ≈ 40 min; <code>train_probe.py --folds splits/nsa_folds_plus_asv19.csv</code> picks the layer by inner CV as for M1b</td></tr>
+<tr><td>2</td><td><strong>XLS-R layers 5–9 concatenated probe</strong></td><td>do second</td><td>EV −0.001; range −0.008 to +0.010</td><td>all 25 layers of the v3 embeddings exist for every row set (<code>outputs/embeddings/wav2vec2-xls-r-300m/*_v3</code>, <code>asv19_addon_v3</code>, <code>itw_stress_v3</code>); <code>train_probe.py</code> needs a <code>--layers 5,6,7,8,9</code> option (concat → 5,120-d); CPU, under an hour. Gemini's layer-5 literature claim failed source verification: hypothesis, not prior</td></tr>
+<tr><td>3</td><td><strong>Second M3 suppression tier</strong> (halve below −3 as now, quarter below −6)</td><td>do as a free audit</td><td>EV ≈ 0; range ±0.006</td><td>exported scores only, one variant of <code>scripts/fuse_sweep_m5.py</code>; ten minutes. Absolute diagnostic: the deeper tier must fire on zero known spoof rows across all proxies and perturbations</td></tr>
+<tr><td>4</td><td><strong>Noise-augmented handcrafted twins</strong> (one 20 dB white-noise twin per class, fit-side rows only, clean validation rows, unchanged LightGBM recipe, direct replacement of the handcrafted slot)</td><td>do in a parallel session only</td><td>EV ≈ 0; range −0.006 to +0.012</td><td><code>hearsay.augment.add_noise</code> exists; <code>scripts/extract_handcrafted.py</code> has <code>--launder-frac</code> / <code>--tilt-frac</code> and needs a <code>--noise-frac</code>; re-extraction ≈ 17 min at 4 workers plus training via <code>--extra-rows-from</code>; about an hour. Caveat: additive noise is not an established test-set mechanism (the shift is a smooth low-pass)</td></tr>
+<tr><td>5</td><td>Delta/dynamics-only handcrafted</td><td>maybe, one bounded run if a session is idle</td><td>EV +0.001</td><td>disputed (Gemini do, GPT-5.6 skip); the column-pruning failure points against it</td></tr>
+<tr><td>6</td><td>M5 fold-model averaging</td><td>skip</td><td>0</td><td>naïve averaging leaks each OOF row into its own prediction; M5's problem is bias, not variance</td></tr>
+<tr><td>7</td><td>Noise-augmented M1b embeddings</td><td>maybe only if WavLM finishes early</td><td>EV −0.001</td><td>duplicates the WavLM slot</td></tr>
+<tr><td>8</td><td>New feature families (LTAS residuals, vocoder harmonics, formants, sub-band modulation, bispectral)</td><td>skip tonight; README future work</td><td>0 to +0.004</td><td>each is a research lane; LTAS residuals would learn the AUC-0.99 train/test channel split</td></tr>
+<tr><td>9</td><td>Generator-family router, property-gated mixture of experts, stackers, isotonic-before-blend, cascade</td><td><strong>skip all</strong></td><td>+0.002 to +0.005, wide downside</td><td>re-slicing the same three columns against thrice-reused proxies; the short-clip premise is contradicted by M5's numbers</td></tr>
+<tr><td>10</td><td>Capped Bayesian M3 likelihood</td><td>forbidden</td><td>unbounded asymmetric downside</td><td>M3's margin is not a calibrated likelihood; violates our suppression-only rule</td></tr>
+</tbody>
+</table></div>
+<p><strong>Pre-declared fusion entry for a new probe (1 or 2):</strong> the new column takes 0.20 from M1b's 0.60; handcrafted and M5 stay at 0.20; the M3 step is unchanged; no weight sweeps tonight. One candidate per slot.</p>
+<p><strong>Clock (memo times shifted +75 min to the memo's arrival; Nathan's bandwidth, not compute, is the binding constraint):</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Time (EDT)</th><th>Activity</th><th>Nathan</th>
+</tr></thead>
+<tbody>
+<tr><td>17:00–17:20</td><td>Hash the shipped TSV; write the manifest (four candidates, one fusion entry each) and the gate above; run the M3 second tier</td><td>approve the manifest only</td></tr>
+<tr><td>17:20–18:50</td><td>Parallel: WavLM probe (MPS), XLS-R 5–9 probe (CPU), noise twins (CPU); optional delta-only run</td><td>none</td></tr>
+<tr><td>18:50–19:30</td><td>One locked table: inner / holdout / In-the-Wild under both costs, mechanism diagnostics, rank displacement</td><td>none</td></tr>
+<tr><td>19:30–20:00</td><td>Review at most one ready-to-ratify candidate</td><td>30 min hard cap</td></tr>
+<tr><td>20:00–21:30</td><td>Only if ratified: regenerate all 1,671 scores through the runner, reproduce ordering and pinned block, update numbers</td><td>final ratification</td></tr>
+<tr><td>21:30–05:00</td><td>Stop touching the scoring path and the TSV; sleep; documentation lanes continue; README polish 05:00–07:30</td><td>none</td></tr>
+</tbody>
+</table></div>
+<p><strong>Stop/go (the memo's direct call):</strong> continue, but only the frozen bounded jobs above, for about three hours; change the TSV now, no; ship a marginal proxy win, no; if nothing clears by the decision window, stop entirely rather than filling the clock. Gemini's full-13-hour schedule is rejected.</p>
+<h2 id="what-to-ignore-and-why">What to ignore (and why)</h2>
+<ul>
+<li>All fusion redesign: constrained stackers, isotonic calibration, property-gated experts, cascades, Bayesian M3, a second learned layer. Same three columns, thrice-reused proxies, no new information; and calibration cannot move minDCF at all.</li>
+<li>M5 fold averaging (leaks OOF rows). New feature families tonight (feature lottery). Gemini's "mathematically definitive" brief-cost claim and its high confidence.</li>
+<li>Two literature claims failed VeriLM's own source check: WavLM-fusion precedent (GPT-5.6) and layer-5 discriminability in ASVspoof 5 (Gemini). Both candidates stay on mechanism plausibility only.</li>
+</ul>
+<h2 id="where-the-experts-disagreed">Where the experts disagreed</h2>
+<p>Gemini: the cost convention is certain from the EER feasibility argument, and the layer 5–9 probe fixes a representation gap. GPT-5.6: the pair is non-identifying (sponsor-feasible points exist, e.g. 67 false alarms and 2 misses); the miss-tail read rests on NSA's spoken statement. Synthesis adopted GPT-5.6's framing, kept Gemini's constraint as a sharpening, demoted the layer idea to a cheap second experiment. Delta-only handcrafted: Gemini do, GPT-5.6 skip; left as a maybe.</p>
+<h2 id="failure-modes-the-memo-named-that-we-had-not">Failure modes the memo named that we had not</h2>
+<ol>
+<li><strong>Winner's curse from proxy reuse:</strong> fold discipline prevents row leakage, not selection-fitting from many free sweeps on the same three tables; cap the candidate count in the manifest.</li>
+<li><strong>Sponsor-code sweep bug:</strong> any sweep that silently optimizes P_FA + 4·P_miss instead of 9.33·P_FA + P_miss drives the system into the high-false-alarm region the brief punishes 9× per file. Check the cost function in every new script.</li>
+<li><strong>Effective sample size below 1,671</strong> makes every file-count equivalent look more certain than it is.</li>
+<li><strong>Reproducibility near-ties:</strong> Spearman 1.0 with max drift 9.3e-4 does not guarantee identical ordering among near-tied files; compare exact sorted file IDs before and after any regeneration.</li>
+<li><strong>Fatigue-driven ratification error:</strong> one packet at the decision window and an early immutable freeze are worth more than any experiment; a 03:00 ratification is the likeliest way to lose the 0.0733 in hand.</li>
+</ol>
+<h2 id="unmeasured">Unmeasured</h2>
+<p>NSA's cost convention, P_FA, P_miss and threshold; every candidate's effect on the test set (unobservable before the freeze); whether the presumed miss tail is unseen generators (inference from MLAAD and M3 probes, not measurement).</p>
+<h2 id="our-own-reading-added">Our own reading, added</h2>
+<ul>
+<li><strong>Rubric arithmetic.</strong> The detection gap to first place is 0.95 of 60 points. The four experiments together have an expected gain of a fraction of a point, and none adds a new rubric technique (a second SSL probe is still "deep anti-spoofing"). They are worth running because they are cheap, bounded, and produce graded negative results; they are not worth a late night. The 40 points for diversity and documentation remain the larger lever, and those lanes must not be starved for this.</li>
+<li><strong>Delta-only handcrafted</strong> is the one disputed item we lean toward skipping: it is the pruning experiment in different clothes, and the CPU session's hour is better spent on the noise twins the channel lane's measurement actually motivates.</li>
+</ul>
+<hr>
+<h2 id="round-2-an-independent-claude-fable-51-opinion-and-what-it-changes-sat-1720">Round 2: an independent Claude Fable 5.1 opinion, and what it changes (Sat ~17:20)</h2>
+<p>Nathan asked for a second opinion from a Fable agent with the same question and repo access, blind to the VeriLM memo. Verbatim: <code>2026-09-26_post-draft-review_RESPONSE_fable.md</code>. Unlike the panel, it computed on the exports. The consult chat re-verified its two load-bearing claims from the exports with the sweep's own loaders:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Rule</th><th>Inner (brief / averse)</th><th>Holdout</th><th>In-the-Wild</th><th>Test Spearman vs shipped</th>
+</tr></thead>
+<tbody>
+<tr><td>Shipped A3 w0.2 + E</td><td>0.1351 / 0.2997</td><td>0.0065 / 0.0087</td><td>0.228 / 0.2385</td><td>1.000</td></tr>
+<tr><td>A3 w0.3 + E</td><td>0.1374 / 0.3139</td><td>0.0060 / 0.0091</td><td>0.2113 / 0.2310</td><td>0.993</td></tr>
+<tr><td><strong>A3 w0.4 + E</strong></td><td>0.1373 / 0.3366</td><td>0.0065 / 0.0088</td><td><strong>0.1997 / 0.2075</strong></td><td>0.970</td></tr>
+<tr><td>Second M3 tier on shipped</td><td>0.1351 / 0.2997</td><td>0.0065 / 0.0087</td><td>0.228 / 0.2385</td><td>0.986</td></tr>
+</tbody>
+</table></div>
+<p>Both claims hold: the M5 weight at 0.4 improves In-the-Wild by 0.028 under both costs with the holdout unchanged and inner worse by 0.002 (brief) and 0.037 (averse); the second tier is inert at the metric on every split (it reorders files only below the threshold region).</p>
+<p><strong>Where the two opinions agree:</strong> direction is ours; the cost convention is unknowable from the pair and every candidate must improve under both costs; the likely error is a miss tail; one readout licenses nothing; calibration is worth zero; the mixture-of-experts premise is backwards; M5 fold averaging is dead; stop by ~21:30 and let sleep equal shipping.</p>
+<p><strong>Where they differ, and what we adopt:</strong></p>
+<ol>
+<li><strong>XLS-R layers 5–9 (VeriLM's #2 "do"): dropped.</strong> The Fable agent ran it: with the layer-7 baseline reproducing M1b exactly (inner 0.2649, holdout 0.0717, In-the-Wild 0.342), the mean of layers 5–9 improves the holdout (0.052) but worsens In-the-Wild (0.368) and doubles its false-alarm rate (0.8% → 1.55%); the concatenations of 6–8, of 5/7/9 and of 5–9 give In-the-Wild 0.353 / 0.430 / 0.399. Every head on the same backbone inherits M1b's blind spot: of the 158 In-the-Wild misses under the shipped rule, M1b would flag 1, M5 33, M3 107. Recorded as a negative result for the README; the heads chat runs WavLM only.</li>
+<li><strong>Second M3 tier (VeriLM's #3 "free audit"): inert</strong>, verified. Still run by the gate chat as a ten-second audit so the record shows it, expected outcome "identical".</li>
+<li><strong>Noise twins (VeriLM's #4): README only.</strong> Both opinions put its test effect at zero; the Fable agent adds that the test set shows no additive noise (its noise-floor percentiles sit beyond the clean end in the channel lane's per-feature table). The CPU chat is re-scoped to negative-result write-ups; the twins run only if that chat has idle time.</li>
+<li><strong>New candidate: A3 (0.4, 0.2, 0.4) + E, post hoc.</strong> The pre-declared M5 sweep stopped at w = 0.2 on an expectation that proved wrong. Under the standing four-condition rule it qualifies; under the stricter gate adopted above it <strong>fails rule 3</strong> (inner must improve by ≥ 0.010 with no sponsor-cost regression; it worsens by 0.002 and 0.037). It is added to the manifest as the one fusion candidate, labelled post hoc, with the disclosure that its numbers were seen before the manifest was written. Which gate governs it is Nathan's call to make before the 19:30 packet, not after; the consult chat's recommendation is the stricter gate, which means KEEP unless he decides otherwise.</li>
+<li><strong>WavLM's fusion entry:</strong> VeriLM says a fourth column at 0.2 taken from M1b; the Fable agent says the refit seat (replace M1b) via the existing <code>--refit-m1b</code> mode. We keep the fourth-column entry as the single pre-declared candidate (it adds a backbone without removing the best-validated stream) and do not run the refit variant tonight (one candidate per column).</li>
+<li><strong>M3 threshold −3 → −1.5 and M3 promotion:</strong> both improve every proxy (promotion recovers 76 of 158 In-the-Wild misses at zero added false alarms) and both stay skipped: the evidence is In-the-Wild, which M3's authors evaluated on, and the suppression-only rule is a documented principle. Recorded as the measured ceiling of what the excluded detector could do.</li>
+</ol>
+<p><strong>Adopted additions to the plan:</strong> the gate chat copies the shipped TSV to its final name with its sha256 in the log before anyone sleeps ("sleep equals ship"); the full 1,671-row parity is re-run if the M5 weight changes (its CPU-vs-A100 logit gap scales with the weight); no one inspects the files that cross 0.5 on the test set to decide anything (that is selection on the test set); the handcrafted column's role is documented honestly (admissible stacker coefficient −0.04; test-set Spearman with M1b 0.21 against 0.79 on the holdout, so it reads the envelope shift; it is the readable column, not a vote).</p>
+<p><strong>Correction (CPU lane, ~19:10):</strong> the Fable memo's sponsor-cost example "5 misses + 40 FA" is infeasible: 40 of ~1,170 real files is 3.4%, below the 3.53% EER, and under the sponsor's cost the feasible region is P_FA in [3.53%, 7.33%] (41–86 false alarms) with P_miss ≤ 0.95%. Cite the feasible example instead: 67 false alarms + 2 misses (<code>docs/reports/2026-09-26_post-draft-negatives.md</code>, item 5). The memo's brief-cost example (3 FA + 25 misses) is feasible.</p>
+<p><strong>Correction (gate lane, ~19:05; recorded at <code>b877760</code>):</strong> the miss-tail counts quoted in Round 2 ("158 In-the-Wild misses; M1b flags 1, M5 33, Spectra 107") were taken at the In-the-Wild argmin threshold, not at the inner-OOF threshold the rule names. At CURRENT's inner-OOF threshold the shipped rule misses 122 In-the-Wild fakes, of which M5 alone flags 19 and Spectra 79. The mechanism reading is unchanged (heads on M1b's backbone cannot see the tail; only a different backbone or Spectra can); the numbers the gate's P_wl diagnostic uses are the inner-threshold ones. Also: Nathan had already ruled on W4 at ~17:40 (a fresh-evidence bake-off: standing rule, within −0.010 on all ten perturbation cells, speaker-cluster bootstrap 5th percentile of the In-the-Wild gain above 0 under both costs; manifest <code>141b254</code>), so the Round 2 line "which gate governs it is Nathan's call to make" was already settled.</p>
+<p><strong>Correction and outcome (CPU lane, ~19:30):</strong> Round 2 item 3 said "the test set shows no additive noise"; that is too strong. In the channel lane's per-feature table the noise-floor percentiles (p2, p10) sit beyond the clean end, but floor stationarity (1.08) and flatness (1.74) sit beyond the wild end, so the reading is "probably no additive noise", with that caveat. The noise twins were run anyway on Nathan's word (handcrafted v6, <code>docs/reports/2026-09-26_post-draft-hc-noise.md</code>): noise-cohort AUC 0.640 → 0.772 against the 0.90 bar, clean AUC 0.998 → 0.993, clean holdout 0.137 → 0.227, In-the-Wild AUC 0.768 → 0.722. A measured negative; <code>models/hc_selected</code> untouched. With that, all four post-draft candidates (T2, W4, P_wl, H_noise) failed their pre-declared rules (<code>docs/reports/2026-09-26_post-draft-sweep.md</code>); the decision is KEEP and the shipped file stands.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/consults/2026-09-26_post-draft-review_RESPONSE.md</code> <span class="hash">b26d639226d0</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

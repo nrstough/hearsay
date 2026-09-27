@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post-draft heads: a frozen WavLM Large probe on the M1b recipe (Sat Sep 26, 2026, 19:10) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_post-draft-heads.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_post-draft-heads.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#result-in-one-paragraph">Result in one paragraph</a></li><li><a href="#gate-verdict-from-the-gate-chat-commit-57b9c90-not-computed-here">Gate verdict (from the gate chat, commit 57b9c90; not computed here)</a></li><li><a href="#recipe-unchanged-from-m1b-v3">Recipe (unchanged from M1b v3)</a></li><li><a href="#inner-cv-mindcf-by-layer-selection-metric-folds-include-the-asv19-rows">Inner-CV minDCF by layer (selection metric; folds include the ASV19 rows)</a></li><li><a href="#readouts-beside-m1b-v3">Readouts beside M1b v3</a></li><li><a href="#diagnostics-pre-declared-d4-scriptsheads_diagnosticspy-wavlm_l">Diagnostics (pre-declared, D4; scripts/headsdiagnostics.py wavlml)</a></li><li><a href="#reading">Reading</a></li><li><a href="#incident-transient-decode-failures-under-parallel-extraction-fixed-d2">Incident: transient decode failures under parallel extraction (fixed; D2)</a></li><li><a href="#acceptance-checks-run-spec">Acceptance checks (run spec)</a></li><li><a href="#timing">Timing</a></li><li><a href="#artifacts-gitignored-not-archived">Artifacts (gitignored; not archived)</a></li></ul></details>
+<h1 id="post-draft-heads-a-frozen-wavlm-large-probe-on-the-m1b-recipe-sat-sep-26-2026-1910">Post-draft heads: a frozen WavLM Large probe on the M1b recipe (Sat Sep 26, 2026, 19:10)</h1>
+<p><strong>Run spec:</strong> <code>docs/specs/2026-09-26_post-draft-heads.md</code> (checks and diagnostics pre-declared before any number was seen). <strong>Handoff:</strong> <code>docs/handoffs/2026-09-26_post-draft-heads-handoff.md</code>. <strong>Export for the gate chat:</strong> <code>outputs/detector_scores/wavlm_l.csv</code>. This report computes no fused numbers; the gate chat judges the column under its pre-declared entry (0.4·M1b + 0.2·WavLM + 0.2·handcrafted v5 + 0.2·M5, then the unchanged M3 step).</p>
+<h2 id="result-in-one-paragraph">Result in one paragraph</h2>
+<p>WavLM Large, frozen and probed exactly like M1b v3, is <strong>level with M1b on the NSA holdout</strong> (minDCF 0.0717 both; EER 1.45% vs 1.4%), <strong>slightly worse on inner CV</strong> (0.2936 vs 0.2649), and <strong>much worse on In-the-Wild</strong> (0.752 vs 0.342 under the brief's cost; 0.383 vs 0.296 under the sponsor-averse cost). At its inner threshold it calls 7.05% of In-the-Wild real speech synthetic, against M1b's 0.8%. It is <strong>not a clone</strong> of M1b (test-set Spearman 0.79), and it <strong>reaches part of the miss tail M1b cannot</strong>: of the shipped rule's 158 In-the-Wild misses, WavLM alone flags 57 at its inner threshold (M1b 1, handcrafted 2, M5 33, Spectra 107). So the mechanism the consult hoped for is real, but on web-sourced real speech it comes with roughly 141 false alarms per 2,000. Whether a 0.2 rank weight keeps the 57 and not the 141 is the gate's question.</p>
+<h2 id="gate-verdict-from-the-gate-chat-commit-57b9c90-not-computed-here">Gate verdict (from the gate chat, commit 57b9c90; not computed here)</h2>
+<p>The pre-declared entry failed both the pre-declared gate and the room. Details: <code>docs/reports/2026-09-26_post-draft-sweep.md</code>.</p>
+<p><strong>The blend</strong> is 0.4 M1b + 0.2 WavLM + 0.2 hc v5 + 0.2 M5, then E. Against the shipped rule:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>Blend (brief / averse)</th><th>Shipped rule</th><th>Direction</th>
+</tr></thead>
+<tbody>
+<tr><td>Inner</td><td>0.1557 / 0.3330</td><td>0.1351 / 0.2997</td><td>worse</td></tr>
+<tr><td>Holdout</td><td>0.0030 / 0.0071</td><td>0.0065 / 0.0087</td><td>better</td></tr>
+<tr><td>In-the-Wild</td><td>0.2047 / 0.2300</td><td>0.228 / 0.2385</td><td>better, but short of the room's 0.03 under each cost</td></tr>
+</tbody>
+</table></div>
+<p><strong>The gate's diagnostic</strong> counts, at the inner-OOF threshold, the shipped rule's 122 In-the-Wild misses: WavLM catches 41 of them. Its corrective share is 0.80 on In-the-Wild but 0.31 on inner OOF, which fails the diagnostic. This report's 57 of 158 is the same kind of count against the misses at the In-the-Wild argmin.</p>
+<p><strong>The refit seat</strong> (WavLM replacing M1b, diagnostic only) reaches In-the-Wild 0.275 / 0.2665 with In-the-Wild P_FA 5.3%. That is the wild-speech false-alarm problem the Reading section below describes.</p>
+<p><strong>WavLM does not ship.</strong> The recorded negative result stands on its own: a second backbone reaches fakes M1b misses, but it brings more false alarms on wild real speech than a rank blend can absorb.</p>
+<h2 id="recipe-unchanged-from-m1b-v3">Recipe (unchanged from M1b v3)</h2>
+<ul>
+<li><strong>Backbone.</strong> <code>weights/wavlm-large</code>: 24 layers, 25 hidden states, 1,024-d, loaded through <code>transformers.AutoModel</code>. Its feature-extractor config has <code>do_normalize: true</code>, the same zero-mean / unit-variance step <code>hearsay.embed</code> applies, so nothing in the input path differs.</li>
+<li><strong>Input path.</strong> <code>hearsay.embed.prepare_segment</code>: band match (7.25 kHz), silence trim, test-length crop, 8 s cap. Then <code>embed_segment</code>: per-input normalization, time-mean per layer, fp16.</li>
+<li><strong>Extraction flags,</strong> copied from each v3 twin's <code>extract_meta.json</code> and identical to them (check A1):</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Set</th><th>Rows</th><th>Crop</th><th>Seed</th>
+</tr></thead>
+<tbody>
+<tr><td><code>nsa_train_sample_wl</code></td><td>20,000</td><td>test</td><td>0</td></tr>
+<tr><td><code>asv19_addon_wl</code></td><td>7,648</td><td>test</td><td><strong>100</strong></td></tr>
+<tr><td><code>nsa_test_wl</code></td><td>1,671</td><td>none</td><td>—</td></tr>
+<tr><td><code>itw_stress_wl</code></td><td>3,000</td><td>test</td><td>200</td></tr>
+</tbody>
+</table></div>
+<p>  The seed-100 row is a correction: the handoff's command said 0, but <code>asv19_addon_v3</code> recorded 100.</p>
+<ul>
+<li><strong>Probe.</strong> <code>scripts/train_probe.py --model wavlm-large --train nsa_train_sample_wl,asv19_addon_wl --folds splits/nsa_folds_plus_asv19.csv --stress itw_stress_wl</code>. The layer is the inner-CV argmin (ASV19 rows are inner-only). StandardScaler + class-balanced logistic (C = 1), refit per inner fold for the out-of-fold scores. Then one 2-parameter Platt map is fit on the pooled inner out-of-fold scores and applied to all columns, as in M1b (<code>train_probe.py:78</code>).
+<ul>
+<li>The handoff's "all fold-local" was inaccurate for the Platt step. The <code>inner_oof</code> logits are therefore out-of-fold in their ranking but in-sample in their calibration.</li>
+<li>Platt is a positive affine map, so every rank, Spearman figure, rank-fusion input and threshold argmin in this report is unaffected; only calibrated inner logit values carry the in-sample step. Outer-holdout, In-the-Wild and test labels are never used in any fit.</li>
+<li>The holdout is read once and In-the-Wild is never fit on. Model: <code>models/m1_wavlm-large_L9_20260926-1906</code> (59 s).</li>
+</ul></li>
+<li><strong>Export.</strong> <code>scripts/export_probe_scores.py --probe models/m1_wavlm-large_L9_20260926-1906 --name wavlm_l --train nsa_train_sample_wl,asv19_addon_wl --folds splits/nsa_folds_plus_asv19.csv --test nsa_test_wl --stress itw_stress_wl</code>.</li>
+</ul>
+<h2 id="inner-cv-mindcf-by-layer-selection-metric-folds-include-the-asv19-rows">Inner-CV minDCF by layer (selection metric; folds include the ASV19 rows)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Layer</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th><strong>9</strong></th><th>10</th><th>11</th><th>12</th>
+</tr></thead>
+<tbody>
+<tr><td>minDCF</td><td>0.798</td><td>0.829</td><td>0.680</td><td>0.582</td><td>0.477</td><td>0.410</td><td>0.399</td><td>0.332</td><td>0.302</td><td><strong>0.294</strong></td><td>0.304</td><td>0.298</td><td>0.302</td></tr>
+<tr><td>EER</td><td>0.252</td><td>0.253</td><td>0.253</td><td>0.216</td><td>0.195</td><td>0.147</td><td>0.142</td><td>0.132</td><td>0.134</td><td><strong>0.135</strong></td><td>0.143</td><td>0.147</td><td>0.147</td></tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Layer</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th><th>21</th><th>22</th><th>23</th><th>24</th>
+</tr></thead>
+<tbody>
+<tr><td>minDCF</td><td>0.318</td><td>0.313</td><td>0.322</td><td>0.312</td><td>0.314</td><td>0.297</td><td>0.314</td><td>0.325</td><td>0.343</td><td>0.330</td><td>0.363</td><td>0.375</td></tr>
+<tr><td>EER</td><td>0.134</td><td>0.121</td><td>0.114</td><td>0.105</td><td>0.095</td><td>0.093</td><td>0.098</td><td>0.096</td><td>0.105</td><td>0.098</td><td>0.106</td><td>0.108</td></tr>
+</tbody>
+</table></div>
+<p>The curve is flat from layer 8 to layer 18 (0.294–0.322); layer 9 wins narrowly over 18 (0.2974) and 11 (0.2979). M1b's XLS-R curve bottoms at layer 7 (0.2649).</p>
+<h2 id="readouts-beside-m1b-v3">Readouts beside M1b v3</h2>
+<p>Normalized minDCF, π = 0.3, C_FA = 4 ("brief") unless marked. M1b v3 from <code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0521/meta.json</code>; WavLM from <code>models/m1_wavlm-large_L9_20260926-1906/meta.json</code>; the "export" rows from <code>scripts/heads_diagnostics.py wavlm_l</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>M1b v3 (XLS-R L7)</th><th>WavLM L9</th>
+</tr></thead>
+<tbody>
+<tr><td>Inner-CV minDCF (trainer; NSA + ASV19 rows)</td><td>0.2649</td><td>0.2936</td></tr>
+<tr><td>Inner-OOF brief / averse (export; NSA rows only)</td><td>0.3013 / 0.3307</td><td>0.3108 / 0.6241</td></tr>
+<tr><td>Holdout minDCF / EER / AUC</td><td>0.0717 / 1.40% / 0.9986</td><td>0.0717 / 1.45% / 0.9991</td></tr>
+<tr><td>Holdout act DCF (Platt at π = 0.3)</td><td>0.0742</td><td>0.0806</td></tr>
+<tr><td>Holdout averse (export)</td><td>0.0571</td><td>0.0449</td></tr>
+<tr><td>Holdout, playht / wavegrad2</td><td>0.0371 / 0.0892</td><td>0.0902 / 0.0431</td></tr>
+<tr><td>Holdout, bona fide LibriSpeech / LJ</td><td>0.102 / 0.027</td><td>0.0893 / 0.017</td></tr>
+<tr><td>Sponsor code as-is / flipped (holdout)</td><td>1.00 / 0.0571</td><td>1.00 / 0.0449</td></tr>
+<tr><td><strong>In-the-Wild minDCF, brief</strong></td><td><strong>0.342</strong></td><td><strong>0.752</strong></td></tr>
+<tr><td>In-the-Wild averse (export)</td><td>0.2955</td><td>0.3825</td></tr>
+<tr><td>In-the-Wild EER</td><td>7.55%</td><td>11.57%</td></tr>
+<tr><td>In-the-Wild P_FA / P_miss at the inner threshold</td><td>0.8% / 27.8%</td><td>7.05% / 19.9%</td></tr>
+<tr><td>Inner threshold (LLR)</td><td>2.325</td><td>1.650</td></tr>
+</tbody>
+</table></div>
+<h2 id="diagnostics-pre-declared-d4-scriptsheads_diagnosticspy-wavlm_l">Diagnostics (pre-declared, D4; <code>scripts/heads_diagnostics.py wavlm_l</code>)</h2>
+<p><strong>Rank agreement with M1b (Spearman of logits):</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th>Holdout (3,858)</th><th>Test (1,671)</th><th>In-the-Wild (3,000)</th>
+</tr></thead>
+<tbody>
+<tr><td>WavLM vs M1b</td><td>0.863</td><td><strong>0.795</strong></td><td>0.774</td></tr>
+</tbody>
+</table></div>
+<p>For reference, Spectra vs M1b on the test set is 0.620 by this script. The handoff quotes 0.57 from another computation; the difference was not chased.</p>
+<p><strong>Miss tail.</strong></p>
+<ul>
+<li><strong>Reproduction first.</strong> The shipped rule (A3 w0.2 + E) reproduces on In-the-Wild from the exports: brief 0.2280, <strong>15 FA / 158 miss</strong> at the In-the-Wild brief argmin (check A9).</li>
+<li><strong>Method.</strong> Each column's inner threshold is the brief-cost argmin over its own inner-OOF logits. Each column's count below is how many of the 158 it flags on its own.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Column</th><th>Flags of the 158</th>
+</tr></thead>
+<tbody>
+<tr><td>M1b v3</td><td>1</td></tr>
+<tr><td>handcrafted v5</td><td>2</td></tr>
+<tr><td>M5 (XLS-R fine-tune)</td><td>33</td></tr>
+<tr><td><strong>WavLM L9</strong></td><td><strong>57</strong></td></tr>
+<tr><td>Spectra-AASIST (M3)</td><td>107</td></tr>
+</tbody>
+</table></div>
+<p>The four reference counts reproduce the Fable consult's numbers exactly (<code>docs/consults/2026-09-26_post-draft-review_RESPONSE_fable.md</code>).</p>
+<h2 id="reading">Reading</h2>
+<ul>
+<li><strong>A different backbone does see different fakes.</strong> WavLM flags 57 of the misses, 57 times M1b's count and more than M5, while agreeing with M1b's ranking at only 0.79 on the test set. This is the new information the consult said only a new representation could bring.</li>
+<li><strong>On the NSA domain it ties M1b on the holdout and loses on inner OOF.</strong> Holdout minDCF ties M1b (0.0717). The generator profile flips: WavLM is better on wavegrad2 and worse on playht. Real LibriSpeech and LJ are slightly better. Inner CV is worse by 0.03, and the inner-OOF averse cost nearly doubles (0.624 vs 0.331): at the averse operating point it misses far more of the inner generators than M1b does.</li>
+<li><strong>On wild real speech it false-alarms.</strong> P_FA at the inner threshold is 7.05% against M1b's 0.8%, and the brief-cost minDCF doubles. Under C_FA = 4 that is the costly direction. M1b's own In-the-Wild weakness is misses; WavLM's is false alarms. Complementary errors are what a rank blend can exploit, but WavLM's false alarms sit where the blend's threshold operates.</li>
+<li><strong>Against the gate.</strong> Before the verdict this report named the sponsor-averse In-the-Wild condition as the one to watch because of the false-alarm rate. That was the wrong one.
+<ul>
+<li>In the blend, In-the-Wild improved under both costs (+0.023 brief, +0.009 averse). It fell short of the room's 0.03 but was not worse.</li>
+<li>The candidate failed on inner (worse by 0.021 brief and 0.033 averse; the column-alone inner-OOF averse gap above predicted this), on the gate's corrective-share diagnostic, and on thresholds doubled by the 0.967 test-set Spearman of the blend with the shipped rule.</li>
+</ul></li>
+</ul>
+<h2 id="incident-transient-decode-failures-under-parallel-extraction-fixed-d2">Incident: transient decode failures under parallel extraction (fixed; D2)</h2>
+<p><strong>What happened.</strong></p>
+<ul>
+<li>WavLM extraction at one clip per forward pass ran 0.17–0.25 s/clip. Serial, it would have finished near 19:15.</li>
+<li>At ~17:40 the serial chain was cut. The four sets then ran in three concurrent processes, and the training sample resumed from its five completed shards.</li>
+<li>Each process grew to ~5.5 GB (the MPS allocator caches buffers for variable-length inputs). The 18 GB Mac swapped (~16 GB of swap in use), throughput fell to 0.4–0.5 s/clip, and FFmpeg failed transiently on files that decode fine on retry.</li>
+<li>The extractor replaces an undecodable clip with 1 s of zeros and records <code>decode_error</code> in the shard and in <code>manifest.csv</code>, so the failure is recorded. But <code>hearsay.probe.load_embeddings</code> does not read the flag, so such a row would have entered training and scoring as a silent clip without warning.</li>
+</ul>
+<p><strong>Counts.</strong></p>
+<ul>
+<li>99 rows in total: 74 train sample, 10 ASV19, 4 test, 11 In-the-Wild.</li>
+<li>They include a burst of 51 consecutive train-sample rows (8925–8975) at the swap peak.</li>
+<li>0 in any v3 set and 0 in the five shards written serially.</li>
+<li>98 in shards written while three processes ran, 1 (row 10487) in a shard written with two, and 0 in the eight training-sample shards written after the 18:34 restart.</li>
+</ul>
+<p><strong>Fix.</strong></p>
+<ul>
+<li>The process count dropped to two at ~18:15, and the training-sample process was restarted clean at 18:34. Resumes are bit-identical: crop lengths and per-row seeds are regenerated deterministically.</li>
+<li>New <code>scripts/repair_decode_errors.py</code> re-embeds only flagged rows through the extractor's own segment path (the stored crop length, seed = meta seed + row).</li>
+<li>It first re-embeds unflagged rows of the same set (<code>--verify</code>, 5 in every run here) and refuses to write unless they reproduce.</li>
+<li>It ran on the test set, In-the-Wild and ASV19 once each after their extraction finished. The fixed row IDs are listed below.</li>
+<li>The train sample's 74 rows were repaired by the finish chain (<code>outputs/logs/wavlm_finish_chain.log</code>), which also re-ran ASV19 (a no-op) before training.</li>
+<li><strong>Tightened after the pre-audit critique.</strong>
+<ul>
+<li>The first version's identity bar was a whole-matrix max relative error, lax at WavLM's value range; it is now element-wise, |diff| ≤ 5e-3 + 5e-3·|stored|.</li>
+<li>The tool now refuses an empty verify pool, a mismatched manifest and an unfinished set, and writes shards atomically.</li>
+</ul></li>
+<li><strong>Persisted evidence for A1–A5.</strong> The tool's new <code>--verify-only</code> mode was run on all four sets after training. It changes nothing. It compared each set with its v3 twin (meta, paths, stored crop lengths), counted decode errors, checked finiteness, and re-embedded 10 random rows per shard plus every repaired row: 426 rows in all, every one matching exactly (max abs diff 0.0). Logs: <code>outputs/logs/wavlm_verify_{nsa_train_sample_wl, asv19_addon_wl, nsa_test_wl, itw_stress_wl}.json</code>.</li>
+<li><strong>Repaired rows.</strong>
+<ul>
+<li>Test: 1141, 1143, 1164, 1233.</li>
+<li>In-the-Wild: 1057, 1090, 1390, 2049, 2050, 2051, 2118, 2215, 2224, 2368, 2719.</li>
+<li>ASV19: 1279, 1303, 1350, 1365, 1377, 2912, 2913, 3369, 3370, 3371.</li>
+<li>Train sample: the 74 listed in the chain log.</li>
+<li>The train IDs come from <code>outputs/logs/wavlm_finish_chain.log</code>. The other 25 were printed by the three unlogged repair runs and recovered from the session transcript. The verify-only runs re-embedded all 99 and match the stored values exactly.</li>
+</ul></li>
+<li><code>tests/test_repair_decode_errors.py</code> covers it (22 hermetic tests after the audit rounds; each of 17 single-guard mutants of the tool fails at least one of them).</li>
+</ul>
+<p><strong>Latent hazard for other lanes.</strong> <code>extract_embeddings.py</code> falls back to zeros on a decode failure and only flags the row. Any future extraction under memory pressure should check <code>manifest.csv</code>'s <code>flag</code> column before training, or run the repair tool.</p>
+<h2 id="acceptance-checks-run-spec">Acceptance checks (run spec)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>#</th><th>Check</th><th>Result</th>
+</tr></thead>
+<tbody>
+<tr><td>A1</td><td><code>extract_meta.json</code> equal to v3 twins</td><td>pass (all four)</td></tr>
+<tr><td>A2</td><td>Rows 20,000 / 7,648 / 1,671 / 3,000, paths in v3 order</td><td>pass</td></tr>
+<tr><td>A3</td><td>0 decode errors after repair</td><td>pass (99 repaired, 0 still failing)</td></tr>
+<tr><td>A4</td><td>Shape (N, 25, 1024), finite</td><td>pass</td></tr>
+<tr><td>A5</td><td>Re-embedding reproduces stored rows</td><td>pass: 426 rows re-embedded across all four sets (10 per shard plus all 99 repaired rows), max abs diff 0.0 (<code>outputs/logs/wavlm_verify_*.json</code>)</td></tr>
+<tr><td>A6</td><td>Layer by inner-CV argmin, table recorded</td><td>pass (layer 9)</td></tr>
+<tr><td>A7</td><td>Holdout AUC &gt; 0.5</td><td>pass (0.9991)</td></tr>
+<tr><td>A8</td><td>Export splits 16,142 / 3,858 / 1,671 / 3,000, path sets equal to <code>m1b_v3.csv</code>, no NaN or duplicates</td><td>pass</td></tr>
+<tr><td>A9</td><td>Shipped rule reproduces 15 FA / 158 miss</td><td>pass</td></tr>
+<tr><td>A10</td><td><code>pytest -q</code> all pass; <code>ruff check .</code> clean</td><td>pass; see the run spec's Results for the counts at each commit</td></tr>
+</tbody>
+</table></div>
+<h2 id="timing">Timing</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Stage</th><th>When (Sat Sep 26)</th>
+</tr></thead>
+<tbody>
+<tr><td>Extraction</td><td>17:19–19:05, including the parallel detour; a clean serial run would take ~1 h 55 min at 0.215 s/clip</td></tr>
+<tr><td>Train-sample shards after the 18:34 restart</td><td>0.10–0.41 s/clip per shard, 0.23 cumulative</td></tr>
+<tr><td>Repair, validation, training, export</td><td>19:05–19:07 (training 59 s)</td></tr>
+</tbody>
+</table></div>
+<h2 id="artifacts-gitignored-not-archived">Artifacts (gitignored; not archived)</h2>
+<ul>
+<li><code>outputs/embeddings/wavlm-large/{nsa_train_sample_wl, asv19_addon_wl, nsa_test_wl, itw_stress_wl}</code>: ~1.5 GB fp16, ~2 h to regenerate.</li>
+<li><code>models/m1_wavlm-large_L9_20260926-1906/</code>: <code>probe.joblib</code> and <code>meta.json</code>; its numbers are copied above.</li>
+<li><code>outputs/detector_scores/wavlm_l.csv</code>: regenerable from the probe in about a minute.</li>
+<li>Logs: <code>outputs/logs/wavlm_extract_*.log</code>, <code>outputs/logs/wavlm_finish_chain.log</code>.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_post-draft-heads.md</code> <span class="hash">67bb6875be61</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

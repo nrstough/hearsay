@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post-draft candidate manifest and gate (pre-declared Sat Sep 26, 2026, ~17:45 EDT) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_post-draft-manifest.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_post-draft-manifest.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#the-candidates-four-the-cap-never-combined-no-fifth-after-results">The candidates (four; the cap; never combined; no fifth after results)</a></li><li><a href="#the-gate-verbatim-from-the-response-record-governs-t2-p_wl-h_noise">The gate (verbatim from the RESPONSE record; governs T2, Pwl, Hnoise)</a></li><li><a href="#the-w4-bake-off-fresh-evidence-only-pre-declared-before-any-of-it-is-computed">The W4 bake-off (fresh evidence only; pre-declared before any of it is computed)</a></li><li><a href="#readouts-per-candidate-all-go-in-the-locked-table">Readouts per candidate (all go in the locked table)</a></li><li><a href="#self-check-must-hold-before-any-candidate-is-read">Self-check (must hold before any candidate is read)</a></li><li><a href="#decision-rule-the-1930-packet">Decision rule (the 19:30 packet)</a></li><li><a href="#clarifications-before-any-new-number-1825-pre-data-the-wavlm-export-does-not-exist-and-no-w4-bake-off-cell-has-been-computed">Clarifications before any new number (18:25, pre-data; the WavLM export does not exist and no W4 bake-off cell has been computed)</a></li><li><a href="#amendment-p_wl-ships-only-with-room-ruled-by-nathan-in-the-gate-chat-pre-data">Amendment: Pwl ships only "with room" (ruled by Nathan in the gate chat; pre-data)</a></li><li><a href="#note-1915-pre-data-h_noise-back-in-the-run">Note (19:15, pre-data): Hnoise back in the run</a></li><li><a href="#erratum-to-the-43916ee-note-clock-times">Erratum to the 43916ee note (clock times)</a></li></ul></details>
+<h1 id="post-draft-candidate-manifest-and-gate-pre-declared-sat-sep-26-2026-1745-edt">Post-draft candidate manifest and gate (pre-declared Sat Sep 26, 2026, ~17:45 EDT)</h1>
+<p><strong>Status:</strong> frozen at commit. Approved by Nathan in the gate chat (P1 "freeze" ~17:30; W4 ruling ~17:40). Nothing below is changed after any candidate's new number is seen. Results go in <code>docs/reports/2026-09-26_post-draft-sweep.md</code>; the sweep script is <code>scripts/fuse_sweep_v3.py</code>, report <code>outputs/fusion/sweep_v3_report.json</code>.</p>
+<p><strong>State at commit:</strong></p>
+<ul>
+<li>Shipped TSV <code>submissions/20260926-0914_M4_sweep_A3_w0.2_E_CANDIDATE_our_direction.tsv</code>, sha256 <code>fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607</code>. NSA draft review: minDCF 0.0733, EER 3.534%.</li>
+<li>"Sleep equals ship": a byte copy at <code>submissions/CrossExam_predictions.tsv</code> with the same sha256, logged 17:33:52 as FINAL unless replaced by a ratified candidate.</li>
+<li>No new candidate export exists at commit time: <code>outputs/detector_scores/wavlm_l.csv</code> and <code>handcrafted_v6.csv</code> are absent. The one exception is W4, whose numbers were seen first (post hoc, see below).</li>
+<li>Sources: gate verbatim from <code>docs/consults/2026-09-26_post-draft-review_RESPONSE.md</code> ("What to do (adopted)"); candidate list from the same file's "Round 2" and <code>docs/handoffs/2026-09-26_post-draft-gate-handoff.md</code> (revised 17:25).</li>
+</ul>
+<h2 id="the-candidates-four-the-cap-never-combined-no-fifth-after-results">The candidates (four; the cap; never combined; no fifth after results)</h2>
+<p>All ranks are <code>searchsorted(sorted inner-OOF logits of that column, logit) / n</code>, exactly as <code>scripts/fuse_sweep_m5.py</code> and <code>hearsay.pipeline</code> compute them. The E step is the shipped one: if M3 logit &lt; −3 and base &gt; 0.5, base × 0.5. CURRENT is the shipped rule, A3 w0.2 + E = <code>0.6·rank(m1b_v3) + 0.2·rank(handcrafted_v5) + 0.2·rank(m5_xlsr_ft)</code>, then E. The Platt map (for the 0.5-crossing count only) is the M5 sweep's: class-balanced logistic on inner-OOF fused scores, plus the prior shift log(0.3/0.7).</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>ID</th><th>Definition</th><th>Source</th><th>Governing test</th>
+</tr></thead>
+<tbody>
+<tr><td><code>T2</code></td><td>CURRENT with a second M3 tier: × 0.5 when M3 logit &lt; −3 and base &gt; 0.5 (as now), × 0.25 in total when M3 logit &lt; −6 and base &gt; 0.5. Nothing fitted.</td><td>shipped exports</td><td>stricter gate</td></tr>
+<tr><td><code>W4</code></td><td>A3 (0.4, 0.2, 0.4) + E: <code>0.4·rank(m1b_v3) + 0.2·rank(handcrafted_v5) + 0.4·rank(m5_xlsr_ft)</code>, then E. <strong>Post hoc</strong> (disclosure below).</td><td>shipped exports</td><td>the W4 bake-off (below)</td></tr>
+<tr><td><code>P_wl</code></td><td><code>0.4·rank(m1b_v3) + 0.2·rank(wavlm_l) + 0.2·rank(handcrafted_v5) + 0.2·rank(m5_xlsr_ft)</code>, then E. The refit-seat variant is not run.</td><td><code>outputs/detector_scores/wavlm_l.csv</code> (heads chat, due 18:50)</td><td>stricter gate</td></tr>
+<tr><td><code>H_noise</code></td><td>CURRENT with <code>handcrafted_v6</code> in the handcrafted seat.</td><td><code>outputs/detector_scores/handcrafted_v6.csv</code> and <code>_itw_handcrafted_v6.csv</code> (CPU chat, only if idle)</td><td>stricter gate</td></tr>
+</tbody>
+</table></div>
+<p>A missing export marks its candidate <strong>not run</strong>; it is never an error and never a pass. <code>P_l59</code> (XLS-R layers 5–9) was dropped at 17:20: the Fable agent measured it as a negative (Round 2, item 1), before this manifest.</p>
+<p><strong>W4 post-hoc disclosure.</strong> W4's proxy numbers were computed by the Fable agent and re-verified by the consult chat before this manifest existed. They are inner 0.1373 / 0.3366, holdout 0.0065 / 0.0088, In-the-Wild 0.1997 / 0.2075 (brief / averse), and test Spearman 0.970 against the shipped file. It passes the standing four-condition rule. Under the stricter gate it fails rule 3: inner is worse by 0.002 (brief) and 0.037 (averse). Because those numbers are already seen, they cannot decide anything, so Nathan chose a fresh-evidence bake-off (next section) over either rulebook alone.</p>
+<h2 id="the-gate-verbatim-from-the-response-record-governs-t2-p_wl-h_noise">The gate (verbatim from the RESPONSE record; governs T2, P_wl, H_noise)</h2>
+<p>Supersedes the standing rule (ITW ≥ 0.01 better, averse ≤ 0.01 worse, holdout ≤ 0.05 worse, inner ≤ 0.03 worse) for these three candidates tonight.</p>
+<ol>
+<li>Each candidate's definition, weights and preprocessing go in a manifest before its proxy table exists; candidates are never combined tonight.</li>
+<li>In-the-Wild brief-cost improvement ≥ 0.020; sponsor-cost regression ≤ 0.002.</li>
+<li>Inner-OOF brief-cost improvement ≥ 0.010; no sponsor-cost regression at printed precision.</li>
+<li>Holdout degradation ≤ 0.010 under either convention (a safety constraint, not evidence).</li>
+<li>Both costs must improve on at least two of the three proxy populations, and the candidate's mechanism diagnostic must pass (noise twins must recover the 20 dB lane; a new probe must correct baseline errors rather than clone M1b's ranks).</li>
+<li>If the candidate's test-ranking Spearman against the shipped file falls below 0.974, the required gains double; 0.5-crossings are counted for disclosure only.</li>
+<li>If two candidates pass, ship neither unless one Pareto-dominates across all six split × cost cells. Nathan ratifies exactly one candidate from one consolidated packet; the runner must then reproduce the exact ordering and pinned block. Nothing auto-ships.</li>
+</ol>
+<h3 id="how-the-gate-is-computed-operationalization-approved-at-p1">How the gate is computed (operationalization, approved at P1)</h3>
+<ul>
+<li><strong>Costs.</strong> Brief = <code>min_cost(y, s, 0.3)</code> with C_FA 4, C_miss 1 (normalized 9.33·P_FA + P_miss). Averse, the sponsor code's convention = <code>min_cost(y, s, 0.5, c_fa=1, c_miss=4)</code> (P_FA + 4·P_miss). A test pins both.</li>
+<li><strong>Populations.</strong> Inner = the inner-OOF rows (16,142). Holdout = the outer holdout (3,858). In-the-Wild = the 3,000-row stress set. Six cells = 3 populations × 2 costs.</li>
+<li><strong>Δ.</strong> Δ = CURRENT − candidate, both rounded to 4 decimals. "Improve" means Δ &gt; 0; "regression" means Δ &lt; 0.</li>
+<li><strong>Rule 2.</strong> ITW brief Δ ≥ 0.020, and ITW averse Δ ≥ −0.002.</li>
+<li><strong>Rule 3.</strong> Inner brief Δ ≥ 0.010, and inner averse Δ ≥ 0.</li>
+<li><strong>Rule 4.</strong> Holdout brief Δ ≥ −0.010, and holdout averse Δ ≥ −0.010.</li>
+<li><strong>Rule 5.</strong> Under the brief cost, Δ &gt; 0 on at least 2 of the 3 populations; the same under the averse cost; and the candidate's diagnostic (below) passes.</li>
+<li><strong>Rule 6.</strong> Spearman between the candidate's fused test scores and the shipped TSV's <code>cm-score</code>, over the test rows outside the pinned block (shipped <code>cm-score</code> &lt; 0.001 marks the pinned block). If it is below 0.974, the rule-2 threshold becomes 0.040 and the rule-3 threshold becomes 0.020; nothing else changes.</li>
+<li><strong>0.5 crossings.</strong> The count of non-pinned test files whose candidate probability and shipped probability fall on opposite sides of 0.5. Disclosure only; <strong>no one inspects which files cross</strong> (selection on the test set).</li>
+<li><strong>Row sets.</strong> Each candidate is compared with CURRENT rebuilt on the identical row intersection (every column the candidate uses, plus M3). Any shrink from the base set is disclosed with the row counts. The self-check runs on the base set.</li>
+</ul>
+<h3 id="mechanism-diagnostics-pre-declared">Mechanism diagnostics (pre-declared)</h3>
+<ul>
+<li><strong>T2.</strong> The deeper tier (M3 logit &lt; −6 and base &gt; 0.5) must fire on <strong>zero</strong> spoof rows in every proxy split (inner, holdout, In-the-Wild) and in every kind of the channel lane's perturbation cohort (<code>outputs/channel/m3_perturb.csv</code>, using its <code>fused_base</code>). Expected overall outcome: readouts identical to CURRENT (verified inert in Round 2). That fails rule 2 (no improvement), so T2's verdict is KEEP either way; it is run so the record shows it.</li>
+<li><strong>P_wl.</strong> Two parts; both must pass.
+<ol>
+<li><em>New catches.</em> Take CURRENT's In-the-Wild misses at CURRENT's inner-OOF brief-cost threshold (158 in Round 2). The <code>wavlm_l</code> column alone, thresholded at its own inner-OOF brief-cost threshold, must flag at least <strong>16</strong> of them (10%). For scale: M1b flags 1, M5 33, M3 107.</li>
+<li><em>Corrective, not a clone.</em> Take CURRENT's errors at the same threshold on inner OOF and, separately, on In-the-Wild. On a false alarm, the error counts as corrected if <code>rank(wavlm_l)</code> &lt; <code>rank(m1b_v3)</code>; on a miss, if <code>rank(wavlm_l)</code> &gt; <code>rank(m1b_v3)</code>. Ties do not count. The corrected share must be <strong>&gt; 0.5</strong> on both populations. The Spearman of <code>wavlm_l</code> against <code>m1b_v3</code> on holdout and test is reported beside it.</li>
+</ol></li>
+<li><strong>H_noise.</strong> The CPU chat's pre-declared bar (its handoff, step 5), read from its report because the check needs audio: under 20 dB white noise on the channel lane's 500-clip cohort, <code>handcrafted_v6</code> AUC ≥ 0.90, and clean AUC within 0.005 of v5's 0.998. If those numbers are not reported, the diagnostic fails and H_noise fails rule 5.</li>
+<li><strong>W4.</strong> None under the gate; its bake-off is below.</li>
+</ul>
+<h2 id="the-w4-bake-off-fresh-evidence-only-pre-declared-before-any-of-it-is-computed">The W4 bake-off (fresh evidence only; pre-declared before any of it is computed)</h2>
+<p>W4 enters the packet as ratifiable only if <strong>all three</strong> hold:</p>
+<ol>
+<li><strong>Standing rule</strong> (already known to pass): ITW brief Δ ≥ 0.01; ITW averse Δ ≥ −0.01; holdout brief Δ ≥ −0.05; inner brief Δ ≥ −0.03.</li>
+<li><strong>Perturbation robustness.</strong> This evidence is unseen for W4. The cohort is the channel lane's 500 holdout clips (250 bona fide, 250 spoof) under each of five kinds: none, MP3 64 kbps, 20 dB white noise, ±2% speed, one-sample shift. Per-row logits come from <code>outputs/channel/m3_perturb.csv</code>, and ranks use the shipped inner-OOF references (<code>models/fusion_v2/constants.json</code>). On every kind, W4's brief minDCF and averse minDCF must each be no more than 0.010 worse than CURRENT's on the same rows: 10 cells, all with Δ ≥ −0.010.</li>
+<li><strong>The ITW gain is not noise.</strong> Resample In-the-Wild <strong>by speaker</strong> (the manifest's <code>speaker</code> column, since clips of one speaker are not independent): 2,000 cluster-bootstrap replicates, <code>numpy.random.default_rng(0)</code>, the same resample for both rules. The 5th percentile of (CURRENT − W4) must be <strong>&gt; 0</strong> under the brief cost and, separately, under the averse cost.</li>
+</ol>
+<p>If W4 fails any part, it is recorded as a measured negative (post hoc, did not survive fresh evidence) and is not in the ratifiable set. If W4 passes, it counts as a "pass" for rule 7: if another candidate also passes, neither ships unless one Pareto-dominates the other across the six split × cost cells (≤ in all six and &lt; in at least one, at 4 decimals).</p>
+<h2 id="readouts-per-candidate-all-go-in-the-locked-table">Readouts per candidate (all go in the locked table)</h2>
+<ul>
+<li>Inner, holdout and In-the-Wild minDCF under both costs (the six cells).</li>
+<li>Holdout argmin [#FA, #miss] under the brief cost.</li>
+<li>In-the-Wild P_FA and P_miss at the candidate's inner-OOF brief-cost threshold.</li>
+<li>Holdout LJ Speech and LibriSpeech brief cost (as in the M5 sweep).</li>
+<li>Test Spearman against the shipped file (non-pinned rows), and the 0.5-crossing count.</li>
+<li>The mechanism diagnostic, or for W4 the bake-off.</li>
+<li>Gate verdict per rule, and the overall verdict: PASS / FAIL / NOT RUN.</li>
+</ul>
+<h2 id="self-check-must-hold-before-any-candidate-is-read">Self-check (must hold before any candidate is read)</h2>
+<p>With no new exports present, CURRENT reproduces <code>outputs/fusion/sweep_m5_report.json</code>'s shipped row to four decimals:</p>
+<ul>
+<li>inner 0.1351</li>
+<li>holdout 0.0065 / 0.0087</li>
+<li>In-the-Wild 0.228 / 0.2385</li>
+<li>ITW P_FA / P_miss at the inner threshold 0.013 / 0.122</li>
+<li>holdout argmin [0, 13]</li>
+</ul>
+<p>CURRENT's Spearman against the shipped TSV is ≥ 0.999 on non-pinned rows. W4 reproduces the consult chat's numbers above. If the self-check fails, no candidate is read until it is fixed.</p>
+<h2 id="decision-rule-the-1930-packet">Decision rule (the 19:30 packet)</h2>
+<ul>
+<li><strong>No candidate passes:</strong> KEEP. <code>submissions/CrossExam_predictions.tsv</code> (sha256 <code>fb783076…</code>) is final. Record the negatives in the sweep report and a log note row, then stop.</li>
+<li><strong>Exactly one passes:</strong> recommend it to Nathan, with its integration risk stated.
+<ul>
+<li>P_wl needs a second backbone in the runner and does not ship unless it is reproduced end to end by 21:30.</li>
+<li>W4 needs the full 1,671-row parity re-run: Spearman ≥ 0.999, max |Δp| ≤ 1e-3, exact sorted IDs for near-ties.</li>
+<li>H_noise is a bundle swap.</li>
+</ul></li>
+<li><strong>Two or more pass:</strong> ship none unless one Pareto-dominates every other passer across the six cells.</li>
+<li><strong>In every case:</strong> Nathan ratifies or not in one 30-minute window (19:30–20:00). No weight or threshold is changed after the table is seen. Nothing auto-ships.</li>
+</ul>
+<h2 id="clarifications-before-any-new-number-1825-pre-data-the-wavlm-export-does-not-exist-and-no-w4-bake-off-cell-has-been-computed">Clarifications before any new number (18:25, pre-data; the WavLM export does not exist and no W4 bake-off cell has been computed)</h2>
+<p>Found by the plan critique (Claude) and the Codex plan review (<code>docs/reports/2026-09-26_post-draft-gate-sweep-plan-review.md</code>). They resolve ambiguities; none changes a threshold.</p>
+<ol>
+<li><strong>P_wl new catches.</strong> The rule text governs: CURRENT's misses are taken at CURRENT's <strong>inner-OOF</strong> brief-cost threshold, and the bar is the absolute <strong>16</strong>. The parenthetical reference numbers ("158 in Round 2"; "M1b 1, M5 33, M3 107") were taken at the In-the-Wild brief-cost argmin, a different threshold. At the inner-OOF threshold, CURRENT has <strong>122</strong> ITW misses (and 26 false alarms), and the same scale is M1b 1, M5 19, M3 79. The bar of 16 is therefore 13% of the operative miss set: stricter than the 10% described, and still below M5's 19. The report prints the miss count. The corrective-share test uses the same threshold.</li>
+<li><strong>The pinned block is empty in the shipped file.</strong> No shipped <code>cm-score</code> is below 0.001 (min 0.001446); the file is value-identical to <code>outputs/fusion/sweep_m5_final_test.csv</code>'s <code>p</code>. "Non-pinned rows" is therefore all 1,671, and the Spearman and crossings use them all. A candidate whose test coverage is incomplete (fewer than 1,671 unique files) is INVALID, not scored on a subset.</li>
+<li><strong>T2 is expected identical at the metric, not row-identical.</strong> Its deeper tier fires on bona fide rows: 133 inner, 34 holdout, 2 ITW. The diagnostic is spoof-only, as written. The report also prints the bona fide fire counts.</li>
+<li><strong>H_noise.</strong> The CPU lane withdrew it at ~17:42. If an export appears anyway, no noise-AUC evidence has been supplied, so its diagnostic fails (as written above) and it cannot pass.</li>
+<li><strong>Rule 7 across row sets.</strong> If two candidates pass, the Pareto comparison re-scores every passer on the intersection of their row sets, so the six cells compare the same rows.</li>
+<li><strong>Invalid inputs.</strong> A candidate whose export fails validation is INVALID: an inverted direction (inner AUC &lt; 0.5), duplicate paths, split or fold disagreement with <code>splits/nsa_folds.csv</code>, non-finite logits, incomplete test or ITW coverage, or a non-finite Spearman. INVALID is recorded per candidate; it never passes and never stops the other candidates from being evaluated.</li>
+<li><strong>Rounding in the bake-off.</strong> Perturbation cells are rounded to 4 decimals before the Δ ≥ −0.010 comparison, as in the gate. The bootstrap percentile uses <code>np.percentile</code> (linear) on the unrounded replicate Δs.</li>
+</ol>
+<h2 id="amendment-p_wl-ships-only-with-room-ruled-by-nathan-in-the-gate-chat-pre-data">Amendment: P_wl ships only "with room" (ruled by Nathan in the gate chat; pre-data)</h2>
+<p>Ruled by Nathan in this chat, relayed from his 18:30 and 18:55 instructions. <code>outputs/detector_scores/wavlm_l.csv</code> does not exist at commit time, and no W4 bake-off cell has been computed.</p>
+<p><strong>P_wl is ratifiable only if all of the following hold:</strong></p>
+<ol>
+<li>It passes the full seven-rule gate above, including its diagnostic (≥ 16 new catches and a corrective share &gt; 0.5).</li>
+<li><strong>Room:</strong> In-the-Wild brief Δ ≥ <strong>0.030</strong> and In-the-Wild averse Δ ≥ <strong>0.030</strong>. That is, it improves under both costs, not the gate's 0.020 / −0.002. The gate's inner (≥ 0.010 better, averse no worse) and holdout (≤ 0.010 worse) conditions are unchanged. If rule 6 doubles the gate's ITW brief threshold to 0.040, the larger one applies.</li>
+<li><strong>Catch bar:</strong> <code>wavlm_l</code> alone, at its own inner-OOF brief threshold, flags ≥ <strong>19</strong> of CURRENT's ITW misses at CURRENT's inner-OOF threshold (122 misses; for scale M1b 1, M5 19, Spectra-AASIST 79). That is, it adds at least as much as M5 did.</li>
+</ol>
+<p><strong>Outcomes:</strong></p>
+<ul>
+<li><strong>Passes the gate but not the room or the catch bar:</strong> a README bake-off row ("tested, not shipped"). The shipped file stands.</li>
+<li><strong>Fails the gate:</strong> a README negative. The shipped file stands.</li>
+</ul>
+<p><strong>Clock</strong> (Nathan, 18:55; the outer bound for any ratified candidate):</p>
+<ul>
+<li>P_wl is judged whenever <code>wavlm_l</code> lands, not skipped if it is later than 19:15. The 19:30 packet time stays the target for T2, W4 and H_noise.</li>
+<li>Integration may <strong>start as late as 23:00</strong>.</li>
+<li>The full 1,671-file run and parity must be done by <strong>00:30</strong>.</li>
+<li>Nathan ratifies the parity result by <strong>01:00</strong>. If not, it lapses to KEEP.</li>
+<li>The shipped TSV and <code>submissions/CrossExam_predictions.tsv</code> stay untouched until parity passes.</li>
+</ul>
+<p><strong>Unchanged:</strong> W4 is still governed only by its bake-off (Nathan, ~17:40). Rule 7's one-candidate-per-packet rule and the pre-data clarifications (<code>b877760</code>) stand.</p>
+<h2 id="note-1915-pre-data-h_noise-back-in-the-run">Note (19:15, pre-data): H_noise back in the run</h2>
+<p>At 19:10, via the orchestrator, the CPU chat is running <code>handcrafted_v6</code> after all, with its export expected ~20:30. Clarification 4 assumed the withdrawal. With the export coming, H_noise is judged by the original pre-declared diagnostic above:</p>
+<ul>
+<li>20 dB noise AUC ≥ 0.90 on the channel cohort;</li>
+<li>clean AUC within 0.005 of 0.998.</li>
+</ul>
+<p>The numbers come from the CPU chat's report and are passed to the sweep as <code>--hnoise-evidence NOISE_AUC,CLEAN_AUC</code>. Without them, the diagnostic fails, as written above. No threshold changes.</p>
+<p>The refit seat (<code>wavlm_l</code> in M1b's seat, via <code>fuse_sweep_m5.py --refit-m1b wavlm_l</code>) is printed beside P_wl as a <strong>diagnostic only</strong>. It is not a candidate, never enters the gate and cannot be ratified tonight (Nathan, 19:10).</p>
+<h2 id="erratum-to-the-43916ee-note-clock-times">Erratum to the 43916ee note (clock times)</h2>
+<p>The note is headed "(19:15, pre-data)" and cites "19:10". Commit 43916ee was made at <strong>19:08:02</strong>, and <code>wavlm_l.csv</code> was written at <strong>19:07:01</strong>. The times in the note were the relay's labels, not the clock.</p>
+<ul>
+<li><strong>Refit-seat item:</strong> written about a minute after the WavLM export existed, though before any number from it had been computed or seen (the locked run is 19:08:36). It adds a diagnostic only, with no gate and no ratification path, so its timing cannot bias a verdict.</li>
+<li><strong>H_noise item:</strong> still pre-data (its export does not exist at this erratum).</li>
+</ul>
+<p>The sweep doc's provenance line is qualified to match. Also from audit round 2:</p>
+<ul>
+<li>The H_noise evidence must now come with <code>--hnoise-evidence-source PATH</code>, and that file's sha256 goes into the report's inputs.</li>
+<li>AUCs outside [0, 1] are rejected.</li>
+<li>An H_noise export with in-file ITW rows is accepted when the separate <code>_itw</code> file is absent, with coverage still enforced.</li>
+</ul>
+<p>No threshold changes.</p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_post-draft-manifest.md</code> <span class="hash">9ddd8d92c802</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

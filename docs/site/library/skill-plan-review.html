@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/plan-review — Full Change Pipeline · HEARSAY</title>
+<meta name="description" content="&quot;Full change pipeline — P1, P2, Spec + Plan (native + Codex-reviewed), Execute with doc propagation&quot;">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>.claude/skills/plan-review/SKILL.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#when-to-use-this-vs-workflow-review">When to use this vs /workflow-review</a></li><li><a href="#relief-valve">Relief valve</a></li><li><a href="#hearsay-localization-project-specific--read-before-phase-0">HEARSAY localization (project-specific — read before Phase 0)</a></li><li><a href="#phase-0--resolve-project-conventions-automatic-no-user-stop">Phase 0 — Resolve project conventions (automatic, no user stop)</a></li><li><a href="#phase-1--problem--approach">Phase 1 — Problem &amp; Approach</a></li><li><a href="#phase-2--test-design--doc-impact">Phase 2 — Test Design &amp; Doc Impact</a></li><li><a href="#phase-3--specs-plan--review">Phase 3 — Specs, Plan &amp; Review</a></li><li><a href="#phase-4--execute">Phase 4 — Execute</a></li><li><a href="#documentation-model">Documentation model</a></li><li><a href="#user-interactions-summary">User interactions summary</a></li><li><a href="#rules">Rules</a></li></ul></details>
+<h1 id="plan-review--full-change-pipeline">/plan-review — Full Change Pipeline</h1>
+<p>Four phases, three user stops.</p>
+<pre><code>P1 (problem) → user freezes
+P2 (tests + doc impact) → user freezes ("freeze" or "freeze deep")
+Write specs → Plan (standard or deep + Codex-reviewed) → user approves
+Execute → tests → commit → Codex audit → present results</code></pre>
+<h2 id="when-to-use-this-vs-workflow-review">When to use this vs <code>/workflow-review</code></h2>
+<p><code>/plan-review</code> is for surgical, linear changes — one ordered edit list executed by the main
+loop. If the work is <strong>parallelizable or large-scale</strong> (a migration, a broad audit/sweep,
+"apply X across N files", multi-dimension review), use <code>/workflow-review</code> instead: same
+P1/P2/spec discipline, but the reviewed deliverable is a multi-agent <code>Workflow</code> script.</p>
+<h2 id="relief-valve">Relief valve</h2>
+<p>If the user says "just fix it", "quick fix", or the change is clearly trivial (one-line,
+typo, config), skip the full pipeline. Make a short checklist, code it, test it, commit it.</p>
+<h2 id="hearsay-localization-project-specific--read-before-phase-0">HEARSAY localization (project-specific — read before Phase 0)</h2>
+<ul>
+<li><strong>When to use it here:</strong> any rung or change expected to take more than an hour
+(CLAUDE.md working rule). Under an hour → relief valve.</li>
+<li><strong>Budget:</strong> the build ends 8 AM Sunday (Sep 27); see the timeline and hard cutoffs in
+<code>docs/plan.md</code>. Every P1 names the rung (M0, M1, D-track, M3, M5, M4, K, DOC), a <strong>time
+box</strong> (a few hours max per rung), and the stop point. When the box runs out, stop and
+report — do not push through.</li>
+<li><strong>Always have a valid TSV:</strong> from M1 onward, no plan may leave the repo unable to emit a
+valid <code>teamName_predictions.tsv</code>. Every execution that touches the scoring pipeline ends
+with a fresh valid TSV <strong>and</strong> a new row in <code>submissions/log.csv</code> (timestamp, rung,
+outer-holdout minDCF, submission path), or names the blocker. Never overwrite a
+previously submitted TSV.</li>
+<li><strong>Freeze on Sunday morning (Sep 27):</strong> no new plan-review runs start that cannot land
+before the freeze. After the freeze, only TSV- or Docker-breaking fixes, via the relief
+valve.</li>
+<li><strong>Detector contract:</strong> a change to <code>DetectorResult</code> / <code>ClipContext</code> / <code>safe_run</code>
+(<code>src/hearsay/detectors/base.py</code>) must say so in P1 and name the detector owners it
+affects (CLAUDE.md team table). Contract fields do not change silently.</li>
+<li><strong>Model rules (every rung):</strong> validate by generator and speaker via the fold file, not
+by clip; never train on the validation split; log every TSV with its validation score;
+keep a clean-only validation score alongside any augmented one.</li>
+<li><strong>Sources of truth:</strong> <code>docs/nsa-challenge.md</code> + the NSA instructions (rules, scoring) and
+<code>docs/plan.md</code> (plan and scope) are the super docs; <code>docs/scoping.md</code> and
+<code>docs/master-doc.md</code> are historical.</li>
+<li><strong>Cloud GPU:</strong> ask before renting one (M5 is GPU-only; cap about $75).</li>
+</ul>
+<hr>
+<h2 id="phase-0--resolve-project-conventions-automatic-no-user-stop">Phase 0 — Resolve project conventions (automatic, no user stop)</h2>
+<p>This skill is project-agnostic. Before Phase 1, resolve the following from the project
+itself and state the resolved values in P1 so the user can correct them. Read <code>CLAUDE.md</code>
+/ <code>AGENTS.md</code> first — a project that documents its own conventions overrides every
+fallback below.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Thing</th><th>How to resolve</th><th>Fallback</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Run spec dir</strong></td><td>Existing dir of per-change design docs</td><td><code>docs/specs/</code> (create)</td></tr>
+<tr><td><strong>Feature spec dir</strong></td><td>Existing dir of living per-feature docs</td><td><code>docs/features/</code> (create)</td></tr>
+<tr><td><strong>Plan file dir</strong></td><td>Where durable plan files live</td><td><code>docs/reports/</code> (create)</td></tr>
+<tr><td><strong>Super docs</strong></td><td>The top-level living docs named in <code>CLAUDE.md</code> / a doc map / <code>README.md</code></td><td><code>README.md</code> + any <code>docs/ARCHITECTURE.md</code></td></tr>
+<tr><td><strong>Bug log</strong></td><td>The project's known-issues file (<code>BUGS.md</code>, issue tracker, …)</td><td>skip the historical-bug sweep and say so</td></tr>
+<tr><td><strong>Full test command</strong></td><td><code>CLAUDE.md</code> → <code>package.json</code> <code>scripts.test</code> → <code>Makefile</code> <code>test</code> → <code>pyproject.toml</code>/<code>pytest.ini</code> → <code>Cargo.toml</code> → <code>go.mod</code></td><td>none — say so explicitly rather than silently skipping regression</td></tr>
+<tr><td><strong>Codex scripts</strong></td><td><code>&lt;repo&gt;/.claude/review-plan.sh</code> and <code>review-audit.sh</code> if present</td><td><code>~/.claude/review-plan.sh</code>, <code>~/.claude/review-audit.sh</code></td></tr>
+</tbody>
+</table></div>
+<p>HEARSAY: this repo ships <code>.claude/review-plan.sh</code>, <code>.claude/review-audit.sh</code>, and HEARSAY-
+localized rubrics (<code>.claude/codex-review-prompt.md</code>, <code>.claude/codex-audit-prompt.md</code>), so
+the project copies are the ones to use. They need the Codex CLI installed and logged in
+(<code>codex --version</code>). If a teammate has no Codex CLI, say so at P1; the Claude critique loop
+(Phase 4, step 1) stands in as the gate and the plan is presented without a Codex review.
+Plan files go in <code>docs/reports/</code>, run specs in <code>docs/specs/</code>; this project has no feature-
+spec layer — collapse to run specs plus the super docs.</p>
+<p>If a project has no doc layers at all, collapse to a single run spec and say so in P2 —
+do NOT invent a three-layer doc tree for a project that doesn't have one.</p>
+<hr>
+<h2 id="phase-1--problem--approach">Phase 1 — Problem &amp; Approach</h2>
+<ol>
+<li>Confirm the working branch AND worktree (<code>git branch --show-current</code> + <code>pwd</code>)</li>
+<li>Discuss the problem with the user:
+<ul>
+<li>What is the problem?</li>
+<li>What existing docs are relevant?</li>
+<li>What is the approach, in plain English?</li>
+</ul></li>
+<li>You may read files, explore, research — but do NOT write any files yet</li>
+<li>Present P1 to the user (including the Phase 0 resolved conventions)</li>
+</ol>
+<h3 id="stop-1-user-freezes-p1">&gt;&gt;&gt; STOP 1: User freezes P1 &lt;&lt;&lt;</h3>
+<p>Wait for "freeze". Then move to Phase 2.</p>
+<p><strong>P1 rules:</strong> Plain English, no implementation details, no test details.</p>
+<hr>
+<h2 id="phase-2--test-design--doc-impact">Phase 2 — Test Design &amp; Doc Impact</h2>
+<ol>
+<li><strong>Failure-mode inventory FIRST</strong> (2026-07-30, user directive — "we write all this
+new code and write five tests for it, and then we find 1 million problems in three
+weeks"). Before listing a single test, think really deeply about what tests are
+actually NEEDED, not the minimal set that demonstrates the happy path:
+<ul>
+<li>Enumerate, per component/stage the change touches, <strong>all the things that could
+go wrong</strong> — then derive the tests from that inventory. The inventory appears in
+P2 itself (a failure-mode → test table per stage), not just the test names.</li>
+<li><strong>Map every historical bug class in the touched area to at least one test.</strong>
+Search the project's bug log, run specs, and memory for what has ALREADY bitten in
+this area (decode/orientation bugs, silent stale artifacts, cascading transforms,
+vacuous guards, …) — each prior class gets a pin.</li>
+<li><strong>Counterfactual tests for every guard/branch</strong>: at least one test that FAILS if
+the guard is removed (a guard nothing can fail is not tested).</li>
+<li><strong>Negative tests for every gate</strong> (wrong artifact, missing asset, degenerate
+input → must refuse loudly, never silently fall back).</li>
+<li>Where platform twins exist, <strong>share/port the exact vector sets</strong> across
+platforms rather than writing parallel approximations.</li>
+<li>For anything touching models/hardware: <strong>determinism, artifact-identity
+(tree-sha) gating, and config-drift tripwires</strong> are mandatory test categories.</li>
+<li><strong>Scale test count to code size</strong>: a new subsystem warrants a per-stage
+failure-mode table and typically dozens of tests; "5 tests for a new module" is
+an automatic P2 rejection.</li>
+<li><strong>HEARSAY standing failure modes</strong> — every P2 in this project must address each of
+these (a test, a measurement, or an explicit one-line waiver saying why it doesn't
+apply to this change):
+<ol>
+<li><strong>Laundering, telephony and replay in the test set</strong> — the brief lists transcoded,
+band-limited, noised and replayed fakes; report a clean-only score beside any
+augmented one and measure on an augmented validation slice. Physical replay is not
+covered (no hardware; simulated RIR only) — say so rather than claim it.</li>
+<li><strong>Overfitting to known generators or speakers</strong> — validation must hold out whole
+generator and speaker groups via the fold file (grouped, nested); a gain that only
+appears on seen groups is not a gain.</li>
+<li><strong>Class imbalance and prior</strong> — about 70% of test files are real (π_synth = 0.3);
+check class counts per fold, class-balanced training, and whether a decision flips
+between the metric readings in <code>docs/plan.md</code> (including the sponsor-code reading).</li>
+<li><strong>Shortcuts</strong> — duration, peak level, silence, container fields, the single LJ
+speaker; check per-feature AUC against the label and compare clean vs transcoded
+before trusting a gain.</li>
+<li><strong>Format conversion errors in the loader</strong> — sample rate, channel count,
+int/float scaling, codec decoder padding, clipping. Everything must arrive as
+16 kHz mono; pin it with fixture clips in each input format we expect (incl. MP4).</li>
+</ol></li>
+</ul></li>
+<li>Then specify:
+<ul>
+<li>What specific tests validate the change? (exact commands)</li>
+<li>What are acceptance criteria? (pass/fail definitions)</li>
+<li>What constitutes a regression?</li>
+</ul></li>
+<li>Identify the documentation layers affected (per the Phase 0 resolution):
+<ul>
+<li><strong>Run spec</strong> (<code>{run-spec-dir}/{CHANGE_NAME}.md</code>): Always created. The design doc for THIS change. Frozen after commit — never modify a previous run spec.</li>
+<li><strong>Feature master spec</strong> (<code>{feature-spec-dir}/{FEATURE_NAME}.md</code>): The living truth for the feature being changed. Created if it doesn't exist, updated if it does.</li>
+<li><strong>Super master docs</strong>: Updated if the change affects flow, architecture, or shipped status.</li>
+</ul></li>
+<li>Present P2 to the user — include which docs will be created/updated</li>
+</ol>
+<h3 id="stop-2-user-freezes-p2">&gt;&gt;&gt; STOP 2: User freezes P2 &lt;&lt;&lt;</h3>
+<p>Wait for "freeze" or "freeze deep". Then move to Phase 3.</p>
+<ul>
+<li><strong>"freeze"</strong> — standard planning (single-agent exploration → plan)</li>
+<li><strong>"freeze deep"</strong> — deep planning (parallel multi-agent exploration + critique agent → plan)</li>
+</ul>
+<p><strong>P2 rules:</strong> Be specific — exact test commands, expected output. For docs, list ONLY the files you commit to editing (the post-commit audit grades Documentation against this list, so an unfulfilled entry is an automatic finding). If unsure a doc is affected, mark it "conditional — confirm at execution" rather than promising it.</p>
+<hr>
+<h2 id="phase-3--specs-plan--review">Phase 3 — Specs, Plan &amp; Review</h2>
+<p>After P2 freeze, do ALL of the following without stopping:</p>
+<h3 id="3a-write-specs-automatic--no-user-stop">3a. Write specs (automatic — no user stop)</h3>
+<ol>
+<li>Create the <strong>run spec</strong> (<code>{run-spec-dir}/{CHANGE_NAME}.md</code>) — problem, solution, what will change</li>
+<li>Create or update the <strong>feature spec</strong> (<code>{feature-spec-dir}/{FEATURE_NAME}.md</code>)</li>
+<li>Update <strong>super docs</strong> if affected</li>
+</ol>
+<h3 id="3b-write-implementation-plan">3b. Write implementation plan</h3>
+<h4 id="standard-mode-user-said-freeze">Standard mode (user said "freeze")</h4>
+<ol>
+<li>Explore the codebase — read files that will be changed, check current state (line numbers, current code)</li>
+<li>Write the plan to a durable file <code>{plan-dir}/YYYY-MM-DD_{slug}-plan.md</code>:
+<ul>
+<li>Step-by-step execution order</li>
+<li>Grounded in actual file contents (specific line numbers, current code state)</li>
+<li>Files to create/modify</li>
+<li>Test commands to run</li>
+<li>Verification steps
+(A durable file — NOT native plan mode — because Codex review needs a file path and the run spec is the persistent record. Present the plan in-message at STOP 3 and wait for explicit approval.)</li>
+</ul></li>
+</ol>
+<h4 id="deep-mode-user-said-freeze-deep">Deep mode (user said "freeze deep")</h4>
+<ol>
+<li>Spawn 3 parallel exploration agents (using the Agent tool) to investigate simultaneously:
+<ul>
+<li><strong>Architecture agent</strong> — understand the relevant existing code, patterns, and reusable functions</li>
+<li><strong>File impact agent</strong> — find all files that will need modification, with current line numbers and code state</li>
+<li><strong>Risk agent</strong> — identify potential risks, edge cases, dependencies, and regression vectors</li>
+</ul></li>
+<li>Synthesize all three agents' findings into a unified implementation plan</li>
+<li>Spawn a <strong>critique agent</strong> to review the synthesized plan for missing steps, risks, and mitigations</li>
+<li>Incorporate critique feedback, then write the final plan to a durable file <code>{plan-dir}/YYYY-MM-DD_{slug}-plan.md</code>:
+<ul>
+<li>Step-by-step execution order</li>
+<li>Grounded in actual file contents (specific line numbers, current code state)</li>
+<li>Files to create/modify</li>
+<li>Test commands to run</li>
+<li>Verification steps</li>
+<li>Risks and mitigations (from risk + critique agents)</li>
+</ul></li>
+</ol>
+<h3 id="3c-codex-plan-review">3c. Codex plan review</h3>
+<ol>
+<li>Run Codex plan review: <code>bash {codex-review-script} "&lt;plan-file-path&gt;"</code></li>
+<li>Read review, address findings in the plan</li>
+</ol>
+<h3 id="stop-3-present-plan--codex-review-to-user">&gt;&gt;&gt; STOP 3: Present plan + Codex review to user &lt;&lt;&lt;</h3>
+<ol start="3">
+<li>Present EVERY step of the plan to the user — not a summary, the complete plan</li>
+<li>Present the Codex review findings and how they were addressed</li>
+<li><strong>STOP. Do NOT proceed to execution.</strong> Wait for explicit approval ("go ahead", "implement", "do it")</li>
+</ol>
+<p><strong>Plan rules:</strong> The plan describes HOW and IN WHAT ORDER, with specific line numbers and code patterns. Codex reviews for implementation gaps, missing edge cases, stale file paths. Codex review runs ONLY on plans — never on specs or feature docs. The plan lives as a durable file in the plan dir; the <strong>run spec is the persistent audit record</strong> of what was planned. The Codex audit checks adherence against the run spec, not the plan file.</p>
+<hr>
+<h2 id="phase-4--execute">Phase 4 — Execute</h2>
+<h3 id="pre-flight">Pre-flight</h3>
+<ol>
+<li><code>git branch --show-current</code> + <code>pwd</code> — hard stop if wrong branch or wrong worktree</li>
+<li>Scope check: <code>git status</code> — stash/commit unrelated changes first</li>
+</ol>
+<h3 id="execute-no-stopping-until-done">Execute (no stopping until done)</h3>
+<ul>
+<li>Code every planned step</li>
+<li>Run all P2 tests</li>
+<li>Run the full regression suite (the command resolved in Phase 0)</li>
+<li>Update any docs that need final data (e.g., test results in run spec)</li>
+<li><strong>Doc-sync sweep (before commit).</strong> Do the sync NOW so the post-commit audit <em>verifies</em> rather than <em>discovers</em> it (this is what turns a 3-round audit into a 1-round pass):
+<ol>
+<li><strong>Reconcile</strong> the P2 doc list against the actual diff — edit each listed doc, or strike it from the run spec with a one-line reason (deferred / not-needed). Leave no unfulfilled promise.</li>
+<li><strong>Staleness grep</strong> — for every flag/field/function/threshold/behavior you changed, AND every "TODO / not-yet / blocked / pending / defaults-to-None" this change <em>resolves</em>, grep the feature specs, the super docs, and the run specs for now-contradicted claims. Fix living docs; add a dated note to frozen run specs (don't rewrite them — see freeze rule).</li>
+<li>For cross-cutting changes, launch a doc-sync agent (this project's <code>doc-sync-checker</code> if it has one) to do 1–2 automatically.
+<ul>
+<li>The frozen-spec forward-reference (a doc that said "TODO X" when X is now done) is the most common miss — grep for the thing you just shipped.</li>
+</ul></li>
+</ol></li>
+<li>Commit with conventional commit prefix</li>
+</ul>
+<h3 id="post-commit-required--do-not-skip">Post-commit (REQUIRED — do not skip)</h3>
+<p><strong>Claude critique FIRST (loop until it passes), Codex audit LAST (one confirmation pass).</strong>
+Codex is rate-limited, so spend the cheap Claude pass on the obvious/avoidable failures and
+reserve Codex for the final grade. (This ordering came from a real run where Codex burned 2
+quota-limited rounds on things a Claude critique caught for free.)</p>
+<ol>
+<li><strong>Claude pre-audit critique — loop until Acceptable.</strong> Launch a Claude critique agent
+(<code>general-purpose</code>) that grades the change the way the Codex audit does — and instruct it
+to be <strong>maximally adversarial</strong>: assume the implementer cut corners, and <strong>bias toward
+Fail / Needs-work whenever a claim is not verifiable in the code.</strong> (A soft critique that
+passes work Codex then fails wastes a rate-limited Codex round — the whole point of running
+this first.)
+<ul>
+<li>It reads the <strong>AUDIT rubric</strong> (the <code>codex-audit-prompt.md</code> that <code>review-audit.sh</code>
+resolves — project <code>.claude/</code> first, else <code>~/.claude/</code>; the SAME rubric it feeds Codex,
+NOT the lighter plan-oriented <code>codex-review-prompt.md</code>), the run spec, the plan +
+<code>*-review.md</code>, and the diff (<code>git diff &lt;base&gt;...HEAD</code>).</li>
+<li>It emits the 7-dimension scorecard — Plan adherence, Scope discipline, Test coverage,
+Review compliance, Freeze integrity, Regression check, Documentation, Overall (= worst) —
+and must VERIFY each finding in the code (<code>file:line</code>), not take the docs' word. Require
+specifically:
+<ul>
+<li><strong>Test coverage</strong> — enumerate EVERY acceptance criterion in the run spec and confirm
+each maps to a test that actually exercises it; an untested criterion is a Fail.</li>
+<li><strong>Plan adherence</strong> — verify each design decision (D1, D2, …) is implemented AS STATED,
+including its <strong>edge / fallback path</strong> (fallback engines, nil/empty inputs, boundary
+values), not just the happy path. Actively try to break each new / changed function.</li>
+</ul></li>
+<li><strong>Fix every finding</strong> (code/docs/tests), commit, and <strong>re-run the critique, looping
+until Overall is Acceptable</strong> (or only non-blocking risks remain). Continue the SAME
+agent via <code>SendMessage</code> so it re-checks its own prior findings.</li>
+<li><strong>Stop the loop when the deliverable stops moving</strong> — if a round produces findings but
+changes nothing material, the loop is done; record the open items rather than spinning.</li>
+</ul></li>
+<li><strong>Codex audit (final confirmation):</strong> <code>bash {codex-audit-script} &lt;run-spec-path&gt;</code></li>
+<li>If the audit fails (network error, empty output): retry once. If it fails again,
+<strong>hard stop</strong> and tell the user — do NOT silently skip.
+<ul>
+<li><strong>On a Codex quota / usage-limit failure specifically:</strong> the passing Claude critique
+(step 1) stands in as the gate, so do NOT block the change. Instead <strong>auto-schedule the
+confirmation pass</strong>: parse the reset time from the Codex error (<code>"try again at &lt;date&gt;
+&lt;time&gt;"</code>, the user's LOCAL time) and call <code>mcp__scheduled-tasks__create_scheduled_task</code>
+with a one-time <code>fireAt</code> ≈ 5 min after that reset. The scheduled prompt must be
+self-contained: <code>cd</code> to this worktree, <code>source ~/.zshrc</code>, run
+<code>bash {codex-audit-script} &lt;run-spec-path&gt;</code>, then on Acceptable record the
+scorecard in the run spec + commit, or on findings auto-fix/commit/re-audit — and NEVER
+push/merge. Record in the run spec that the Codex pass is <strong>pending (scheduled for
+&lt;reset time&gt;)</strong>, and tell the user it's queued.</li>
+</ul></li>
+<li>Read the audit results. Update the run spec with the scores — BOTH the Claude critique
+verdict and the Codex grade.</li>
+<li><strong>Automatically fix all audit findings.</strong> Do not ask — just fix them (code, docs, tests).
+Commit the fixes, then re-run the audit to confirm resolution.</li>
+<li>Present final results to user (Claude critique outcome + Codex scorecard).</li>
+</ol>
+<h3 id="present-results">Present results</h3>
+<ul>
+<li>Test results (pass/fail counts)</li>
+<li>Codex audit/scorecard results (REQUIRED — if missing, explain why)</li>
+<li>Audit findings fixed (list what was found and how it was resolved)</li>
+<li>Any deviations from plan and why</li>
+<li>Issues encountered</li>
+</ul>
+<p><strong>Execution rules:</strong></p>
+<ul>
+<li>Go step by step. Do not skip or reorder without documenting why.</li>
+<li>Do NOT stop to ask questions after "go ahead". Only exception: scope-level blocker.</li>
+</ul>
+<hr>
+<h2 id="documentation-model">Documentation model</h2>
+<p>Every plan-review run touches up to three documentation layers:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Layer</th><th>Location</th><th>Lifecycle</th><th>When</th>
+</tr></thead>
+<tbody>
+<tr><td><strong>Run spec</strong></td><td><code>{run-spec-dir}/{CHANGE}.md</code></td><td>One per change, <strong>frozen after commit</strong></td><td>Always created</td></tr>
+<tr><td><strong>Feature master spec</strong></td><td><code>{feature-spec-dir}/{FEATURE}.md</code></td><td>Living document, updated over time</td><td>Created if new, updated if exists</td></tr>
+<tr><td><strong>Super master docs</strong></td><td>The project's top-level living docs</td><td>Top-level overviews</td><td>Updated if affected</td></tr>
+</tbody>
+</table></div>
+<p>Run specs are frozen after commit — never modify a previous run spec. Feature specs are the living truth and get updated with each change. Changes propagate upward: run spec → feature spec → super docs.</p>
+<hr>
+<h2 id="user-interactions-summary">User interactions summary</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Phase</th><th>What happens</th><th>User says</th>
+</tr></thead>
+<tbody>
+<tr><td>P1</td><td>Problem discussed (+ resolved conventions)</td><td>"freeze"</td></tr>
+<tr><td>P2</td><td>Tests + doc impact discussed</td><td>"freeze" or "freeze deep"</td></tr>
+<tr><td>Specs + Plan</td><td>Specs written, plan + Codex review presented</td><td>"go ahead"</td></tr>
+<tr><td>Execute</td><td>Results + audit presented</td><td>direction</td></tr>
+</tbody>
+</table></div>
+<p>Three stops. Everything between stops is automatic.</p>
+<hr>
+<h2 id="rules">Rules</h2>
+<ul>
+<li>Plans are written to a durable markdown file in the plan dir (Codex review requires a file path; native plan mode is not used). Deep mode adds parallel exploration agents + critique before writing the plan.</li>
+<li>Codex plan review: <code>bash {codex-review-script} &lt;plan-file-path&gt;</code> — <strong>only on plans, never on specs</strong></li>
+<li>Codex audit: <code>bash {codex-audit-script} &lt;run-spec-path&gt;</code></li>
+<li><strong>Prefer the project's own <code>.claude/review-*.sh</code> and <code>codex-*-prompt.md</code> when they exist</strong> — they encode project-specific review context. The <code>~/.claude/</code> copies are the generic fallback.</li>
+<li><strong>The run spec is the audit artifact</strong> — the Codex audit checks plan adherence and review compliance against the run spec. The plan file persists alongside it.</li>
+<li><strong>Run specs are frozen after commit</strong> — never modify a previous run spec</li>
+<li><strong>NEVER skip the plan presentation stop.</strong> The user MUST see and approve the full plan before execution.</li>
+<li><strong>Codex post-commit audit is REQUIRED</strong> — never skip it. If it fails after retry, hard stop and report.</li>
+<li><strong>Audit findings are automatically fixed</strong> — do not present findings and wait. Fix them immediately (code, docs, tests), commit, re-audit, then present the final results.</li>
+<li><strong>NEVER push without user approval.</strong></li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>.claude/skills/plan-review/SKILL.md</code> <span class="hash">a34ff81ed8fe</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

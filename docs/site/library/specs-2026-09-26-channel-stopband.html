@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run spec: does the double low-pass stopband move any detector? (Sat Sep 26, 2026, 14:26) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/specs/2026-09-26_channel-stopband.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/specs/2026-09-26_channel-stopband.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#question">Question</a></li><li><a href="#design-fixed-before-any-result">Design (fixed before any result)</a></li><li><a href="#failure-modes--tests-teststest_channel_stopbandpy">Failure modes → tests (tests/testchannelstopband.py)</a></li><li><a href="#documentation">Documentation</a></li><li><a href="#results-1441">Results (14:41)</a></li><li><a href="#review">Review</a></li></ul></details>
+<h1 id="run-spec-does-the-double-low-pass-stopband-move-any-detector-sat-sep-26-2026-1426">Run spec: does the double low-pass stopband move any detector? (Sat Sep 26, 2026, 14:26)</h1>
+<p><strong>Go:</strong> Nathan, in the channel-robustness chat ("go stop band"), after oversight scoped it as measurement only. Follows the open shortcut-ledger entry "Double low-pass stopband" (<code>docs/architecture.md</code> §11) and <code>docs/reports/2026-09-26_channel-robustness.md</code> (A). Short path (sub-hour, measurement only): this spec, one script, hermetic tests, one Claude critique. No TSV, no rule change, no refit.</p>
+<h2 id="question">Question</h2>
+<p>Every detector applies <code>hearsay.handcrafted.band_limit</code> once inside its own path: M1b in <code>prepare_segment</code>, M3 in <code>prepare_input</code>, M5 in <code>deploy_transform</code>, handcrafted in <code>_crop</code>. NSA test files arrive already low-passed at ~7.2 kHz, so at test time they are filtered twice, while training clips are filtered once. Scoring <code>band_limit(x)</code> instead of <code>x</code> for the same clip approximates the test condition. It matches the floor depth but not the wall's transition-band shape (see Review). The difference is the detectors' response to the stopband depth alone.</p>
+<h2 id="design-fixed-before-any-result">Design (fixed before any result)</h2>
+<ul>
+<li><strong>Cohort:</strong> the 500 outer-holdout clips of action E (<code>scripts/m3_probes.holdout_rows(500)</code>, same seeds and test-length crops): 250 real, 250 spoof. These are out of sample for M1b, M5 and handcrafted v5.</li>
+<li><strong>Conditions per clip:</strong> <code>once</code> = the raw segment; <code>twice</code> = <code>band_limit(segment)</code>. Both are scored through the runner's own paths (<code>hearsay.pipeline.Models</code>, CPU) and fused with <code>models/fusion_v2/constants.json</code>, as in E. The fused probability is recorded as well.</li>
+<li><strong>Readouts:</strong>
+<ul>
+<li>Per detector (M1b, M5, M3, handcrafted v5): Δlogit = twice − once; mean, median, 95th percentile of |Δ|, and signed mean by class.</li>
+<li>The same for the fused score and the fused probability.</li>
+<li>The M3 step's firing rate under each condition.</li>
+<li>Verdict flips at P = 0.5, and at the brief-cost argmin threshold of the <code>once</code> fused scores (descriptive, computed on this cohort).</li>
+<li>Holdout minDCF under each condition, per detector and fused.</li>
+</ul></li>
+<li><strong>Reading rule (pre-declared):</strong>
+<ul>
+<li>A detector <strong>responds</strong> if its 95th-percentile |Δlogit| exceeds 10% of the IQR of its inner-OOF logits (from its export in <code>outputs/detector_scores/</code>).</li>
+<li>The fused rule <strong>responds</strong> if its holdout minDCF moves by more than 0.037 (one holdout false alarm).</li>
+<li><strong>Inconclusive</strong> if fewer than 500 complete pairs, any readout input is non-finite, or an IQR is zero.</li>
+<li>If nothing responds, the ledger entry closes as "measured, no response".</li>
+<li>If something responds, the report states the refit cost (handcrafted ~30 min; M1b ~1–1.2 h; M5 not feasible today). Any refit goes to Nathan and through <code>scripts/fuse_sweep_m5.py</code>.</li>
+</ul></li>
+</ul>
+<h2 id="failure-modes--tests-teststest_channel_stopbandpy">Failure modes → tests (<code>tests/test_channel_stopband.py</code>)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Failure mode</th><th>Test</th>
+</tr></thead>
+<tbody>
+<tr><td>The second pass changes the passband (a confound)</td><td>band levels below 6.5 kHz move &lt; 0.5 dB; the 7.5–8 kHz level drops by &gt; 20 dB</td></tr>
+<tr><td><code>once</code> is not the untouched segment</td><td><code>once</code> returns the input unchanged</td></tr>
+<tr><td>Unpaired or non-finite rows enter the readout</td><td>a NaN or ±inf in any column for either condition drops that clip</td></tr>
+<tr><td>The reading rule's guards</td><td>each trigger alone flips it to "responds"; a zero IQR, a NaN or a short cohort gives "inconclusive"</td></tr>
+<tr><td>Verdict flips miscounted</td><td>a known shift across 0.5 gives the exact flip count</td></tr>
+</tbody>
+</table></div>
+<h2 id="documentation">Documentation</h2>
+<ul>
+<li>Create: this spec; a section in <code>docs/reports/2026-09-26_channel-robustness.md</code>.</li>
+<li>Update: the §11 ledger entry in <code>docs/architecture.md</code> (its status), and the STATUS channel-robustness row.</li>
+</ul>
+<h2 id="results-1441">Results (14:41)</h2>
+<p><strong>Measured, no response</strong> on all four detectors and the fused rule (<code>outputs/channel/stopband.json</code>): 500 of 500 clips paired, 250 real and 250 spoof.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Detector</th><th>95th pct |Δlogit|</th><th>Threshold</th><th>Share of threshold</th>
+</tr></thead>
+<tbody>
+<tr><td>M1b v3</td><td>0.139</td><td>0.992</td><td>14%</td></tr>
+<tr><td>Handcrafted v5</td><td>0.466</td><td>0.886</td><td>53%</td></tr>
+<tr><td>M5</td><td>0.099</td><td>0.732</td><td>13%</td></tr>
+<tr><td>M3</td><td>0.301</td><td>1.684</td><td>18%</td></tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>Fused holdout minDCF:</strong> 0.012 → 0.016 (limit 0.037).</li>
+<li><strong>Verdict flips:</strong> 0 at P 0.5; 2 at the <code>once</code> argmin threshold.</li>
+<li><strong>M3 step:</strong> fires on 2.0% of clips under both conditions.</li>
+<li><strong>Ledger:</strong> the entry in <code>architecture.md</code> §11 is closed; no refit.</li>
+<li><strong>Tests:</strong> <code>tests/test_channel_stopband.py</code>, 61 passing after the review (full suite 645).</li>
+</ul>
+<h2 id="review">Review</h2>
+<p><strong>Claude critique (14:55, on f268f35): Overall Acceptable.</strong></p>
+<ul>
+<li>Verified:
+<ul>
+<li>one band-limit pass in <code>once</code> for every detector path, and two in <code>twice</code></li>
+<li><code>once</code> equals E's clean scores exactly</li>
+<li>the monkeypatched scorer ran, and E's cache is untouched</li>
+<li>the reading rule matches this spec</li>
+<li><code>stopband.json</code> rebuilds identically from the cache</li>
+</ul></li>
+<li>Findings, all fixed in the follow-up commit:
+<ol>
+<li>The ledger row called the 95th percentile a maximum. Reworded, and the single-clip maxima are now stated.</li>
+<li>"Reproduces the test condition" was an overclaim. The extra pass matches floor depth but not the transition band (about 9 dB) or the 7.5–8 kHz stopband (about 11 dB). The conclusion is now scoped to stopband depth, and the shape is recorded as an unprobed residual in the ledger.</li>
+<li>Test gaps: a sweep over every column with non-finite values, single-responder ledgers (one detector, or fused only), zero or NaN IQR through <code>readout</code>, and exact boundaries. Tests added.</li>
+<li>The fused row mixed probability and logit units. Footnoted.</li>
+<li>The header time was wrong (the file was created 14:26, before the run started at 14:27). Corrected, and this critique is recorded here.</li>
+</ol></li>
+<li>Not fixed (out of scope): the STATUS "Tests" row predates this change.</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/specs/2026-09-26_channel-stopband.md</code> <span class="hash">0a87989fc6bc</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>
