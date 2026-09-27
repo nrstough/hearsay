@@ -41,7 +41,7 @@ export function ForensicChart() {
                 Acoustic Telemetry &amp; Anomaly Trajectory
               </h2>
               <p className="text-[11px] text-slate-500 font-mono">
-                Left Axis: Spectral Cutoff (kHz) | Right Axis: Embedding Drift Score
+                Left Axis: Spectral Cutoff (kHz) | Right Axis: Speaker drift is evidence only Score
               </p>
             </div>
           </div>
@@ -120,19 +120,19 @@ export function ForensicChart() {
                 }`}
               />
               {isSynthetic
-                ? "Vocoder artifact: 16.0 kHz Nyquist cutoff locked"
-                : "Continuous biological harmonic dispersion verified"}
+                ? "Verdict from the shipped rule: synthetic"
+                : "Verdict from the shipped rule: real"}
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 text-xs font-sans">
             <span className="flex items-center gap-1.5 text-[#005493] bg-[#005493]/10 px-3 py-1 rounded-full border border-[#005493]/20 font-medium">
               <span className="w-2 h-2 rounded-full bg-[#005493]" />
-              Nyquist Roll-off
+              No per-frame timeline: the pipeline scores whole clips
             </span>
             <span className="flex items-center gap-1.5 text-[#c37530] bg-[#c37530]/10 px-3 py-1 rounded-full border border-[#c37530]/20 font-medium">
               <span className="w-2 h-2 rounded-full bg-[#c37530]" />
-              Embedding Drift
+              Speaker drift is evidence only
             </span>
           </div>
         </div>

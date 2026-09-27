@@ -39,3 +39,7 @@ dist/
 build/
 *.log
 *.tsbuildinfo
+
+# Demo clips are tracked (small; see demo/README.md)
+!demo/*.wav
+!public/demo/*.wav

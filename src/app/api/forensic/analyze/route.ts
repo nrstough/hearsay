@@ -1,87 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, unlink } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
-import { execFile } from "child_process";
-import { promisify } from "util";
-import { randomBytes } from "crypto";
-
-const execFileAsync = promisify(execFile);
+import { createHash } from "crypto";
+import { apiBase, toUiAnalysis, type AnalyzeResponse } from "@/lib/hearsay";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * POST /api/forensic/analyze: forward the uploaded file to the HEARSAY pipeline's API
+ * (`uv run uvicorn hearsay.api:app --port 8000`, endpoint POST /analyze) and adapt its
+ * AnalyzeResponse for the UI. The score and every evidence sentence come from the pipeline;
+ * this route never computes anything about the audio.
+ */
 export async function POST(req: NextRequest) {
-  let tempFilePath: string | null = null;
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-
     if (!file) {
       return NextResponse.json({ error: "No audio file provided in request" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
 
-    // Generate safe unique temporary path
-    const randomId = randomBytes(8).toString("hex");
-    const originalExt = file.name.includes(".") ? file.name.split(".").pop() : "wav";
-    const tempFileName = `hearsay_${Date.now()}_${randomId}.${originalExt}`;
-    tempFilePath = join(tmpdir(), tempFileName);
+    const upstream = new FormData();
+    upstream.append("file", new Blob([bytes], { type: file.type || "application/octet-stream" }), file.name);
 
-    // Write file to temp disk
-    await writeFile(tempFilePath, buffer);
-
-    // Call the Python backend analyzer via uv run
-    const projectRoot = process.cwd();
-    const { stdout, stderr } = await execFileAsync(
-      "uv",
-      ["run", "python", "-m", "hearsay.analyzer", tempFilePath],
-      {
-        cwd: projectRoot,
-        timeout: 30000,
-        env: {
-          ...process.env,
-          PYTHONUNBUFFERED: "1",
-        },
-      }
-    );
-
-    if (stderr && !stdout) {
-      console.error("Python analyzer stderr:", stderr);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 180_000); // first request loads the models (~16 s)
+    let res: Response;
+    try {
+      res = await fetch(`${apiBase()}/analyze`, { method: "POST", body: upstream, signal: controller.signal });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       return NextResponse.json(
-        { error: `Analyzer error: ${stderr.slice(0, 300)}` },
-        { status: 500 }
+        {
+          error:
+            `HEARSAY API not reachable at ${apiBase()} (${msg}). Start it from the repo root: ` +
+            "uv run uvicorn hearsay.api:app --port 8000",
+        },
+        { status: 503 }
       );
+    } finally {
+      clearTimeout(timer);
     }
 
-    const result = JSON.parse(stdout);
-
-    // Ensure the original user-facing filename is preserved
-    if (result.audio) {
-      result.audio.filename = file.name;
-      result.audio.title = `Analyte: ${file.name}`;
+    if (!res.ok) {
+      const text = await res.text();
+      return NextResponse.json({ error: `Pipeline returned ${res.status}: ${text.slice(0, 300)}` }, { status: 502 });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result,
-    });
-  } catch (error: any) {
+    const resp = (await res.json()) as AnalyzeResponse;
+    const data = toUiAnalysis(resp, { sha256, sizeBytes: bytes.length });
+    data.audio.filename = file.name;
+    data.audio.title = `Analyte: ${file.name}`;
+    return NextResponse.json({ success: true, data });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to analyze audio clip";
     console.error("Audio Analysis Route Error:", error);
-    return NextResponse.json(
-      {
-        error: error.message || "Failed to analyze audio clip",
-      },
-      { status: 500 }
-    );
-  } finally {
-    if (tempFilePath) {
-      try {
-        await unlink(tempFilePath);
-      } catch {
-        // Ignore temp cleanup error
-      }
-    }
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

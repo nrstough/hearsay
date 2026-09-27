@@ -50,7 +50,7 @@ export function HeroSection({ onOpenBatch, onOpenAudit }: HeroSectionProps) {
             >
               <Sparkles className="w-4 h-4 text-[#c37530] relative z-10" />
               <span className="relative z-10">
-                {isAnalyzing ? "Scanning 8 Modalities..." : "Re-Scan Current File"}
+                {isAnalyzing ? "Running ten detectors..." : "Re-Scan Current File"}
               </span>
             </button>
 
@@ -64,7 +64,7 @@ export function HeroSection({ onOpenBatch, onOpenAudit }: HeroSectionProps) {
               <span className="relative z-10">
                 {isBatchRunning
                   ? `Evaluating Batch (${batchProcessed}/${batchTotal})...`
-                  : "Run 1,671 NSA Test Batch"}
+                  : "Load the submitted 1,671-file run"}
               </span>
             </button>
           </div>
@@ -86,11 +86,11 @@ export function HeroSection({ onOpenBatch, onOpenAudit }: HeroSectionProps) {
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                   </span>
                   <span className="text-xs font-semibold text-white/95 tracking-wide whitespace-nowrap">
-                    Logistic Stacker Live
+                    Shipped rule: rank blend, Spectra suppression only
                   </span>
                 </div>
                 <div className="glass-pill rounded-full px-3 py-1 text-xs font-medium text-white/95 shadow-sm whitespace-nowrap border border-white/20 font-sans">
-                  minDCF: {currentAudio.minDcfScore.toFixed(3)}
+                  fused rank: {currentAudio.fusedRank.toFixed(3)}
                 </div>
               </div>
 

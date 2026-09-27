@@ -86,13 +86,13 @@ export function BatchQueueView() {
             Normalized minDCF
           </span>
           <div className="my-3">
-            <span className="text-3xl font-bold font-mono text-slate-900">0.124</span>
+            <span className="text-3xl font-bold font-mono text-slate-900">0.0733</span>
             <p className="text-xs text-slate-500 mt-1 font-sans">
-              Optimized Bayes threshold τ = 0.380
+              NSA draft review of the submitted file (EER 3.53%)
             </p>
           </div>
           <span className="text-xs text-[#005493] font-semibold font-sans">
-            False acceptance penalty C_FA = 4.0
+            A false alarm costs 4× a miss
           </span>
         </div>
 

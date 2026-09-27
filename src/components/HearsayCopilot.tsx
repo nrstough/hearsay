@@ -20,23 +20,23 @@ interface Message {
 }
 
 const FORENSIC_PRESET_PROMPTS = [
-  "Why is the current audio clip classified as synthetic?",
-  "Explain the 16.0 kHz vocoder Nyquist cutoff found in this file",
-  "Did the 60Hz ENF mains hum match Eastern Interconnection grid data?",
-  "How did the ECAPA-TDNN speaker embedding drift across the clip?",
+  "Why did the system give this verdict?",
+  "What did the deep detectors say?",
+  "What does the routing log show?",
+  "How is the score fused?",
 ];
 
 export function HearsayCopilot() {
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(searchParams?.get("copilot") === "open");
-  const { currentAudio, modalities } = useForensic();
+  const { currentAudio, modalities, routingLog } = useForensic();
   const [speechEnabled, setSpeechEnabled] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome-1",
       sender: "ai",
-      text: "Acoustic Intelligence Copilot online. I have analyzed the current analyte against all 8 NSA forensic modalities. Ask me to articulate forensic rationale, explain spectral artifacts, or assess minDCF bayesian risk.",
+      text: "Guide online. I only quote what the pipeline reported for the current file (verdict, evidence sentences, routing log) and the fixed facts of the shipped rule. Ask why it decided, what a detector found, or how the score is fused.",
       timestamp: "Just now",
     },
   ]);
@@ -61,35 +61,8 @@ export function HearsayCopilot() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const generateForensicResponse = (query: string): string => {
-    const q = query.toLowerCase();
-    const isSynth = currentAudio.decision === "SYNTHETIC";
-
-    if (q.includes("why") || q.includes("classified") || q.includes("verdict")) {
-      if (isSynth) {
-        return `Current analyte '${currentAudio.filename}' is classified as SYNTHETIC with p = ${currentAudio.overallScore.toFixed(3)}. Key evidence: (1) Spectral Nyquist cliff at 16.0 kHz characteristic of neural vocoders, (2) F0 pitch monotonicity variance 3.1x below biological vocal tracts, and (3) Wav2Vec2 deep anti-spoof probe logit of +4.82.`;
-      } else {
-        return `Current analyte '${currentAudio.filename}' is verified as BONA FIDE with p = ${currentAudio.overallScore.toFixed(3)}. Key evidence: (1) Unbroken 24kHz air-absorption harmonic dispersion, (2) Continuous 60Hz ENF mains phase lock matching regional grid telemetry, and (3) Natural vocal fold micro-tremors and respiratory inhalation gaps.`;
-      }
-    }
-
-    if (q.includes("vocoder") || q.includes("cutoff") || q.includes("spectral") || q.includes("nyquist")) {
-      return `STFT spectral analysis revealed a steep brick-wall rolloff at 16,000 Hz with harmonic flatness deviation Δ 4.2 dB. Modern zero-shot neural vocoders (like HiFi-GAN and ElevenLabs v2) commonly operate at 32kHz internal sample rates, leaving high-frequency voids above 16kHz that human condenser microphones never exhibit.`;
-    }
-
-    if (q.includes("enf") || q.includes("hum") || q.includes("grid") || q.includes("mains")) {
-      return `Electrical Network Frequency (ENF) analysis monitors 60Hz electromagnetic mains hum inducted into the recording environment. In authentic field audio, minute frequency drifts (60.012 Hz ± 0.03 Hz) match historical regional power grid logs. In pure zero-shot synthetic audio, ambient ENF is completely absent (0.00 Hz variance) or digitally synthesized with phase breaks.`;
-    }
-
-    if (q.includes("drift") || q.includes("ecapa") || q.includes("speaker") || q.includes("identity")) {
-      return `We employ a sliding 1.5-second temporal window using ECAPA-TDNN speaker embeddings. For genuine single-speaker audio, cosine distance across frames stays below 0.05. In this clip, frame distance surged to 0.44 around t = 4.1s, indicating voice conversion latency or synthetic identity jitter.`;
-    }
-
-    if (q.includes("dcf") || q.includes("mindcf") || q.includes("score") || q.includes("rubric")) {
-      return `Normalized minDCF is calculated using the official NSA parameters: C_FA = 4.0, C_miss = 1.0, and synthetic prior π_synth = 0.30. Under these costs, false acceptances (classifying a synthetic spoof as real) are penalized 4x more severely than false alarms. Current score is ${currentAudio.minDcfScore.toFixed(3)}.`;
-    }
-
-    return `Forensic analysis confirmed across all 8 modalities. Overall synthetic probability: ${currentAudio.overallScore.toFixed(3)}. All acoustic telemetry is archived in the courtroom-grade dossier.`;
+  const generateForensicResponse = (_query: string): string => {
+    return `The guide could not reach the server. Current file '${currentAudio.filename}': ${currentAudio.decision}, probability of synthetic ${currentAudio.overallScore.toFixed(3)}.`;
   };
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -115,6 +88,7 @@ export function HearsayCopilot() {
           message: messageText,
           currentAudio,
           modalities,
+          routingLog,
         }),
       });
 

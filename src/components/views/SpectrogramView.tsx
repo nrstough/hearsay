@@ -24,10 +24,10 @@ export function SpectrogramView() {
             </span>
           </div>
           <h2 className="text-xl font-semibold text-slate-900 tracking-tight font-sans">
-            High-Resolution Spectrogram &amp; 60Hz ENF Mains Trace
+            Spectrogram panel (schematic)
           </h2>
           <p className="text-xs text-slate-600 mt-1 font-sans">
-            Visualizing spectral energy voids, neural vocoder Nyquist cutoff cliffs, and electromagnetic power-grid induction.
+            This panel is a schematic, not a measurement. The pipeline works on 16 kHz mono audio band-matched to 7.25 kHz; the detector cards carry the analysis.
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export function SpectrogramView() {
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-xs font-mono text-slate-500">
           <span className="flex items-center gap-2 text-[#005493] font-semibold">
             <Waves className="w-4 h-4 text-[#005493]" />
-            STFT SPECTRAL HEATMAP (0 kHz — 24 kHz)
+            SCHEMATIC HEATMAP (0 kHz — 8 kHz)
           </span>
           <span className="font-semibold text-slate-700">Target: {currentAudio.filename}</span>
         </div>
@@ -79,10 +79,10 @@ export function SpectrogramView() {
           {isSynthetic && (
             <div className="absolute top-[33%] left-0 right-0 border-b-2 border-dashed border-rose-500 z-20 flex items-center justify-between px-3">
               <span className="text-[10px] font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 shadow-sm">
-                VOCODER CEILING: 16.0 kHz
+                BAND MATCH: 7.25 kHz low-pass
               </span>
               <span className="text-[10px] font-mono text-rose-600 font-semibold">
-                SPECTRAL VOID ENERGY &gt; 16kHz
+                nothing above 7.25 kHz is used
               </span>
             </div>
           )}
@@ -90,7 +90,7 @@ export function SpectrogramView() {
           {/* 60Hz ENF Trace Guideline at bottom */}
           <div className="absolute bottom-[8%] left-0 right-0 border-b border-[#005493]/40 z-20 flex items-center justify-between px-3">
             <span className="text-[9px] font-mono text-[#005493] bg-[#005493]/10 px-2 py-0.5 rounded border border-[#005493]/20 font-semibold shadow-sm">
-              ENF MAINS: 60.014 Hz
+              ENF: see the hum detector card
             </span>
             <span className="text-[9px] font-mono text-slate-600 font-semibold">
               {isSynthetic ? "0.00 Hz Variance (Absent)" : "Grid Frequency Locked"}

@@ -108,12 +108,12 @@ export function Navigation({
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-rose-700 font-sans">
-                          Neural Vocoder 16kHz Cutoff
+                          Demo: synthetic clip
                         </span>
-                        <span className="text-[10px] text-rose-600 font-mono font-bold">p = 0.942</span>
+                        <span className="text-[10px] text-rose-600 font-mono font-bold">presets</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-snug font-sans">
-                        Intercept #0042 exhibits an artificial Nyquist cliff at 16.0 kHz and harmonic flatness variance.
+                        Load a demo preset to see the shipped pipeline’s real verdict and evidence.
                       </p>
                     </div>
 
@@ -127,12 +127,12 @@ export function Navigation({
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-emerald-700 font-sans">
-                          60Hz ENF Phase Lock OK
+                          Demo: real clip
                         </span>
-                        <span className="text-[10px] text-emerald-600 font-mono font-bold">p = 0.024</span>
+                        <span className="text-[10px] text-emerald-600 font-mono font-bold">presets</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-snug font-sans">
-                        Briefing #0119 verified continuous 60.014 Hz mains hum matching Eastern Interconnection grid data.
+                        Every number shown comes from the pipeline’s JSON; nothing is computed in the browser.
                       </p>
                     </div>
 
@@ -187,11 +187,11 @@ export function Navigation({
                 </div>
                 <div className="pt-2 text-xs space-y-1.5 font-sans">
                   <div className="w-full text-left py-2 px-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-slate-700">
-                    <span className="font-medium">minDCF Stacker</span>
+                    <span className="font-medium">Rank-blend fusion</span>
                     <span className="text-[11px] text-emerald-600 font-semibold font-mono">Calibrated</span>
                   </div>
                   <div className="w-full text-left py-2 px-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-slate-700">
-                    <span className="font-medium">Wav2Vec2 Probe</span>
+                    <span className="font-medium">XLS-R probe</span>
                     <span className="text-[11px] text-emerald-600 font-semibold font-mono">Live</span>
                   </div>
                   <button

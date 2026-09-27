@@ -5,7 +5,7 @@ import { FileText, CheckCircle2, AlertOctagon, Printer } from "lucide-react";
 import { useForensic } from "@/context/ForensicContext";
 
 export function EvidenceDossierView() {
-  const { currentAudio, modalities } = useForensic();
+  const { currentAudio, modalities, routingLog } = useForensic();
   const [copied, setCopied] = useState(false);
   const isSynthetic = currentAudio.decision === "SYNTHETIC";
 
@@ -17,17 +17,19 @@ export function EvidenceDossierView() {
     const report = `HEARSAY FORENSIC INTELLIGENCE DOSSIER
 Target File: ${currentAudio.filename}
 SHA-256: ${currentAudio.sha256}
-Classification: ${currentAudio.decision} (Confidence: ${(currentAudio.overallScore * 100).toFixed(1)}%)
-minDCF Score: ${currentAudio.minDcfScore.toFixed(3)}
+Verdict: ${currentAudio.decision} (probability of synthetic ${currentAudio.overallScore.toFixed(3)})
+Fused rank before the probability map: ${currentAudio.fusedRank.toFixed(3)}
+Fusion: ${currentAudio.detectedVector}
+Routing log: ${routingLog.join(" | ")}
 Key Forensic Findings:
-- Vocoder Nyquist Cutoff: ${modalities.spectral.detail}
-- Speaker Drift: ${modalities.speaker.detail}
-- 60Hz ENF Mains Hum: ${modalities.enf.detail}
-- Deep SSL Probe: ${modalities.deepSpoof.detail}
-- Prosody & Phonetics: ${modalities.prosody.detail}
-- Compression & Quantization: ${modalities.compression.detail}
-- Container & Metadata: ${modalities.container.detail}
-- Splice & Phase Steps: ${modalities.splice.detail}`;
+- Spectral features (handcrafted model): ${modalities.spectral?.detail}
+- Speaker drift (evidence only): ${modalities.speaker?.detail}
+- Mains hum, ENF (evidence only): ${modalities.enf?.detail}
+- Deep anti-spoofing: ${modalities.deepSpoof?.detail}
+- Prosody and speech gate: ${modalities.prosody?.detail}
+- Compression traces (evidence only): ${modalities.compression?.detail}
+- Container (routing only): ${modalities.container?.detail}
+- Splice and discontinuities (evidence only): ${modalities.splice?.detail}`;
 
     navigator.clipboard.writeText(report);
     setCopied(true);
@@ -116,16 +118,14 @@ Key Forensic Findings:
             Executive Forensic Summary
           </h4>
           <p className="text-sm text-slate-700 leading-relaxed font-sans">
-            {isSynthetic
-              ? `The acoustic analyte '${currentAudio.filename}' demonstrates conclusive characteristics of synthetic zero-shot text-to-speech voice cloning. The logistic stacker assigns a synthetic probability of ${(currentAudio.overallScore * 100).toFixed(1)}% (p = ${currentAudio.overallScore.toFixed(3)}) with a minDCF risk rating of ${currentAudio.minDcfScore.toFixed(3)}. Multiple independent detectors detected high-frequency spectral suppression above 16.0 kHz, pitch contour monotonicity characteristic of neural vocoders, and deep latent representations consistent with artificial voice models.`
-              : `The acoustic analyte '${currentAudio.filename}' exhibits authentic biological vocal tract acoustics and natural ambient room physics. The logistic stacker assigns an authentic confidence of ${((1 - currentAudio.overallScore) * 100).toFixed(1)}% (p = ${currentAudio.overallScore.toFixed(3)}) with an optimal minDCF risk rating of ${currentAudio.minDcfScore.toFixed(3)}. All 8 modalities confirm unbroken 24kHz spectral resonance, organic pitch modulation, and continuous 60Hz ENF mains electrical hum.`}
+            {`'${currentAudio.filename}': ${currentAudio.decision}, probability of synthetic ${currentAudio.overallScore.toFixed(3)}. ${currentAudio.detectedVector}. ${routingLog.length ? "Routing log: " + routingLog.join(" | ") : ""}`}
           </p>
         </div>
 
         {/* Modality Findings Table */}
         <div>
           <h4 className="text-xs font-semibold text-slate-900 uppercase font-mono mb-3 tracking-wider">
-            Independent Detector Findings (8 NSA Modalities)
+            Detector findings (ten detectors; eight rubric techniques)
           </h4>
           <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden">
             {Object.keys(modalities).map((key) => {
