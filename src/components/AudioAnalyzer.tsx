@@ -147,6 +147,7 @@ export function AudioAnalyzer() {
 
   return (
     <div
+      id="tour-audio-analyzer"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

@@ -32,6 +32,12 @@ export function HearsayCopilot() {
   const { currentAudio, modalities, routingLog } = useForensic();
   const [speechEnabled, setSpeechEnabled] = useState(false);
 
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("hearsay-open-copilot", handleOpen);
+    return () => window.removeEventListener("hearsay-open-copilot", handleOpen);
+  }, []);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome-1",
@@ -124,7 +130,7 @@ export function HearsayCopilot() {
     <>
       {/* Floating Trigger Pill on Pure Light Surface */}
       {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div id="tour-copilot" className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <button
             onClick={() => setIsOpen(true)}
             className="btn-glow-inward-nsa bg-white/95 backdrop-blur-md text-slate-900 border border-slate-200/90 px-5 py-3 rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.12)] flex items-center gap-3 cursor-pointer group hover:scale-105 transition-all select-none"
@@ -148,7 +154,7 @@ export function HearsayCopilot() {
 
       {/* Floating Chat Modal (Pure Light Surface) */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[380px] sm:w-[440px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-48px)] bg-white text-slate-900 border border-slate-200/90 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div id="tour-copilot" className="fixed bottom-6 right-6 z-50 w-[380px] sm:w-[440px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-48px)] bg-white text-slate-900 border border-slate-200/90 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/90 relative z-10">
             <div className="flex items-center gap-2.5">

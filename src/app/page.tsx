@@ -10,6 +10,7 @@ import { RecentForensics } from "@/components/RecentForensics";
 import { ModalityGrid } from "@/components/ModalityGrid";
 import { BenchmarkMetrics } from "@/components/BenchmarkMetrics";
 import { HearsayCopilot } from "@/components/HearsayCopilot";
+import { GuidedTour } from "@/components/GuidedTour";
 import { SpectrogramView } from "@/components/views/SpectrogramView";
 import { ModalitiesView } from "@/components/views/ModalitiesView";
 import { BatchQueueView } from "@/components/views/BatchQueueView";
@@ -19,6 +20,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "dashboard";
   const [activeTab, setActiveTab] = useState<string>(initialTab);
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -44,6 +46,7 @@ function DashboardContent() {
         <Navigation
           activeTab={activeTab}
           setActiveTab={handleTabChange}
+          onStartTour={() => setIsTourOpen(true)}
         />
       </div>
 
@@ -55,7 +58,7 @@ function DashboardContent() {
           <>
             {/* Hero Section */}
             <div className="relative z-10 w-full mb-3">
-              <HeroSection />
+              <HeroSection onStartTour={() => setIsTourOpen(true)} />
             </div>
 
             {/* Voice Bar & Live Audio Waveform Analyzer (Pure Light) */}
@@ -103,6 +106,16 @@ function DashboardContent() {
 
       {/* Floating Acoustic Intelligence Copilot (Pure Light) */}
       <HearsayCopilot />
+
+      {/* Guided Interactive Product Tour */}
+      <GuidedTour
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
+        isOpen={isTourOpen}
+        onClose={() => setIsTourOpen(false)}
+        onOpen={() => setIsTourOpen(true)}
+        onOpenCopilot={() => window.dispatchEvent(new CustomEvent("hearsay-open-copilot"))}
+      />
     </main>
   );
 }

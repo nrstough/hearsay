@@ -28,7 +28,7 @@ export function ForensicChart() {
   const isSynthetic = currentAudio.decision === "SYNTHETIC";
 
   return (
-    <div className="bg-white/95 backdrop-blur-md rounded-[28px] p-6 sm:p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/90 flex flex-col justify-between h-full relative select-none overflow-visible">
+    <div id="tour-forensic-chart" className="bg-white/95 backdrop-blur-md rounded-[28px] p-6 sm:p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/90 flex flex-col justify-between h-full relative select-none overflow-visible">
       {/* Top Header Row */}
       <div>
         <div className="flex items-center justify-between">

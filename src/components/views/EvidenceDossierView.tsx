@@ -37,7 +37,7 @@ Key Forensic Findings:
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14 space-y-6 select-none relative z-10">
+    <div id="tour-dossier-view" className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14 space-y-6 select-none relative z-10">
       {/* Header Banner */}
       <div className="bg-white rounded-[28px] p-6 shadow-sm border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

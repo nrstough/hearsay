@@ -9,12 +9,14 @@ interface NavigationProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onOpenBatchModal?: () => void;
+  onStartTour?: () => void;
 }
 
 export function Navigation({
   activeTab,
   setActiveTab,
   onOpenBatchModal,
+  onStartTour,
 }: NavigationProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -70,8 +72,21 @@ export function Navigation({
           </nav>
         </div>
 
-        {/* Right: Notification Bell & Profile */}
-        <div className="flex items-center gap-3">
+        {/* Right: Tour Button, Notification Bell & Profile */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Guided Tour Trigger Button */}
+          {onStartTour && (
+            <button
+              onClick={onStartTour}
+              className="btn-glow-inward-light flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-amber-300 hover:text-amber-200 text-xs font-semibold tracking-wide transition-all cursor-pointer shadow-xs group"
+              title="Launch Guided Feature Tour"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">Demo Tour</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            </button>
+          )}
+
           {/* Notification Bell */}
           <div className="relative">
             <button
@@ -194,6 +209,18 @@ export function Navigation({
                     <span className="font-medium">XLS-R probe</span>
                     <span className="text-[11px] text-emerald-600 font-semibold font-mono">Live</span>
                   </div>
+                  {onStartTour && (
+                    <button
+                      onClick={() => {
+                        onStartTour();
+                        setShowUserMenu(false);
+                      }}
+                      className="btn-glow-inward-light w-full text-left py-2 px-2.5 rounded-xl bg-amber-50/60 hover:bg-amber-100/60 border border-amber-200/80 transition-colors text-amber-900 font-semibold flex items-center justify-between cursor-pointer shadow-2xs"
+                    >
+                      <span className="relative z-10">Restart Demo Tour</span>
+                      <Sparkles className="w-3.5 h-3.5 relative z-10 text-[#c37530]" />
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       exportPredictionTsv();
