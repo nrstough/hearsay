@@ -66,7 +66,7 @@ All figures are normalized minDCF with `C_FA = 4`, `C_miss = 1`, `π_synth = 0.3
 | Previous rule (`E on α 0.2`, no M5), the fallback | 0.140 | 0.014 | 0.260 | same report |
 | M1b alone (the best single detector we trained) | 0.301 | 0.072 | 0.343 | same report |
 
-**On NSA's test set, the number that counts, the shipped rule scored minDCF 0.0733 (EER 3.53%).** NSA returned it at the draft review (`docs/reports/2026-09-26_sponsor-questions.md`; `submissions/log.csv`, 15:40 row). That is 11× worse than our holdout and 3× better than In-the-Wild ([Validation](#validation) has the full comparison).
+**On NSA's test set, the number that counts, the shipped rule scored minDCF 0.0733 (EER 3.53%).** NSA returned it at the draft review (`docs/reports/2026-09-26_sponsor-questions.md`; `submissions/log.csv`, 15:40 row). That is 11× worse than our holdout and 3× better than In-the-Wild ([Validation](#validation) has the full comparison). The final submission, sent to NSA at 00:09 on Sunday, is the same file byte for byte: `submissions/CrossExam_predictions.tsv`, sha256 `fb783076…` (`submissions/log.csv`, FINAL row).
 
 The full per-detector and per-rule tables are in [Numbers](#numbers).
 
