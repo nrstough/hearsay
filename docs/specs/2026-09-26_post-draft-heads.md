@@ -119,3 +119,27 @@ The critique graded e611d1b **Fail** on Test coverage and Documentation. Fixed i
   - It now states the exception: the M1-family and fusion Platt maps are fit once on pooled inner out-of-fold scores, so ranks and metrics are unchanged and calibrated inner values are in-sample. No outer-holdout, stress or test label enters any fit.
   - The diagram edge at the inner_oof column says the same.
 - Docs-only change. The suite result above stands; `tests/test_docs_consistency.py` was re-run on the edit.
+
+## Review scorecards
+
+| Round | Reviewer | Overall | Resolved in |
+|---|---|---|---|
+| 1 | Claude pre-audit critique, on e611d1b | Fail (Test coverage, Documentation) | cf11b85 |
+| 2 | Claude critique, on cf11b85 | Acceptable (5 low items) | f085d89 |
+| 3 | Codex audit | Fail (Platt described as fold-local) | b0b76f6 |
+| 4 | Codex audit | Fail (architecture.md fold-discipline invariant) | fabd87e |
+| 5 | Codex audit | **Acceptable** | none needed; `docs/specs/2026-09-26_post-draft-heads-audit.md` |
+
+The round-5 dimension grades were:
+
+| Dimension | Grade |
+|---|---|
+| Plan adherence | Acceptable |
+| Scope | Excellent |
+| Test coverage | Acceptable |
+| Review compliance | Excellent |
+| Freeze | Acceptable (no hashes) |
+| Regression | Acceptable |
+| Documentation | Excellent |
+
+Codex could not re-run the full suite in its read-only sandbox. It passed the docs tests (52/52) and ruff, and it reproduced the diagnostics, the export counts and the shipped TSV hash itself.
