@@ -1,0 +1,25 @@
+[Unit]
+Description=HEARSAY pipeline API (uvicorn hearsay.api:app on 127.0.0.1:8000)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=hearsay
+Group=hearsay
+WorkingDirectory=/home/hearsay/hearsay
+Environment=HEARSAY_RESULTS=outputs/runner/v2_full
+Environment=OMP_NUM_THREADS=4
+Environment=HF_HUB_OFFLINE=1
+Environment=TRANSFORMERS_OFFLINE=1
+Environment=TOKENIZERS_PARALLELISM=false
+Environment=PYTHONUNBUFFERED=1
+# Optional box-only secrets (none needed for the demo); never in the repo.
+EnvironmentFile=-/etc/hearsay.env
+ExecStart=/home/hearsay/hearsay/.venv/bin/uvicorn hearsay.api:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

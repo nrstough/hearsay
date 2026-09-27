@@ -1,0 +1,19 @@
+[Unit]
+Description=HEARSAY demo app (next start on 127.0.0.1:3000)
+After=network-online.target hearsay-api.service
+Wants=network-online.target
+
+[Service]
+User=hearsay
+Group=hearsay
+WorkingDirectory=/home/hearsay/hearsay
+Environment=NODE_ENV=production
+Environment=HEARSAY_API_URL=http://127.0.0.1:8000
+Environment=HEARSAY_RESULTS=outputs/runner/v2_full
+Environment=HEARSAY_SUBMITTED_TSV=submissions/CrossExam_predictions.tsv
+ExecStart=/home/hearsay/hearsay/node_modules/.bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

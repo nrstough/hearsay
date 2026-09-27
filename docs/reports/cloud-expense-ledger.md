@@ -35,3 +35,4 @@ and `scripts/cloud/teardown_check.sh` appends the credit left. Balance: `uvx vas
 | 2026-09-26 05:40 | vast.ai | 52724249 | abl_cons attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
 | 2026-09-26 05:45 | vast.ai | 52725556 (51341862) | abl_cons attempt | A100 | | | stuck in loading, destroyed by the launcher (row added 10:55 from the launch logs) | 
 | 2026-09-26 08:57 | vast.ai | M5 resume probes (52746167 failed setup, 52747172 DONE) | G4 evidence | A100 SXM4 $0.61/h | | | $0.33 (credit $33.28 → $32.95) | 
+| 2026-09-26 23:03 | Vultr | hearsay-demo `d8c2e85c…` 64.177.49.133 (Atlanta) | demo host for Hrushi's video (`docs/reports/2026-09-26_vultr-hosting.md`) | none: vc2-4c-8gb, 4 vCPU / 8 GB, $0.055/h | 160 GB SSD incl. | 4 TB/mo incl. | running; $0.06 accrued at 23:20; destroy row to follow |
