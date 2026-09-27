@@ -39,7 +39,10 @@ The pre-declared entry failed both the pre-declared gate and the room. Details: 
 
   The seed-100 row is a correction: the handoff's command said 0, but `asv19_addon_v3` recorded 100.
 
-- **Probe.** `scripts/train_probe.py --model wavlm-large --train nsa_train_sample_wl,asv19_addon_wl --folds splits/nsa_folds_plus_asv19.csv --stress itw_stress_wl`. The layer is the inner-CV argmin (ASV19 rows are inner-only). StandardScaler + class-balanced logistic (C = 1) + Platt, all fold-local. The holdout is read once and In-the-Wild is never fit on. Model: `models/m1_wavlm-large_L9_20260926-1906` (59 s).
+- **Probe.** `scripts/train_probe.py --model wavlm-large --train nsa_train_sample_wl,asv19_addon_wl --folds splits/nsa_folds_plus_asv19.csv --stress itw_stress_wl`. The layer is the inner-CV argmin (ASV19 rows are inner-only). StandardScaler + class-balanced logistic (C = 1), refit per inner fold for the out-of-fold scores. Then one 2-parameter Platt map is fit on the pooled inner out-of-fold scores and applied to all columns, as in M1b (`train_probe.py:78`).
+  - The handoff's "all fold-local" was inaccurate for the Platt step. The `inner_oof` logits are therefore out-of-fold in their ranking but in-sample in their calibration.
+  - Platt is a positive affine map, so every rank, Spearman figure, rank-fusion input and threshold argmin in this report is unaffected; only calibrated inner logit values carry the in-sample step. Outer-holdout, In-the-Wild and test labels are never used in any fit.
+  - The holdout is read once and In-the-Wild is never fit on. Model: `models/m1_wavlm-large_L9_20260926-1906` (59 s).
 - **Export.** `scripts/export_probe_scores.py --probe models/m1_wavlm-large_L9_20260926-1906 --name wavlm_l --train nsa_train_sample_wl,asv19_addon_wl --folds splits/nsa_folds_plus_asv19.csv --test nsa_test_wl --stress itw_stress_wl`.
 
 ## Inner-CV minDCF by layer (selection metric; folds include the ASV19 rows)

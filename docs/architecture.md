@@ -186,7 +186,7 @@ flowchart LR
 
   FF --> inner
   FF --> HO
-  inner -->|"leave-fold-out, every learned piece fit fold-locally"| OOF["inner_oof column"]
+  inner -->|"leave-fold-out · scalers and classifiers fit fold-locally · M1-family Platt map fit once on pooled inner OOF (monotone, ranks unchanged)"| OOF["inner_oof column"]
   OOF --> SEL["selection · minDCF = 9.33·P_FA + P_miss<br/>layer, model, features, fusion weights"]
   OOF --> STK["stacker training rows"]
   HO --> HOC["holdout column · one readout"]

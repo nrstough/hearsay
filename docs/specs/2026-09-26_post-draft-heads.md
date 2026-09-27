@@ -103,3 +103,12 @@ The critique graded e611d1b **Fail** on Test coverage and Documentation. Fixed i
 - **N3.** The report's test count is updated.
 - **N5.** The report states the source of the 25 recovered row IDs.
 - **N4.** The CLAUDE.md lane bullet names a Codex audit; its result is recorded below once it has run.
+
+## Post-run notes, round 3 (post-run; Codex audit round 1: Fail → fixes)
+
+- **Calibration wording (Plan adherence and Documentation, Fail).** D1's "StandardScaler + class-balanced logistic (C = 1) + Platt, all fold-local" copied the handoff's summary of the M1b recipe, and it is wrong for Platt.
+  - `scripts/train_probe.py:78` fits one Platt map on the pooled inner out-of-fold scores, and `scripts/export_probe_scores.py:56` applies it back to the inner rows. The scaler and classifier are fold-local.
+  - The run mirrored M1b exactly, which was D1's intent. The claim is corrected and the recipe is unchanged: changing it would break the like-for-like comparison with M1b and the gate's column.
+  - Platt is a positive affine map. Ranks, Spearman figures, rank-fusion inputs, argmin thresholds and every minDCF or EER in the report are unaffected; only calibrated inner logit values are in-sample.
+  - Corrected in the report's recipe section and in `docs/architecture.md`'s validation diagram, whose inner_oof edge made the same claim for every M1-family column.
+- **Final suite** (re-run after this round's changes, working tree at HEAD f085d89 plus this round): `uv run pytest -q` 775 passed, 1 skipped; `uv run ruff check .` clean.
