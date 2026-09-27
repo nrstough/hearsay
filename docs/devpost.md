@@ -42,7 +42,7 @@ More detectors do not automatically make a better detector. Metadata, hum, splic
 
 ## What's next
 
-Our clearest measured weakness is additive noise: at 20 dB it degrades the handcrafted model and the combined rule. In the final hours we trained the handcrafted model with noise applied symmetrically to real and synthetic speech; it recovered only part of the loss and got worse on clean audio, so it did not ship. The challenge test set probably carries little additive noise, but real-world recordings will. Next would be noise-robust training across all detectors, more varied real-world recordings, and evaluation against independent labeled data.
+Three things, in order. First, evaluate on independent labeled data beyond the challenge set, because our two proxies bracketed the real number by 11x on one side and 3x on the other. Second, noise-robust training across every detector: at 20 dB of added noise the handcrafted model loses most of its discrimination and the combined rule follows, and a last-hours attempt to fix only that model with symmetric noise augmentation recovered part of the loss while getting worse on clean audio, so it did not ship. Third, more varied real-world recordings on the real side, where false alarms cost the most. The challenge test set probably carries little added noise; recordings in the field will.
 
 ## AI use and credits
 
