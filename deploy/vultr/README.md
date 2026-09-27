@@ -25,4 +25,5 @@ ssh root@<ip> 'systemctl start hearsay-api hearsay-web && sleep 90 && su - hears
 ```
 
 Redeploy a UI change: `ssh hearsay@<ip> 'cd hearsay && git pull --ff-only && npm run build' && ssh root@<ip> systemctl restart hearsay-web`.
+If the box was bootstrapped before these files were on `main`, the first pull refuses to overwrite the untracked copies: `rm -rf deploy && git pull --ff-only` as `hearsay` (the pulled files are the same ones; the units are already installed under /etc).
 Teardown: destroy the instance in the Vultr console, then add the spend row to the ledger.

@@ -47,6 +47,7 @@ fi
 if [ "$HERE" != "$APP/deploy/vultr" ]; then
   install -d -o hearsay -g hearsay "$APP/deploy/vultr"
   install -m 644 -o hearsay -g hearsay "$HERE"/* "$APP/deploy/vultr/"
+  chown -R hearsay:hearsay "$APP/deploy"   # install -d leaves the parent root-owned, which blocks git pull later
 fi
 su - hearsay -c "cd $APP && git log --oneline -1"
 
