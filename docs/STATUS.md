@@ -1,4 +1,4 @@
-# HEARSAY: current state (Sat Sep 26, ~20:05; the file is final unless a ratified candidate replaces it)
+# HEARSAY: current state (Sun Sep 27, ~00:05: **FINAL SUBMITTED.** `CrossExam_predictions.tsv`, sha256 `fb783076…`, DM'd to NSA with the repo and documentation links; after this, only fixes that unbreak the file or the README)
 
 A snapshot for teammates joining now. The plan, with its rules and timeline, is [docs/plan.md](plan.md). The architecture, with diagrams, is [docs/architecture.md](architecture.md). The NSA brief is [docs/nsa-challenge.md](nsa-challenge.md). Setup and repo rules are in [CLAUDE.md](../CLAUDE.md).
 
