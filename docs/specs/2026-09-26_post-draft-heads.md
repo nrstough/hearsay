@@ -112,3 +112,10 @@ The critique graded e611d1b **Fail** on Test coverage and Documentation. Fixed i
   - Platt is a positive affine map. Ranks, Spearman figures, rank-fusion inputs, argmin thresholds and every minDCF or EER in the report are unaffected; only calibrated inner logit values are in-sample.
   - Corrected in the report's recipe section and in `docs/architecture.md`'s validation diagram, whose inner_oof edge made the same claim for every M1-family column.
 - **Final suite** (re-run after this round's changes, working tree at HEAD f085d89 plus this round): `uv run pytest -q` 775 passed, 1 skipped; `uv run ruff check .` clean.
+
+## Post-run notes, round 4 (post-run; Codex audit round 2: Documentation Fail → fix)
+
+- `docs/architecture.md`'s fold-discipline invariant still said every learned piece, "including … Platt maps", is fit fold-locally.
+  - It now states the exception: the M1-family and fusion Platt maps are fit once on pooled inner out-of-fold scores, so ranks and metrics are unchanged and calibrated inner values are in-sample. No outer-holdout, stress or test label enters any fit.
+  - The diagram edge at the inner_oof column says the same.
+- Docs-only change. The suite result above stands; `tests/test_docs_consistency.py` was re-run on the edit.

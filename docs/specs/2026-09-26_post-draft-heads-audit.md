@@ -2,19 +2,19 @@
 
 | Dimension | Grade | Notes |
 |-----------|-------|-------|
-| Plan adherence | Fail | D1’s fold-local calibration requirement is not implemented. |
-| Scope discipline | Excellent | Changes stay within the experiment and documented follow-up fixes; shipped inference code is untouched. |
-| Test coverage | Acceptable | A1–A4 and A8 independently verified; A5 logs record 426 exact matches; A6–A9 supported. A10 rerun limited by sandbox. |
-| Review compliance | Acceptable | No Codex plan review was required; embedded critique fixes are present. |
-| Freeze integrity | Acceptable | Skipped: no P1/P2/P3 hashes supplied. |
-| Regression check | Acceptable | No demonstrated regression. Diagnostics reproduce; logged shipped TSV remains valid and matches its recorded SHA-256. |
-| Documentation | Fail | The new report incorrectly describes Platt calibration as fold-local. |
-| **Overall** | **Fail** | Calibration implementation and stated validation contract disagree. |
+| Plan adherence | Acceptable | Matches M1b recipe; deviations and pooled-calibration clarification recorded. |
+| Scope discipline | Excellent | Changes confined to experiment tooling, tests, evidence and documentation. |
+| Test coverage | Acceptable | A1–A4 and A8 independently verified; A5 logs record 426 exact matches; A6–A9 supported. Final suite recorded as 775 passed, 1 skipped. |
+| Review compliance | Acceptable | Prior report/spec findings addressed; related architecture contradiction remains. |
+| Freeze integrity | Acceptable | Skipped: no P1/P2/P3 hashes present. |
+| Regression check | Acceptable | Diagnostics reproduce; lint passes; shipped TSV validates and matches its logged SHA-256. Independent pytest rerun blocked. |
+| Documentation | Fail | Architecture still incorrectly guarantees fold-local Platt calibration. |
+| **Overall** | **Fail** | Substantive calibration documentation contradiction remains. |
 
 ### Commentary
 
-1. **Plan adherence — downgrade to Fail.** D1 requires StandardScaler, logistic regression and Platt calibration to be “all fold-local.” However, [train_probe.py:78](/Users/nathanstough/Projects/hearsay/scripts/train_probe.py:78) fits one Platt calibrator using **all inner-OOF labels**, and [export_probe_scores.py:56](/Users/nathanstough/Projects/hearsay/scripts/export_probe_scores.py:56) applies it back to those same inner rows. The classifier and scaler are fold-local; calibration is not. This follows the existing M1b implementation but contradicts the run’s explicit requirement. Resolve that conflict through a documented, approved recipe clarification or implement and test fold-local calibration. **Outer holdout and In-the-Wild labels remain excluded from fitting.** The positive affine calibration also preserves rankings, so this finding does not invalidate the reproduced minDCF, Spearman or threshold-selected miss counts.
+1. **Documentation — downgrade to Fail.** [docs/architecture.md:53](/Users/nathanstough/Projects/hearsay/docs/architecture.md:53) says every learned component, including Platt maps, is fit fold-locally. That contradicts both the corrected diagram at line 189 and the [report’s recipe](/Users/nathanstough/Projects/hearsay/docs/reports/2026-09-26_post-draft-heads.md:42): M1-family calibration uses pooled inner-OOF labels and is applied back to those rows. This concerns the exact validation-provenance correction declared in round 3, rather than unrelated historical staleness. A developer relying on the stated invariant could treat calibrated inner logits as fully out-of-fold. Update the invariant to state the pooled-calibration exception and distinguish it from untouched outer validation.
 
-2. **Documentation — downgrade to Fail.** The [report’s recipe description](/Users/nathanstough/Projects/hearsay/docs/reports/2026-09-26_post-draft-heads.md:42) repeats the unsupported “all fold-local” claim. This is a substantive validation-provenance error: a developer could incorrectly treat the calibrated inner exports as fully out-of-fold. Describe pooled inner-OOF calibration explicitly and distinguish it from untouched outer validation.
+2. **Plan adherence — limited to Acceptable.** The original fold-local calibration requirement was clarified after execution to preserve the existing M1b recipe. The persisted WavLM Platt slope is positive, supporting the explanation that rankings and rank-based results remain unchanged. Outer-holdout and In-the-Wild labels are excluded from fitting. This resolves the implementation discrepancy through a documented deviation.
 
-3. **Test coverage / Regression check — limited to Acceptable.** The spec records **770 passed, 1 skipped** before round-two changes and describes 22 repair tests afterward, but does not record a final full-suite result. Independent rerunning on `main`, Python **3.12.13**, was blocked: `uv` could not initialize its cache; direct pytest collection encountered filesystem/cache errors. These are environmental, not demonstrated regressions. `.venv/bin/ruff check --no-cache .` passed. Record a full-suite result for the final revision in a writable environment.
+3. **Test coverage / Regression check — limited to Acceptable.** The final full-suite result is recorded, but could not be independently rerun here: `uv` cannot initialize its cache, and direct pytest cannot create temporary files in the read-only environment. These are environmental failures, not demonstrated regressions. Independent lint, export checks and diagnostics passed; both shipped TSV copies match the logged hash.
