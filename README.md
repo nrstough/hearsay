@@ -323,6 +323,8 @@ uv run pytest -q
 uv run ruff check .
 ```
 
+**On a Linux CPU box, don't run plain `uv sync`.** There `uv.lock` resolves torch to the CUDA build and pulls several GB of `nvidia-*` / `cuda-*` packages a CPU cannot use. Run `bash deploy/vultr/venv.sh` from the repo root instead. It is the Dockerfile's recipe as a script: it installs the locked packages with `--no-deps`, skips LightGBM (training only), and takes torch 2.14.0 and torchaudio 2.11.0 from the PyTorch CPU index (`docs/reports/2026-09-26_vultr-hosting.md`).
+
 Data, weights, model directories and submission TSVs are gitignored; only `submissions/log.csv` is tracked. Expected layout: the NSA test set at `data/nsa/HackGTHearsayTesting/`, the template at `data/nsa/HearsayScoreKey4TeamX.tsv`, pretrained weights under `weights/`, trained bundles under `models/` (the probe `m1_wav2vec2-xls-r-300m_L7_20260926-0521`, `hc_selected`, the M5 checkpoint `m5_xlsr_ft_20260926-0741/`, `fusion_v2/constants.json`, and `fusion_v1/constants.json` for the previous rule). [docs/STATUS.md](docs/STATUS.md) lists every dataset and where it comes from.
 
 ### Score a directory on the Mac
