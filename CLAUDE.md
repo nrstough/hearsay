@@ -95,6 +95,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
 - `docs/nsa-challenge.md` and `data/nsa/HEARSAY_HackGT2026_Instructions.pdf`: the NSA brief and instructions. Authoritative on rules and scoring.
 - `docs/plan.md`: the working plan (software-only, rewritten Sep 26).
 - `docs/scoping.md` and `docs/master-doc.md`: historical, pre-rescope background.
+- `docs/prod-chunks.md`: the post-hackathon master doc. It holds the v1 retrospective (frozen at tag `v1`) and the v2 plan as chunks. For v2 work it is the plan of record; `docs/plan.md` stays as the hackathon plan.
 
 Where these and this file disagree, the NSA documents win on rules, `docs/plan.md` wins on plan and scope, and `submissions/log.csv` wins on numbers.
 
