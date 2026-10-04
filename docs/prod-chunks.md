@@ -409,7 +409,7 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 ## Phase 2: Understand the models
 
 ### V2-20 🟡 Layer-wise probing across backbones
-- **Started Oct 3:** `docs/reports/2026-10-03_layer-diversity.md`. Per-layer probes for XLS-R and WavLM, error overlap, pairs and the noise test. Lead: XLS-R L7 + L20 beats L7 alone on inner (0.255 vs 0.265) and In-the-Wild (0.267 vs 0.342), pending a pre-declared confirmation.
+- **Started Oct 3:** `docs/reports/2026-10-03_layer-diversity.md`. Per-layer probes for XLS-R and WavLM, error overlap, pairs and the noise test. Lead: XLS-R L7 + L20 beats L7 alone on inner (0.255 vs 0.265) and In-the-Wild (0.267 vs 0.342), pending a pre-declared confirmation. **Bake-off (Oct 3, `docs/reports/2026-10-03_layer-bakeoff.md`): did not confirm.** Big wild and holdout gains, but it fails R1 (the ElevenLabs fold, 0.464 → 0.536) and R4 (20 dB noise); 0 of 4 neighbour pairs confirm. Learned layer combinations (concat, all-layer stack) overfit.
 - **Goal:** One chart per backbone showing which layers carry fake-vs-real information, and which carry corpus and channel information.
 - **Method:**
   - For XLS-R, WavLM Large, WavLM Base and one more (e.g. HuBERT or wav2vec2-BERT), probe every layer for four targets:
