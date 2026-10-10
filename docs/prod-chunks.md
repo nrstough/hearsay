@@ -252,6 +252,8 @@ V2-23 tests these.
 
 ## B.7 How the metric decides what matters
 
+> **Superseded for v2 selection by C.1 rule 5 (Oct 10).** v2 selects on NSA's shipped minDCF, P_FA + 4·P_miss, where misses cost 4×. This section explains v1's brief reading, which v1 used.
+
 normalized minDCF = 9.33·P_FA + P_miss. **One false alarm costs about 9 misses.** So:
 - **Real speech gets most of the attention.** The real-speech side of the distribution decides the score.
 - **Ranking is enough for minDCF.** It sets its own best threshold.
@@ -281,10 +283,19 @@ Carried from v1:
 - No hosted model on the scoring path.
 
 New for v2:
-1. **v1 is untouchable.** Nothing under tag `v1` changes, and `submissions/` keeps v1's history. v2 experiments log to `experiments/log.csv`, created in V2-00. It has the same columns plus `benchmark_version`.
+1. **v1 is untouchable.** Nothing under tag `v1` changes, and `submissions/` keeps v1's history. v2 experiments log to `experiments/log.csv`, created in V2-00. It has the same columns plus `benchmark_version`. `experiments/log.csv` was created header-only on Oct 10. Each v2 lane appends one row per pre-declared run, with `validation_score` on rule 5's reading and the basis stated in `notes`.
 2. **One benchmark, versioned.** Every v2 number is reported on the V2-01 benchmark, all populations, both costs. A number from anywhere else is a note, not a result.
 3. **A sealed set.** One held-out population is touched only to close a phase (V2-01). In-the-Wild can no longer be that set: v1 used it to *select* the fusion rule, so it is contaminated for selection.
 4. **Understanding before building.** Phases 1–2 exist so that Phases 3–6 change one thing at a time for a stated reason.
+5. **The selection metric is NSA's shipped minDCF function** (Nathan, Oct 10: "It's the min DCF function").
+   - **Source:** `data/nsa/HackGTMinDCF/asvspoof5/evaluation-package/calculate_metrics.py:16-21`, with Pspoof 0.5, Cmiss 1 on a rejected bona fide clip, and Cfa 4 on an accepted spoof.
+   - **What it means for our scores** (1.0 = synthetic): **minDCF = P_FA + 4·P_miss. Misses cost 4×.** This is the reverse of v1's brief reading (9.33·P_FA + P_miss), which v1 used for selection.
+   - **Code:** `hearsay.metrics.min_cost(y, s, 0.5, c_fa=1.0, c_miss=4.0)`, identical to `sponsor_min_dcf(y, s, flip=True)` (checked Oct 10). v1 scripts call it "averse".
+   - **Always reported alongside:** the package at Pspoof 0.3, `min_cost(y, s, 0.3, c_fa=1.0, c_miss=4.0)` = P_FA + 1.714·P_miss, which other teams say NSA used; and v1's brief reading, `min_cost(y, s)`.
+   - **Rule:** a v2 candidate may not regress on any of the three readings beyond its pre-declared tie band.
+   - **Why it matters:** the v1 numbers and the hackathon `CLAUDE.md` constants stay as they are for v1's record (pinned by `tests/test_docs_consistency.py`).
+6. **Fusion rank references are nested** (`docs/reports/2026-10-10_v2-fusion-research.md`). An inner-OOF readout ranks each column against the training folds only. Under this rule, v1's shipped rule scores inner 0.1558 brief / 0.3390 package, not the reported 0.1351.
+7. **In-the-Wild is spent as a selection set.** v1's α, its E rule and M5's seat were all chosen on it, and it has been reused since. It stays a readout only. Final v2 adoption needs a fresh sealed population (V2-01).
 
 ## C.2 Phase map
 
@@ -295,11 +306,11 @@ Phase 1  Understand data   V2-10 corpus atlas · V2-11 test-set profile
                                         │
 Phase 2  Understand models V2-20 layer probing · V2-21 XLS-R vs WavLM · V2-22 M5 ablation · V2-23 Spectra anatomy
                                         │
-Phase 3  Data              V2-30 new data · V2-31 augmentation library · V2-32 data mix
+Phase 3  Data              V2-30 new data · V2-31 augmentation library · V2-32 data mix · V2-33 hard negatives
                                         │
 Phase 4  Features          V2-40 handcrafted spectral v7 · V2-41 forensic upgrades
                                         │
-Phase 5  Models            V2-50 backbone fine-tune done right · V2-51 new architectures · V2-52 short-clip
+Phase 5  Models            V2-50 backbone fine-tune done right · V2-51 new architectures · V2-52 short-clip · V2-53 bigger backbones
                                         │
 Phase 6  Fusion + decision V2-60 neural fusion · V2-61 probabilistic decision layer · V2-62 orchestrator v2 · V2-63 Jev
                                         │
@@ -350,6 +361,7 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   6. **Sealed set:** a population never used for any choice, touched once per phase
 - **Also:**
   - Ask NSA whether the test key (labels) can be released after the event. If yes, it becomes the best sealed set we could have.
+  - **NSA's cross-team analysis (organizer feedback, Oct 2026).** NSA plans to compare every team's submitted scores to find which test clips drew many false alarms or misses. Ask for the per-clip result (even just "hard real" / "hard fake" flags): it gives the test set partial labels and a difficulty map. Use it for the V2-02 error atlas, and as the sealed set if the full key is released.
   - Speaker-cluster bootstrap CIs (`scripts/fuse_sweep_v3.py` already has one).
   - actDCF at a fixed threshold beside minDCF and EER.
 - **Deliverables:** `scripts/benchmark.py`, `benchmarks/v1.yaml` (population manifests + hashes), `docs/reports/<date>_benchmark-v1.md` with v1's full scorecard as the baseline.
@@ -495,6 +507,29 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 - **Depends on:** V2-01. V2-30 is helpful.
 - **Size:** M.
 
+### V2-33 🟡 Hard-negative mining
+- **Status (Oct 10):** scoped in `docs/reports/2026-10-10_v2-fusion-research.md`.
+  - Stage 0 runs on the CPU over saved embeddings. Pilot: focal and OHEM reach about 0.250 inner and about 0.42 on f4, against 0.265 / 0.464.
+  - Stage 0.5 needs MPS. Stage 1 needs the drive. Stage 2 needs a GPU.
+  - Handoff: `docs/handoffs/2026-10-10_v2-hard-negatives-handoff.md`.
+- **Goal:** Train on the examples the current models find hardest under rule 5's metric (P_FA + 4·P_miss, where misses cost 4×): fakes that score real, and real clips that score fake.
+- **Why:**
+  - Other teams used it, including an RL-driven variant (organizer feedback, Oct 2026). v1 never did.
+  - v1's errors cluster: wild real speech, ElevenLabs, noise (`docs/reports/2026-10-03_layer-bakeoff.md`).
+- **Method candidates:**
+  - **Mine-and-retrain loops:** score the training pool, up-weight or oversample the top-k false alarms and misses, refit. Inner folds only.
+  - **Online hard-example mining (OHEM) / focal loss** in the M5-style head.
+  - **Adversarial or RL-guided augmentation search:** pick the augmentation or codec chain that most fools the current model, and add it to training (pairs with V2-31).
+  - **Mining sources:**
+    - real: wild real corpora (V2-30)
+    - spoof: new MLAAD pulls only, with Nathan's decision. The local 572-clip MLAAD cohort is a readout, so it is barred from mining.
+- **Rules:**
+  - Mining never touches the outer holdout, the sealed set or In-the-Wild.
+  - Report a clean-only score beside the mined one.
+- **Done when:** a mined model has a full V2-01 benchmark row beside its unmined twin, with the false-alarm rate on wild real speech reported separately.
+- **Depends on:** V2-01. V2-30 and V2-31 help.
+- **Size:** M.
+
 ### V2-32 ⬜ Data mix study
 - **Goal:** Know how much each source contributes. Make the proportions of real speech, spoof families and augmentation a measured choice.
 - **Why:** v1 cut MLAAD from 28% to 12% on one probe, and adding VCTK raised wild false alarms.
@@ -572,9 +607,29 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 - **Done when:** the duration cohort in the benchmark is flat within the margin for the shipped columns.
 - **Size:** S–M.
 
+### V2-53 ⬜ Bigger pretrained anti-deepfake backbones
+- **Goal:** Find out whether a larger pretrained backbone moves our numbers, and whether we can trust its numbers. Candidates: the AntiDeepfake family (`nii-yamagishilab/xls-r-2b-anti-deepfake` and its 1B and MMS-1B siblings, arXiv 2506.21090), and XLS-R 1B or 2B as frozen probes.
+- **Why:**
+  - The HEARSAY winner (SideQuests, 0.0317 / EER 1.44%) used three AntiDeepfake backbones. Their own table shows the untuned 2B model already scored In-the-Wild 0.038.
+  - The backbone was the main lever (`docs/reports/2026-10-10_v2-fusion-research.md`, "What other HEARSAY teams did").
+- **Risk: contamination.** AntiDeepfake's post-training data likely includes ASVspoof 2019 LA (probably the eval partition), DiffSSD and MLAAD. That is the same untrusted-evaluation problem as Spectra (B.4). Membership tests and a clean sealed population come first.
+- **Done when:**
+  - Licence, training data and compute cost are recorded for each candidate.
+  - A membership/contamination test has run against our populations.
+  - At least one candidate has a full benchmark row (V2-01) under all three metric readings, with a verdict: column, suppressor only, or drop.
+- **Depends on:** V2-01. Frozen probes need the external drive for training audio. GPU rental needs Nathan's approval.
+- **Size:** M–L.
+- **Handoff:** `docs/handoffs/2026-10-10_v2-backbone-handoff.md`.
+
 ## Phase 6: Fusion and decision
 
-### V2-60 ⬜ Neural fusion layer
+### V2-60 🟡 Neural fusion layer
+- **Status (Oct 10):** research done (`docs/reports/2026-10-10_v2-fusion-research.md`).
+  - Option A: the four shipped columns, with Spectra kept outside fitted parameters as the frozen E step.
+  - At most 4 pre-declared candidates.
+  - No condition gate until noisy or wild training data exists.
+  - A learned fusion currently ties the fixed blends on nested inner. It is paired with building V2-01.
+  - Handoff: `docs/handoffs/2026-10-10_v2-fusion-benchmark-handoff.md`.
 - **Goal:** Replace the hand-set rank blend with a small learned fusion network that beats it on the benchmark and stays explainable.
 - **Why:** v1's blend weights were chosen from a short pre-declared list, and the plan's stacker never shipped. Equal-weight fusion beat the shipped rule on every labeled readout (`outputs/fusion/orchestration_ablation_v2.md`), so the hand-set weights left performance on the table.
 - **Design (proposed, hand-built in PyTorch):**
