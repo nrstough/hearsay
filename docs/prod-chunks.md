@@ -25,7 +25,7 @@ Status markers used below: ✅ done (v1), 🟡 built but thin, ⬜ not started.
 
 ---
 
-# Part A: v1 as built (retrospective)
+## Part A: v1 as built (retrospective)
 
 ## A.0 v1 in one paragraph
 
@@ -158,7 +158,7 @@ Each v1 chunk is listed with what it produced and what it taught. Detail lives i
 
 ---
 
-# Part B: Understanding v1
+## Part B: Understanding v1
 
 Each section marks which parts the repo **measured** and which are **background** (general knowledge, not tested here). The background parts are hypotheses for Part C to test.
 
@@ -261,7 +261,7 @@ normalized minDCF = 9.33·P_FA + P_miss. **One false alarm costs about 9 misses.
 
 ---
 
-# Part C: v2
+## Part C: v2
 
 ## C.0 Before any v2 chunk (housekeeping)
 
