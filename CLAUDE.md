@@ -52,7 +52,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
 **Model rules**
 - Validate by generator and speaker, not by clip, using nested folds from the fold file.
 - Log every TSV with its validation score.
-- Cap any rung at a few hours.
+- Hackathon only (Sep 25–27): cap any rung at a few hours. After the event (v2), no default cap; a run spec may set its own time box.
 - Keep a clean-only validation score beside any augmented one.
 
 ## Conventions
@@ -87,7 +87,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
 - Never overwrite a submitted TSV. Every submission gets a new file and a new log row.
 - Never train on the validation split (including scalers, calibration, and stacking folds).
 - Ask before renting a cloud GPU.
-- When a time box runs out, stop and report rather than push through.
+- When a run spec sets a time box and it runs out, stop and report rather than push through. v2 work has no default time box (Nathan, Oct 11); report at the end of each part instead.
 - Freeze is Sunday morning (Sep 27): after it, only fixes that unbreak the TSV or the Docker image.
 
 ## Sources of truth
