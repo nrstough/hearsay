@@ -328,9 +328,9 @@ def run_from_embeddings(column: str, *, pilot: int, force: bool) -> dict:
     return meta
 
 
-def run(cohort: str, column: str, *, pilot: int, threads: int, force: bool) -> dict:
+def run(cohort: str, column: str, *, pilot: int, threads: int, force: bool, allow_busy: bool = False) -> dict:
     busy = busy_processes()
-    if busy and (cohort, column) not in TORCH_FREE:
+    if busy and (cohort, column) not in TORCH_FREE and not allow_busy:
         raise SystemExit("other heavy jobs are running; wait or ask Nathan first:\n" + "\n".join(busy))
     if (cohort, column) in EMBEDDING_FAST_PATH:
         return run_from_embeddings(column, pilot=pilot, force=force)
@@ -388,12 +388,15 @@ def main(argv=None) -> int:
     r.add_argument("--threads", type=int, default=MAX_THREADS)
     r.add_argument("--force", action="store_true")
     r.add_argument("--confirm-ask-first", action="store_true", help="Nathan approved this compute")
+    r.add_argument("--allow-busy", action="store_true",
+                   help="run a torch column while other lanes' jobs run, ONLY after checking none of them uses torch/MPS")
     a = ap.parse_args(argv)
     if a.column not in COLUMNS[a.cohort]:
         raise SystemExit(f"{a.column} is not scored on the {a.cohort} cohort by this step")
     if not a.confirm_ask_first:
         raise SystemExit("ask-first compute: rerun with --confirm-ask-first once Nathan has approved it")
-    print(json.dumps(B.clean(run(a.cohort, a.column, pilot=a.pilot, threads=a.threads, force=a.force)),
+    print(json.dumps(B.clean(run(a.cohort, a.column, pilot=a.pilot, threads=a.threads, force=a.force,
+                                 allow_busy=a.allow_busy)),
                      indent=1, sort_keys=True))
     return 0
 

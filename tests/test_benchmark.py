@@ -1417,3 +1417,12 @@ def test_cohort_embedding_fast_path_rows_and_parity():
     keys = [B.canonical_key(p) for p in pd.read_csv(VC.ITW_MANIFEST)["path"].iloc[rows]]
     stored = VC.stored_clean("xlsr_L20")
     assert VC.pilot_parity(got["none"][1][:50], [stored[k] for k in keys[:50]], "cpu")["ok"]
+
+
+def test_cohort_torch_column_refused_while_busy_unless_allowed(monkeypatch):
+    monkeypatch.setattr(VC, "busy_processes", lambda: ["123 python scripts/v2_backbone_score.py"])
+    with pytest.raises(SystemExit, match="wait or ask Nathan"):
+        VC.run("itw", "wavlm_l", pilot=1, threads=1, force=False)
+    monkeypatch.setattr(VC, "cohort_inputs", lambda cohort: (_ for _ in ()).throw(RuntimeError("reached")))
+    with pytest.raises(RuntimeError, match="reached"):
+        VC.run("itw", "wavlm_l", pilot=1, threads=1, force=False, allow_busy=True)
