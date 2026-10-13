@@ -101,6 +101,17 @@ def c2_offinner_weights(bench: B.Bench, cols, target) -> dict:
     return F.fit_c2_offinner(L, inner.y, inner.fold, cols, target)
 
 
+def itw_block(bench: B.Bench, rule: B.Rule, boot_n: int) -> dict:
+    """ITW readout for one rule: pooled readings and counts, the stratified speaker-cluster bootstrap,
+    and the same without E. Report-only (ITW is spent on v1 selection)."""
+    r = bench.score_rule(rule, "itw")
+    if not r["scored"]:
+        return {"scored": False, "reason": r["reason"]}
+    out = VB.readout_scores(bench.pops, {"itw": r["fused"]}, boot_n=boot_n)["itw"]
+    out["without_e"] = {"pooled": B.readings(bench.pops["itw"].y, r["base"])}
+    return out
+
+
 def inner_readout(bench: B.Bench, name: str, fused, base, mask, weights: dict, refs_cols) -> dict:
     inner = bench.pops["inner"]
     real = inner.y == 0
@@ -207,14 +218,11 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
     readout["ledger_count"] = ledger.count()
 
     # ITW, test, cohorts, MLAAD: report-only
-    itw = bench.pops["itw"]
     readout["itw"], readout["test"], readout["gaps"] = {}, {}, {}
     c0_thr_inner = readout["candidates"]["C0"]["inner"]["counts"][B.PRIMARY]["threshold"]
     c0_test = bench.score_rule(rules["C0"], "test")["fused"]
     for n, rule in rules.items():
-        r = bench.score_rule(rule, "itw")
-        readout["itw"][n] = {"scored": False, "reason": r["reason"]} if not r["scored"] else {
-            "pooled": B.readings(itw.y, r["fused"])}
+        readout["itw"][n] = itw_block(bench, rule, boot_n)
         t = bench.score_rule(rule, "test")
         thr = readout["candidates"][n]["inner"]["counts"][B.PRIMARY]["threshold"]
         readout["test"][n] = B.agreement_with_shipped(bench.pops["test"].keys, t["fused"], thr, control_fused=c0_test,
@@ -224,18 +232,19 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
         readout["gaps"][n] = {
             "holdout": population_gap(inner_p, readout["holdout"][n].get("pooled", {})),
             "itw": population_gap(inner_p, readout["itw"][n].get("pooled", {}))}
-    shipped4 = ["m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist"]
-    frames, labels = VB.cohort_holdout_frame(shipped4, bench.pops)
+    frames, labels = VB.load_cohort_frames("holdout", bench.pops)
     if dry_run:
         readout["holdout_cohort"] = {"scored": False, "reason": "dry run: holdout cohort not read (holdout labels)"}
     else:  # holdout labels: its own ledgered read for the candidate set
-        cdefs = [{"population": "holdout_cohort", **d} for d in defs]
+        cdefs = [{"population": "holdout_cohort", **d, **VB.cohort_key_extra(frames)} for d in defs]
         co = B.read_holdout(cdefs, lambda: VB.cohort_readout(bench, rules, frames, labels), ledger=ledger,
                             holdout_sha=VB.cohort_sha(frames, labels), meta=meta)
         readout["holdout_cohort"] = co["readout"]
         readout["holdout_cohort_ledger"] = co["ledger"]
         readout["ledger_count"] = ledger.count()
-    readout["itw_cohort"] = {"scored": False, "reason": "pending: cohort scoring job (Step 6, ask-first)"}
+    itw_frames, itw_labels = VB.load_cohort_frames("itw", bench.pops)
+    readout["itw_cohort"] = (VB.cohort_readout(bench, rules, itw_frames, itw_labels) if itw_frames else
+                             {"scored": False, "reason": "pending: no ITW cohort files yet (Step 6, ask-first)"})
     thr = {n: readout["candidates"][n]["inner"]["counts"][B.PRIMARY]["threshold"] for n in rules}
     readout["mlaad"] = VB.mlaad_readout(bench, rules, thr)
 

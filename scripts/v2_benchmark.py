@@ -280,6 +280,44 @@ def cohort_holdout_frame(columns, pops):
     return frames, yv
 
 
+LEGACY_HOLDOUT_COHORT = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist")
+COHORT_DIR = OUT / "cohorts"
+
+
+def load_cohort_frames(cohort: str, pops, *, cohort_dir: Path = COHORT_DIR, legacy: bool = True,
+                       per_class: int = 250) -> tuple[dict, pd.Series]:
+    """All cohort scores for one cohort: the legacy wide holdout file (four shipped columns) plus every
+    per-column file written by scripts/v2_cohort_scores.py under cohorts/<cohort>/<column>.csv. Every
+    column must cover the same (path, kind) set, inside the population, `per_class` real + spoof per kind."""
+    pop = pops["holdout" if cohort == "holdout" else "itw"]
+    labels = pd.Series(pop.y, index=pop.keys)
+    frames = {}
+    if cohort == "holdout" and legacy:
+        frames, _ = cohort_holdout_frame(list(LEGACY_HOLDOUT_COHORT), pops)
+    d = Path(cohort_dir) / cohort
+    for f in sorted(d.glob("*.csv")) if d.exists() else []:
+        if f.stem in frames:
+            raise B.BenchmarkError(f"cohort {cohort}: {f.stem} is scored twice")
+        fr = B.read_cohort_file(f)
+        if not set(fr["key"]) <= set(labels.index):
+            raise B.BenchmarkError(f"cohort {cohort}: {f.name} has paths outside the {pop.name} population")
+        for kind in B.COHORT_KINDS:
+            y = labels.reindex(fr.loc[fr["kind"] == kind, "key"]).to_numpy()
+            if int((y == 0).sum()) != per_class or int((y == 1).sum()) != per_class:
+                raise B.BenchmarkError(f"cohort {cohort}: {f.name} kind {kind} is not {per_class} + {per_class}")
+        frames[f.stem] = fr
+    keysets = {c: set(zip(fr["key"], fr["kind"])) for c, fr in frames.items()}
+    if len({frozenset(v) for v in keysets.values()}) > 1:
+        raise B.BenchmarkError(f"cohort {cohort}: columns cover different (path, kind) sets")
+    return frames, labels
+
+
+def cohort_key_extra(frames: dict) -> dict:
+    """Ledger-definition extra for a holdout-cohort read: empty for the legacy four columns (so the
+    already-completed reads keep their keys); the column set otherwise (new columns = new read)."""
+    return {} if set(frames) == set(LEGACY_HOLDOUT_COHORT) else {"cohort_columns": sorted(frames)}
+
+
 def cohort_sha(frames: dict, labels: pd.Series) -> str:
     keys = sorted(set(next(iter(frames.values()))["key"]))
     return B.sha256_json({"cohort_keys": keys, "y": labels.reindex(keys).astype(int).tolist()})
@@ -524,16 +562,22 @@ def v1_scorecard(boot_n: int = 2000) -> dict:
         out["rules"][f"SHIP_{refs}"]["populations"]["holdout"] = sh["readout"]
         out["rules"][f"SHIP_{refs}"]["holdout_ledger"] = sh["ledger"] + " (holdout uses all-inner refs)"
     # holdout perturbation cohort: holdout labels, so ledgered
-    shipped4 = ["m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist"]
-    frames, labels = cohort_holdout_frame(shipped4, pops)
-    single = {c: B.Rule(c, {c: 1.0}, e=False) for c in shipped4 if c != B.E_COLUMN}
+    shipped4 = list(LEGACY_HOLDOUT_COHORT)
+    frames, labels = load_cohort_frames("holdout", pops)
+    single = {c: B.Rule(c, {c: 1.0}, e=False) for c in frames if c != B.E_COLUMN}
     cohort_rules = {"SHIP": ship, **single}
+    extra = cohort_key_extra(frames)
     cdefs = [{"population": "holdout_cohort", "name": n, **r.definition(),
-              "inputs": {c: shas[c] for c in shipped4}} for n, r in cohort_rules.items()]
+              "inputs": {c: shas[c] for c in (shipped4 if not extra else sorted(frames))}, **extra}
+             for n, r in cohort_rules.items()]
     co = B.read_holdout(cdefs, lambda: cohort_readout(bench, cohort_rules, frames, labels), ledger=ledger,
                         holdout_sha=cohort_sha(frames, labels), meta=meta, pinned=pinned)
     out["holdout_cohort"] = co["readout"]
     out["holdout_cohort_ledger"] = co["ledger"]
+    itw_frames, itw_labels = load_cohort_frames("itw", pops)
+    itw_rules = {"SHIP": ship, **{c: B.Rule(c, {c: 1.0}, e=False) for c in itw_frames if c != B.E_COLUMN}}
+    out["itw_cohort"] = (cohort_readout(bench, itw_rules, itw_frames, itw_labels) if itw_frames else
+                         {"scored": False, "reason": "pending: no ITW cohort files yet (Step 6, ask-first)"})
     thr = {"SHIP": out["rules"]["SHIP_nested"]["populations"]["inner"]["counts"][B.PRIMARY]["threshold"]}
     for c in single:
         r = bench.score_rule(single[c], "inner", "nested")["fused"]

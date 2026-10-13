@@ -66,7 +66,7 @@ These do not enter the verdict. Holdout was read once for the candidate set (led
 
 - **C1 and C3 look better off-inner.** They are the two that lose on inner, through the ElevenLabs fold. Holdout (PlayHT and WaveGrad2) and ITW contain no ElevenLabs-style generator, and both were already read for these columns in the bake-off. This is exactly the disagreement a sealed population has to settle; it is not a reason to re-pick.
 - **Test set** (unlabelled): decision flips against C0 at each rule's inner package-0.5 threshold: C1 287, C3 74, C2 16 of 1,671. Spearman with the shipped TSV: C1 0.921, C3 0.980, C2 0.996.
-- **Holdout perturbation cohort:** only C0 and C2 are scorable (C2's off-inner model gives zero weight to the unscored columns). 20 dB noise: C0 0.196, C2 0.192 package-0.5. C1 and C3 are not scored until the cohort job runs.
+- **Holdout perturbation cohort (exploratory, see Disclosures):** only C0 and C2 are scorable (C2's off-inner model gives zero weight to the unscored columns). 20 dB noise: C0 0.196, C2 0.192 package-0.5. C1 and C3 are not scored until the cohort job runs.
 - **MLAAD** (in-sample for M5): detected share at the inner threshold, C0 0.970, C2 0.972. C1 and C3 not scored.
 - **E** fires on 345 (C0), 332 (C1), 364 (C2) and 349 (C3) inner reals, and on no spoofs.
 

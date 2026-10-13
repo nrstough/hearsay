@@ -1297,3 +1297,69 @@ def test_cohort_rows_match_cohort_rows_fn():
         assert np.array_equal(rows, np.load(REPO / f"outputs/v2/bakeoff/emb_itw_{kind}.npz")["row"])
     m = pd.read_csv(VC.ITW_MANIFEST)
     assert (m["label"].iloc[rows] == "bonafide").sum() == 250
+
+
+# ---------------------------------------------------------------------------
+# Codex audit round 2: cohort files reach the readouts; ITW block schema
+# ---------------------------------------------------------------------------
+
+ALL_COLS = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist", "wavlm_l", "xlsr_L20")
+
+
+def _write_itw_cohort(world, cohort_dir, cols, per_class=10, shift_keys=False):
+    _root, pops, rng = world
+    itw = pops["itw"]
+    real = [k for k, y in zip(itw.keys, itw.y) if y == 0][:per_class]
+    spoof = [k for k, y in zip(itw.keys, itw.y) if y == 1][:per_class]
+    keys = real + spoof
+    for c in cols:
+        ks = keys if not (shift_keys and c == cols[-1]) else real[1:] + [k for k, y in zip(itw.keys, itw.y)
+                                                                          if y == 0][per_class:per_class + 1] + spoof
+        rows = [{"path": k, "kind": kind, "logit": float(2 * (k in spoof) - 1 + rng.normal() - 0.2 * j),
+                 "error": ""} for j, kind in enumerate(B.COHORT_KINDS) for k in ks]
+        out = Path(cohort_dir) / "itw" / f"{c}.csv"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(rows).to_csv(out, index=False)
+
+
+def test_cohort_files_integrate_into_readouts(world, tmp_path):
+    """Files written for the new columns are loaded and make the option-B rules scorable on the cohort."""
+    bench = bench_with(world, names=ALL_COLS)
+    _write_itw_cohort(world, tmp_path, ALL_COLS)
+    frames, labels = VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10)
+    assert set(frames) == set(ALL_COLS)
+    c1 = B.Rule("C1", {c: 0.2 for c in ALL_COLS if c != "spectra_aasist"})
+    out = VB.cohort_readout(bench, {"C1": c1, "SHIP": B.Rule("SHIP", dict(B.SHIP_WEIGHTS))}, frames, labels)
+    for kind in B.COHORT_KINDS:
+        assert out["C1"][kind]["package05"] is not None and out["SHIP"][kind]["brief"] is not None
+    frames4, _ = VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path / "none", legacy=False, per_class=10)
+    assert frames4 == {}
+
+
+def test_cohort_files_with_different_rows_refused(world, tmp_path):
+    bench = bench_with(world, names=ALL_COLS)
+    _write_itw_cohort(world, tmp_path, ("m1b_v3", "wavlm_l"), shift_keys=True)
+    with pytest.raises(B.BenchmarkError, match="different"):
+        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10)
+    _write_itw_cohort(world, tmp_path / "u", ("m1b_v3",), per_class=9)
+    with pytest.raises(B.BenchmarkError, match="10 \\+ 10"):
+        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path / "u", legacy=False, per_class=10)
+
+
+def test_cohort_key_extra_keeps_legacy_keys():
+    legacy = {c: None for c in VB.LEGACY_HOLDOUT_COHORT}
+    assert VB.cohort_key_extra(legacy) == {}
+    assert VB.cohort_key_extra({**legacy, "wavlm_l": None}) == {"cohort_columns": sorted([*legacy, "wavlm_l"])}
+
+
+def test_fusion_itw_block_has_bootstrap_and_without_e(world):
+    spec = importlib.util.spec_from_file_location("v2_fusion", REPO / "scripts/v2_fusion.py")
+    vf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vf)
+    bench = bench_with(world)
+    blk = vf.itw_block(bench, B.Rule("SHIP", dict(B.SHIP_WEIGHTS)), 20)
+    assert {"pooled", "counts", "bootstrap", "without_e"} <= set(blk)
+    assert "stratified" in blk["bootstrap"] and set(blk["without_e"]["pooled"]) == {"brief", "package05",
+                                                                                    "package03", "eer"}
+    miss = vf.itw_block(bench, B.Rule("C1", {"m1b_v3": 0.5, "wavlm_l": 0.5}), 20)
+    assert miss["scored"] is False
