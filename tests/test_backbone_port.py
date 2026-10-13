@@ -1227,7 +1227,16 @@ def test_w2_real_audio_scores_finite_at_every_length():
     if not all(p.exists() for p in paths):
         pytest.skip("In-the-Wild audio not reachable")
 
-    with mps_reservation(REPO / "outputs" / "v2" / "backbone" / "MPS.lock", scope="test_w2", wait_s=5.0):
+    # A legitimate scoring run holding the device is not a test failure. The reservation
+    # working correctly must not turn into a red suite, so a held lock skips.
+    try:
+        ctx = mps_reservation(
+            REPO / "outputs" / "v2" / "backbone" / "MPS.lock", scope="test_w2", wait_s=5.0
+        )
+        ctx.__enter__()
+    except TimeoutError as e:
+        pytest.skip(f"MPS device reserved by another job: {e}")
+    try:
         model = load_antideepfake(dirs[0], device="cpu", dtype=torch.float32)
         for p in paths:
             x = prepare_segment(load_audio(p))
@@ -1239,6 +1248,8 @@ def test_w2_real_audio_scores_finite_at_every_length():
             assert logits.shape == (1, 2)
             assert np.isfinite(logits.numpy()).all()
             assert np.isfinite(synth_logit(logits[0]))
+    finally:
+        ctx.__exit__(None, None, None)
 
 
 def test_i6_clips_below_the_receptive_field_are_refused_by_name(tmp_path, cfg, ckpt):
