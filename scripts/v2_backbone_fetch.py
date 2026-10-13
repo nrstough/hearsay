@@ -77,17 +77,33 @@ def hub_meta(model: str) -> dict:
     return {"revision": info.sha, "files": files}
 
 
-def check_target(target: Path, need_bytes: int) -> Path:
-    """A3: refuse the repo volume, and refuse a volume without 2x the download free."""
+class TargetRefused(ValueError):
+    """Raised when a download target fails A3. Separate from `die` so tests can assert on it."""
+
+
+def check_target(target: Path, need_bytes: int, repo: Path = REPO) -> Path:
+    """A3: refuse the repo **volume**, and refuse a volume without 2x the download free.
+
+    The first revision compared path prefixes, which is "not inside the repo directory", not
+    "off the repo volume" -- and it passed on the one case it exists to prevent:
+    `~/.cache/huggingface` is a different directory on the *same* device as the repo
+    (`st_dev` 16777229 for both), so 16.4 GiB of weights would have been allowed onto the
+    volume that has ~19 GiB free. Compare device ids, not strings.
+    """
     resolved = target.resolve()
-    if str(resolved).startswith(str(REPO.resolve())):
-        die(f"refusing to place weights inside the repo volume: {resolved}")
     probe = resolved
     while not probe.exists():
         probe = probe.parent
+    if probe.stat().st_dev == repo.resolve().stat().st_dev:
+        raise TargetRefused(
+            f"refusing: {resolved} is on the same volume as the repo (st_dev "
+            f"{probe.stat().st_dev}); weights must go on separate storage (A3/D8)"
+        )
     free = shutil.disk_usage(probe).free
     if free < 2 * need_bytes:
-        die(f"refusing: {free / 2**30:.1f} GiB free at {probe} < 2x the {need_bytes / 2**30:.1f} GiB download")
+        raise TargetRefused(
+            f"refusing: {free / 2**30:.1f} GiB free at {probe} < 2x the {need_bytes / 2**30:.1f} GiB download"
+        )
     return resolved
 
 
@@ -97,7 +113,13 @@ def fetch(model: str, dry_run: bool) -> dict:
     hf_home = os.environ.get("HF_HOME")
     if not hf_home:
         die("HF_HOME is unset; point it at the external drive before downloading (A3)")
-    target = check_target(Path(hf_home), need)
+    try:
+        target = check_target(Path(hf_home), need)
+    except TargetRefused as e:
+        if os.environ.get("HEARSAY_ALLOW_SAME_VOLUME") != "1":
+            die(f"{e}\n       set HEARSAY_ALLOW_SAME_VOLUME=1 to override, and record it as a deviation")
+        print(f"WARNING: A3 overridden by HEARSAY_ALLOW_SAME_VOLUME -- {e}")
+        target = Path(hf_home).resolve()
 
     print(f"{model}: revision {meta['revision'][:12]} | {need / 2**30:.2f} GiB | cache {target}")
     for name, f in sorted(meta["files"].items()):

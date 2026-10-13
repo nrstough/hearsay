@@ -330,7 +330,7 @@ Then: 856 + 81 pass, 3 skipped (plus 4 without weights), ruff clean, the diff to
 
 ---
 
-# Revision 3 — Codex plan review, findings addressed
+## Revision 3 — Codex plan review, findings addressed
 
 `bash .claude/review-plan.sh` returned 13 findings (9 critical) into
 `docs/reports/2026-10-11_v2-backbone-plan-review.md`. Each is addressed below; where a finding

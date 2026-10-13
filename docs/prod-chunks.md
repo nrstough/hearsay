@@ -607,16 +607,17 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 - **Done when:** the duration cohort in the benchmark is flat within the margin for the shipped columns.
 - **Size:** S–M.
 
-### V2-53 ⬜ Bigger pretrained anti-deepfake backbones
+### V2-53 🟡 Bigger pretrained anti-deepfake backbones
 - **Goal:** Find out whether a larger pretrained backbone moves our numbers, and whether we can trust its numbers. Candidates: the AntiDeepfake family (`nii-yamagishilab/xls-r-2b-anti-deepfake` and its 1B and MMS-1B siblings, arXiv 2506.21090), and XLS-R 1B or 2B as frozen probes.
 - **Why:**
   - The HEARSAY winner (SideQuests, 0.0317 / EER 1.44%) used three AntiDeepfake backbones. Their own table shows the untuned 2B model already scored In-the-Wild 0.038.
   - The backbone was the main lever (`docs/reports/2026-10-10_v2-fusion-research.md`, "What other HEARSAY teams did").
-- **Risk: contamination.** AntiDeepfake's post-training data likely includes ASVspoof 2019 LA (probably the eval partition), DiffSSD and MLAAD. That is the same untrusted-evaluation problem as Spectra (B.4). Membership tests and a clean sealed population come first.
+- **Risk: contamination — now verified, not suspected.** The HF model cards' training table (29 corpora, 56,370 h genuine / 18,280 h fake; archived at `outputs/v2/backbone/cards/`) lists **ASVspoof2019-LA, DiffSSD, MLAAD, LJSpeech and LibriTTS/LibriTTS-R/MLS**. So our NSA inner and holdout, our MLAAD cohort and our LJ/LibriSpeech reals are all in-sample; **In-the-Wild is the one exception**, listed as a test database. The partition of ASVspoof2019-LA is still unstated. Same untrusted-evaluation problem as Spectra (B.4), but the membership question is answered from the source rather than needing tests.
 - **Done when:**
   - Licence, training data and compute cost are recorded for each candidate.
   - A membership/contamination test has run against our populations.
   - At least one candidate has a full benchmark row (V2-01) under all three metric readings, with a verdict: column, suppressor only, or drop.
+- **Status (Oct 13): 🟡 open, port landed, scoring blocked.** Done: the strict fairseq→transformers port (`hearsay.antideepfake`, 65 tests) with the tensor budget 431 = 422 + 7 + 2 asserted on every load and numerical equivalence to an independent reference forward; MMS-300M fetched, sha-verified and disclosed; licence (CC BY-NC-SA 4.0) and training corpora recorded. **Not done:** no scoring has run. The external drive unmounted mid-run, taking the whole 20,000-row fold population (DiffSSD, LJSpeech, LibriSpeech); the three larger checkpoints are unfetched because 16.4 GiB fails the free-space rule on the internal volume. **The third "done when" cannot be met at all until V2-01 exists** — this lane was run out of its declared dependency order, so the chunk stays open. See `docs/specs/2026-10-11_v2-backbone.md`.
 - **Depends on:** V2-01. Frozen probes need the external drive for training audio. GPU rental needs Nathan's approval.
 - **Size:** M–L.
 - **Handoff:** `docs/handoffs/2026-10-10_v2-backbone-handoff.md`.
