@@ -187,7 +187,16 @@ def mps_reservation(
                 age = time.time() - lock_path.stat().st_mtime
             except FileNotFoundError:
                 continue  # released in the window between the failed create and the read
-            if age > stale_s and not _owner_alive(held):
+            # Three states, not two. A **live** owner is never reclaimed from, at any age --
+            # that is the condition the reservation exists to prevent. A **dead** owner is
+            # reclaimed immediately, because its lock is never worth waiting for; gating that
+            # behind `age > stale_s` left a killed job's lock blocking the device for the full
+            # 12-hour default, which it then did to a real run. Age decides only when liveness
+            # is **unknown** (an unparseable or pid-less lock file).
+            alive = _owner_alive(held)
+            if alive is False or (alive is None and age > stale_s):
+                reason = "owner gone" if alive is False else f"owner unknown, stale after {age:.0f}s"
+                print(f"reclaiming {lock_path.name} ({reason})")
                 lock_path.unlink(missing_ok=True)
                 continue
             if time.monotonic() >= deadline:
@@ -206,18 +215,27 @@ def mps_reservation(
             pass
 
 
-def _owner_alive(contents: str) -> bool:
-    """Is the pid recorded in a lock file still running? An unparseable lock counts as dead."""
+def _owner_alive(contents: str) -> bool | None:
+    """Is the pid in a lock file still running? `None` when it cannot be determined.
+
+    Tri-state deliberately: "unknown" must not be collapsed into either "alive" (which would
+    let a crashed job wedge the device forever) or "dead" (which would let us steal a live
+    owner's lock whenever the file was written by something we cannot parse).
+    """
     for line in contents.splitlines():
         if line.startswith("pid="):
             try:
-                os.kill(int(line[4:]), 0)
+                pid = int(line[4:])
+            except ValueError:
+                return None
+            try:
+                os.kill(pid, 0)
                 return True
-            except (ValueError, ProcessLookupError):
+            except ProcessLookupError:
                 return False
             except PermissionError:
-                return True  # exists, owned by someone else
-    return False
+                return True  # it exists, owned by another user
+    return None
 
 
 def receptive_field(conv_kernel, conv_stride) -> int:
@@ -499,8 +517,13 @@ def load_antideepfake(
         )
     # The cast is explicit and matches the file, having just been checked against it.
     model = model.to(dtype=dtype)
-    if device is not None:
-        model = model.to(device)
+    # `None` means the repo's default, which is MPS when available -- matching
+    # `hearsay.embed.default_device()`. Treating `None` as "leave it on CPU" silently ran a
+    # multi-hour scoring job at ~10x the intended wall clock, at 136% CPU and no GPU at all.
+    # Pass "cpu" explicitly to mean CPU; the equivalence tests do.
+    from hearsay.embed import default_device
+
+    model = model.to(device or default_device())
     return model.eval()
 
 

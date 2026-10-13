@@ -173,7 +173,7 @@ def port_from(cfg, sd, root: Path) -> AntiDeepfakeDetector:
     Takes `root` rather than calling `tempfile.mkdtemp()`: the latter sits outside pytest's
     `tmp_path` rotation, so ~20 calls per run left ~2 MiB of checkpoints behind permanently.
     """
-    return load_antideepfake(write_ckpt(root, cfg, sd), device=None, dtype=torch.float32)
+    return load_antideepfake(write_ckpt(root, cfg, sd), device="cpu", dtype=torch.float32)
 
 
 # === Stage B: the strict key map ============================================================
@@ -576,12 +576,12 @@ def test_a6_loader_refuses_a_checkpoint_whose_bytes_do_not_match_the_record(tmp_
         }
 
     good = record()
-    assert load_antideepfake(root, dtype=torch.float32, identity=good) is not None
+    assert load_antideepfake(root, device="cpu", dtype=torch.float32, identity=good) is not None
 
     # a different but structurally valid checkpoint at the same path
     write_ckpt(root, cfg, synthetic_checkpoint(cfg, seed=99))
     with pytest.raises(ValueError, match="model.safetensors sha256"):
-        load_antideepfake(root, dtype=torch.float32, identity=good)
+        load_antideepfake(root, device="cpu", dtype=torch.float32, identity=good)
 
     # the architecture must be covered too: a shape-compatible config change alters inference
     # while the checkpoint hash still matches.
@@ -591,7 +591,7 @@ def test_a6_loader_refuses_a_checkpoint_whose_bytes_do_not_match_the_record(tmp_
     raw["layerdrop"] = 0.5
     (root2 / "config.json").write_text(json.dumps(raw))
     with pytest.raises(ValueError, match="config.json sha256"):
-        load_antideepfake(root2, dtype=torch.float32, identity=rec2)
+        load_antideepfake(root2, device="cpu", dtype=torch.float32, identity=rec2)
 
     # an incomplete record is refused rather than partially trusted
     for bad, msg in (
@@ -599,14 +599,14 @@ def test_a6_loader_refuses_a_checkpoint_whose_bytes_do_not_match_the_record(tmp_
         ({"file_sha256": {"model.safetensors": "x" * 64}}, "no sha256 for config.json"),
     ):
         with pytest.raises(ValueError, match=msg):
-            load_antideepfake(root, dtype=torch.float32, identity=bad)
+            load_antideepfake(root, device="cpu", dtype=torch.float32, identity=bad)
 
     root3 = write_ckpt(tmp_path / "unpinned", cfg, ckpt)
     for field in ("model_id", "revision"):
         rec = record(root3)
         rec[field] = ""
         with pytest.raises(ValueError, match=f"no {field!r}"):
-            load_antideepfake(root3, dtype=torch.float32, identity=rec)
+            load_antideepfake(root3, device="cpu", dtype=torch.float32, identity=rec)
 
 
 def test_a6c_check_identity_rejects_two_records_that_agree_on_being_empty():
@@ -965,20 +965,20 @@ def test_load_asserts_the_tensor_budget(tmp_path, cfg, ckpt):
     """The module docstring claims the budget is "asserted on every load". It must be true on
     the production path, not only in a download-gated test."""
     root = write_ckpt(tmp_path / "ok", cfg, ckpt)
-    model = load_antideepfake(root, dtype=torch.float32)
+    model = load_antideepfake(root, device="cpu", dtype=torch.float32)
     assert isinstance(model, AntiDeepfakeDetector)
 
     extra = dict(ckpt)
     extra[f"{PREFIX}encoder.mystery.weight"] = torch.zeros(3)
     with pytest.raises(ValueError, match="unclassified"):
-        load_antideepfake(write_ckpt(tmp_path / "extra", cfg, extra), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "extra", cfg, extra), device="cpu", dtype=torch.float32)
 
 
 def test_load_refuses_a_missing_mapped_tensor(tmp_path, cfg, ckpt):
     """A dropped tensor must not leave a module at its random initialisation."""
     short = {k: v for k, v in ckpt.items() if k != f"{PREFIX}encoder.layers.0.fc1.weight"}
     with pytest.raises(ValueError, match="mapped tensors, expected"):
-        load_antideepfake(write_ckpt(tmp_path / "short", cfg, short), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "short", cfg, short), device="cpu", dtype=torch.float32)
 
 
 def test_load_refuses_a_removed_declared_unused_tensor(tmp_path, cfg, ckpt):
@@ -991,7 +991,7 @@ def test_load_refuses_a_removed_declared_unused_tensor(tmp_path, cfg, ckpt):
     """
     bad = {k: v for k, v in ckpt.items() if k != f"{PREFIX}project_q.bias"}
     with pytest.raises(ValueError, match="declared-unused set changed"):
-        load_antideepfake(write_ckpt(tmp_path / "unused_removed", cfg, bad), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "unused_removed", cfg, bad), device="cpu", dtype=torch.float32)
 
 
 def test_load_refuses_an_unknown_tensor_at_the_unclassified_guard(tmp_path, cfg, ckpt):
@@ -999,14 +999,14 @@ def test_load_refuses_an_unknown_tensor_at_the_unclassified_guard(tmp_path, cfg,
     bad = dict(ckpt)
     bad[f"{PREFIX}project_q.renamed"] = torch.zeros(1)
     with pytest.raises(ValueError, match="unclassified"):
-        load_antideepfake(write_ckpt(tmp_path / "unused_added", cfg, bad), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "unused_added", cfg, bad), device="cpu", dtype=torch.float32)
 
 
 def test_load_refuses_a_missing_head_tensor(tmp_path, cfg, ckpt):
     """R2: deleting the head-tuple guard turned this into a raw KeyError from `sd[...]`."""
     bad = {k: v for k, v in ckpt.items() if k != "proj_fc.bias"}
     with pytest.raises(ValueError, match="head tensors"):
-        load_antideepfake(write_ckpt(tmp_path / "nohead", cfg, bad), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "nohead", cfg, bad), device="cpu", dtype=torch.float32)
 
 
 def test_load_enforces_injectivity_not_merely_tests_it(tmp_path, cfg, ckpt, monkeypatch):
@@ -1022,7 +1022,7 @@ def test_load_enforces_injectivity_not_merely_tests_it(tmp_path, cfg, ckpt, monk
     collided[f"{PREFIX}mask_emb"] = "feature_projection.projection.weight"
     monkeypatch.setattr(mod, "STATIC", collided)
     with pytest.raises(ValueError, match="not injective"):
-        load_antideepfake(write_ckpt(tmp_path / "collide", cfg, ckpt), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "collide", cfg, ckpt), device="cpu", dtype=torch.float32)
 
 
 def test_the_loader_loads_strictly():
@@ -1049,7 +1049,7 @@ def test_load_refuses_a_wrong_shaped_head(tmp_path, cfg, ckpt):
     bad["proj_fc.weight"] = torch.randn(3, cfg.hidden_size)
     bad["proj_fc.bias"] = torch.randn(3)
     with pytest.raises(ValueError, match="head shapes"):
-        load_antideepfake(write_ckpt(tmp_path / "head3", cfg, bad), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "head3", cfg, bad), device="cpu", dtype=torch.float32)
 
 
 def test_a_padded_layer_index_does_not_alias_a_real_layer(cfg):
@@ -1072,13 +1072,13 @@ def test_load_refuses_bad_architecture_flags(tmp_path, cfg, ckpt):
     raw["do_stable_layer_norm"] = False
     (root / "config.json").write_text(json.dumps(raw))
     with pytest.raises(ValueError, match="do_stable_layer_norm"):
-        load_antideepfake(root, dtype=torch.float32)
+        load_antideepfake(root, device="cpu", dtype=torch.float32)
 
     raw["do_stable_layer_norm"] = True
     raw["feat_extract_norm"] = "group"
     (root / "config.json").write_text(json.dumps(raw))
     with pytest.raises(ValueError, match="feat_extract_norm"):
-        load_antideepfake(root, dtype=torch.float32)
+        load_antideepfake(root, device="cpu", dtype=torch.float32)
 
 
 def test_load_config_names_the_file_on_malformed_json(tmp_path):
@@ -1095,15 +1095,15 @@ def test_k17_dtype_mismatch_is_refused_not_silently_honoured(tmp_path, cfg, ckpt
     """F12: the old test asserted `.float()` then `nn.Module.to` -- it could never fail, and
     the on-disk dtype was never compared to anything."""
     root = write_ckpt(tmp_path / "fp32", cfg, ckpt)
-    assert next(load_antideepfake(root, dtype=torch.float32).parameters()).dtype == torch.float32
+    assert next(load_antideepfake(root, device="cpu", dtype=torch.float32).parameters()).dtype == torch.float32
     with pytest.raises(ValueError, match="checkpoint is torch.float32"):
-        load_antideepfake(root, dtype=torch.float16)
+        load_antideepfake(root, device="cpu", dtype=torch.float16)
 
     half = {k: (v.half() if v.is_floating_point() else v) for k, v in ckpt.items()}
     root16 = write_ckpt(tmp_path / "fp16", cfg, half)
-    assert next(load_antideepfake(root16, dtype=torch.float16).parameters()).dtype == torch.float16
+    assert next(load_antideepfake(root16, device="cpu", dtype=torch.float16).parameters()).dtype == torch.float16
     with pytest.raises(ValueError, match="checkpoint is torch.float16"):
-        load_antideepfake(root16, dtype=torch.float32)
+        load_antideepfake(root16, device="cpu", dtype=torch.float32)
 
     # R9: an fp16 base with an fp32 head once loaded clean as fp32, silently upcasting the base,
     # because the guard sampled a single tensor.
@@ -1111,7 +1111,7 @@ def test_k17_dtype_mismatch_is_refused_not_silently_honoured(tmp_path, cfg, ckpt
     mixed["proj_fc.weight"] = mixed["proj_fc.weight"].float()
     mixed["proj_fc.bias"] = mixed["proj_fc.bias"].float()
     with pytest.raises(ValueError, match="mixed tensor dtypes"):
-        load_antideepfake(write_ckpt(tmp_path / "mixed", cfg, mixed), dtype=torch.float32)
+        load_antideepfake(write_ckpt(tmp_path / "mixed", cfg, mixed), device="cpu", dtype=torch.float32)
 
 
 def test_reference_forward_refuses_a_missing_conv_bias(cfg, ckpt, audio):
@@ -1159,8 +1159,17 @@ def test_mps_reservation_reclaims_a_stale_lock_whose_owner_is_gone(tmp_path):
 
     lock = tmp_path / "MPS.lock"
     lock.write_text("pid=999999999\ntoken=deadbeef\n")  # a pid that cannot exist
-    with mps_reservation(lock, scope="x", stale_s=0.0):
+    # reclaimed on the spot, with no wait: a dead owner's lock is never worth waiting for.
+    # An earlier version gated liveness behind `age > stale_s`, so a killed job's lock blocked
+    # the device for the full 12-hour default -- which it then did, to a real run.
+    with mps_reservation(lock, scope="x", stale_s=43200.0, wait_s=0.0):
         assert lock.exists()
+
+    # an unparseable lock file has no discoverable owner, so age is the only signal left
+    lock2 = tmp_path / "other.lock"
+    lock2.write_text("garbage\n")
+    with mps_reservation(lock2, scope="y", stale_s=0.0, wait_s=0.0):
+        assert lock2.exists()
 
 
 def test_mps_reservation_will_not_steal_a_lock_from_a_live_owner(tmp_path):
@@ -1172,6 +1181,8 @@ def test_mps_reservation_will_not_steal_a_lock_from_a_live_owner(tmp_path):
 
     lock = tmp_path / "MPS.lock"
     lock.write_text(f"pid={os.getpid()}\ntoken=other\n")  # alive by construction
+    # stale_s=0 on purpose: a LIVE owner must never be reclaimed from, at any age. An earlier
+    # revision made liveness and age a single `or`, so this case started stealing the lock.
     with pytest.raises(TimeoutError, match="refusing to share"), mps_reservation(
         lock, scope="thief", wait_s=0.1, stale_s=0.0
     ):
