@@ -66,13 +66,13 @@ Spectra's numbers are not comparable evidence: its training data is undisclosed,
 
 ## Bootstrap intervals (inner and ITW)
 
-Class-stratified cluster bootstrap, 2,000 draws, seed 0 (p5 to p95). Inner, primary row: LJ is one fixed stratum present once in every draw, so the intervals are conditional on LJ; LibriSpeech speakers and spoof generators are resampled. ITW: speakers resampled within class. Holdout has only 2 spoof generators, so no interval is reported (marked degenerate in the JSON).
+Class-stratified cluster bootstrap, 2,000 draws, seed 0 (p5 to p95). Inner, primary row: LJ is one fixed stratum present once in every draw, so the intervals are conditional on LJ; LibriSpeech speakers and spoof generators are resampled. ITW: speakers resampled within class. Holdout has only 2 spoof generators, so no interval is reported: m1b_v3 and SHIP carry the degenerate marker in the JSON; the five baseline columns' holdout readouts come from the Oct 12 read, which predates the interval code.
 
 | What | inner brief | inner package-0.5 | ITW brief | ITW package-0.5 |
 |---|---|---|---|---|
-| m1b_v3 | 0.098 to 0.504 | 0.060 to 0.454 | 0.229 to 0.441 | 0.187 to 0.405 |
+| m1b_v3 | 0.097 to 0.504 | 0.060 to 0.454 | 0.229 to 0.441 | 0.186 to 0.404 |
 | handcrafted_v5 | 0.264 to 0.660 | 0.175 to 0.980 | 0.955 to 0.996 | 0.674 to 0.937 |
-| m5_xlsr_ft | 0.112 to 0.514 | 0.072 to 0.690 | 0.291 to 0.466 | 0.287 to 0.486 |
+| m5_xlsr_ft | 0.112 to 0.513 | 0.072 to 0.690 | 0.290 to 0.466 | 0.287 to 0.486 |
 | spectra_aasist | 0.001 to 0.010 | 0.001 to 0.004 | 0.044 to 0.086 | 0.089 to 0.173 |
 | wavlm_l | 0.079 to 0.553 | 0.047 to 0.776 | 0.526 to 0.995 | 0.286 to 0.488 |
 | xlsr_L20 | 0.092 to 0.581 | 0.045 to 0.797 | 0.224 to 0.425 | 0.226 to 0.527 |

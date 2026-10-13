@@ -818,6 +818,10 @@ def test_code_sha_sees_dirty_tree(tmp_path):
     assert B.code_sha(repo) == clean_sha
     (repo / "src/a.py").write_text("x = 2\n")
     assert B.code_sha(repo).startswith(clean_sha + "+dirty:")
+    (repo / "src/a.py").write_text("x = 1\n")
+    assert B.code_sha(repo) == clean_sha
+    (repo / "src/new_script.py").write_text("print(1)\n")  # untracked code counts too
+    assert B.code_sha(repo).startswith(clean_sha + "+dirty:")
 
 
 def test_ledger_written_before_holdout_metrics(tmp_path):
@@ -1129,6 +1133,11 @@ def test_commands_refuse_on_registry_mismatch(monkeypatch):
                         "boot_n": 0})()
     with pytest.raises(SystemExit, match="registry check failed"):
         VB.cmd_score(ns)
+    rule = type("R", (), {"rule": "r.json", "holdout": False, "force": False, "boot_n": 0})()
+    with pytest.raises(SystemExit, match="registry check failed"):
+        VB.cmd_rule(rule)
+    with pytest.raises(SystemExit, match="registry check failed"):
+        VB.v1_scorecard(boot_n=0)
 
 
 def test_score_name_sanitized():

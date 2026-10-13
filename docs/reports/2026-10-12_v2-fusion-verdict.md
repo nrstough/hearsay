@@ -50,7 +50,7 @@ C2 is worse than C0 in almost every resample. The intervals are dominated by the
   | f3 | −0.0152 | 0.0000 | 0.0152 |
   | f4 | −0.0180 | +0.0290 | 0.0470 |
 
-  Mean optimism: package-0.5 0.022, package-0.3 0.012, brief 0.008. The fit's edge exists only on the rows it was fitted on, and it is largest on the ElevenLabs fold. Holdout and ITW agree: C2 is no better than C0 there.
+  Mean optimism: package-0.5 0.022, package-0.3 0.012, brief 0.008. The fit's edge exists only on the rows it was fitted on, and it is largest on the ElevenLabs fold. Holdout and ITW agree: C2 is no better than C0 there. In f1 to f3 both rules cost 0.0000 out of fold, so optimism there equals the in-sample advantage by construction; the conclusion rests mainly on f0 and f4 (0.018 and 0.047).
 - **No Platt.** C2 ends at the E step (K1, Nathan, Oct 12). The early look had shown C2 at 0.376 without per-fold Platt and 0.514 with it; the ruling came after that look. Under either reading C2 does not win.
 
 ## Report-only populations
@@ -79,6 +79,7 @@ Fusion of today's columns cannot beat the shipped rule on the selection metric. 
 - **Early look.** A planning agent computed inner readouts for the frozen candidates (C1 0.452, C3 0.358, C2 prototype 0.376) after the candidate table was committed and before this run. No holdout labels were touched. This run reproduces those numbers.
 - **K1 after the look.** The no-Platt ruling was made after seeing that per-fold Platt would turn C2's TIE into a LOSE. It does not change the conclusion.
 - **Second-order stacking leakage.** The base columns' OOF scores came from models that saw the held-out fusion fold when scoring training rows. This favours fitted candidates only; a TIE or LOSE is robust to it.
+- **Provenance of the V2-60 cohort read.** It ran from uncommitted code (recorded as `41b61b1+dirty:...` in the ledger). The final readout was regenerated at clean commit 3032558, reusing the persisted reads.
 - **Cohort read outside the ledger before the fix.** The dry run and the first real run computed the holdout-cohort readout for C0 and C2 outside the ledger; the pre-audit critique caught it and the cohort now goes through the ledger. Nothing was selected on it.
 - **Option-B columns were not fresh off-inner.** WavLM and layer 20 were read on holdout and ITW in the October 3 bake-off, and both were trained on the 23,790-row basis (with ASVspoof 2019 train/dev); the shipped columns were not.
 

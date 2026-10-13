@@ -136,6 +136,10 @@ def code_sha(repo: Path = REPO, paths: tuple = CODE_PATHS) -> str:
                               check=True).stdout.strip()
         diff = subprocess.run(["git", "diff", "HEAD", "--", *paths], cwd=repo, capture_output=True,
                               check=True).stdout
+        untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", *paths], cwd=repo,
+                                   capture_output=True, check=True).stdout
+        for rel in untracked.decode().split():
+            diff += rel.encode() + b"\0" + (Path(repo) / rel).read_bytes()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
     return head if not diff else f"{head}+dirty:{hashlib.sha256(diff).hexdigest()[:16]}"
