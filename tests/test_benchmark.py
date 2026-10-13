@@ -1419,10 +1419,35 @@ def test_cohort_embedding_fast_path_rows_and_parity():
     assert VC.pilot_parity(got["none"][1][:50], [stored[k] for k in keys[:50]], "cpu")["ok"]
 
 
-def test_cohort_torch_column_refused_while_busy_unless_allowed(monkeypatch):
+def test_cohort_torch_column_refused_while_busy_unless_allowed(monkeypatch, tmp_path):
+    monkeypatch.setattr(VC, "MPS_LOCK", tmp_path / "MPS.lock")  # never touch the real shared lock
     monkeypatch.setattr(VC, "busy_processes", lambda: ["123 python scripts/v2_backbone_score.py"])
     with pytest.raises(SystemExit, match="wait or ask Nathan"):
         VC.run("itw", "wavlm_l", pilot=1, threads=1, force=False)
     monkeypatch.setattr(VC, "cohort_inputs", lambda cohort: (_ for _ in ()).throw(RuntimeError("reached")))
     with pytest.raises(RuntimeError, match="reached"):
         VC.run("itw", "wavlm_l", pilot=1, threads=1, force=False, allow_busy=True)
+
+
+
+def test_cohort_mps_reservation_waits_for_live_owner_and_reclaims_dead(tmp_path):
+    lock = tmp_path / "MPS.lock"
+    lock.write_text(f"pid={os.getpid()}\ntoken=abc\nscope=other-lane\n")  # a live owner (this process)
+    with pytest.raises(TimeoutError), VC.MpsReservation("mine", lock_path=lock, wait_s=0.3, poll_s=0.05):
+        pass
+    assert "token=abc" in lock.read_text()  # never stolen from a live owner
+    dead = subprocess.run([sys.executable, "-c", "import os; print(os.getpid())"], capture_output=True, text=True,
+                          check=True).stdout.strip()
+    lock.write_text(f"pid={dead}\ntoken=old\nscope=crashed\n")
+    with VC.MpsReservation("mine", lock_path=lock, wait_s=1.0, poll_s=0.05) as r:
+        assert f"token={r.token}" in lock.read_text()
+    assert not lock.exists()  # released our own token
+    assert VC.uses_mps("itw", "wavlm_l") and VC.uses_mps("holdout", "xlsr_L20")
+    assert not VC.uses_mps("itw", "m5_xlsr_ft") and not VC.uses_mps("itw", "xlsr_L20")
+
+
+
+@pytest.fixture(autouse=True)
+def _no_real_mps_lock(monkeypatch, tmp_path):
+    """No test may claim the shared MPS reservation other lanes rely on."""
+    monkeypatch.setattr(VC, "MPS_LOCK", tmp_path / "mps" / "MPS.lock")

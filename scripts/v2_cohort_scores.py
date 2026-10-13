@@ -158,6 +158,78 @@ def pilot_parity(new, stored, device: str) -> dict:
             "tolerance": tol, "spearman_min": SPEARMAN_MIN, "n": int(new.size)}
 
 
+# The shared graphics-device reservation every v2 lane uses (src/hearsay/antideepfake.py
+# mps_reservation, backbone lane): one O_EXCL lock file in the shared outputs/ dir, holding
+# pid/token/scope. A live owner is never reclaimed; a dead owner's lock is; release only removes
+# our own token. Same file format, so the lanes take turns instead of sharing the device.
+MPS_LOCK = REPO / "outputs/v2/backbone/MPS.lock"
+
+
+def _owner_alive(contents: str):
+    for line in contents.splitlines():
+        if line.startswith("pid="):
+            try:
+                pid = int(line[4:])
+            except ValueError:
+                return None
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                return True
+            return True
+    return None
+
+
+class MpsReservation:
+    def __init__(self, scope: str, *, lock_path: Path | None = None, wait_s: float = 6 * 3600.0,
+                 stale_s: float = 43200.0, poll_s: float = 0.25):
+        lock_path = MPS_LOCK if lock_path is None else lock_path  # resolved at call time (tests redirect it)
+        self.scope, self.path, self.wait_s, self.stale_s, self.poll_s = scope, Path(lock_path), wait_s, stale_s, poll_s
+        self.token = os.urandom(8).hex()
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        deadline = time.monotonic() + self.wait_s
+        waited = False
+        while True:
+            try:
+                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, f"pid={os.getpid()}\ntoken={self.token}\nscope={self.scope}\n"
+                             f"acquired={time.time():.0f}\n".encode())
+                os.close(fd)
+                return self
+            except FileExistsError:
+                try:
+                    held = self.path.read_text()
+                    age = time.time() - self.path.stat().st_mtime
+                except FileNotFoundError:
+                    continue
+                alive = _owner_alive(held)
+                if alive is False or (alive is None and age > self.stale_s):
+                    self.path.unlink(missing_ok=True)
+                    continue
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"{self.path} held by another job for {age:.0f}s; not sharing the MPS device")
+                if not waited:
+                    print(f"waiting for the shared MPS reservation ({held.splitlines()[2:3]})", flush=True)
+                    waited = True
+                time.sleep(self.poll_s)
+
+    def __exit__(self, *exc):
+        try:
+            if f"token={self.token}" in self.path.read_text():
+                self.path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            pass
+        return False
+
+
+def uses_mps(cohort: str, column: str) -> bool:
+    return column == "wavlm_l" or (cohort == "holdout" and column == "xlsr_L20")
+
+
 def busy_processes() -> list[str]:
     out = subprocess.run(["pgrep", "-fl", BUSY], capture_output=True, text=True, check=False).stdout
     return [line for line in out.splitlines() if line.strip() and str(os.getpid()) not in line.split()[0]]
@@ -334,6 +406,13 @@ def run(cohort: str, column: str, *, pilot: int, threads: int, force: bool, allo
         raise SystemExit("other heavy jobs are running; wait or ask Nathan first:\n" + "\n".join(busy))
     if (cohort, column) in EMBEDDING_FAST_PATH:
         return run_from_embeddings(column, pilot=pilot, force=force)
+    if uses_mps(cohort, column):
+        with MpsReservation(f"v2_cohort_scores:{cohort}:{column}"):
+            return _run_scored(cohort, column, pilot=pilot, threads=threads, force=force)
+    return _run_scored(cohort, column, pilot=pilot, threads=threads, force=force)
+
+
+def _run_scored(cohort: str, column: str, *, pilot: int, threads: int, force: bool) -> dict:
     keys, rows, labels, load = cohort_inputs(cohort)
     seeds = seeds_for(cohort, rows)
     score = make_scorer(column, cohort, cap_threads(threads))
