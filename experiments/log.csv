@@ -1,1 +1,5 @@
 timestamp,rung,validation_score,validation_score_clean_only,csv_path,notes,benchmark_version
+2026-10-13T03:49:01+00:00,V2-60 C0,0.3390,0.3390,outputs/v2/fusion/v2_60_readout.json,"brief=0.1558; package03=0.2156; eer=0.0813; basis=inner 16,142 nested OOF with E; verdict=control",v1
+2026-10-13T03:49:01+00:00,V2-60 C1,0.4520,0.4520,outputs/v2/fusion/v2_60_readout.json,"brief=0.1959; package03=0.2684; eer=0.1041; basis=inner 16,142 nested OOF with E; verdict=LOSE",v1
+2026-10-13T03:49:01+00:00,V2-60 C3,0.3584,0.3584,outputs/v2/fusion/v2_60_readout.json,"brief=0.1785; package03=0.2318; eer=0.0866; basis=inner 16,142 nested OOF with E; verdict=LOSE",v1
+2026-10-13T03:49:01+00:00,V2-60 C2,0.3764,0.3764,outputs/v2/fusion/v2_60_readout.json,"brief=0.1620; package03=0.2247; eer=0.0878; basis=inner 16,142 nested OOF with E; verdict=TIE",v1

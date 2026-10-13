@@ -255,4 +255,20 @@ Output: `outputs/v2/benchmark/<name>.json` + a markdown scorecard row. Every rea
 _To be filled in post-commit._
 
 ## Results
-_To be filled in after execution._
+
+Filled in Oct 12 after execution. Details: `docs/reports/2026-10-11_benchmark-v1.md` and `docs/reports/2026-10-12_v2-fusion-verdict.md`.
+
+**Part 1 (V2-01-lite).** All seven reference numbers reproduce within 5e-5 (the values match to 6 decimals). The shipped rule reproduces the shipped TSV to 1e-12. Registry v1 pins 33 inputs. Holdout: m1b_v3 and the shipped rule under the reference exemption; the other five v1 columns read as one ledgered set.
+
+**Part 2 (V2-60).** Pooled nested inner with E, 16,142 rows:
+
+| Candidate | brief | package-0.5 | package-0.3 | f4 package-0.5 | Verdict |
+|---|---|---|---|---|---|
+| C0 | 0.1558 | 0.3390 | 0.2156 | 0.1649 | control |
+| C1 | 0.1959 | 0.4520 | 0.2684 | 0.2968 | LOSE |
+| C2 | 0.1620 | 0.3764 | 0.2247 | 0.1939 | TIE |
+| C3 | 0.1785 | 0.3584 | 0.2318 | 0.2243 | LOSE |
+
+Follow-on (larger learned model): not triggered. Holdout read once for the candidate set (ledger count 2 in total).
+
+**Not done in this run:** Step 6, the cohort scoring job (ask-first compute, awaiting Nathan). `docs/code-map.md` not edited (outside the lane's ownership; ask-first).
