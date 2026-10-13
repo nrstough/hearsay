@@ -125,7 +125,7 @@ def test_run_refuses_if_candidates_differ_from_spec_hash(tmp_path):
     cand["candidates"]["C2"]["alpha_grid"] = [0.0, 0.5, 1.0]
     bad = tmp_path / "c.json"
     bad.write_text(json.dumps(cand))
-    with pytest.raises(B.BenchmarkError, match="C2 settings"):
+    with pytest.raises(B.BenchmarkError, match="pre-declaration"):
         F.check_candidates(bad, SPEC)
 
 
@@ -518,3 +518,29 @@ def test_report_refuses_stale_readout(tmp_path):
     f.write_text(json.dumps({**good, "registry_sha256": "old"}))
     with pytest.raises(B.BenchmarkError, match="different registry"):
         VF.report(f)
+
+
+
+def test_candidates_pinned_to_predeclaration_any_change_refused(tmp_path):
+    """Codex audit: a committed edit to the candidates file must not pass. Weights,
+    bands, membership and E changes are each refused; the declared file passes."""
+    F.check_candidates(CAND, SPEC)
+    base = json.loads(CAND.read_text())
+    edits = [
+        lambda c: c["candidates"]["C1"]["weights"].update({"m1b_v3": 0.6, "wavlm_l": 0.0}),
+        lambda c: c["tie_bands"].update({"package05": 0.04}),
+        lambda c: c["candidates"].pop("C3"),
+        lambda c: c["candidates"].update({"C4": {"kind": "fixed", "weights": {"m1b_v3": 1.0}, "e": True}}),
+        lambda c: c["e_rule"].update({"spectra_logit_below": -1.5}),
+        lambda c: c["f4_guard"].update({"max_above_control": 0.1}),
+    ]
+    for i, edit in enumerate(edits):
+        c = json.loads(json.dumps(base))
+        edit(c)
+        f = tmp_path / f"c{i}.json"
+        f.write_text(json.dumps(c, indent=2))
+        with pytest.raises(B.BenchmarkError, match="pre-declaration"):
+            F.check_candidates(f, SPEC)
+    same = tmp_path / "same.json"
+    same.write_bytes(CAND.read_bytes())
+    F.check_candidates(same, SPEC)

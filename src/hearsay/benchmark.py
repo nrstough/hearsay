@@ -13,12 +13,12 @@ nothing from scripts/, and never torch or lightgbm.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
 import posixpath
 import subprocess
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -907,6 +907,7 @@ class HoldoutLedger:
     def __init__(self, authority_dir, jsonl_paths=()):
         self.dir = Path(authority_dir)
         self.jsonl = [Path(p) for p in jsonl_paths]
+        self._locks: dict[str, int] = {}
 
     @classmethod
     def default(cls, root: Path = REPO) -> HoldoutLedger:
@@ -999,38 +1000,61 @@ class HoldoutLedger:
         d = json.loads(p.read_text())
         return d if d.get("status") == "complete" else None
 
+    def _lock(self, key: str) -> None:
+        """Per-key exclusive lock, held from reservation through completion. A
+        second process cannot take it while the owner runs, so it can never
+        'resume' a live read; once the owner exits (or crashes) the OS frees it."""
+        fd = os.open(self.dir / f"{key}.lock", os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(fd)
+            raise HoldoutAlreadyRead(f"holdout key {key[:12]} is being read by another process") from None
+        self._locks[key] = fd
+
+    def release(self, key: str) -> None:
+        fd = self._locks.pop(key, None)
+        if fd is not None:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
     def reserve(self, key: str, meta: dict) -> dict:
         """Atomically reserve a holdout read. Returns {'status': 'new'|'resumed'|'complete', ...}.
-        A crashed reservation resumes only with identical code and input shas."""
+        The caller holds the key's lock until complete() or release(). A crashed
+        reservation (owner gone, lock free) resumes only with identical code and
+        input shas."""
         self.dir.mkdir(parents=True, exist_ok=True)
         p = self._path(key)
         entry = {"key": key, "status": "reserved", "meta": meta}
         if not p.exists() and key in self.audit_keys():
             raise HoldoutAlreadyRead(f"holdout key {key[:12]} is in the audit log but its authority file is missing; "
                                      "restore it before reading again")
+        self._lock(key)
         try:
-            fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
-            cur = None
-            for _ in range(100):  # a racing writer may not have flushed yet
-                try:
-                    cur = json.loads(p.read_text())
-                    break
-                except json.JSONDecodeError:
-                    time.sleep(0.01)
-            if cur is None:
-                raise HoldoutAlreadyRead(f"holdout key {key[:12]} is being reserved by another process") from None
-            if cur.get("status") == "complete":
-                return {"status": "complete", "entry": cur}
-            same = (cur.get("meta", {}).get("code_sha") == meta.get("code_sha")
-                    and cur.get("meta", {}).get("input_shas") == meta.get("input_shas"))
-            if not same:
-                raise HoldoutAlreadyRead(f"holdout key {key[:12]} is reserved by a different code/input state")
-            return {"status": "resumed", "entry": cur}
-        with os.fdopen(fd, "w") as f:
-            json.dump(entry, f, sort_keys=True)
-        self._append({"event": "reserve", **entry})
-        return {"status": "new", "entry": entry}
+            try:
+                fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            except FileExistsError:
+                text = p.read_text()
+                if not text.strip():  # the owner died between create and write; we hold the lock
+                    p.write_text(json.dumps(entry, sort_keys=True))
+                    self._append({"event": "reserve", **entry, "recovered_empty": True})
+                    return {"status": "resumed", "entry": entry}
+                cur = json.loads(text)
+                if cur.get("status") == "complete":
+                    self.release(key)
+                    return {"status": "complete", "entry": cur}
+                same = (cur.get("meta", {}).get("code_sha") == meta.get("code_sha")
+                        and cur.get("meta", {}).get("input_shas") == meta.get("input_shas"))
+                if not same:
+                    raise HoldoutAlreadyRead(f"holdout key {key[:12]} is reserved by a different code/input state")
+                return {"status": "resumed", "entry": cur}
+            with os.fdopen(fd, "w") as f:
+                json.dump(entry, f, sort_keys=True)
+            self._append({"event": "reserve", **entry})
+            return {"status": "new", "entry": entry}
+        except BaseException:
+            self.release(key)
+            raise
 
     def complete(self, key: str, readout: dict) -> None:
         p = self._path(key)
@@ -1042,6 +1066,7 @@ class HoldoutLedger:
         tmp.write_text(json.dumps(cur, sort_keys=True))
         os.replace(tmp, p)
         self._append({"event": "complete", "key": key, "digest": cur["digest"]})
+        self.release(key)
 
 
 def read_holdout(rule_defs: list, compute, *, ledger: HoldoutLedger, holdout_sha: str,
@@ -1056,6 +1081,9 @@ def read_holdout(rule_defs: list, compute, *, ledger: HoldoutLedger, holdout_sha
     if res["status"] == "complete":
         return {"ledger": f"persisted {key[:12]}", "readout": res["entry"]["readout"],
                 "ledger_count": ledger.count()}
-    readout = compute()
-    ledger.complete(key, readout)
+    try:
+        readout = compute()
+        ledger.complete(key, readout)
+    finally:
+        ledger.release(key)  # no-op after complete(); frees the lock if compute() raised
     return {"ledger": f"read {key[:12]}", "readout": readout, "ledger_count": ledger.count()}

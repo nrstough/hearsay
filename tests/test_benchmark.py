@@ -180,9 +180,13 @@ def test_holdout_read_ledger_refuses_second_read(tmp_path):
     # a crashed reservation under a different code state is refused
     key = B.ledger_key([{"kind": "x"}], "h")
     led.reserve(key, {"code_sha": "c1", "input_shas": {}})
-    with pytest.raises(B.HoldoutAlreadyRead):
-        led.reserve(key, {"code_sha": "c2", "input_shas": {}})
-    assert led.reserve(key, {"code_sha": "c1", "input_shas": {}})["status"] == "resumed"
+    with pytest.raises(B.HoldoutAlreadyRead, match="being read"):  # owner still holds the lock
+        B.HoldoutLedger(tmp_path / "a", [tmp_path / "t.jsonl"]).reserve(key, {"code_sha": "c1", "input_shas": {}})
+    led.release(key)  # the owner crashes: the lock is freed, the reservation stays
+    other = B.HoldoutLedger(tmp_path / "a", [tmp_path / "t.jsonl"])
+    with pytest.raises(B.HoldoutAlreadyRead, match="different code"):
+        other.reserve(key, {"code_sha": "c2", "input_shas": {}})
+    assert other.reserve(key, {"code_sha": "c1", "input_shas": {}})["status"] == "resumed"
 
 
 def test_holdout_ledger_allows_new_candidate_set(tmp_path):
@@ -1145,3 +1149,151 @@ def test_score_name_sanitized():
     for bad in ("../evil", "a/b", "", ".hidden", "x..y"):
         with pytest.raises(SystemExit):
             VB.safe_name(bad)
+
+
+# ---------------------------------------------------------------------------
+# Codex audit round 1: ledger lock
+# ---------------------------------------------------------------------------
+
+
+def test_ledger_live_reservation_cannot_be_resumed_by_identical_process(tmp_path):
+    """Two runs with IDENTICAL code and inputs: while the first is computing, the
+    second is refused; only after the first is gone may it resume."""
+    code = (
+        "import sys, time; from hearsay import benchmark as B; "
+        "led = B.HoldoutLedger(sys.argv[1], [sys.argv[1] + '/t.jsonl']); "
+        "print(led.reserve('k' * 64, {'code_sha': 'same', 'input_shas': {}})['status'], flush=True); "
+        "time.sleep(float(sys.argv[2]))"
+    )
+    a = subprocess.Popen([sys.executable, "-c", code, str(tmp_path / "a"), "3"], stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, text=True, cwd=REPO)
+    assert a.stdout.readline().strip() == "new"
+    b = subprocess.run([sys.executable, "-c", code, str(tmp_path / "a"), "0"], capture_output=True, text=True,
+                       cwd=REPO, check=False)
+    assert "HoldoutAlreadyRead" in b.stderr and "being read" in b.stderr
+    a.communicate()
+    c = subprocess.run([sys.executable, "-c", code, str(tmp_path / "a"), "0"], capture_output=True, text=True,
+                       cwd=REPO, check=False)
+    assert c.stdout.strip() == "resumed"
+
+
+def test_ledger_lock_released_when_compute_raises(tmp_path):
+    led = B.HoldoutLedger(tmp_path / "a", [tmp_path / "t.jsonl"])
+    defs = [{"kind": "fixed", "weights": {"z": 1.0}, "e": True}]
+
+    def boom():
+        raise RuntimeError("crash mid-read")
+
+    with pytest.raises(RuntimeError):
+        B.read_holdout(defs, boom, ledger=led, holdout_sha="h", meta={"code_sha": "c", "input_shas": {}})
+    assert led._locks == {}
+    r = B.read_holdout(defs, lambda: {"v": 1}, ledger=led, holdout_sha="h", meta={"code_sha": "c", "input_shas": {}})
+    assert r["readout"] == {"v": 1}
+
+
+# ---------------------------------------------------------------------------
+# S8: cohort scoring script (scripts/v2_cohort_scores.py), hermetic
+# ---------------------------------------------------------------------------
+
+_cspec = importlib.util.spec_from_file_location("v2_cohort_scores", REPO / "scripts/v2_cohort_scores.py")
+VC = importlib.util.module_from_spec(_cspec)
+_cspec.loader.exec_module(VC)
+
+
+def _cohort_records(keys, labels, *, drop=None, error=None):
+    rows = []
+    for k in keys:
+        for kind in B.COHORT_KINDS:
+            if drop == (k, kind):
+                continue
+            rows.append({"path": k, "kind": kind, "logit": float(labels[k]) + 0.1,
+                         "error": "boom" if error == (k, kind) else None})
+    return rows
+
+
+def _cohort_world():
+    keys = [f"data/in_the_wild/release_in_the_wild/{i}.wav" for i in range(500)]
+    labels = {k: int(i >= 250) for i, k in enumerate(keys)}
+    return keys, labels
+
+
+def test_cohort_flag_column_and_zero_audio_refused():
+    with pytest.raises(B.BenchmarkError, match="decode_error"):
+        VC.check_audio(np.ones(100), flag="decode_error", path="x")
+    for bad in (np.zeros(16000), np.array([]), np.array([np.nan, 1.0])):
+        with pytest.raises(B.BenchmarkError, match="refused"):
+            VC.check_audio(bad, path="x")
+    VC.check_audio(np.r_[np.zeros(10), 0.1], path="x")
+    keys, labels = _cohort_world()
+    with pytest.raises(B.BenchmarkError, match="failed"):
+        VC.assemble(_cohort_records(keys, labels, error=(keys[3], "mp3")), keys, labels)
+
+
+def test_partial_cohort_rejected():
+    keys, labels = _cohort_world()
+    VC.assemble(_cohort_records(keys, labels), keys, labels)
+    with pytest.raises(B.BenchmarkError, match="partial cohort"):
+        VC.assemble(_cohort_records(keys, labels, drop=(keys[7], "noise20")), keys, labels)
+    lopsided = {k: (1 if i < 251 else 0) for i, k in enumerate(keys)}
+    with pytest.raises(B.BenchmarkError, match="250 real"):
+        VC.assemble(_cohort_records(keys, lopsided), keys, lopsided)
+
+
+def test_cohort_writer_output_reads_through_benchmark_reader(tmp_path):
+    keys, labels = _cohort_world()
+    df = VC.assemble(_cohort_records(keys, labels), keys, labels)
+    out = VC.write_cohort(df, tmp_path / "itw" / "wavlm_l.csv", {"column": "wavlm_l"})
+    back = B.read_cohort_file(out, main=tmp_path, repo=tmp_path)
+    assert len(back) == 2500 and set(back["kind"]) == set(B.COHORT_KINDS)
+    with pytest.raises(SystemExit, match="refusing"):
+        VC.write_cohort(df, out, {})
+
+
+def test_perturb_seed_matches_m3_probes():
+    x = np.random.default_rng(0).normal(0, 0.1, 16000).astype(np.float32)
+    for kind in ("none", "noise20", "speed", "shift1"):
+        for seed in (0, 1, 37):
+            assert np.array_equal(VC.perturb(x, kind, seed), VC.MP.perturb(x, kind, seed))
+    assert not np.array_equal(VC.perturb(x, "noise20", 1), VC.perturb(x, "noise20", 2))
+    rows = np.array([4, 17, 2996])
+    assert VC.seeds_for("itw", rows).tolist() == [4, 17, 2996]  # ITW: the manifest row index
+    assert VC.seeds_for("holdout", rows).tolist() == [0, 1, 2]  # holdout: position in holdout_rows
+    with pytest.raises(ValueError):
+        VC.seeds_for("mlaad", rows)
+
+
+def test_threads_capped():
+    assert VC.cap_threads(6) == 4 and VC.cap_threads(3) == 3 and VC.MAX_THREADS == 4
+    with pytest.raises(ValueError):
+        VC.cap_threads(0)
+    for v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        assert int(os.environ[v]) <= 4
+
+
+def test_cohort_pilot_parity_gate():
+    ok = VC.pilot_parity([1.0, 2.0, 3.0, 4.0], [1.01, 2.0, 2.99, 4.0], "cpu")
+    assert ok["ok"] and ok["max_abs_dlogit"] == pytest.approx(0.01)
+    bad = VC.pilot_parity([1.0, 2.0, 3.0, 4.0], [1.1, 2.0, 3.0, 4.0], "cpu")
+    assert not bad["ok"]
+    assert VC.pilot_parity([1.0, 2.0, 3.0, 4.0], [1.04, 2.0, 3.0, 4.0], "mps")["ok"]
+    assert not VC.pilot_parity([1.0, 2.0, 3.0, 4.0], [4.0, 3.0, 2.0, 1.0], "mps")["ok"]
+
+
+def test_cohort_run_requires_ask_first_confirmation():
+    with pytest.raises(SystemExit, match="ask-first"):
+        VC.main(["run", "--cohort", "itw", "--column", "handcrafted_v5"])
+    with pytest.raises(SystemExit, match="not scored on the holdout"):
+        VC.main(["run", "--cohort", "holdout", "--column", "handcrafted_v5", "--confirm-ask-first"])
+
+
+@needs_data
+def test_cohort_rows_match_cohort_rows_fn():
+    spec = importlib.util.spec_from_file_location("bakeoff_layers", REPO / "scripts/bakeoff_layers.py")
+    bl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bl)
+    rows = VC.itw_cohort_rows()
+    assert np.array_equal(rows, bl.cohort_rows()["row"].to_numpy())
+    for kind in B.COHORT_KINDS:
+        assert np.array_equal(rows, np.load(REPO / f"outputs/v2/bakeoff/emb_itw_{kind}.npz")["row"])
+    m = pd.read_csv(VC.ITW_MANIFEST)
+    assert (m["label"].iloc[rows] == "bonafide").sum() == 250

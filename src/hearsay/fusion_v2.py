@@ -263,8 +263,18 @@ def frozen_region(spec_text: str, start: str, end: str) -> str:
     return "\n".join(line.rstrip() for line in spec_text[a:b].replace("\r\n", "\n").split("\n"))
 
 
+# The pre-declaration as committed in f8e4ca6, before any code read data. Any change to the
+# candidates file (weights, bands, membership, E, alpha grid, prior) fails this pin; an authorized
+# amendment needs a new constant here, visible in review, plus a dated spec amendment.
+DECLARED_CANDIDATES_COMMIT = "f8e4ca6"
+DECLARED_CANDIDATES_SHA256 = "aede43b3ffb90f15a81ed54bf73b505a1c6899b09320cd348a3b007b8f17fcdb"
+
+
 def check_candidates(cand_path, spec_path) -> dict:
-    """The committed candidates JSON must match the frozen spec region's hash."""
+    """The candidates file must be byte-identical to the pre-declaration, and its
+    recorded frozen-spec-region hash must still match the spec."""
+    if hashlib.sha256(Path(cand_path).read_bytes()).hexdigest() != DECLARED_CANDIDATES_SHA256:
+        raise B.BenchmarkError(f"candidates file differs from the pre-declaration ({DECLARED_CANDIDATES_COMMIT})")
     cand = json.loads(Path(cand_path).read_text())
     r = cand["spec_frozen_region"]
     region = frozen_region(Path(spec_path).read_text(), r["start"], r["end"])

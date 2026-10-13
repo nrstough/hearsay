@@ -103,7 +103,8 @@ The inner intervals are wide because they resample only 8 spoof generators: whet
 - The other five columns were read once as one ledgered set, "benchmark-v1 baseline", on Oct 12. The ledger key now includes each file's sha256; the new key is recorded as an alias of that read (same files), not a new read.
 - The holdout perturbation cohort is one ledgered read.
 - Ledger total for this lane: 4 distinct holdout reads (this baseline set, this cohort, and the V2-60 candidate set and its cohort). The tracked audit copy is `benchmarks/holdout_ledger.jsonl`; the authority files live in the shared `outputs/v2/benchmark/holdout_ledger/`.
-- **Disclosure.** Before the pre-audit critique, the cohort readout ran outside the ledger: in the first scorecard run (Oct 12) and in the V2-60 dry run and first run. Nothing was selected on it.
+- **This run's historical exception.** Before the pre-audit critique, the cohort readout ran outside the ledger: in the first scorecard run (Oct 12) and in the V2-60 dry run and first run. Nothing was selected on it. The ledger cannot certify those earlier reads after the fact.
+- **What the ledger guarantees from commit 0d9a6e4 on** (plus the per-key lock added after the Codex audit): every holdout and holdout-cohort read goes through `read_holdout`; a rule set is read at most once, even by two concurrent runs; only the two registry-pinned references are exempt.
 
 ## Pending and deferred
 
