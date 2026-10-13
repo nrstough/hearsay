@@ -125,6 +125,17 @@ def canonical_key(path, *, main: Path | None = None, repo: Path | None = None) -
     return key
 
 
+def code_sha(repo: Path = REPO) -> str:
+    """HEAD plus a hash of any uncommitted tracked changes ('<head>+dirty:<hash>')."""
+    try:
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True,
+                              check=True).stdout.strip()
+        diff = subprocess.run(["git", "diff", "HEAD"], cwd=repo, capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return head if not diff else f"{head}+dirty:{hashlib.sha256(diff).hexdigest()[:16]}"
+
+
 def sha256_file(path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -660,8 +671,12 @@ def cluster_bootstrap(y, s_control, s_cand, cluster, stratum, *, n: int = 2000, 
                 "lj_mode": lj_mode}
     diffs = {k: [] for k in readings_}
     skipped = 0
+    lj_rows = stratum == "lj"
+    missing_lj = 0
     for ix in _draws(fixed_idx, groups, n, seed):
         yy = y[ix]
+        if lj_rows.any() and not lj_rows[ix].any():
+            missing_lj += 1
         if len(np.unique(yy)) < 2:
             skipped += 1
             continue
@@ -670,11 +685,50 @@ def cluster_bootstrap(y, s_control, s_cand, cluster, stratum, *, n: int = 2000, 
     if skipped == n:
         raise BenchmarkError("bootstrap: every draw was single-class")
     out = {"degenerate": False, "n": n, "seed": seed, "lj_mode": lj_mode, "skipped_single_class": skipped,
-           "point": point}
+           "draws_missing_lj": missing_lj, "point": point}
     for k in readings_:
         d = np.asarray(diffs[k])
         out[k] = {"p5": float(np.percentile(d, 5)), "p50": float(np.percentile(d, 50)),
                   "p95": float(np.percentile(d, 95)), "p_better": float(np.mean(d < 0))}
+    return out
+
+
+def bootstrap_ci(y, s, cluster, stratum, *, n: int = 2000, seed: int = 0, lj_mode: str = "fixed",
+                 readings_: tuple = tuple(READINGS)) -> dict:
+    """Marginal class-stratified cluster bootstrap interval (p5, p50, p95) of each
+    reading for one score vector. Degenerate (no CI) when a resampled stratum has
+    <= 2 clusters (holdout: 2 spoof generators; inner f3/f4: 1)."""
+    y = np.asarray(y)
+    s = np.asarray(s, dtype=float)
+    cluster = np.asarray(cluster).astype(str)
+    stratum = np.asarray(stratum).astype(str)
+    if not (len(y) == len(s) == len(cluster) == len(stratum)):
+        raise BenchmarkError("bootstrap: arrays differ in length")
+    fixed_idx, groups = bootstrap_strata(cluster, stratum, lj_mode)
+    small = {k: len(v) for k, v in groups.items() if len(v) <= 2}
+    if small:
+        return {"degenerate": True, "reason": f"stratum cluster counts {small} (<= 2)", "lj_mode": lj_mode}
+    vals = {k: [] for k in readings_}
+    skipped = 0
+    lj_rows = stratum == "lj"
+    missing_lj = 0
+    for ix in _draws(fixed_idx, groups, n, seed):
+        if lj_rows.any() and not lj_rows[ix].any():
+            missing_lj += 1
+        yy = y[ix]
+        if len(np.unique(yy)) < 2:
+            skipped += 1
+            continue
+        for k in readings_:
+            vals[k].append(reading(yy, s[ix], k))
+    if skipped == n:
+        raise BenchmarkError("bootstrap: every draw was single-class")
+    out = {"degenerate": False, "n": n, "seed": seed, "lj_mode": lj_mode, "skipped_single_class": skipped,
+           "draws_missing_lj": missing_lj}
+    for k in readings_:
+        v = np.asarray(vals[k])
+        out[k] = {"p5": float(np.percentile(v, 5)), "p50": float(np.percentile(v, 50)),
+                  "p95": float(np.percentile(v, 95))}
     return out
 
 
@@ -791,10 +845,28 @@ class HoldoutAlreadyRead(BenchmarkError):
     pass
 
 
-REFERENCE_RULE_DEFS = (
-    {"kind": "column", "name": "m1b_v3"},
-    {"kind": "fixed", "weights": dict(SHIP_WEIGHTS), "e": True, "refs": "full"},
-)
+REFERENCE_COLUMN_FILES = {
+    "m1b_v3": "outputs/detector_scores/m1b_v3.csv",
+    "handcrafted_v5": "outputs/detector_scores/handcrafted_v5.csv",
+    "m5_xlsr_ft": "outputs/detector_scores/m5_xlsr_ft.csv",
+    "spectra_aasist": "outputs/detector_scores/spectra_aasist.csv",
+}
+
+
+def column_def(name: str, sha: str) -> dict:
+    """Ledger definition of a single column: its name AND its file's sha256."""
+    return {"kind": "column", "name": name, "sha256": sha}
+
+
+def ship_def(input_shas: dict) -> dict:
+    return {"kind": "fixed", "weights": dict(SHIP_WEIGHTS), "e": True, "refs": "full", "inputs": dict(input_shas)}
+
+
+def reference_defs(pinned: dict) -> list:
+    """The two published holdout references, bound to the registry's file pins
+    (`pinned`: registry inputs, rel path -> {"sha256": ...})."""
+    sha = {c: pinned[rel]["sha256"] for c, rel in REFERENCE_COLUMN_FILES.items()}
+    return [column_def("m1b_v3", sha["m1b_v3"]), ship_def(sha)]
 
 
 def ledger_key(rule_defs: list, holdout_sha: str) -> str:
@@ -805,9 +877,13 @@ def ledger_key(rule_defs: list, holdout_sha: str) -> str:
     return sha256_json({"rules": defs, "holdout": holdout_sha})
 
 
-def is_reference(rule_defs: list) -> bool:
-    ref = {json.dumps(d, sort_keys=True) for d in REFERENCE_RULE_DEFS}
-    return len(rule_defs) > 0 and all(json.dumps(d, sort_keys=True) in ref for d in rule_defs)
+def is_reference(rule_defs: list, pinned: dict | None) -> bool:
+    """Exempt only if every definition is one of the two references with the
+    registry-pinned file hashes. Without pins nothing is exempt."""
+    if not pinned or not rule_defs:
+        return False
+    ref = {json.dumps(d, sort_keys=True) for d in reference_defs(pinned)}
+    return all(json.dumps(d, sort_keys=True) in ref for d in rule_defs)
 
 
 class HoldoutLedger:
@@ -843,8 +919,69 @@ class HoldoutLedger:
     def _path(self, key: str) -> Path:
         return self.dir / f"{key}.json"
 
+    def entries(self) -> list[dict]:
+        out = []
+        for f in sorted(self.dir.glob("*.json")) if self.dir.exists() else []:
+            try:
+                out.append(json.loads(f.read_text()))
+            except json.JSONDecodeError:
+                out.append({"key": f.stem, "status": "unreadable"})
+        return out
+
     def count(self) -> int:
-        return len(list(self.dir.glob("*.json"))) if self.dir.exists() else 0
+        """Distinct holdout reads (aliases of an earlier read are not counted)."""
+        return sum(1 for e in self.entries() if not e.get("alias_of"))
+
+    def audit_keys(self) -> set:
+        keys = set()
+        for p in self.jsonl:
+            if p.exists():
+                for line in p.read_text().splitlines():
+                    if line.strip():
+                        keys.add(json.loads(line).get("key"))
+        return keys - {None}
+
+    def rebuild(self) -> int:
+        """Append any authority event missing from an audit copy. Returns events added."""
+        added = 0
+        for p in self.jsonl:
+            have = set()
+            if p.exists():
+                for line in p.read_text().splitlines():
+                    if line.strip():
+                        e = json.loads(line)
+                        have.add((e.get("event"), e.get("key")))
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, "a") as f:
+                for e in self.entries():
+                    k = e.get("key")
+                    events = ["alias"] if e.get("alias_of") else ["reserve"] + (
+                        ["complete"] if e.get("status") == "complete" else [])
+                    for ev in events:
+                        if (ev, k) not in have:
+                            body = {"event": ev, "key": k, "rebuilt": True}
+                            if ev in ("complete", "alias"):
+                                body["digest"] = e.get("digest")
+                            if ev == "alias":
+                                body["alias_of"] = e.get("alias_of")
+                            f.write(json.dumps(body, sort_keys=True) + "\n")
+                            added += 1
+        return added
+
+    def alias(self, new_key: str, old_key: str, meta: dict) -> dict:
+        """Record that `new_key` is the same holdout read as the completed
+        `old_key` (e.g. after a ledger key format change). Not a new read."""
+        old = self.persisted(old_key)
+        if old is None:
+            raise BenchmarkError(f"cannot alias: {old_key[:12]} is not a completed read")
+        self.dir.mkdir(parents=True, exist_ok=True)
+        entry = {"key": new_key, "status": "complete", "alias_of": old_key, "meta": meta,
+                 "readout": old["readout"], "digest": old["digest"]}
+        fd = os.open(self._path(new_key), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        with os.fdopen(fd, "w") as f:
+            json.dump(entry, f, sort_keys=True)
+        self._append({"event": "alias", "key": new_key, "alias_of": old_key, "digest": old["digest"]})
+        return entry
 
     def persisted(self, key: str) -> dict | None:
         p = self._path(key)
@@ -859,6 +996,9 @@ class HoldoutLedger:
         self.dir.mkdir(parents=True, exist_ok=True)
         p = self._path(key)
         entry = {"key": key, "status": "reserved", "meta": meta}
+        if not p.exists() and key in self.audit_keys():
+            raise HoldoutAlreadyRead(f"holdout key {key[:12]} is in the audit log but its authority file is missing; "
+                                     "restore it before reading again")
         try:
             fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
         except FileExistsError:
@@ -896,11 +1036,11 @@ class HoldoutLedger:
 
 
 def read_holdout(rule_defs: list, compute, *, ledger: HoldoutLedger, holdout_sha: str,
-                 meta: dict | None = None) -> dict:
+                 meta: dict | None = None, pinned: dict | None = None) -> dict:
     """Run `compute()` on the holdout at most once per rule set. Reference rules
-    (the two published holdout numbers) are exempt. A completed key returns its
-    persisted readout instead of reading again."""
-    if is_reference(rule_defs):
+    (the two published holdout numbers, bound to the registry pins) are exempt.
+    A completed key returns its persisted readout instead of reading again."""
+    if is_reference(rule_defs, pinned):
         return {"ledger": "reference (exempt)", "readout": compute()}
     key = ledger_key(rule_defs, holdout_sha)
     res = ledger.reserve(key, meta or {})

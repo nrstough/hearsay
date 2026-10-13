@@ -29,7 +29,9 @@ VB = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(VB)
 
 HAVE_DATA = (REPO / "outputs/detector_scores/m1b_v3.csv").exists() and (REPO / "splits/nsa_folds.csv").exists()
-needs_data = pytest.mark.skipif(not HAVE_DATA, reason="needs the gitignored score exports")
+def needs_data(f):
+    """Marker (selectable with -m needs_data) plus a skip when the exports are absent."""
+    return pytest.mark.needs_data(pytest.mark.skipif(not HAVE_DATA, reason="needs the gitignored score exports")(f))
 TRACKED_LEDGER = REPO / "benchmarks/holdout_ledger.jsonl"
 
 
@@ -735,21 +737,82 @@ def test_k7_sensitivity_row_and_degenerate_folds_marked(world):
 # ---------------------------------------------------------------------------
 
 
+PINNED = {rel: {"sha256": f"sha-{c}"} for c, rel in B.REFERENCE_COLUMN_FILES.items()}
+PINNED_SHAS = {c: f"sha-{c}" for c in B.REFERENCE_COLUMN_FILES}
+
+
 def test_reference_rules_exempt_from_ledger(tmp_path):
     led = B.HoldoutLedger(tmp_path / "a", [tmp_path / "t.jsonl"])
     for _ in range(2):
-        r = B.read_holdout([{"kind": "column", "name": "m1b_v3"}], lambda: {"ok": 1}, ledger=led, holdout_sha="h")
+        r = B.read_holdout([B.column_def("m1b_v3", "sha-m1b_v3")], lambda: {"ok": 1}, ledger=led, holdout_sha="h",
+                           pinned=PINNED)
         assert r["ledger"].startswith("reference")
     assert led.count() == 0
 
 
 def test_reference_exemption_limited_to_spec_refs():
-    ship_full = {"kind": "fixed", "weights": dict(B.SHIP_WEIGHTS), "e": True, "refs": "full"}
-    assert B.is_reference([ship_full]) and B.is_reference([{"kind": "column", "name": "m1b_v3"}])
-    assert not B.is_reference([{"kind": "column", "name": "m5_xlsr_ft"}])
-    assert not B.is_reference([{**ship_full, "weights": {"m1b_v3": 0.5, "handcrafted_v5": 0.25, "m5_xlsr_ft": 0.25}}])
-    assert not B.is_reference([ship_full, {"kind": "column", "name": "wavlm_l"}])
-    assert not B.is_reference([])
+    ship = B.ship_def(PINNED_SHAS)
+    assert B.is_reference([ship], PINNED) and B.is_reference([B.column_def("m1b_v3", "sha-m1b_v3")], PINNED)
+    assert not B.is_reference([B.column_def("m5_xlsr_ft", "sha-m5_xlsr_ft")], PINNED)
+    assert not B.is_reference([{**ship, "weights": {"m1b_v3": 0.5, "handcrafted_v5": 0.25, "m5_xlsr_ft": 0.25}}],
+                              PINNED)
+    assert not B.is_reference([ship, B.column_def("wavlm_l", "x")], PINNED)
+    assert not B.is_reference([], PINNED)
+    assert not B.is_reference([B.column_def("m1b_v3", "sha-m1b_v3")], None)  # no pins, no exemption
+
+
+def test_reference_exemption_bound_to_pinned_file(tmp_path):
+    """A different file that calls itself m1b_v3 is not the reference: it is ledgered."""
+    led = B.HoldoutLedger(tmp_path / "a", [tmp_path / "t.jsonl"])
+    imposter = B.column_def("m1b_v3", "sha-of-some-other-file")
+    assert not B.is_reference([imposter], PINNED)
+    n = []
+    B.read_holdout([imposter], lambda: n.append(1) or {"v": 1}, ledger=led, holdout_sha="h", pinned=PINNED)
+    B.read_holdout([imposter], lambda: n.append(1) or {"v": 2}, ledger=led, holdout_sha="h", pinned=PINNED)
+    assert len(n) == 1 and led.count() == 1
+    ship_other = B.ship_def({**PINNED_SHAS, "m5_xlsr_ft": "changed"})
+    assert not B.is_reference([ship_other], PINNED)
+
+
+def test_ledger_refuses_when_authority_lost_but_audit_has_key(tmp_path):
+    led = B.HoldoutLedger(tmp_path / "a", [tmp_path / "t.jsonl"])
+    defs = [{"kind": "fixed", "weights": {"x": 1.0}, "e": True}]
+    B.read_holdout(defs, lambda: {"v": 1}, ledger=led, holdout_sha="h")
+    for f in (tmp_path / "a").glob("*.json"):
+        f.unlink()  # the gitignored authority dir is lost; the tracked audit copy remains
+    with pytest.raises(B.HoldoutAlreadyRead, match="audit log"):
+        B.read_holdout(defs, lambda: {"v": 2}, ledger=led, holdout_sha="h")
+
+
+def test_ledger_rebuild_and_alias_not_counted(tmp_path):
+    led = B.HoldoutLedger(tmp_path / "a", [tmp_path / "t.jsonl", tmp_path / "m.jsonl"])
+    old = B.ledger_key([{"kind": "column", "name": "hc"}], "h")
+    B.read_holdout([{"kind": "column", "name": "hc"}], lambda: {"v": 1}, ledger=led, holdout_sha="h")
+    new = B.ledger_key([B.column_def("hc", "s")], "h")
+    led.alias(new, old, {"code_sha": "c"})
+    assert led.count() == 1 and led.persisted(new)["readout"] == {"v": 1}
+    r = B.read_holdout([B.column_def("hc", "s")], lambda: pytest.fail("aliased read must not recompute"),
+                       ledger=led, holdout_sha="h")
+    assert r["readout"] == {"v": 1}
+    (tmp_path / "m.jsonl").unlink()
+    assert led.rebuild() == 3  # reserve + complete for the read, alias for the alias
+    events = [json.loads(x)["event"] for x in (tmp_path / "m.jsonl").read_text().splitlines()]
+    assert sorted(events) == ["alias", "complete", "reserve"]
+    assert led.rebuild() == 0
+
+
+def test_code_sha_sees_dirty_tree(tmp_path):
+    repo = tmp_path / "r"
+    repo.mkdir()
+    GIT = "git"
+    subprocess.run([GIT, "init", "-q"], cwd=repo, check=True)
+    (repo / "a.py").write_text("x = 1\n")
+    subprocess.run([GIT, "add", "a.py"], cwd=repo, check=True)
+    subprocess.run([GIT, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "a"], cwd=repo, check=True)
+    clean_sha = B.code_sha(repo)
+    assert "+dirty" not in clean_sha
+    (repo / "a.py").write_text("x = 2\n")
+    assert B.code_sha(repo).startswith(clean_sha + "+dirty:")
 
 
 def test_ledger_written_before_holdout_metrics(tmp_path):
@@ -997,8 +1060,8 @@ def test_rerun_bit_identical():
         "import json; from hearsay import benchmark as B; import importlib.util as u; "
         "s=u.spec_from_file_location('vb','scripts/v2_benchmark.py'); m=u.module_from_spec(s); s.loader.exec_module(m); "
         "b=m.load_bench(['m1b_v3','handcrafted_v5','m5_xlsr_ft','spectra_aasist']); "
-        "c=m.rule_scorecard(b, B.Rule('SHIP', dict(B.SHIP_WEIGHTS)), with_holdout=False); "
-        "c.pop('populations').pop('test', None); "
+        "c=m.rule_scorecard(b, B.Rule('SHIP', dict(B.SHIP_WEIGHTS)), with_holdout=False, boot_n=20); "
+        "c['populations'].pop('test', None); assert 'inner' in c['populations']; "
         "r=B.cluster_bootstrap(b.pops['inner'].y, b.score_rule(B.Rule('S',dict(B.SHIP_WEIGHTS)),'inner')['fused'], "
         "b.score_rule(B.Rule('E',{'m1b_v3':0.5,'m5_xlsr_ft':0.5}),'inner')['fused'], b.pops['inner'].cluster, "
         "b.pops['inner'].stratum, n=20); print(B.dumps({'card': c, 'boot': r}))"
@@ -1009,3 +1072,62 @@ def test_rerun_bit_identical():
         outs.append(subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO, env=env,
                                    check=True).stdout)
     assert outs[0] == outs[1] and len(outs[0]) > 1000
+
+
+# ---------------------------------------------------------------------------
+# Added after the pre-audit critique
+# ---------------------------------------------------------------------------
+
+
+def test_dominance_check_flags_column_over_share():
+    """L: a column that drives the fused score far beyond its weight (the way a
+    free fit hands Spectra the score) is flagged; a fairly weighted one is not."""
+    rng = np.random.default_rng(21)
+    driver, other = rng.random(800), rng.random(800)
+    fused = 0.98 * driver + 0.02 * other
+    d = B.dominance({"spectra_like": driver, "other": other}, fused, {"spectra_like": 0.1, "other": 0.9})
+    assert d["spectra_like"]["flag"] is True and d["other"]["flag"] is False
+    d2 = B.dominance({"m1b": driver}, fused, {"m1b": 0.6})
+    assert d2["m1b"]["flag"] is False
+
+
+def test_bootstrap_ci_marks_holdout_degenerate_and_counts_missing_lj(world):
+    _, pops, rng = world
+    h = pops["holdout"]
+    ci = B.bootstrap_ci(h.y, h.y + rng.normal(0, 1, h.n), h.cluster, h.stratum, n=10)
+    assert ci["degenerate"] and "spoof" in ci["reason"]
+    inner = pops["inner"]
+    s = inner.y + rng.normal(0, 1, inner.n)
+    fixed = B.bootstrap_ci(inner.y, s, inner.cluster, inner.stratum, n=200, lj_mode="fixed")
+    sens = B.bootstrap_ci(inner.y, s, inner.cluster, inner.stratum, n=200, lj_mode="cluster")
+    assert fixed["draws_missing_lj"] == 0 and sens["draws_missing_lj"] > 0
+    for k in B.READINGS:
+        assert fixed[k]["p5"] <= fixed[k]["p50"] <= fixed[k]["p95"]
+
+
+def test_scorecards_carry_bootstrap_intervals(world):
+    bench = bench_with(world)
+    card = VB.rule_scorecard(bench, B.Rule("SHIP", dict(B.SHIP_WEIGHTS)), with_holdout=False, boot_n=30)
+    assert {"lj_fixed", "lj_resampled"} <= set(card["populations"]["inner"]["bootstrap"])
+    assert "stratified" in card["populations"]["itw"]["bootstrap"]
+    col = VB.column_scorecard(bench, "m1b_v3", with_holdout=False, boot_n=30)
+    assert col["populations"]["inner"]["bootstrap"]["lj_fixed"]["n"] == 30
+
+
+def test_commands_refuse_on_registry_mismatch(monkeypatch):
+    if not VB.REGISTRY.exists():
+        pytest.skip("no registry")
+    monkeypatch.setattr(VB, "check", lambda reg, trees=True: ["sha256 mismatch outputs/detector_scores/m1b_v3.csv"])
+    with pytest.raises(SystemExit, match="registry check failed"):
+        VB.require_registry()
+    ns = type("A", (), {"name": "x", "file": "f.csv", "itw": None, "holdout": False, "force": False, "lane": "t",
+                        "boot_n": 0})()
+    with pytest.raises(SystemExit, match="registry check failed"):
+        VB.cmd_score(ns)
+
+
+def test_score_name_sanitized():
+    assert VB.safe_name("wavlm_l.v2-hn") == "wavlm_l.v2-hn"
+    for bad in ("../evil", "a/b", "", ".hidden", "x..y"):
+        with pytest.raises(SystemExit):
+            VB.safe_name(bad)

@@ -27,7 +27,8 @@ _spec.loader.exec_module(VF)
 CAND = REPO / "benchmarks/v2_60_candidates.json"
 SPEC = REPO / "docs/specs/2026-10-11_v2-benchmark-fusion.md"
 HAVE_DATA = (REPO / "outputs/detector_scores/m1b_v3.csv").exists() and (REPO / "outputs/v2/benchmark/scores/xlsr_L20.csv").exists()
-needs_data = pytest.mark.skipif(not HAVE_DATA, reason="needs the gitignored score exports")
+def needs_data(f):
+    return pytest.mark.needs_data(pytest.mark.skipif(not HAVE_DATA, reason="needs the gitignored score exports")(f))
 TARGET = np.array([0.6, 0.2, 0.2, 0.0, 0.0])
 COLS = ["m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "wavlm_l", "xlsr_L20"]
 
@@ -250,8 +251,7 @@ def test_learned_readout_includes_holdout_and_itw_gap():
     inner = {"brief": 0.15, "package05": 0.33, "package03": 0.21}
     g = VF.population_gap(inner, {"brief": 0.01, "package05": 0.02, "package03": None})
     assert g == {"brief": pytest.approx(-0.14), "package05": pytest.approx(-0.31), "package03": None}
-    src = (REPO / "scripts/v2_fusion.py").read_text()
-    assert '"holdout": population_gap(' in src and '"itw": population_gap(' in src
+    assert VF.population_gap(inner, {}) == {"brief": None, "package05": None, "package03": None}
 
 
 def test_followon_refused_unless_c2_verdict_win():
@@ -307,6 +307,38 @@ def test_alpha_tie_breaks_to_larger_alpha():
     assert F.choose_alpha({0.0: 0.3, 0.25: 0.2, 0.5: 0.2 + 1e-13, 0.75: 0.25}) == 0.5
 
 
+def _e_world(seed=0, n=120):
+    """A world where Spectra fires on half the rows of both classes, so applying
+    E inside the alpha search changes the choice (seed 0: pre-E 0.0, post-E 0.75)."""
+    rng = np.random.default_rng(seed)
+    N = 5 * n
+    fold = np.array([str(i % 5) for i in range(N)])
+    y = (rng.random(N) < 0.5).astype(int)
+    L = np.column_stack([s * y + rng.normal(0, 1, N) for s in [0.8, 1.4, 0.6, 1.0, 0.5]])
+    spectra = np.where(rng.random(N) < 0.5, -5.0, 2.0)
+    return L, y, fold, spectra
+
+
+def test_alpha_pre_e_choice_differs_from_post_e_on_fixture():
+    L, y, fold, spectra = _e_world(0)
+    tr = fold != "0"
+    blocks = list(F.inner_inner_blocks(L, y, fold, tr))
+    post = {}
+    for a in F.ALPHA_GRID:
+        s, yy, m3 = [], [], []
+        for g, X, yb, w in blocks:
+            s.append(F.blend_cols(X, F.shrink(w, a, TARGET)))
+            yy.append(yb)
+            m3.append(spectra[tr & (fold == g)])
+        post[a] = B.reading(np.concatenate(yy), B.apply_e(np.concatenate(s), np.concatenate(m3))[0], "package05")
+    a_post = F.choose_alpha(post)
+    a_pre, _ = F.select_alpha(L, y, fold, tr, TARGET)
+    assert a_pre != a_post
+    assert a_pre == 0.0 and a_post == 0.75
+    r = F.run_c2_nested(L, y, fold, spectra, COLS, TARGET)
+    assert r["folds"]["0"]["alpha"] == a_pre
+
+
 def test_alpha_selected_on_package05_pre_e():
     """The per-alpha costs are pooled package-0.5 of the pre-E blocks, recomputed independently."""
     L, y, fold, _ = world(13)
@@ -334,12 +366,21 @@ def test_c2_has_no_platt_step():
 
 
 def test_c2_offinner_model_fit_on_all_inner_only():
-    import inspect
+    """Poison every non-inner population: the off-inner C2 weights do not move."""
+    from types import SimpleNamespace
 
-    params = list(inspect.signature(F.fit_c2_offinner).parameters)
-    assert params[:4] == ["L_inner", "y", "fold", "cols"]
-    src = inspect.getsource(VF.c2_offinner_weights)
-    assert '["inner"]' in src and "holdout" not in src and "itw" not in src
+    L, y, fold, _ = world(15)
+    pop = SimpleNamespace(y=y, fold=fold)
+    rng = np.random.default_rng(3)
+
+    def bench(scale):
+        cols = {c: {"inner": L[:, j], "holdout": scale * rng.normal(size=50), "itw": scale * rng.normal(size=40),
+                    "test": scale * rng.normal(size=10)} for j, c in enumerate(COLS)}
+        return SimpleNamespace(pops={"inner": pop}, cols=cols)
+
+    w1 = VF.c2_offinner_weights(bench(1.0), COLS, TARGET)["weights"]
+    w2 = VF.c2_offinner_weights(bench(1e6), COLS, TARGET)["weights"]
+    assert np.array_equal(w1, w2)
 
 
 def _p(b, p5, p3):
@@ -417,3 +458,63 @@ def test_inner_numbers_match_independent_early_look():
     assert got["C0"] == pytest.approx(0.339045, abs=1e-6)
     assert got["C1"] == pytest.approx(0.452, abs=5e-4)
     assert got["C3"] == pytest.approx(0.358, abs=5e-4)
+
+
+# ---------------------------------------------------------------------------
+# Added after the pre-audit critique
+# ---------------------------------------------------------------------------
+
+
+def test_c2_refuses_non_selectable_population():
+    L, y, fold, spectra = world(16)
+    for role in ("read_once", "report_only", "in_sample"):
+        with pytest.raises(B.BenchmarkError, match="never used for selection"):
+            F.run_c2_nested(L, y, fold, spectra, COLS, TARGET,
+                            population=B.Population("holdout", role, np.array(["k"]), np.array([0])))
+    r = F.run_c2_nested(L, y, fold, spectra, COLS, TARGET,
+                        population=B.Population("inner", "selectable", np.array(["k"]), np.array([0])))
+    assert r["platt"] is None
+
+
+def test_overfit_optimism_detects_known_overfit_column():
+    """Column 5 tracks the label in folds 0-3 and is reversed in fold 4: for outer
+    fold 4 the fit leans on it in-sample, and its edge over C0 collapses out of
+    fold, so optimism (advantage_oof - advantage_in) is clearly positive there."""
+    rng = np.random.default_rng(17)
+    n = 600
+    fold = np.array([str(i % 5) for i in range(n)])
+    y = (rng.random(n) < 0.5).astype(int)
+    sign = np.where(fold == "4", -1.0, 1.0)
+    L = np.column_stack([0.5 * y + rng.normal(0, 1, n), 0.3 * y + rng.normal(0, 1, n),
+                         0.3 * y + rng.normal(0, 1, n), rng.normal(0, 1, n), 3.0 * sign * y + rng.normal(0, 1, n)])
+    spectra = np.full(n, 5.0)
+    r = F.run_c2_nested(L, y, fold, spectra, COLS, TARGET)
+    f4 = r["folds"]["4"]
+    assert f4["advantage_in"]["package05"] < 0  # better than C0 in-sample
+    assert f4["optimism"]["package05"] > 0.2
+    assert f4["optimism"]["package05"] > max(r["folds"][f]["optimism"]["package05"] for f in "0123")
+    assert set(r["optimism_mean"]) == set(B.READINGS)
+
+
+def test_verdict_none_reading_raises():
+    c0 = _vin(_p(0.15, 0.3390, 0.21), 0.1649)
+    with pytest.raises(B.BenchmarkError, match="no value"):
+        F.verdict(c0, _vin(_p(0.15, None, 0.21), 0.1649), BANDS, 0.05)
+    with pytest.raises(B.BenchmarkError, match="no value"):
+        F.verdict(c0, _vin(_p(0.15, 0.30, 0.21), None), BANDS, 0.05)
+
+
+def test_report_refuses_stale_readout(tmp_path):
+    if not VF.VB.REGISTRY.exists():
+        pytest.skip("no registry")
+    blob = F.committed_blob_sha(CAND)
+    reg_sha = B.sha256_file(VF.VB.REGISTRY)
+    good = {"candidates_blob_sha": blob, "registry_sha256": reg_sha,
+            "candidates": {"C0": {"inner": {"pooled": {"brief": 0.1, "package05": 0.2, "package03": 0.1, "eer": 0.05},
+                                            "per_fold": {"4": {"package05": 0.1}}}}}, "verdicts": {}}
+    f = tmp_path / "r.json"
+    f.write_text(json.dumps(good))
+    assert "| C0 |" in VF.report(f)
+    f.write_text(json.dumps({**good, "registry_sha256": "old"}))
+    with pytest.raises(B.BenchmarkError, match="different registry"):
+        VF.report(f)

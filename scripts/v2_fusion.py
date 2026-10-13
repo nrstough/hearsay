@@ -125,6 +125,10 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
         raise B.BenchmarkError(f"registry check failed: {problems}")
     cols = cand["columns"]
     F.refuse_fit_feature(cols)
+    e = cand["e_rule"]
+    if (e["spectra_logit_below"], e["base_above"], e["multiply_by"]) != (
+            B.E_RULE["spectra_logit_below"], B.E_RULE["base_above"], B.E_RULE["multiply_by"]):
+        raise B.BenchmarkError(f"candidates e_rule {e} differs from the frozen E step {B.E_RULE}")
     bench = VB.load_bench(cols + [cand["e_column"]])
     inner = bench.pops["inner"]
     target = np.array([cand["candidates"]["C0"]["weights"][c] for c in cols])
@@ -139,14 +143,14 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
                                        "inner": inner_readout(bench, name, r["fused"], r["base"], r["e_mask"],
                                                               rule.weights, cols)}
     L = np.column_stack([bench.cols[c]["inner"] for c in cols])
-    c2 = F.run_c2_nested(L, inner.y, inner.fold, bench.cols[B.E_COLUMN]["inner"], cols, target)
+    c2 = F.run_c2_nested(L, inner.y, inner.fold, bench.cols[B.E_COLUMN]["inner"], cols, target, population=inner)
     scores["C2"] = c2["fused"]
     c2_diag = {f: {k: v for k, v in d.items()} for f, d in c2["folds"].items()}
     readout["candidates"]["C2"] = {
         "definition": cand["candidates"]["C2"],
         "inner": inner_readout(bench, "C2", c2["fused"], c2["base"], c2["e_mask"], c2["mean_weights"], cols),
         "c2": {"folds": c2_diag, "alpha_spread": c2["alpha_spread"], "alpha_at_grid_max_all": c2["alpha_at_grid_max_all"],
-               "mean_weights": c2["mean_weights"], "platt": None},
+               "optimism_mean": c2["optimism_mean"], "mean_weights": c2["mean_weights"], "platt": None},
     }
 
     # verdicts (nested inner only)
@@ -222,7 +226,15 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
             "itw": population_gap(inner_p, readout["itw"][n].get("pooled", {}))}
     shipped4 = ["m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist"]
     frames, labels = VB.cohort_holdout_frame(shipped4, bench.pops)
-    readout["holdout_cohort"] = VB.cohort_readout(bench, rules, frames, labels)
+    if dry_run:
+        readout["holdout_cohort"] = {"scored": False, "reason": "dry run: holdout cohort not read (holdout labels)"}
+    else:  # holdout labels: its own ledgered read for the candidate set
+        cdefs = [{"population": "holdout_cohort", **d} for d in defs]
+        co = B.read_holdout(cdefs, lambda: VB.cohort_readout(bench, rules, frames, labels), ledger=ledger,
+                            holdout_sha=VB.cohort_sha(frames, labels), meta=meta)
+        readout["holdout_cohort"] = co["readout"]
+        readout["holdout_cohort_ledger"] = co["ledger"]
+        readout["ledger_count"] = ledger.count()
     readout["itw_cohort"] = {"scored": False, "reason": "pending: cohort scoring job (Step 6, ask-first)"}
     thr = {n: readout["candidates"][n]["inner"]["counts"][B.PRIMARY]["threshold"] for n in rules}
     readout["mlaad"] = VB.mlaad_readout(bench, rules, thr)
@@ -235,6 +247,14 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
                     "code_sha": VB._code_sha(), "early_look_disclosure": cand["early_look_disclosure"],
                     "k1": cand["clarifications"]["K1"]})
     return readout
+
+
+def report(path: Path = OUT) -> str:
+    """Print the verdict table from a stored readout, refusing a stale one."""
+    readout = json.loads(Path(path).read_text())
+    F.check_readout_fresh(readout, candidates_blob=F.committed_blob_sha(CANDIDATES),
+                          registry_sha=B.sha256_file(VB.REGISTRY))
+    return summary(readout)
 
 
 def summary(readout: dict) -> str:
@@ -256,7 +276,11 @@ def main(argv=None) -> int:
     r.add_argument("--boot-n", type=int, default=2000)
     r.add_argument("--no-log", action="store_true")
     r.add_argument("--dry-run", action="store_true", help="no holdout read, no log row, writes *_dryrun.json")
+    sub.add_parser("report")
     a = ap.parse_args(argv)
+    if a.cmd == "report":
+        print(report())
+        return 0
     out = OUT.with_name("v2_60_readout_dryrun.json") if a.dry_run else OUT
     if out.exists() and not a.force:
         raise SystemExit(f"refusing to overwrite {out} (use --force)")

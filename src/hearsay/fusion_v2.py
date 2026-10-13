@@ -145,31 +145,52 @@ def fit_c2(L, y, fold, tr, target, *, grid=ALPHA_GRID, prior=PRIOR_FAKE) -> dict
             **info}
 
 
-def run_c2_nested(L, y, fold, spectra, cols, target, *, grid=ALPHA_GRID, prior=PRIOR_FAKE) -> dict:
+def _diff(a: dict, b: dict) -> dict:
+    return {k: (None if a[k] is None or b[k] is None else a[k] - b[k]) for k in B.READINGS}
+
+
+def run_c2_nested(L, y, fold, spectra, cols, target, *, population=None, grid=ALPHA_GRID,
+                  prior=PRIOR_FAKE) -> dict:
     """Nested OOF C2 on inner rows: per outer fold f, fit on the other folds
-    (references = those folds), score fold f, pool, then apply E (K1: no Platt)."""
+    (references = those folds), score fold f, pool, then apply E (K1: no Platt).
+
+    Overfitting (owner's P2 risk) is measured relative to C0 on the SAME rows:
+    advantage_in = cost(C2) - cost(C0) on the training folds (in-sample fit,
+    train-fold refs); advantage_oof = the same difference on fold f. optimism =
+    advantage_oof - advantage_in > 0 means C2's edge shrinks out of fold."""
+    if population is not None:
+        B.require_selectable(population)
     refuse_fit_feature(cols)
     L = np.asarray(L, dtype=float)
     y, fold = np.asarray(y), np.asarray(fold)
+    spectra = np.asarray(spectra, dtype=float)
+    target = np.asarray(target, dtype=float)
     base = np.empty(len(y))
     folds = {}
     for f in sorted(set(fold)):
         tr, te = fold != f, fold == f
         fit = fit_c2(L, y, fold, tr, target, grid=grid, prior=prior)
-        base[te] = blend_cols(rank_matrix(L, tr, te), fit["weights"])
-        in_base = blend_cols(rank_matrix(L, tr, tr), fit["weights"])
-        in_fused = B.apply_e(in_base, spectra[tr])[0]
-        oof_fused = B.apply_e(base[te], spectra[te])[0]
-        fit["in_sample"] = {k: B.reading(y[tr], in_fused, k) for k in B.READINGS}
-        fit["oof_fold"] = {k: B.reading(y[te], oof_fused, k) for k in B.READINGS}
-        fit["gap"] = {k: (None if fit["oof_fold"][k] is None or fit["in_sample"][k] is None
-                          else fit["oof_fold"][k] - fit["in_sample"][k]) for k in B.READINGS}
+        X_tr, X_te = rank_matrix(L, tr, tr), rank_matrix(L, tr, te)
+        base[te] = blend_cols(X_te, fit["weights"])
+        c2_in = B.apply_e(blend_cols(X_tr, fit["weights"]), spectra[tr])[0]
+        c0_in = B.apply_e(blend_cols(X_tr, target), spectra[tr])[0]
+        c2_te = B.apply_e(base[te], spectra[te])[0]
+        c0_te = B.apply_e(blend_cols(X_te, target), spectra[te])[0]
+        fit["in_sample"] = {k: B.reading(y[tr], c2_in, k) for k in B.READINGS}
+        fit["oof_fold"] = {k: B.reading(y[te], c2_te, k) for k in B.READINGS}
+        fit["gap"] = _diff(fit["oof_fold"], fit["in_sample"])
+        fit["advantage_in"] = _diff(fit["in_sample"], {k: B.reading(y[tr], c0_in, k) for k in B.READINGS})
+        fit["advantage_oof"] = _diff(fit["oof_fold"], {k: B.reading(y[te], c0_te, k) for k in B.READINGS})
+        fit["optimism"] = _diff(fit["advantage_oof"], fit["advantage_in"])
         folds[f] = fit
     fused, mask = B.apply_e(base, spectra)
     alphas = [folds[f]["alpha"] for f in folds]
+    optimism_mean = {k: (None if any(folds[f]["optimism"][k] is None for f in folds)
+                         else float(np.mean([folds[f]["optimism"][k] for f in folds]))) for k in B.READINGS}
     return {"cols": list(cols), "base": base, "fused": fused, "e_mask": mask, "folds": folds,
             "alpha_spread": float(max(alphas) - min(alphas)),
             "alpha_at_grid_max_all": all(folds[f]["alpha_at_grid_max"] for f in folds),
+            "optimism_mean": optimism_mean,
             "mean_weights": dict(zip(cols, np.mean([folds[f]["weights"] for f in folds], axis=0))),
             "platt": None}
 
@@ -206,6 +227,10 @@ def verdict(control: dict, cand: dict, bands: dict, f4_guard: float, *, label_pr
     for name, d in (("control", control), ("candidate", cand)):
         if d.get("basis") != BASIS:
             raise B.BenchmarkError(f"verdict reads nested inner OOF only; {name} basis is {d.get('basis')!r}")
+        missing = [k for k in bands if d["pooled"].get(k) is None] + (["f4_package05"] if d.get("f4_package05") is None
+                                                                       else [])
+        if missing:
+            raise B.BenchmarkError(f"verdict: {name} has no value for {missing}")
     reasons = []
     worse = {k: _tt(cand["pooled"][k]) - _tt(control["pooled"][k]) for k in bands}
     band = {k: _tt(bands[k]) for k in bands}

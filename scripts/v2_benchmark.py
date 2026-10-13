@@ -18,7 +18,7 @@ for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB
 
 import argparse
 import json
-import subprocess
+import re
 import sys
 from pathlib import Path
 
@@ -73,11 +73,33 @@ DEFERRED = {
 
 
 def _code_sha() -> str:
-    try:
-        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True,
-                              check=True).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
+    """HEAD plus a hash of uncommitted tracked changes (a dirty tree is visible)."""
+    return B.code_sha(REPO)
+
+
+NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+
+
+def safe_name(name: str) -> str:
+    if not NAME_RE.fullmatch(name) or ".." in name:
+        raise SystemExit(f"invalid --name {name!r}: letters, digits, '_', '.', '-' only")
+    return name
+
+
+def require_registry(*, trees: bool = False) -> dict:
+    """Every command that reads pinned inputs refuses unless the registry checks clean."""
+    if not REGISTRY.exists():
+        raise SystemExit(f"no registry at {REGISTRY}; run `registry --build` first")
+    reg = B.load_registry(REGISTRY)
+    problems = check(reg, trees=trees)
+    if problems:
+        raise SystemExit("registry check failed:\n" + "\n".join(problems))
+    return reg
+
+
+def main_sha(sf: B.ScoreFile) -> str:
+    """sha256 of the score file itself (not its ITW override)."""
+    return next(iter(sf.shas.values()))
 
 
 def write_json(path: Path, obj, *, force: bool) -> None:
@@ -205,9 +227,22 @@ def holdout_sha(pops) -> str:
     return B.sha256_json({"keys": list(h.keys), "y": h.y.tolist(), "fold": list(h.fold)})
 
 
-def readout_scores(pops, scores_by_pop: dict, *, inner_counts=True) -> dict:
+def bootstrap_block(pop, s, boot_n: int) -> dict:
+    """K7 intervals for one population: inner gets the primary (LJ fixed) and the
+    sensitivity (LJ resampled) rows; holdout and ITW get one stratified row
+    (holdout is marked degenerate: 2 spoof generators)."""
+    if boot_n <= 0 or pop.cluster is None:
+        return {}
+    if pop.name == "inner":
+        return {"lj_fixed": B.bootstrap_ci(pop.y, s, pop.cluster, pop.stratum, n=boot_n, lj_mode="fixed"),
+                "lj_resampled": B.bootstrap_ci(pop.y, s, pop.cluster, pop.stratum, n=boot_n, lj_mode="cluster")}
+    return {"stratified": B.bootstrap_ci(pop.y, s, pop.cluster, pop.stratum, n=boot_n)}
+
+
+def readout_scores(pops, scores_by_pop: dict, *, inner_counts=True, boot_n: int = 0) -> dict:
     """Readings per population given {pop: scores}. Inner gets the fold table and
-    thresholded counts (each naming its reading and threshold)."""
+    thresholded counts (each naming its reading and threshold); boot_n > 0 adds
+    the K7 bootstrap intervals."""
     out = {}
     for p, s in scores_by_pop.items():
         if s is None:
@@ -223,18 +258,31 @@ def readout_scores(pops, scores_by_pop: dict, *, inner_counts=True) -> dict:
         else:
             out[p] = {"pooled": B.readings(pop.y, s),
                       "counts": {k: B.counts_at(pop.y, s, k) for k in B.READINGS}}
+        if boot_n:
+            out[p]["bootstrap"] = bootstrap_block(pop, s, boot_n)
     return out
 
 
 def cohort_holdout_frame(columns, pops):
-    """The legacy holdout perturbation cohort (four shipped columns, wide)."""
+    """The legacy holdout perturbation cohort (four shipped columns, wide): 500
+    holdout clips x 5 kinds, 250 real + 250 spoof per kind. Its labels are
+    holdout labels, so every readout of it goes through the ledger."""
     path = REPO / "outputs/channel/m3_perturb.csv"
     frames = {c: B.read_cohort_file(path, column=c) for c in columns}
     keys = frames[columns[0]]
     yv = pd.Series(pops["holdout"].y, index=pops["holdout"].keys)
     if not set(keys["key"]) <= set(yv.index):
         raise B.BenchmarkError("holdout cohort paths are not all holdout rows")
+    for kind in B.COHORT_KINDS:
+        y = yv.reindex(keys[keys["kind"] == kind]["key"]).to_numpy()
+        if int((y == 0).sum()) != 250 or int((y == 1).sum()) != 250:
+            raise B.BenchmarkError(f"holdout cohort kind {kind}: expected 250 real + 250 spoof")
     return frames, yv
+
+
+def cohort_sha(frames: dict, labels: pd.Series) -> str:
+    keys = sorted(set(next(iter(frames.values()))["key"]))
+    return B.sha256_json({"cohort_keys": keys, "y": labels.reindex(keys).astype(int).tolist()})
 
 
 def cohort_readout(bench: B.Bench, rules: dict, frames: dict, labels: pd.Series) -> dict:
@@ -271,6 +319,11 @@ def mlaad_readout(bench: B.Bench, rules: dict, thresholds: dict) -> dict:
     threshold. In-sample for any rule containing M5: readout only."""
     path = REPO / "outputs/channel/m3_mlaad.csv"
     df = pd.read_csv(path)
+    keys = [B.canonical_key(p) for p in df["path"]]
+    if len(df) != 572 or len(set(keys)) != len(keys):
+        raise B.BenchmarkError(f"MLAAD cohort: expected 572 unique paths, got {len(df)} rows / {len(set(keys))} unique")
+    if set(df["label"].astype(str)) != {"spoof"}:
+        raise B.BenchmarkError("MLAAD cohort must be spoof only")
     out = {}
     for rname, rule in rules.items():
         need = [c for c, w in rule.weights.items() if w > 0]
@@ -288,7 +341,7 @@ def mlaad_readout(bench: B.Bench, rules: dict, thresholds: dict) -> dict:
     return out
 
 
-def column_scorecard(bench: B.Bench, name: str, *, with_holdout: bool) -> dict:
+def column_scorecard(bench: B.Bench, name: str, *, with_holdout: bool, boot_n: int = 2000) -> dict:
     pops = bench.pops
     cols = bench.cols[name]
     scores = {p: cols[p] for p in ("inner", "itw")}
@@ -296,7 +349,7 @@ def column_scorecard(bench: B.Bench, name: str, *, with_holdout: bool) -> dict:
         scores["holdout"] = cols["holdout"]
     card = {"column": name, "inputs": bench.files[name].shas, "itw_source": bench.files[name].itw_source,
             "direction_auc_inner": B.direction_guard(pops["inner"].y, cols["inner"], name),
-            "populations": readout_scores(pops, scores)}
+            "populations": readout_scores(pops, scores, boot_n=boot_n)}
     if cols["test"] is not None:
         thr = card["populations"]["inner"]["counts"][B.PRIMARY]["threshold"]
         t = np.inf if thr == "inf" else float(thr)
@@ -306,7 +359,7 @@ def column_scorecard(bench: B.Bench, name: str, *, with_holdout: bool) -> dict:
 
 
 def rule_scorecard(bench: B.Bench, rule: B.Rule, *, refs="nested", with_holdout: bool,
-                   control: B.Rule | None = None) -> dict:
+                   control: B.Rule | None = None, boot_n: int = 2000) -> dict:
     pops = bench.pops
     res = {p: bench.score_rule(rule, p, refs) for p in ("inner", "holdout", "itw", "test")}
     noe = B.Rule(rule.name + " (no E)", rule.weights, e=False)
@@ -319,7 +372,7 @@ def rule_scorecard(bench: B.Bench, rule: B.Rule, *, refs="nested", with_holdout:
     if with_holdout:
         scores["holdout"] = fused(res["holdout"])
     card = {"rule": rule.name, "definition": rule.definition(), "inner_refs": refs,
-            "populations": readout_scores(pops, scores),
+            "populations": readout_scores(pops, scores, boot_n=boot_n),
             "without_e": readout_scores(pops, {p: fused(r) for p, r in res_noe.items()}, inner_counts=False)}
     if res["inner"]["scored"]:
         inner = pops["inner"]
@@ -349,37 +402,51 @@ def rule_scorecard(bench: B.Bench, rule: B.Rule, *, refs="nested", with_holdout:
 
 
 def cmd_score(a) -> None:
+    reg = require_registry(trees=False)
+    name = safe_name(a.name)
     pops = B.load_populations()
     bench = B.Bench(pops)
-    sf = B.read_score_file(a.file, name=a.name, itw=a.itw)
+    sf = B.read_score_file(a.file, name=name, itw=a.itw)
     bench.add(sf)
-    card = column_scorecard(bench, a.name, with_holdout=False)
+    card = column_scorecard(bench, name, with_holdout=False, boot_n=a.boot_n)
     if a.holdout:
-        ledger = B.HoldoutLedger.default()
         res = B.read_holdout(
-            [{"kind": "column", "name": a.name}],
-            lambda: readout_scores(pops, {"holdout": bench.cols[a.name]["holdout"]})["holdout"],
-            ledger=ledger, holdout_sha=holdout_sha(pops),
+            [B.column_def(name, main_sha(sf))],
+            lambda: readout_scores(pops, {"holdout": bench.cols[name]["holdout"]}, boot_n=a.boot_n)["holdout"],
+            ledger=B.HoldoutLedger.default(), holdout_sha=holdout_sha(pops), pinned=reg["inputs"],
             meta={"code_sha": _code_sha(), "input_shas": sf.shas, "lane": a.lane})
         card["populations"]["holdout"] = res["readout"]
         card["holdout_ledger"] = res["ledger"]
-    card["benchmark_version"] = B.load_registry(REGISTRY)["version"] if REGISTRY.exists() else B.BENCHMARK_VERSION
+    card["benchmark_version"] = reg["version"]
+    card["registry_sha256"] = B.sha256_file(REGISTRY)
     card["lane"] = a.lane
-    write_json(OUT / f"{a.name}.json", card, force=a.force)
-    print(json.dumps(B.clean(card["populations"]["inner"]["pooled"]), sort_keys=True))
+    write_json(OUT / f"{name}.json", card, force=a.force)
+    print(score_markdown_row(name, card))
+
+
+def score_markdown_row(name: str, card: dict) -> str:
+    """The Interface v1 markdown scorecard row (pooled readings per population)."""
+    lines = ["| What | Population | brief | package-0.5 | package-0.3 | EER |", "|---|---|---|---|---|---|"]
+    for p in ("inner", "holdout", "itw"):
+        r = card["populations"].get(p, {}).get("pooled")
+        if r:
+            lines.append(f"| {name} | {p} | {_fmt(r['brief'])} | {_fmt(r['package05'])} | "
+                         f"{_fmt(r['package03'])} | {_fmt(r['eer'])} |")
+    return "\n".join(lines)
 
 
 def cmd_rule(a) -> None:
+    reg = require_registry(trees=False)
     spec = json.loads(Path(a.rule).read_text())
-    rule = B.Rule(spec["name"], spec["weights"], bool(spec.get("e", True)))
+    rule = B.Rule(safe_name(spec["name"]), spec["weights"], bool(spec.get("e", True)))
     need = [c for c, w in rule.weights.items() if w > 0] + ([B.E_COLUMN] if rule.e else [])
     bench = load_bench(need)
-    card = rule_scorecard(bench, rule, refs=spec.get("refs", "nested"), with_holdout=False)
+    card = rule_scorecard(bench, rule, refs=spec.get("refs", "nested"), with_holdout=False, boot_n=a.boot_n)
     if a.holdout:
-        defn = {**rule.definition(), "refs": "full"}
+        defn = {**rule.definition(), "refs": "full", "inputs": {n: main_sha(f) for n, f in bench.files.items()}}
         res = B.read_holdout([defn], lambda: readout_scores(
-            bench.pops, {"holdout": bench.score_rule(rule, "holdout")["fused"]})["holdout"],
-            ledger=B.HoldoutLedger.default(), holdout_sha=holdout_sha(bench.pops),
+            bench.pops, {"holdout": bench.score_rule(rule, "holdout")["fused"]}, boot_n=a.boot_n)["holdout"],
+            ledger=B.HoldoutLedger.default(), holdout_sha=holdout_sha(bench.pops), pinned=reg["inputs"],
             meta={"code_sha": _code_sha(), "input_shas": {n: f.shas for n, f in bench.files.items()}})
         card["populations"]["holdout"] = res["readout"]
         card["holdout_ledger"] = res["ledger"]
@@ -387,52 +454,88 @@ def cmd_rule(a) -> None:
     print(json.dumps(B.clean(card["populations"]["inner"]["pooled"]), sort_keys=True))
 
 
-def v1_scorecard() -> dict:
+LEGACY_BASELINE_NOTE = ("the v1 baseline set was first read on 2026-10-12 under a name-only ledger key; the "
+                        "sha-bound key is recorded as an alias of that read (not a new read) when the files are unchanged")
+
+
+def baseline_holdout(bench, others, ledger, hsha, meta, pinned, boot_n):
+    """The 'benchmark-v1 baseline' holdout read for the non-reference columns,
+    keyed by name + file sha. A completed read under the earlier name-only key
+    is aliased (same read, same files) instead of read again."""
+    pops = bench.pops
+    defs = [B.column_def(c, main_sha(bench.files[c])) for c in others]
+    key = B.ledger_key(defs, hsha)
+    legacy = B.ledger_key([{"kind": "column", "name": c} for c in others], hsha)
+    note = None
+    if ledger.persisted(key) is None and ledger.persisted(legacy) is not None:
+        old = ledger.persisted(legacy)
+        old_shas = old.get("meta", {}).get("input_shas", {})
+        if all(old_shas.get(c) == bench.files[c].shas for c in others):
+            ledger.alias(key, legacy, meta)
+            note = LEGACY_BASELINE_NOTE
+    res = B.read_holdout(defs, lambda: {c: readout_scores(pops, {"holdout": bench.cols[c]["holdout"]},
+                                                         boot_n=boot_n)["holdout"] for c in others},
+                         ledger=ledger, holdout_sha=hsha, meta=meta, pinned=pinned)
+    return res, note
+
+
+def v1_scorecard(boot_n: int = 2000) -> dict:
     """v1's full baseline scorecard: each column and the shipped rule, on every
-    population we hold. Holdout: m1b_v3 and SHIP under the reference exemption;
-    the other columns as one ledgered set ('benchmark-v1 baseline')."""
-    reg = B.load_registry(REGISTRY)
+    population we hold. Holdout: m1b_v3 and SHIP under the registry-pinned
+    reference exemption; the other columns as one ledgered set ('benchmark-v1
+    baseline'); the holdout perturbation cohort as its own ledgered read."""
+    reg = require_registry(trees=True)
+    pinned = reg["inputs"]
     bench = load_bench()
     pops = bench.pops
     ship = B.Rule("SHIP", dict(B.SHIP_WEIGHTS))
     out = {"benchmark_version": reg["version"], "registry_sha256": B.sha256_file(REGISTRY),
            "code_sha": _code_sha(), "columns": {}, "rules": {}}
     for name in COLUMNS:
-        out["columns"][name] = column_scorecard(bench, name, with_holdout=False)
+        out["columns"][name] = column_scorecard(bench, name, with_holdout=False, boot_n=boot_n)
     ledger = B.HoldoutLedger.default()
     hsha = holdout_sha(pops)
     meta = {"code_sha": _code_sha(), "input_shas": {n: f.shas for n, f in bench.files.items()}}
-    ref = B.read_holdout([{"kind": "column", "name": "m1b_v3"}],
-                         lambda: readout_scores(pops, {"holdout": bench.cols["m1b_v3"]["holdout"]})["holdout"],
-                         ledger=ledger, holdout_sha=hsha, meta=meta)
+    shas = {n: main_sha(f) for n, f in bench.files.items()}
+
+    def hold(scores):
+        return readout_scores(pops, {"holdout": scores}, boot_n=boot_n)["holdout"]
+
+    ref = B.read_holdout([B.column_def("m1b_v3", shas["m1b_v3"])], lambda: hold(bench.cols["m1b_v3"]["holdout"]),
+                         ledger=ledger, holdout_sha=hsha, meta=meta, pinned=pinned)
     out["columns"]["m1b_v3"]["populations"]["holdout"] = ref["readout"]
     out["columns"]["m1b_v3"]["holdout_ledger"] = ref["ledger"]
     others = [c for c in COLUMNS if c != "m1b_v3"]
-    base = B.read_holdout([{"kind": "column", "name": c} for c in others],
-                          lambda: {c: readout_scores(pops, {"holdout": bench.cols[c]["holdout"]})["holdout"]
-                                   for c in others},
-                          ledger=ledger, holdout_sha=hsha, meta=meta)
+    base, note = baseline_holdout(bench, others, ledger, hsha, meta, pinned, boot_n)
     for c in others:
         out["columns"][c]["populations"]["holdout"] = base["readout"][c]
         out["columns"][c]["holdout_ledger"] = base["ledger"] + " (benchmark-v1 baseline set)"
+    if note:
+        out["ledger_note"] = note
     for refs in ("transductive", "nested"):
-        out["rules"][f"SHIP_{refs}"] = rule_scorecard(bench, ship, refs=refs, with_holdout=False)
-    sh = B.read_holdout([{**ship.definition(), "refs": "full"}],
-                        lambda: readout_scores(pops, {"holdout": bench.score_rule(ship, "holdout")["fused"]})["holdout"],
-                        ledger=ledger, holdout_sha=hsha, meta=meta)
+        out["rules"][f"SHIP_{refs}"] = rule_scorecard(bench, ship, refs=refs, with_holdout=False, boot_n=boot_n)
+    ship_inputs = {c: shas[c] for c in B.REFERENCE_COLUMN_FILES}
+    sh = B.read_holdout([B.ship_def(ship_inputs)], lambda: hold(bench.score_rule(ship, "holdout")["fused"]),
+                        ledger=ledger, holdout_sha=hsha, meta=meta, pinned=pinned)
     for refs in ("transductive", "nested"):
         out["rules"][f"SHIP_{refs}"]["populations"]["holdout"] = sh["readout"]
         out["rules"][f"SHIP_{refs}"]["holdout_ledger"] = sh["ledger"] + " (holdout uses all-inner refs)"
-    # cohorts and MLAAD (report-only)
+    # holdout perturbation cohort: holdout labels, so ledgered
     shipped4 = ["m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist"]
     frames, labels = cohort_holdout_frame(shipped4, pops)
     single = {c: B.Rule(c, {c: 1.0}, e=False) for c in shipped4 if c != B.E_COLUMN}
-    out["holdout_cohort"] = cohort_readout(bench, {"SHIP": ship, **single}, frames, labels)
+    cohort_rules = {"SHIP": ship, **single}
+    cdefs = [{"population": "holdout_cohort", "name": n, **r.definition(),
+              "inputs": {c: shas[c] for c in shipped4}} for n, r in cohort_rules.items()]
+    co = B.read_holdout(cdefs, lambda: cohort_readout(bench, cohort_rules, frames, labels), ledger=ledger,
+                        holdout_sha=cohort_sha(frames, labels), meta=meta, pinned=pinned)
+    out["holdout_cohort"] = co["readout"]
+    out["holdout_cohort_ledger"] = co["ledger"]
     thr = {"SHIP": out["rules"]["SHIP_nested"]["populations"]["inner"]["counts"][B.PRIMARY]["threshold"]}
     for c in single:
         r = bench.score_rule(single[c], "inner", "nested")["fused"]
         thr[c] = B.counts_at(pops["inner"].y, r, B.PRIMARY)["threshold"]
-    out["mlaad"] = mlaad_readout(bench, {"SHIP": ship, **single}, thr)
+    out["mlaad"] = mlaad_readout(bench, cohort_rules, thr)
     out["ledger_count"] = ledger.count()
     out["pending"] = reg.get("pending", {})
     out["deferred"] = reg.get("deferred", {})
@@ -479,12 +582,15 @@ def main(argv=None) -> int:
     s.add_argument("--lane", default="unknown")
     s.add_argument("--holdout", action="store_true")
     s.add_argument("--force", action="store_true")
+    s.add_argument("--boot-n", type=int, default=2000)
     ru = sub.add_parser("rule")
     ru.add_argument("--rule", required=True)
     ru.add_argument("--holdout", action="store_true")
     ru.add_argument("--force", action="store_true")
+    ru.add_argument("--boot-n", type=int, default=2000)
     v = sub.add_parser("v1-scorecard")
     v.add_argument("--force", action="store_true")
+    v.add_argument("--boot-n", type=int, default=2000)
     a = ap.parse_args(argv)
     if a.cmd == "adapt-l20":
         df = adapt_l20()
@@ -504,7 +610,7 @@ def main(argv=None) -> int:
     elif a.cmd == "rule":
         cmd_rule(a)
     elif a.cmd == "v1-scorecard":
-        card = v1_scorecard()
+        card = v1_scorecard(a.boot_n)
         write_json(OUT / "v1_scorecard.json", card, force=a.force)
         print(markdown_rows(card))
     return 0
