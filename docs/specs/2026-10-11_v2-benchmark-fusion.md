@@ -272,6 +272,16 @@ Output: `outputs/v2/benchmark/<name>.json` + a markdown scorecard row. Every rea
 5. Full suite not runnable in Codex's sandbox. **Re-run locally after these fixes: 995 passed, 12 skipped (baseline 847 + 148 new), ruff clean.** (The audit record's absolute links broke the strict docs-site build; they are rewritten as code paths after each audit run.)
 6. Stale bookkeeping (ledger count, empty-reservation behaviour). **Fixed** in Results.
 
+**Round 3 (Oct 13): Fail** (audit file overwritten again). Scope, Freeze integrity and Test sensitivity Excellent; Regression and Documentation Acceptable. Findings and responses:
+
+1. Cohort readouts for C1/C3 (holdout cohort) and all candidates (ITW cohort) still missing. **Open: needs Nathan's compute approval** (Step 6). The code path is complete and tested; the run, a registry rebuild (v1.1) and regenerated readouts follow it.
+2. New cohort files were not hash-pinned. **Fixed:** `load_cohort_frames` refuses any per-column cohort file that is not pinned in the registry or whose sha256 changed; `registry --build` pins every cohort file present; the holdout-cohort ledger definition and the run metadata carry each new file's sha256 (a changed file is a new, counted read). Tests: `test_cohort_files_must_be_pinned_and_unchanged`, `test_cohort_key_extra_records_file_shas`.
+3. Follow-on on a provisional WIN. **Open: Nathan's decision** (unchanged; moot while C2 TIEs).
+4. Results of this experiment are exploratory where provenance is incomplete (second-order stacking leakage; historical out-of-ledger cohort reads). **Agreed and already stated** in the verdict report (C2 WIN would be provisional; cohort numbers exploratory). No further change.
+5. Full suite not runnable in Codex's sandbox. **Local: 997 passed, 12 skipped (baseline 847 + 150 new), ruff clean.**
+
+The audit loop stops here: every remaining Fail item needs a decision only Nathan can make (compute approval; the follow-on gate).
+
 ## Test break check
 
 - **Test:** `tests/test_benchmark.py::test_nested_refs_exclude_scored_fold`, the P2 candidate. It guards the leak that already happened (rows ranked against their own fold).

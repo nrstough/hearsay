@@ -232,17 +232,22 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
         readout["gaps"][n] = {
             "holdout": population_gap(inner_p, readout["holdout"][n].get("pooled", {})),
             "itw": population_gap(inner_p, readout["itw"][n].get("pooled", {}))}
-    frames, labels = VB.load_cohort_frames("holdout", bench.pops)
+    frames, labels = VB.load_cohort_frames("holdout", bench.pops, pinned=reg["inputs"])
+    holdout_cohort_files = VB.cohort_file_shas("holdout", frames, reg["inputs"])
     if dry_run:
         readout["holdout_cohort"] = {"scored": False, "reason": "dry run: holdout cohort not read (holdout labels)"}
     else:  # holdout labels: its own ledgered read for the candidate set
-        cdefs = [{"population": "holdout_cohort", **d, **VB.cohort_key_extra(frames)} for d in defs]
+        cdefs = [{"population": "holdout_cohort", **d, **VB.cohort_key_extra(frames, holdout_cohort_files)}
+                 for d in defs]
         co = B.read_holdout(cdefs, lambda: VB.cohort_readout(bench, rules, frames, labels), ledger=ledger,
-                            holdout_sha=VB.cohort_sha(frames, labels), meta=meta)
+                            holdout_sha=VB.cohort_sha(frames, labels),
+                            meta={**meta, "cohort_files": holdout_cohort_files})
         readout["holdout_cohort"] = co["readout"]
         readout["holdout_cohort_ledger"] = co["ledger"]
         readout["ledger_count"] = ledger.count()
-    itw_frames, itw_labels = VB.load_cohort_frames("itw", bench.pops)
+    itw_frames, itw_labels = VB.load_cohort_frames("itw", bench.pops, pinned=reg["inputs"])
+    readout["cohort_files"] = {"holdout": holdout_cohort_files,
+                               "itw": VB.cohort_file_shas("itw", itw_frames, reg["inputs"])}
     readout["itw_cohort"] = (VB.cohort_readout(bench, rules, itw_frames, itw_labels) if itw_frames else
                              {"scored": False, "reason": "pending: no ITW cohort files yet (Step 6, ask-first)"})
     thr = {n: readout["candidates"][n]["inner"]["counts"][B.PRIMARY]["threshold"] for n in rules}

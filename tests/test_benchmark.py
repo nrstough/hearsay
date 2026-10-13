@@ -1322,17 +1322,23 @@ def _write_itw_cohort(world, cohort_dir, cols, per_class=10, shift_keys=False):
         pd.DataFrame(rows).to_csv(out, index=False)
 
 
+def _pins(root):
+    return {f.relative_to(root).as_posix(): {"sha256": B.sha256_file(f)} for f in Path(root).rglob("*.csv")}
+
+
 def test_cohort_files_integrate_into_readouts(world, tmp_path):
     """Files written for the new columns are loaded and make the option-B rules scorable on the cohort."""
     bench = bench_with(world, names=ALL_COLS)
     _write_itw_cohort(world, tmp_path, ALL_COLS)
-    frames, labels = VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10)
+    frames, labels = VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10,
+                                           pinned=_pins(tmp_path), root=tmp_path)
     assert set(frames) == set(ALL_COLS)
     c1 = B.Rule("C1", {c: 0.2 for c in ALL_COLS if c != "spectra_aasist"})
     out = VB.cohort_readout(bench, {"C1": c1, "SHIP": B.Rule("SHIP", dict(B.SHIP_WEIGHTS))}, frames, labels)
     for kind in B.COHORT_KINDS:
         assert out["C1"][kind]["package05"] is not None and out["SHIP"][kind]["brief"] is not None
-    frames4, _ = VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path / "none", legacy=False, per_class=10)
+    frames4, _ = VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path / "none", legacy=False, per_class=10,
+                                       pinned={}, root=tmp_path)
     assert frames4 == {}
 
 
@@ -1340,16 +1346,19 @@ def test_cohort_files_with_different_rows_refused(world, tmp_path):
     bench = bench_with(world, names=ALL_COLS)
     _write_itw_cohort(world, tmp_path, ("m1b_v3", "wavlm_l"), shift_keys=True)
     with pytest.raises(B.BenchmarkError, match="different"):
-        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10)
+        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10,
+                              pinned=_pins(tmp_path), root=tmp_path)
     _write_itw_cohort(world, tmp_path / "u", ("m1b_v3",), per_class=9)
     with pytest.raises(B.BenchmarkError, match="10 \\+ 10"):
-        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path / "u", legacy=False, per_class=10)
+        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path / "u", legacy=False, per_class=10,
+                              pinned=_pins(tmp_path), root=tmp_path)
 
 
 def test_cohort_key_extra_keeps_legacy_keys():
     legacy = {c: None for c in VB.LEGACY_HOLDOUT_COHORT}
     assert VB.cohort_key_extra(legacy) == {}
-    assert VB.cohort_key_extra({**legacy, "wavlm_l": None}) == {"cohort_columns": sorted([*legacy, "wavlm_l"])}
+    assert VB.cohort_key_extra({**legacy, "wavlm_l": None}, {"wavlm_l": "s"}) == {
+        "cohort_columns": sorted([*legacy, "wavlm_l"]), "cohort_files": {"wavlm_l": "s"}}
 
 
 def test_fusion_itw_block_has_bootstrap_and_without_e(world):
@@ -1363,3 +1372,31 @@ def test_fusion_itw_block_has_bootstrap_and_without_e(world):
                                                                                     "package03", "eer"}
     miss = vf.itw_block(bench, B.Rule("C1", {"m1b_v3": 0.5, "wavlm_l": 0.5}), 20)
     assert miss["scored"] is False
+
+
+def test_cohort_files_must_be_pinned_and_unchanged(world, tmp_path):
+    """Codex audit round 3: an unpinned or modified cohort file is refused, never silently read."""
+    bench = bench_with(world, names=ALL_COLS)
+    _write_itw_cohort(world, tmp_path, ("m1b_v3", "wavlm_l"))
+    pins = _pins(tmp_path)
+    VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10, pinned=pins,
+                          root=tmp_path)
+    unpinned = {k: v for k, v in pins.items() if not k.endswith("wavlm_l.csv")}
+    with pytest.raises(B.BenchmarkError, match="not pinned"):
+        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10, pinned=unpinned,
+                              root=tmp_path)
+    f = tmp_path / "itw" / "wavlm_l.csv"
+    df = pd.read_csv(f)
+    df.loc[0, "logit"] = df.loc[0, "logit"] + 1.0
+    df.to_csv(f, index=False)
+    with pytest.raises(B.BenchmarkError, match="changed since it was pinned"):
+        VB.load_cohort_frames("itw", bench.pops, cohort_dir=tmp_path, legacy=False, per_class=10, pinned=pins,
+                              root=tmp_path)
+
+
+def test_cohort_key_extra_records_file_shas():
+    legacy = {c: None for c in VB.LEGACY_HOLDOUT_COHORT}
+    a = VB.cohort_key_extra({**legacy, "wavlm_l": None}, {"wavlm_l": "s1"})
+    b = VB.cohort_key_extra({**legacy, "wavlm_l": None}, {"wavlm_l": "s2"})
+    assert a != b and a["cohort_files"] == {"wavlm_l": "s1"}
+    assert VB.cohort_key_extra(legacy, {}) == {}

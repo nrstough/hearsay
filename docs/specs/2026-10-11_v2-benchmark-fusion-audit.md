@@ -2,26 +2,24 @@
 
 | Dimension | Grade | Notes |
 |-----------|-------|-------|
-| Plan adherence | Fail | Full-readout acceptance remains unmet; cohort integration and some required statistics are missing. |
-| Scope discipline | Excellent | Changes stay within the documented implementation and documentation scope. |
-| Test coverage | Fail | Named tests exist, but they do not establish complete candidate readouts or cohort integration. |
-| Review compliance | Fail | The provisional-WIN follow-on finding remains unresolved. |
-| Freeze integrity | Excellent | Frozen text is unchanged; candidate/spec hashes validate. Owner statements include both required risks. |
-| Regression check | Acceptable | Lint passes; reference values, TSV parity and determinism reproduce. Full pytest execution is sandbox-blocked. |
-| Documentation | Acceptable | Pending work and limitations are disclosed; minor bookkeeping is stale. |
-| Test sensitivity | Excellent | Realistic transductive-rank mutation is caught immediately; no committed mutation found. |
-| **Overall** | **Fail** | Acceptance and review requirements remain open. |
+| Plan adherence | Fail | Required cohort readouts remain incomplete; new cohort inputs bypass hash pinning. |
+| Scope discipline | Excellent | Changes stay within the declared implementation and documentation scope. |
+| Test coverage | Fail | Full-readout acceptance remains unmet; cohort provenance enforcement lacks coverage. |
+| Review compliance | Fail | Provisional-WIN follow-on gate remains unresolved. |
+| Freeze integrity | Excellent | Frozen text and candidate hashes match; amendments are separate; both owner risk statements exist. |
+| Regression check | Acceptable | Reference, TSV-parity and determinism assertions pass directly; ruff passes. Full pytest independently blocked by sandbox permissions. |
+| Documentation | Acceptable | Scoped documentation records pending work and historical evaluation exceptions. |
+| Test sensitivity | Excellent | Recorded realistic leakage mutation caught on first attempt; mutation absent from commit history. |
+| **Overall** | **Fail** | |
 
 ### Commentary
 
-1. **Plan adherence / Test coverage — causes Fail.** The cohort work is incomplete beyond awaiting compute approval. v2_fusion.py (`scripts/v2_fusion.py:227`) loads only the four legacy holdout columns and unconditionally marks ITW cohorts pending. Producing the new CSVs alone cannot complete the readouts. Connect the new files to the registry and both reporting paths, add an integration test, then complete the approved compute and regenerate reports. Until then, “all four candidates have full readouts” is unmet.
+1. **Plan adherence / Test coverage — causes Fail.** Required cohort evaluations remain unfinished. C1/C3 lack holdout-cohort results, and all candidates lack ITW-cohort results, as acknowledged in the run spec (`docs/specs/2026-10-11_v2-benchmark-fusion.md:301`). Waiting for the specified compute approval is appropriate, but “all four candidates have full readouts” is still unmet. Complete the approved scoring, pin its inputs, and regenerate the readouts before claiming acceptance.
 
-2. **Plan adherence / Test coverage — causes Fail.** Already-scored populations also lack required readout fields. The fusion ITW output (`scripts/v2_fusion.py:214`) contains only pooled metrics for every candidate; it lacks speaker-cluster intervals and without-E results. The saved JSON confirms this. Holdout likewise lacks without-E results. Reuse the benchmark reporting functions and test the complete output schema, including explicit degenerate-interval markers where applicable.
+2. **Plan adherence / Test coverage — causes Fail.** load_cohort_frames (`scripts/v2_benchmark.py:287`) loads every cohort CSV without requiring a registry entry or verifying its hash. Registry construction uses fixed input lists that omit these files. The fusion reservation metadata (`scripts/v2_fusion.py:208`) also omits their hashes; `cohort_sha` hashes only paths and labels. Consequently, changed cohort logits can alter ITW results without changing recorded provenance, or resume a holdout reservation despite changed inputs. Require registry pins for consumed cohort files, record their hashes in reservation metadata, and test refusal of unpinned and modified files.
 
-3. **Review compliance — causes Fail.** followon_allowed (`src/hearsay/fusion_v2.py:252`) still accepts `WIN (provisional)` despite the documented second-order stacking leakage. This is the unresolved critical review finding; C2’s current TIE merely leaves the branch unused. Preserve the historical declaration, but add a dated amendment requiring independent validation before authorizing a follow-on.
+3. **Review compliance — causes Fail.** followon_allowed (`src/hearsay/fusion_v2.py:252`) accepts `WIN (provisional)`, despite the critical review finding about second-order stacking leakage. The current TIE prevents execution here but does not resolve the gate. Preserve the historical pre-declaration and record a prospective amendment requiring independent validation before authorizing a follow-on.
 
-4. **Plan adherence — additional Fail finding.** The reports acknowledge repeated holdout-cohort evaluations outside the ledger, including during the original dry run. The current locking fix protects future runs but cannot establish read-once compliance for this completed experiment. Retain the historical exception and treat these readouts as exploratory; confirmatory evidence requires fresh, prospectively controlled evaluation.
+4. **Plan adherence — contributes to Fail.** The verdict disclosures (`docs/reports/2026-10-12_v2-fusion-verdict.md:81`) establish that C2’s base-model training provenance is not fully nested and that earlier holdout-cohort evaluations occurred outside the ledger. Later locking cannot retroactively establish read-once compliance. Keep those results exploratory; confirmatory evidence requires independent validation or fully nested base-model training and a fresh, ledgered evaluation. The inherited speaker-overlap limitation is disclosed and is not a separate regression.
 
-5. **Regression check — limits grade to Acceptable.** The recorded full-suite result is **991 passed, 12 skipped**. Independent pytest execution failed during temporary-directory setup because this sandbox is read-only, not because of an implementation assertion. Direct read-only execution reproduced all seven reference cases, shipped-TSV parity and the determinism check; Ruff passed. These checks do not substitute for independently running the full suite.
-
-6. **Documentation — limits grade to Acceptable; no substantive downgrade.** The run-spec results (`docs/specs/2026-10-11_v2-benchmark-fusion.md:287`) still say ledger count **2**, while current reports and saved readouts say **4**. Its final paragraph also says empty reservations fail closed, whereas current `reserve()` recovers them under the lock. Update these non-frozen bookkeeping statements.
+5. **Regression check — limited to Acceptable, not evidence of a code failure.** The spec records **995 passed, 12 skipped**. During this audit, `uv` could not initialize its cache, and direct pytest encountered temporary-directory setup errors for all 148 new tests. Direct invocation of the seven reference assertions, shipped-TSV parity, nested-reference check, and deterministic rerun assertion passed; `ruff check --no-cache .` passed. The full-suite result remains independently unverified.

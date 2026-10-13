@@ -178,6 +178,8 @@ def build_registry(version: str = B.BENCHMARK_VERSION, pending=None) -> dict:
         inputs[rel] = {"kind": "file", "sha256": B.sha256_file(REPO / rel)}
     for rel in TREE_INPUTS:
         inputs[rel] = {"kind": "tree", "sha256": B.sha256_tree(REPO / rel)}
+    for f in sorted(COHORT_DIR.glob("*/*.csv")) if COHORT_DIR.exists() else []:
+        inputs[f.relative_to(REPO).as_posix()] = {"kind": "file", "sha256": B.sha256_file(f)}
     tsv = B.shipped_tsv_path()
     return {
         "format": "JSON content in a .yaml file (valid YAML 1.2); parse with json",
@@ -284,11 +286,13 @@ LEGACY_HOLDOUT_COHORT = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasi
 COHORT_DIR = OUT / "cohorts"
 
 
-def load_cohort_frames(cohort: str, pops, *, cohort_dir: Path = COHORT_DIR, legacy: bool = True,
-                       per_class: int = 250) -> tuple[dict, pd.Series]:
+def load_cohort_frames(cohort: str, pops, *, pinned: dict, cohort_dir: Path = COHORT_DIR, legacy: bool = True,
+                       per_class: int = 250, root: Path = REPO) -> tuple[dict, pd.Series]:
     """All cohort scores for one cohort: the legacy wide holdout file (four shipped columns) plus every
     per-column file written by scripts/v2_cohort_scores.py under cohorts/<cohort>/<column>.csv. Every
-    column must cover the same (path, kind) set, inside the population, `per_class` real + spoof per kind."""
+    per-column file must be pinned in the registry (`pinned`: registry inputs) with a matching sha256,
+    so changed cohort logits can never slip in unrecorded. Every column must cover the same (path,
+    kind) set, inside the population, `per_class` real + spoof per kind."""
     pop = pops["holdout" if cohort == "holdout" else "itw"]
     labels = pd.Series(pop.y, index=pop.keys)
     frames = {}
@@ -298,6 +302,12 @@ def load_cohort_frames(cohort: str, pops, *, cohort_dir: Path = COHORT_DIR, lega
     for f in sorted(d.glob("*.csv")) if d.exists() else []:
         if f.stem in frames:
             raise B.BenchmarkError(f"cohort {cohort}: {f.stem} is scored twice")
+        rel = Path(os.path.relpath(f, root)).as_posix()  # lexical: outputs/ is a symlink, never resolve
+        pin = pinned.get(rel)
+        if pin is None:
+            raise B.BenchmarkError(f"cohort file {rel} is not pinned in the registry: rebuild the registry first")
+        if pin["sha256"] != B.sha256_file(f):
+            raise B.BenchmarkError(f"cohort file {rel} changed since it was pinned in the registry")
         fr = B.read_cohort_file(f)
         if not set(fr["key"]) <= set(labels.index):
             raise B.BenchmarkError(f"cohort {cohort}: {f.name} has paths outside the {pop.name} population")
@@ -312,10 +322,19 @@ def load_cohort_frames(cohort: str, pops, *, cohort_dir: Path = COHORT_DIR, lega
     return frames, labels
 
 
-def cohort_key_extra(frames: dict) -> dict:
+def cohort_file_shas(cohort: str, frames: dict, pinned: dict) -> dict:
+    """sha256 of every per-column cohort file in use (from the registry pins; legacy columns excluded)."""
+    return {c: pinned[f"{COHORT_DIR.relative_to(REPO).as_posix()}/{cohort}/{c}.csv"]["sha256"]
+            for c in sorted(frames) if c not in LEGACY_HOLDOUT_COHORT or cohort != "holdout"}
+
+
+def cohort_key_extra(frames: dict, file_shas: dict | None = None) -> dict:
     """Ledger-definition extra for a holdout-cohort read: empty for the legacy four columns (so the
-    already-completed reads keep their keys); the column set otherwise (new columns = new read)."""
-    return {} if set(frames) == set(LEGACY_HOLDOUT_COHORT) else {"cohort_columns": sorted(frames)}
+    already-completed reads keep their keys); otherwise the column set AND each new file's sha256, so
+    a new column or a changed cohort file is a new, counted read."""
+    if set(frames) == set(LEGACY_HOLDOUT_COHORT):
+        return {}
+    return {"cohort_columns": sorted(frames), "cohort_files": dict(sorted((file_shas or {}).items()))}
 
 
 def cohort_sha(frames: dict, labels: pd.Series) -> str:
@@ -563,10 +582,10 @@ def v1_scorecard(boot_n: int = 2000) -> dict:
         out["rules"][f"SHIP_{refs}"]["holdout_ledger"] = sh["ledger"] + " (holdout uses all-inner refs)"
     # holdout perturbation cohort: holdout labels, so ledgered
     shipped4 = list(LEGACY_HOLDOUT_COHORT)
-    frames, labels = load_cohort_frames("holdout", pops)
+    frames, labels = load_cohort_frames("holdout", pops, pinned=pinned)
     single = {c: B.Rule(c, {c: 1.0}, e=False) for c in frames if c != B.E_COLUMN}
     cohort_rules = {"SHIP": ship, **single}
-    extra = cohort_key_extra(frames)
+    extra = cohort_key_extra(frames, cohort_file_shas("holdout", frames, pinned))
     cdefs = [{"population": "holdout_cohort", "name": n, **r.definition(),
               "inputs": {c: shas[c] for c in (shipped4 if not extra else sorted(frames))}, **extra}
              for n, r in cohort_rules.items()]
@@ -574,7 +593,8 @@ def v1_scorecard(boot_n: int = 2000) -> dict:
                         holdout_sha=cohort_sha(frames, labels), meta=meta, pinned=pinned)
     out["holdout_cohort"] = co["readout"]
     out["holdout_cohort_ledger"] = co["ledger"]
-    itw_frames, itw_labels = load_cohort_frames("itw", pops)
+    itw_frames, itw_labels = load_cohort_frames("itw", pops, pinned=pinned)
+    out["itw_cohort_files"] = cohort_file_shas("itw", itw_frames, pinned)
     itw_rules = {"SHIP": ship, **{c: B.Rule(c, {c: 1.0}, e=False) for c in itw_frames if c != B.E_COLUMN}}
     out["itw_cohort"] = (cohort_readout(bench, itw_rules, itw_frames, itw_labels) if itw_frames else
                          {"scored": False, "reason": "pending: no ITW cohort files yet (Step 6, ask-first)"})
