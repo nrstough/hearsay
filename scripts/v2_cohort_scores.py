@@ -50,7 +50,12 @@ DEVICE = {"m1b_v3": "cpu", "xlsr_L20": "cpu", "handcrafted_v5": "cpu", "m5_xlsr_
           "spectra_aasist": "cpu", "wavlm_l": "mps"}
 TOLERANCE = {"cpu": 0.02, "mps": 0.05}
 SPEARMAN_MIN = 0.999
-BUSY = "extract_embeddings|repair_decode_errors|score_spectra|m5_score|m3_probes|run_pipeline|bakeoff_layers"
+BUSY = ("extract_embeddings|repair_decode_errors|score_spectra|m5_score|m3_probes|run_pipeline|bakeoff_layers|"
+        "v2_backbone|v2_hardneg")
+# Columns whose cohort scoring loads no torch model (librosa features; or the stored XLS-R cohort
+# embeddings): they may run while another lane's GPU job is live. Everything else waits.
+TORCH_FREE = {("itw", "handcrafted_v5"), ("itw", "m1b_v3"), ("itw", "xlsr_L20")}
+EMBEDDING_FAST_PATH = {("itw", "m1b_v3"), ("itw", "xlsr_L20")}
 
 _spec = importlib.util.spec_from_file_location("m3_probes", REPO / "scripts/m3_probes.py")
 MP = importlib.util.module_from_spec(_spec)
@@ -212,7 +217,7 @@ def make_scorer(column: str, cohort: str, threads: int):
         def emb_logit(e):
             return float(probe.llr(e.astype(np.float16).astype(np.float32)[None])[0])
     elif column in ("xlsr_L20", "m1b_v3"):
-        bb = load_backbone("wav2vec2-xls-r-300m", "cpu")
+        bb = load_backbone("wav2vec2-xls-r-300m", "mps" if (cohort == "holdout" and column == "xlsr_L20") else "cpu")
         if column == "xlsr_L20":
             j = joblib.load(REPO / "outputs/v2/bakeoff/probes/L20.joblib")
 
@@ -279,10 +284,56 @@ def cohort_inputs(cohort: str):
     return keys, np.arange(len(keys)), {k: int(y[k]) for k in keys}, load
 
 
+def embedding_logits(column: str) -> dict:
+    """ITW cohort logits for m1b_v3 / xlsr_L20 from the stored bake-off cohort embeddings
+    (outputs/v2/bakeoff/emb_itw_<kind>.npz: the same perturb -> seed-200 crop -> embed_segment recipe),
+    fp16-rounded as the deployed probes expect. {kind: (rows, logits)}."""
+    import joblib
+
+    from hearsay.probe import Probe
+
+    out = {}
+    for kind in B.COHORT_KINDS:
+        z = np.load(REPO / f"outputs/v2/bakeoff/emb_itw_{kind}.npz")
+        e = z["emb"].astype(np.float16).astype(np.float32)
+        if column == "xlsr_L20":
+            j = joblib.load(REPO / "outputs/v2/bakeoff/probes/L20.joblib")
+            lg = j["a"] * j["clf"].decision_function(e[:, 20]) + j["b"]
+        else:
+            lg = Probe.load(REPO / "models/m1_wav2vec2-xls-r-300m_L7_20260926-0521").llr(e)
+        out[kind] = (z["row"], np.asarray(lg, dtype=float))
+    return out
+
+
+def run_from_embeddings(column: str, *, pilot: int, force: bool) -> dict:
+    keys, rows, labels, _ = cohort_inputs("itw")
+    got = embedding_logits(column)
+    for kind, (r, _) in got.items():
+        if not np.array_equal(r, rows):
+            raise B.BenchmarkError(f"emb_itw_{kind}.npz rows differ from the cohort rows")
+    stored = stored_clean(column)
+    n = min(pilot or 20, len(keys))
+    par = pilot_parity(got["none"][1][:n], [stored[k] for k in keys[:n]], "cpu")
+    meta = {"cohort": "itw", "column": column, "device": "cpu (stored cohort embeddings)",
+            "source": "outputs/v2/bakeoff/emb_itw_<kind>.npz", "pilot": {**par, "checked": column},
+            "code_sha": B.code_sha(), "crop_seed": ITW_CROP_SEED, "started": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    print(json.dumps(B.clean(par), sort_keys=True))
+    if not par["ok"]:
+        raise SystemExit(f"pilot parity failed for {column} on itw: not writing the cohort")
+    if pilot:
+        return meta
+    records = [{"path": k, "kind": kind, "logit": float(lg[i]), "error": None}
+               for kind, (_, lg) in got.items() for i, k in enumerate(keys)]
+    write_cohort(assemble(records, keys, labels), OUT / "itw" / f"{column}.csv", meta, force=force)
+    return meta
+
+
 def run(cohort: str, column: str, *, pilot: int, threads: int, force: bool) -> dict:
     busy = busy_processes()
-    if busy:
-        raise SystemExit("other heavy jobs are running; ask Nathan first:\n" + "\n".join(busy))
+    if busy and (cohort, column) not in TORCH_FREE:
+        raise SystemExit("other heavy jobs are running; wait or ask Nathan first:\n" + "\n".join(busy))
+    if (cohort, column) in EMBEDDING_FAST_PATH:
+        return run_from_embeddings(column, pilot=pilot, force=force)
     keys, rows, labels, load = cohort_inputs(cohort)
     seeds = seeds_for(cohort, rows)
     score = make_scorer(column, cohort, cap_threads(threads))

@@ -1400,3 +1400,20 @@ def test_cohort_key_extra_records_file_shas():
     b = VB.cohort_key_extra({**legacy, "wavlm_l": None}, {"wavlm_l": "s2"})
     assert a != b and a["cohort_files"] == {"wavlm_l": "s1"}
     assert VB.cohort_key_extra(legacy, {}) == {}
+
+
+def test_cohort_busy_check_sees_other_v2_lanes_and_torch_free_columns():
+    assert "v2_backbone" in VC.BUSY and "v2_hardneg" in VC.BUSY
+    assert ("itw", "handcrafted_v5") in VC.TORCH_FREE and ("itw", "wavlm_l") not in VC.TORCH_FREE
+    assert ("holdout", "xlsr_L20") not in VC.TORCH_FREE
+    assert VC.EMBEDDING_FAST_PATH <= VC.TORCH_FREE
+
+
+@needs_data
+def test_cohort_embedding_fast_path_rows_and_parity():
+    got = VC.embedding_logits("xlsr_L20")
+    rows = VC.itw_cohort_rows()
+    assert set(got) == set(B.COHORT_KINDS) and all(np.array_equal(r, rows) for r, _ in got.values())
+    keys = [B.canonical_key(p) for p in pd.read_csv(VC.ITW_MANIFEST)["path"].iloc[rows]]
+    stored = VC.stored_clean("xlsr_L20")
+    assert VC.pilot_parity(got["none"][1][:50], [stored[k] for k in keys[:50]], "cpu")["ok"]
