@@ -806,12 +806,17 @@ def test_code_sha_sees_dirty_tree(tmp_path):
     repo.mkdir()
     GIT = "git"
     subprocess.run([GIT, "init", "-q"], cwd=repo, check=True)
-    (repo / "a.py").write_text("x = 1\n")
-    subprocess.run([GIT, "add", "a.py"], cwd=repo, check=True)
+    (repo / "src").mkdir()
+    (repo / "benchmarks").mkdir()
+    (repo / "src/a.py").write_text("x = 1\n")
+    (repo / "benchmarks/ledger.jsonl").write_text("")
+    subprocess.run([GIT, "add", "src/a.py", "benchmarks/ledger.jsonl"], cwd=repo, check=True)
     subprocess.run([GIT, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "a"], cwd=repo, check=True)
     clean_sha = B.code_sha(repo)
     assert "+dirty" not in clean_sha
-    (repo / "a.py").write_text("x = 2\n")
+    (repo / "benchmarks/ledger.jsonl").write_text('{"event": "reserve"}\n')  # data, not code
+    assert B.code_sha(repo) == clean_sha
+    (repo / "src/a.py").write_text("x = 2\n")
     assert B.code_sha(repo).startswith(clean_sha + "+dirty:")
 
 

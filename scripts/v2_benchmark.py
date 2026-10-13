@@ -476,6 +476,9 @@ def baseline_holdout(bench, others, ledger, hsha, meta, pinned, boot_n):
     res = B.read_holdout(defs, lambda: {c: readout_scores(pops, {"holdout": bench.cols[c]["holdout"]},
                                                          boot_n=boot_n)["holdout"] for c in others},
                          ledger=ledger, holdout_sha=hsha, meta=meta, pinned=pinned)
+    entry = ledger.persisted(key) or {}
+    if entry.get("alias_of") == legacy:
+        note = LEGACY_BASELINE_NOTE
     return res, note
 
 

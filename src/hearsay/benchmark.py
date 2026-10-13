@@ -125,12 +125,17 @@ def canonical_key(path, *, main: Path | None = None, repo: Path | None = None) -
     return key
 
 
-def code_sha(repo: Path = REPO) -> str:
-    """HEAD plus a hash of any uncommitted tracked changes ('<head>+dirty:<hash>')."""
+CODE_PATHS = ("src", "scripts")
+
+
+def code_sha(repo: Path = REPO, paths: tuple = CODE_PATHS) -> str:
+    """HEAD plus a hash of uncommitted changes to code ('<head>+dirty:<hash>').
+    Only `paths` count: ledger and log appends are data, not code."""
     try:
         head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True,
                               check=True).stdout.strip()
-        diff = subprocess.run(["git", "diff", "HEAD"], cwd=repo, capture_output=True, check=True).stdout
+        diff = subprocess.run(["git", "diff", "HEAD", "--", *paths], cwd=repo, capture_output=True,
+                              check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
     return head if not diff else f"{head}+dirty:{hashlib.sha256(diff).hexdigest()[:16]}"
