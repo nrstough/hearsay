@@ -401,15 +401,29 @@ def load_antideepfake(
         # A1/A6 at load time, against the bytes on disk. Fetch-time hashing alone let a
         # structurally valid replacement checkpoint load under a stale identity record, because
         # `check_identity` had no production caller and only compared supplied dictionaries.
-        recorded = (identity.get("file_sha256") or {}).get("model.safetensors")
-        if not recorded:
+        #
+        # **Every recorded file, not just the weights.** Hashing `model.safetensors` alone left
+        # `config.json` unverified, and a shape-compatible config change (a different
+        # `do_stable_layer_norm`, a different layer count) alters inference while the checkpoint
+        # hash still matches.
+        recorded = identity.get("file_sha256") or {}
+        if "model.safetensors" not in recorded:
             raise ValueError("identity record carries no sha256 for model.safetensors")
-        actual = file_sha256(weights_dir / "model.safetensors")
-        if actual != recorded:
-            raise ValueError(
-                f"{weights_dir.name}: model.safetensors sha256 {actual[:16]} does not match the "
-                f"identity record's {recorded[:16]}; refusing to load an unrecorded checkpoint"
-            )
+        if "config.json" not in recorded:
+            raise ValueError("identity record carries no sha256 for config.json; the architecture is unverified")
+        for fname, want in sorted(recorded.items()):
+            path = weights_dir / fname
+            if not path.exists():
+                raise ValueError(f"{weights_dir.name}: {fname} is in the identity record but absent on disk")
+            got = file_sha256(path)
+            if got != want:
+                raise ValueError(
+                    f"{weights_dir.name}: {fname} sha256 {got[:16]} does not match the identity "
+                    f"record's {want[:16]}; refusing to load an unrecorded checkpoint"
+                )
+        for field in ("model_id", "revision"):
+            if not identity.get(field):
+                raise ValueError(f"identity record has no {field!r}; refusing an unpinned load")
     cfg = load_config(weights_dir)
     sd = _read_state_dict(weights_dir)
     n_expected_base = expected_mapped(cfg.num_hidden_layers, cfg.num_feat_extract_layers)
@@ -516,10 +530,15 @@ def check_identity(record: dict, loaded: dict) -> None:
     reimplementation and the shipped path had none. The failure it prevents is the one the
     M4/M5 lane hit: a rank reference built from one model and scored with another is silently
     wrong, and nothing downstream can tell.
+
+    **Empty is not a match.** An earlier version compared values only, so two records agreeing
+    that a field is `""` or `{}` passed — which is precisely the stale-record case this is for.
     """
     for field in IDENTITY_FIELDS:
         if field not in record:
             raise ValueError(f"identity record missing {field!r}")
+        if not record[field]:
+            raise ValueError(f"identity record has an empty {field!r}; refusing to treat it as a match")
         if record[field] != loaded.get(field):
             raise ValueError(
                 f"identity mismatch on {field!r}: recorded {record[field]!r} vs loaded {loaded.get(field)!r}"

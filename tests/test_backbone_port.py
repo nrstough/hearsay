@@ -557,17 +557,61 @@ def test_a6_loader_refuses_a_checkpoint_whose_bytes_do_not_match_the_record(tmp_
     from hearsay.antideepfake import file_sha256
 
     root = write_ckpt(tmp_path / "bound", cfg, ckpt)
-    good = {"file_sha256": {"model.safetensors": file_sha256(root / "model.safetensors")}}
+
+    def record(r=root):
+        return {
+            "model_id": "nii-yamagishilab/mms-300m-anti-deepfake",
+            "revision": "a" * 40,
+            "file_sha256": {
+                "model.safetensors": file_sha256(r / "model.safetensors"),
+                "config.json": file_sha256(r / "config.json"),
+            },
+        }
+
+    good = record()
     assert load_antideepfake(root, dtype=torch.float32, identity=good) is not None
 
     # a different but structurally valid checkpoint at the same path
-    other = synthetic_checkpoint(cfg, seed=99)
-    write_ckpt(root, cfg, other)
-    with pytest.raises(ValueError, match="does not match the identity record"):
+    write_ckpt(root, cfg, synthetic_checkpoint(cfg, seed=99))
+    with pytest.raises(ValueError, match="model.safetensors sha256"):
         load_antideepfake(root, dtype=torch.float32, identity=good)
 
-    with pytest.raises(ValueError, match="no sha256"):
-        load_antideepfake(root, dtype=torch.float32, identity={"file_sha256": {}})
+    # the architecture must be covered too: a shape-compatible config change alters inference
+    # while the checkpoint hash still matches.
+    root2 = write_ckpt(tmp_path / "cfgswap", cfg, ckpt)
+    rec2 = record(root2)
+    raw = json.loads((root2 / "config.json").read_text())
+    raw["layerdrop"] = 0.5
+    (root2 / "config.json").write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="config.json sha256"):
+        load_antideepfake(root2, dtype=torch.float32, identity=rec2)
+
+    # an incomplete record is refused rather than partially trusted
+    for bad, msg in (
+        ({"file_sha256": {}}, "no sha256 for model.safetensors"),
+        ({"file_sha256": {"model.safetensors": "x" * 64}}, "no sha256 for config.json"),
+    ):
+        with pytest.raises(ValueError, match=msg):
+            load_antideepfake(root, dtype=torch.float32, identity=bad)
+
+    root3 = write_ckpt(tmp_path / "unpinned", cfg, ckpt)
+    for field in ("model_id", "revision"):
+        rec = record(root3)
+        rec[field] = ""
+        with pytest.raises(ValueError, match=f"no {field!r}"):
+            load_antideepfake(root3, dtype=torch.float32, identity=rec)
+
+
+def test_a6c_check_identity_rejects_two_records_that_agree_on_being_empty():
+    """An earlier version compared values only, so two records agreeing a field is `""` passed
+    — precisely the stale-record case this exists to catch."""
+    base = identity_record()
+    check_identity(base, dict(base))
+    for field in IDENTITY_FIELDS:
+        rec = dict(base)
+        rec[field] = "" if isinstance(rec[field], str) else {}
+        with pytest.raises(ValueError, match="empty"):
+            check_identity(rec, dict(rec))
 
 
 def test_file_sha256_matches_hashlib(tmp_path):
@@ -674,8 +718,14 @@ def test_p2_alternative_poolings_are_measured_not_asserted(tmp_path, cfg, ckpt, 
     assert logits["time_mean_last_layer"] != logits["last_frame"]
 
 
-def test_p3a_in_sample_ceiling_is_a_diagnostic_with_a_bounded_stop():
-    """P3a: a trained detector should be at ceiling on data it was post-trained on.
+def test_p3a_CONTRACT_in_sample_ceiling_diagnostic_shape():
+    """P3a **CONTRACT ONLY — not coverage of production behaviour.**
+
+    The scorer these diagnostics belong to does not exist yet (the drive unmount blocked stage
+    2), so this pins the decision *shape* against a closure defined here. It cannot detect
+    missing or broken application behaviour, and the run spec records it as deferred coverage.
+
+    P3a: a trained detector should be at ceiling on data it was post-trained on.
 
     Per Codex C3 this *reports and stops*, it does not declare a usage bug: corpus membership
     does not establish that these clips were training examples, nor guarantee a threshold
@@ -692,8 +742,11 @@ def test_p3a_in_sample_ceiling_is_a_diagnostic_with_a_bounded_stop():
     assert bad["declared"]["max_dcf"] == 0.05
 
 
-def test_p3b_external_corroboration_cannot_block_the_verdict():
-    """P3b: a miss sets `usage_unverified`, it never bars the verdict.
+def test_p3b_CONTRACT_external_corroboration_cannot_block_the_verdict():
+    """P3b **CONTRACT ONLY — see `test_p3a_CONTRACT_...`.** Replaced by a test of the real
+    function once the scorer exists.
+
+    P3b: a miss sets `usage_unverified`, it never bars the verdict.
 
     There is no published MMS-300M In-the-Wild number and no overlapping clip set, so making
     this a gate deadlocked the lane: the verdict is its only deliverable.
@@ -707,7 +760,7 @@ def test_p3b_external_corroboration_cannot_block_the_verdict():
     assert miss["usage_unverified"] and miss["blocks_verdict"] is False
 
 
-def test_p4_the_usage_unverified_flag_has_a_counterfactual():
+def test_p4_CONTRACT_usage_unverified_flag_has_a_counterfactual():
     """P4: a flag nothing can set is not a flag (the M4/M5, K8/K9, K13/K14 pattern)."""
     def report(corroborated: bool) -> dict:
         return {"verdict": "column", "provisional": True, "usage_unverified": not corroborated}
@@ -814,6 +867,19 @@ def test_k15_claim4_equivalence_and_layer_order_on_real_24_layer_values():
     assert max_rel_deviation(good, reversed_out) >= GATE
 
 
+def _antideepfake_records():
+    """(dir, identity record) for every fetched checkpoint, so the real identity path runs."""
+    out = []
+    for rec_path in sorted((ad.REPO / "outputs" / "v2" / "backbone").glob("*.identity.json")):
+        d = json.loads(rec_path.read_text())
+        if d.get("dry_run"):
+            continue
+        p = Path(d["realpath"])
+        if (p / "model.safetensors").exists():
+            out.append((p, d))
+    return out
+
+
 def _antideepfake_dirs():
     """Checkpoints to exercise, located through their identity records (A6), not a glob.
 
@@ -860,13 +926,17 @@ def test_w4_golden_logits_are_stable_across_a_reload():
     dirs = _antideepfake_dirs()
     if not dirs:
         pytest.skip("no AntiDeepfake checkpoint downloaded yet")
-    d = dirs[0]
+    recs = _antideepfake_records()
+    if not recs:
+        pytest.skip("no identity record for a fetched checkpoint")
+    d, rec = recs[0]
     torch.manual_seed(5)
     x = torch.randn(1, 16000)
     x = (x - x.mean()) / (x.var() + 1e-7).sqrt()
     outs = []
     for _ in range(2):
-        model = ad.load_antideepfake(d, device="cpu", dtype=torch.float32)
+        # the real identity record, so the production binding path is exercised on real bytes
+        model = ad.load_antideepfake(d, device="cpu", dtype=torch.float32, identity=rec)
         with torch.inference_mode():
             outs.append(model(x).double().numpy())
         del model
