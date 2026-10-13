@@ -274,4 +274,11 @@ Filled in Oct 12 after execution. Details: `docs/reports/2026-10-11_benchmark-v1
 
 Follow-on (larger learned model): not triggered. Holdout read once for the candidate set (ledger count 2 in total).
 
-**Not done in this run:** Step 6, the cohort scoring job (ask-first compute, awaiting Nathan). `docs/code-map.md` not edited (outside the lane's ownership; ask-first).
+**Overfitting (P2 risk).** C2's in-sample advantage over C0 turns into a tie or a loss out of fold in every fold (mean optimism 0.022 package-0.5; largest on f4, 0.047).
+
+**Not done in this run:**
+- Step 6, the cohort scoring job (ask-first compute, awaiting Nathan). Its S8 tests (`test_cohort_flag_column_and_zero_audio_refused`, `test_cohort_rows_match_cohort_rows_fn`, `test_perturb_seed_matches_m3_probes`, `test_threads_capped`) are deferred with it; `test_partial_cohort_rejected` is covered by the cohort reader test. Acceptance "every new test passes" holds for the tests that exist; the S8 set is open.
+- `test_pooled_metrics_scored_on_pre_platt_base` (plan-added) is dropped: K1 removed Platt from C2, so `test_c2_has_no_platt_step` replaces it.
+- `docs/code-map.md` not edited (outside the lane's ownership; ask-first).
+
+**Reviews.** Codex plan review: `docs/reports/2026-10-11_v2-benchmark-fusion-plan-review.md` (findings and responses). Pre-audit Claude critique, round 1 (Oct 13): Needs work. Fixed: the reference exemption is bound to registry-pinned file shas; the holdout cohort goes through the ledger and dry runs skip it; every scorecard carries K7 bootstrap intervals; C2 overfitting is measured as optimism against C0; every benchmark command enforces the registry; the ledger checks its audit log, rebuilds audit copies, aliases the legacy baseline key and records a code-only dirty-tree sha; `require_selectable` and `check_readout_fresh` are wired in; tests that only read source text were replaced by behavioural ones; `needs_data` is a real marker; the rerun test compares the populations block; a pre-E vs post-E alpha fixture exists.

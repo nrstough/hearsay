@@ -64,6 +64,22 @@ Spectra's numbers are not comparable evidence: its training data is undisclosed,
 - Spearman with the fused score on inner real rows: m1b_v3 0.84, m5_xlsr_ft 0.58, handcrafted_v5 0.35. No dominance flag.
 - Test set: 39.6% of the 1,671 files sit above that threshold. Spearman with the shipped TSV: 1.0000.
 
+## Bootstrap intervals (inner and ITW)
+
+Class-stratified cluster bootstrap, 2,000 draws, seed 0 (p5 to p95). Inner, primary row: LJ is one fixed stratum present once in every draw, so the intervals are conditional on LJ; LibriSpeech speakers and spoof generators are resampled. ITW: speakers resampled within class. Holdout has only 2 spoof generators, so no interval is reported (marked degenerate in the JSON).
+
+| What | inner brief | inner package-0.5 | ITW brief | ITW package-0.5 |
+|---|---|---|---|---|
+| m1b_v3 | 0.098 to 0.504 | 0.060 to 0.454 | 0.229 to 0.441 | 0.187 to 0.405 |
+| handcrafted_v5 | 0.264 to 0.660 | 0.175 to 0.980 | 0.955 to 0.996 | 0.674 to 0.937 |
+| m5_xlsr_ft | 0.112 to 0.514 | 0.072 to 0.690 | 0.291 to 0.466 | 0.287 to 0.486 |
+| spectra_aasist | 0.001 to 0.010 | 0.001 to 0.004 | 0.044 to 0.086 | 0.089 to 0.173 |
+| wavlm_l | 0.079 to 0.553 | 0.047 to 0.776 | 0.526 to 0.995 | 0.286 to 0.488 |
+| xlsr_L20 | 0.092 to 0.581 | 0.045 to 0.797 | 0.224 to 0.425 | 0.226 to 0.527 |
+| SHIP, nested | 0.006 to 0.371 | 0.002 to 0.486 | 0.155 to 0.293 | 0.145 to 0.330 |
+
+The inner intervals are wide because they resample only 8 spoof generators: whether grad_tts is drawn moves the shipped rule's cost from near 0 to about 0.5. The sensitivity row in the JSON resamples LJ as one cluster among the real clusters; 719 of its 2,000 draws contain no LJ at all, which is why LJ is held fixed in the primary row. Use paired differences, not these marginal intervals, to compare rules.
+
 ## Holdout perturbation cohort (report-only)
 
 500 holdout clips × 5 kinds, the four shipped columns only (`outputs/channel/m3_perturb.csv`). Pooled package-0.5 / brief per kind:
@@ -75,7 +91,7 @@ Spectra's numbers are not comparable evidence: its training data is undisclosed,
 | handcrafted_v5 | 0.084 / 0.048 | 0.104 / 0.088 | 1.000 / 0.996 | 0.076 / 0.089 | 0.084 / 0.048 |
 | m5_xlsr_ft | 0.264 / 0.433 | 0.280 / 0.432 | 0.380 / 0.487 | 0.280 / 0.425 | 0.260 / 0.428 |
 
-20 dB white noise remains the shipped rule's hole, and handcrafted_v5 collapses completely under it. The cohort's precomputed fused columns are never read (they used transductive references).
+20 dB white noise remains the shipped rule's hole, and handcrafted_v5 collapses completely under it. The cohort's precomputed fused columns are never read (they used transductive references). Its clips are holdout clips with holdout labels, so this readout is its own ledgered read.
 
 ## MLAAD (report-only, in-sample for M5)
 
@@ -83,8 +99,11 @@ Spectra's numbers are not comparable evidence: its training data is undisclosed,
 
 ## Holdout accounting
 
-- m1b_v3 and the shipped rule (all-inner references) are the two published holdout references and are exempt.
-- The other five columns were read as one ledgered set, "benchmark-v1 baseline" (ledger count 1). The tracked audit copy is `benchmarks/holdout_ledger.jsonl`.
+- m1b_v3 and the shipped rule (all-inner references) are the two published holdout references and are exempt, but only for the registry-pinned files: a different file under the same name is ledgered.
+- The other five columns were read once as one ledgered set, "benchmark-v1 baseline", on Oct 12. The ledger key now includes each file's sha256; the new key is recorded as an alias of that read (same files), not a new read.
+- The holdout perturbation cohort is one ledgered read.
+- Ledger total for this lane: 4 distinct holdout reads (this baseline set, this cohort, and the V2-60 candidate set and its cohort). The tracked audit copy is `benchmarks/holdout_ledger.jsonl`; the authority files live in the shared `outputs/v2/benchmark/holdout_ledger/`.
+- **Disclosure.** Before the pre-audit critique, the cohort readout ran outside the ledger: in the first scorecard run (Oct 12) and in the V2-60 dry run and first run. Nothing was selected on it.
 
 ## Pending and deferred
 

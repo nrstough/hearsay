@@ -40,12 +40,22 @@ C2 is worse than C0 in almost every resample. The intervals are dominated by the
 - **The fit barely uses the option-B columns.** Mean final weights: m1b_v3 0.607, m5_xlsr_ft 0.219, handcrafted_v5 0.171, WavLM 0.003, layer 20 0.000. The off-inner model gives both 0.
 - **Near-separation.** Raw fit weights have an L1 norm of 15–37 and intercepts of −6 to −17. The optimizer converged in every fold.
 - **Effective parameters:** 1.5 per fold (1.75 in f4).
-- **Overfitting check (owner's P2 risk).** Per-fold training cost against out-of-fold cost is confounded by fold difficulty (f0 is hard, f2 and f3 are near zero), so the per-fold gaps in the readout swing both ways. The clean signal is pooled: C2 is worse than C0 out-of-fold, and its holdout and ITW numbers are no better than C0's. Nothing suggests the fit generalizes beyond the shipped weights.
+- **Overfitting check (owner's P2 risk): C2 overfits.** The measure compares C2 with C0 on the same rows, so fold difficulty cancels. In-sample (training folds, train-fold references) C2 beats C0 in every fold; out of fold it ties or loses. Optimism = out-of-fold advantage minus in-sample advantage, package-0.5:
+
+  | Outer fold | in-sample C2 − C0 | out-of-fold C2 − C0 | optimism |
+  |---|---|---|---|
+  | f0 | −0.0037 | +0.0147 | 0.0184 |
+  | f1 | −0.0144 | 0.0000 | 0.0144 |
+  | f2 | −0.0146 | 0.0000 | 0.0146 |
+  | f3 | −0.0152 | 0.0000 | 0.0152 |
+  | f4 | −0.0180 | +0.0290 | 0.0470 |
+
+  Mean optimism: package-0.5 0.022, package-0.3 0.012, brief 0.008. The fit's edge exists only on the rows it was fitted on, and it is largest on the ElevenLabs fold. Holdout and ITW agree: C2 is no better than C0 there.
 - **No Platt.** C2 ends at the E step (K1, Nathan, Oct 12). The early look had shown C2 at 0.376 without per-fold Platt and 0.514 with it; the ruling came after that look. Under either reading C2 does not win.
 
 ## Report-only populations
 
-These do not enter the verdict. Holdout was read once for the candidate set (ledger key 2ff99dee; ledger count now 2). ITW is spent on v1 selection.
+These do not enter the verdict. Holdout was read once for the candidate set (ledger key 2ff99dee). The holdout perturbation cohort (holdout clips and labels) is a separate ledgered read (985d6109). Lane total: 4 distinct holdout reads. ITW is spent on v1 selection.
 
 | Candidate | holdout brief | holdout package-0.5 | ITW brief | ITW package-0.5 |
 |---|---|---|---|---|
@@ -69,6 +79,7 @@ Fusion of today's columns cannot beat the shipped rule on the selection metric. 
 - **Early look.** A planning agent computed inner readouts for the frozen candidates (C1 0.452, C3 0.358, C2 prototype 0.376) after the candidate table was committed and before this run. No holdout labels were touched. This run reproduces those numbers.
 - **K1 after the look.** The no-Platt ruling was made after seeing that per-fold Platt would turn C2's TIE into a LOSE. It does not change the conclusion.
 - **Second-order stacking leakage.** The base columns' OOF scores came from models that saw the held-out fusion fold when scoring training rows. This favours fitted candidates only; a TIE or LOSE is robust to it.
+- **Cohort read outside the ledger before the fix.** The dry run and the first real run computed the holdout-cohort readout for C0 and C2 outside the ledger; the pre-audit critique caught it and the cohort now goes through the ledger. Nothing was selected on it.
 - **Option-B columns were not fresh off-inner.** WavLM and layer 20 were read on holdout and ITW in the October 3 bake-off, and both were trained on the 23,790-row basis (with ASVspoof 2019 train/dev); the shipped columns were not.
 
 ## Limitations
