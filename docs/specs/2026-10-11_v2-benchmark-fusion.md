@@ -247,6 +247,10 @@ uv run python scripts/v2_benchmark.py registry --check
 ```
 Output: `outputs/v2/benchmark/<name>.json` + a markdown scorecard row. Every readout reports brief, package-0.5, package-0.3 and EER, pooled / per-fold / macro (inner), with and without E for rules, weight shares, the dominance check, and cluster-bootstrap intervals. Every FA/miss count names its reading and threshold.
 
+## Amendments (dated; outside the frozen region)
+
+- **2026-10-12, Nathan (STOP 3):** "No platt for now it'll overfit and not generalize". C2 drops the per-fold Platt step: C2 = E applied to the shrunk weighted rank. All candidates are scored on the post-E weighted rank. Calibration is deferred to V2-61. Recorded context: the ruling came after an early inner look in which C2 scored 0.376 package-0.5 without Platt and 0.514 with per-fold Platt (C0 0.3390). Other pre-run clarifications (K2–K13) are in `benchmarks/v2_60_candidates.json` and the plan.
+
 ## Test break check
 _To be filled in post-commit._
 
