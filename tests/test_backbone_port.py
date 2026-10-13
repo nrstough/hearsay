@@ -542,6 +542,13 @@ def test_a3c_capacity_is_checked_before_placement_and_always(tmp_path, monkeypat
     with pytest.raises(fetch.NotEnoughSpace, match="free"):
         fetch.check_target(tmp_path, 10**9, repo=REPO)
     assert calls, "disk_usage was never called -- capacity was skipped"
+    # and the device probed must be the destination, not an ancestor on another filesystem
+    dest = tmp_path / "deep" / "not" / "yet" / "created"
+    calls.clear()
+    with pytest.raises(fetch.NotEnoughSpace):
+        fetch.check_target(dest, 10**9, repo=REPO)
+    assert calls == [str(dest.resolve())], f"probed {calls}, expected the destination itself"
+    assert dest.exists(), "the destination must be created so its own volume is the one measured"
     assert not issubclass(fetch.NotEnoughSpace, fetch.SameVolume), (
         "a full disk must not be overridable by a placement-policy flag"
     )

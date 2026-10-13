@@ -104,9 +104,12 @@ def check_target(target: Path, need_bytes: int, repo: Path = REPO) -> Path:
     volume that has ~19 GiB free. Compare device ids, not strings.
     """
     resolved = target.resolve()
+    # Measure the volume we will actually WRITE to, not an ancestor of it. Walking up to the
+    # nearest existing parent can land on a different filesystem than the destination (a mount
+    # point's parent is on the root volume), so both A3 clauses would then be asserted against
+    # the wrong device. Create the destination first, and probe that.
+    resolved.mkdir(parents=True, exist_ok=True)
     probe = resolved
-    while not probe.exists():
-        probe = probe.parent
 
     # Capacity FIRST, and unconditionally. An earlier revision raised the placement error
     # before ever computing free space, so the caller's `except SameVolume` override skipped
