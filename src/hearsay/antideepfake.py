@@ -7,10 +7,15 @@ classified and every shape checked.
 
 Tensor budget, asserted on every load (run spec `docs/specs/2026-10-11_v2-backbone.md`):
 
-    len(mapped) + len(UNUSED) + len(HEAD) == len(checkpoint)
-    431 == 422 + 7 + 2   (24 layers)        815 == 806 + 7 + 2   (48 layers)
+    len(mapped) == expected_mapped(n_layers, n_conv)
+    422 (24 layers) · 806 (48 layers) · and the 7 declared-unused and 2 head tensors by name
 
-and every parameter of the target `Wav2Vec2Model` must receive a tensor. `load_state_dict`
+The load-bearing check is the **mapped count against the architecture**, plus the by-name
+declared-unused and head sets. `len(mapped) + len(unused) + len(head) + len(unclassified)`
+equals the checkpoint size identically for a dict's keys, so that sum is a tautology rather
+than an assertion; it is kept as cheap defence in depth, not relied upon. Target-parameter
+coverage is likewise implied once the count matches, nothing is unclassified and the map is
+injective -- all three of which are enforced above it. `load_state_dict`
 runs with `strict=True`: under `strict=False` a missing tensor leaves that module at its
 random initialisation and returns silently.
 
@@ -46,7 +51,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -139,7 +146,9 @@ class KeyMapping:
 
 
 @contextmanager
-def mps_reservation(lock_path: Path | str, scope: str, wait_s: float = 0.0, stale_s: float = 7200.0):
+def mps_reservation(
+    lock_path: Path | str, scope: str, wait_s: float = 0.0, stale_s: float = 43200.0,
+) -> Iterator[Path]:  # fmt: skip
     """Exclusive claim on the shared graphics device, with an explicit wait-or-abort path.
 
     The MPS working set (`recommended_max_memory()`, 13.32 GiB on this machine) is a **device**
@@ -147,24 +156,37 @@ def mps_reservation(lock_path: Path | str, scope: str, wait_s: float = 0.0, stal
     both fall off a 120x cliff that no `empty_cache()` recovers from -- and this repo currently
     has three lanes in one checkout, one of them in a sibling worktree.
 
-    The first revision "satisfied" this with a hand-written text file no code consulted, which
-    has exactly the property the Codex review objected to: it neither blocks nor waits.
+    Raises `TimeoutError` rather than proceeding.
 
-    Raises `TimeoutError` rather than proceeding. A lock older than `stale_s` is reclaimed, so a
-    killed job cannot wedge the device forever.
+    Three properties the first version lacked, each of which let two lanes share the device:
+
+    * **A stale lock is only reclaimed if its owner is gone.** It reclaimed purely on age, so a
+      second claimant took the lock out from under a live holder still inside its `with` block.
+      `os.kill(pid, 0)` decides.
+    * **Release only unlinks our own lock.** It unlinked whatever was there, so after a reclaim
+      our exit deleted the *other* job's live lock -- two lanes ping-ponging the device.
+      A random token written on acquire is checked before unlinking.
+    * **`stale_s` defaults to 12 h**, not 2. Stage 2's own forward budget is ~5.8 h, so a 2 h
+      window let a sibling lane seize the device in the middle of a legitimate run -- exactly
+      the condition this exists to prevent.
     """
     lock_path = Path(lock_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
+    token = secrets.token_hex(8)
     deadline = time.monotonic() + wait_s
     while True:
         try:
             fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, f"pid={os.getpid()}\nscope={scope}\nacquired={time.time():.0f}\n".encode())
+            os.write(fd, f"pid={os.getpid()}\ntoken={token}\nscope={scope}\nacquired={time.time():.0f}\n".encode())
             os.close(fd)
             break
         except FileExistsError:
-            age = time.time() - lock_path.stat().st_mtime
-            if age > stale_s:
+            try:
+                held = lock_path.read_text()
+                age = time.time() - lock_path.stat().st_mtime
+            except FileNotFoundError:
+                continue  # released in the window between the failed create and the read
+            if age > stale_s and not _owner_alive(held):
                 lock_path.unlink(missing_ok=True)
                 continue
             if time.monotonic() >= deadline:
@@ -176,7 +198,25 @@ def mps_reservation(lock_path: Path | str, scope: str, wait_s: float = 0.0, stal
     try:
         yield lock_path
     finally:
-        lock_path.unlink(missing_ok=True)
+        try:
+            if f"token={token}" in lock_path.read_text():
+                lock_path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            pass
+
+
+def _owner_alive(contents: str) -> bool:
+    """Is the pid recorded in a lock file still running? An unparseable lock counts as dead."""
+    for line in contents.splitlines():
+        if line.startswith("pid="):
+            try:
+                os.kill(int(line[4:]), 0)
+                return True
+            except (ValueError, ProcessLookupError):
+                return False
+            except PermissionError:
+                return True  # exists, owned by someone else
+    return False
 
 
 def expected_mapped(n_layers: int, n_conv: int = 7) -> int:
@@ -383,12 +423,16 @@ def load_antideepfake(
 
     # An implicit cast is refused rather than performed. The checkpoints ship fp32; silently
     # honouring a request that differs from the file hid which precision actually ran.
-    on_disk = sd["proj_fc.weight"].dtype
-    if dtype != on_disk:
+    # Every float tensor, not a sampled one: an fp16 base with an fp32 head once loaded clean
+    # as fp32, silently upcasting the base -- and the harmful orientation silently downcasts it.
+    on_disk = {v.dtype for v in sd.values() if v.is_floating_point()}
+    if len(on_disk) != 1:
+        raise ValueError(f"{weights_dir.name}: mixed tensor dtypes {sorted(map(str, on_disk))}; refusing to guess")
+    if {dtype} != on_disk:
         raise ValueError(
-            f"{weights_dir.name}: checkpoint is {on_disk}, {dtype} requested. Cast explicitly "
-            "with `.to(dtype)` on CPU before moving to the device -- casting on MPS crosses "
-            "the 13.32 GiB working set and costs 74 s per forward."
+            f"{weights_dir.name}: checkpoint is {next(iter(on_disk))}, {dtype} requested. Cast "
+            "explicitly with `.to(dtype)` on CPU before moving to the device -- casting on MPS "
+            "crosses the 13.32 GiB working set and costs 74 s per forward."
         )
     # The cast is explicit and matches the file, having just been checked against it.
     model = model.to(dtype=dtype)

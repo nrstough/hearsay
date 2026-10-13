@@ -23,6 +23,7 @@ the rest of the map is first exercised against a real download in `test_w1_*`.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -166,11 +167,12 @@ def write_ckpt(root: Path, cfg: Wav2Vec2Config, sd: dict) -> Path:
     return root
 
 
-def port_from(cfg, sd, root: Path | None = None) -> AntiDeepfakeDetector:
-    """Load a synthetic checkpoint through the real `load_antideepfake`."""
-    import tempfile
+def port_from(cfg, sd, root: Path) -> AntiDeepfakeDetector:
+    """Load a synthetic checkpoint through the real `load_antideepfake`.
 
-    root = root or Path(tempfile.mkdtemp())
+    Takes `root` rather than calling `tempfile.mkdtemp()`: the latter sits outside pytest's
+    `tmp_path` rotation, so ~20 calls per run left ~2 MiB of checkpoints behind permanently.
+    """
     return load_antideepfake(write_ckpt(root, cfg, sd), device=None, dtype=torch.float32)
 
 
@@ -216,13 +218,13 @@ def test_k6b_a_missing_tensor_is_named(cfg, ckpt, tmp_path):
     assert "encoder.layers.0.feed_forward.intermediate_dense.weight" in expected - covered
 
 
-def test_k7_reference_forward_matches_the_port(cfg, ckpt, audio):
+def test_k7_reference_forward_matches_the_port(tmp_path, cfg, ckpt, audio):
     """K7: the independent implementation agrees with the ported model. THE BREAK CHECK TEST.
 
     Gated on `max|d| / absmax(ref)` at rel 1e-3, never cosine: a deliberate q/k swap passes
     `cos > 0.99` at 0.99083.
     """
-    port = port_from(cfg, ckpt)
+    port = port_from(cfg, ckpt, tmp_path)
     with torch.inference_mode():
         got, ref = port(audio), reference_forward(ckpt, cfg, audio)
     assert got.shape == (1, 2) and ref.shape == (1, 2)
@@ -252,13 +254,13 @@ def test_k7_reference_forward_matches_the_port(cfg, ckpt, audio):
         })),
     ],
 )
-def test_k7b_shape_compatible_mismaps_are_caught(cfg, ckpt, audio, label, mutate):
+def test_k7b_shape_compatible_mismaps_are_caught(tmp_path, cfg, ckpt, audio, label, mutate):
     """K7: swaps that keep every shape and every count intact must still be caught.
 
     `q/k/v/out_proj` are all `[H, H]` and 14 distinct roles share shape `(H,)`, so neither
     the tensor budget nor a shape check can see any of these.
     """
-    port = port_from(cfg, ckpt)
+    port = port_from(cfg, ckpt, tmp_path)
     with torch.inference_mode():
         good = port(audio)
     bad_sd = {k: v.clone() for k, v in ckpt.items()}
@@ -282,13 +284,13 @@ def test_k8_pos_conv_uses_the_legacy_weight_norm_names(cfg, ckpt):
     assert ckpt[f"{PREFIX}encoder.pos_conv.0.weight_v"].shape == params[LEGACY_TO_PARAM["encoder.pos_conv_embed.conv.weight_v"]].shape
 
 
-def test_k8b_the_weight_norm_axis_convention_is_right(cfg, ckpt):
+def test_k8b_the_weight_norm_axis_convention_is_right(tmp_path, cfg, ckpt):
     """K8: `g * v / ||v||` with the norm over dims != 2, checked against the live module.
 
     Taking the norm over dim 2 instead is an O(1) error on an O(1) tensor, so this is not a
     near-miss if it is wrong.
     """
-    model = port_from(cfg, ckpt)
+    model = port_from(cfg, ckpt, tmp_path)
     g = ckpt[f"{PREFIX}encoder.pos_conv.0.weight_g"].double()
     v = ckpt[f"{PREFIX}encoder.pos_conv.0.weight_v"].double()
     right = (g * v / v.pow(2).sum(dim=(0, 1), keepdim=True).sqrt()).numpy()
@@ -377,9 +379,9 @@ def test_k13b_a_missing_flag_refuses_rather_than_defaulting(tmp_path, drop):
         load_config(tmp_path)
 
 
-def test_k14_flipping_stable_layer_norm_changes_the_output(cfg, ckpt, audio):
+def test_k14_flipping_stable_layer_norm_changes_the_output(tmp_path, cfg, ckpt, audio):
     """K14: the flag is load-bearing -- every tensor can be right and the function still wrong."""
-    port = port_from(cfg, ckpt)
+    port = port_from(cfg, ckpt, tmp_path)
     with torch.inference_mode():
         good = port(audio)
     flipped = tiny_config()
@@ -408,20 +410,20 @@ def test_k16b_a_non_injective_map_raises():
         invert_map({"a": "x", "b": "x"})
 
 
-def test_k17_dtype_is_what_was_requested(cfg, ckpt):
+def test_k17_dtype_is_what_was_requested(tmp_path, cfg, ckpt):
     """K17: a silent downcast would move every score."""
-    model = port_from(cfg, ckpt)
+    model = port_from(cfg, ckpt, tmp_path)
     assert next(model.parameters()).dtype == torch.float32
     half = model.to(dtype=torch.float16)
     assert next(half.parameters()).dtype == torch.float16
 
 
-def test_k18_layer_order_errors_are_caught(cfg, audio):
+def test_k18_layer_order_errors_are_caught(tmp_path, cfg, audio):
     """K18: all encoder layers are shape-identical, so a reordering loads with zero missing
     and zero unexpected keys. Only the numerical check can see it."""
     cfg4 = tiny_config(n_layers=4)
     sd = synthetic_checkpoint(cfg4, seed=3)
-    port = port_from(cfg4, sd)
+    port = port_from(cfg4, sd, tmp_path)
     with torch.inference_mode():
         good = port(audio)
 
@@ -439,12 +441,12 @@ def test_k18_layer_order_errors_are_caught(cfg, audio):
         assert max_rel_deviation(good, bad) >= GATE, f"layer permutation {label} slipped through"
 
 
-def test_k7c_non_finite_output_is_infinitely_deviant_never_nan(cfg, ckpt, audio):
+def test_k7c_non_finite_output_is_infinitely_deviant_never_nan(tmp_path, cfg, ckpt, audio):
     """A NaN compares False against any threshold, so it would pass a `< tol` gate silently.
 
     Found by the pos_conv zeroing control, which divides by a zero norm.
     """
-    port = port_from(cfg, ckpt)
+    port = port_from(cfg, ckpt, tmp_path)
     with torch.inference_mode():
         good = port(audio)
     assert max_rel_deviation(good, torch.full_like(good, float("nan"))) == float("inf")
@@ -496,17 +498,37 @@ def test_a3b_free_space_rule_is_two_times_the_download(tmp_path, monkeypatch):
     import shutil as _sh
 
     fetch = _fetch_module()
-    monkeypatch.setattr(fetch, "REPO", tmp_path / "elsewhere")
-    (tmp_path / "elsewhere").mkdir()
-    monkeypatch.setattr(fetch.Path, "stat", Path.stat, raising=False)
 
     class FakeUsage:
         def __init__(self, free):
             self.free = free
 
     monkeypatch.setattr(_sh, "disk_usage", lambda p: FakeUsage(10**9))
-    with pytest.raises(fetch.TargetRefused, match="free"):
-        fetch.check_target(tmp_path, 10**9, repo=Path("/dev/null"))
+    # `/dev` is devfs, a genuinely different st_dev from tmp_path, so the volume clause passes
+    # and the free-space clause is the one actually under test. Asserted, not assumed.
+    import os as _os
+
+    assert _os.stat("/dev").st_dev != _os.stat(tmp_path).st_dev, "test needs two devices"
+    monkeypatch.setattr(fetch.shutil, "disk_usage", lambda p: FakeUsage(10**9), raising=False)
+    with pytest.raises(fetch.NotEnoughSpace, match="free"):
+        fetch.check_target(tmp_path, 10**9, repo=Path("/dev"))
+
+
+def test_a3c_the_override_does_not_also_disable_the_free_space_rule(tmp_path, monkeypatch):
+    """R4: both A3 clauses raised the same type and the caller caught the base class, so
+    HEARSAY_ALLOW_SAME_VOLUME silently bypassed "refuses below 2x the download" too -- the half
+    that exists because this project has already lost three builds to a full disk."""
+    fetch = _fetch_module()
+    assert issubclass(fetch.SameVolume, fetch.TargetRefused)
+    assert issubclass(fetch.NotEnoughSpace, fetch.TargetRefused)
+    assert not issubclass(fetch.NotEnoughSpace, fetch.SameVolume), (
+        "a full disk must not be overridable by a placement-policy flag"
+    )
+    import inspect
+
+    src = inspect.getsource(fetch.fetch)
+    assert "except SameVolume" in src, "the override must catch only the placement clause"
+    assert "except TargetRefused" not in src
 
 
 def test_file_sha256_matches_hashlib(tmp_path):
@@ -584,9 +606,9 @@ def test_p1_pooling_is_declared_and_cited():
     assert "APPROACH.md" in ad.__doc__
 
 
-def test_p1b_the_declared_pooling_is_what_runs(cfg, ckpt, audio):
+def test_p1b_the_declared_pooling_is_what_runs(tmp_path, cfg, ckpt, audio):
     """P1: the constant is load-bearing, not decoration."""
-    port = port_from(cfg, ckpt)
+    port = port_from(cfg, ckpt, tmp_path)
     with torch.inference_mode():
         hidden = port.wav2vec2(audio).last_hidden_state
         expected = port.head(hidden.mean(dim=1))
@@ -596,13 +618,13 @@ def test_p1b_the_declared_pooling_is_what_runs(cfg, ckpt, audio):
         port(audio)
 
 
-def test_p2_alternative_poolings_are_measured_not_asserted(cfg, ckpt, audio):
+def test_p2_alternative_poolings_are_measured_not_asserted(tmp_path, cfg, ckpt, audio):
     """P2: record the margin between poolings; do not assert dominance.
 
     Codex C3: documented mean pooling need not beat alternatives on every sample, so turning
     that expectation into a correctness assertion could fail a correct implementation.
     """
-    port = port_from(cfg, ckpt)
+    port = port_from(cfg, ckpt, tmp_path)
     with torch.inference_mode():
         hidden = port.wav2vec2(audio).last_hidden_state
         variants = {"time_mean_last_layer": hidden.mean(dim=1), "last_frame": hidden[:, -1, :],
@@ -843,12 +865,64 @@ def test_load_refuses_a_missing_mapped_tensor(tmp_path, cfg, ckpt):
         load_antideepfake(write_ckpt(tmp_path / "short", cfg, short), dtype=torch.float32)
 
 
-def test_load_refuses_a_changed_declared_unused_set(tmp_path, cfg, ckpt):
-    """K12 on the production path."""
+def test_load_refuses_a_removed_declared_unused_tensor(tmp_path, cfg, ckpt):
+    """K12, the REMOVAL half -- and the half that had no test.
+
+    The earlier single test dropped a name *and* added a bogus one, so it raised at the
+    unclassified guard, not the declared-unused guard it was named for; a permissive
+    `match="unclassified|declared-unused"` hid that. With the declared-unused guard deleted a
+    6-name unused set loaded clean and the whole suite stayed green.
+    """
     bad = {k: v for k, v in ckpt.items() if k != f"{PREFIX}project_q.bias"}
+    with pytest.raises(ValueError, match="declared-unused set changed"):
+        load_antideepfake(write_ckpt(tmp_path / "unused_removed", cfg, bad), dtype=torch.float32)
+
+
+def test_load_refuses_an_unknown_tensor_at_the_unclassified_guard(tmp_path, cfg, ckpt):
+    """K5 on the production path: the ADDITION half, asserted at its own guard."""
+    bad = dict(ckpt)
     bad[f"{PREFIX}project_q.renamed"] = torch.zeros(1)
-    with pytest.raises(ValueError, match="unclassified|declared-unused"):
-        load_antideepfake(write_ckpt(tmp_path / "unused", cfg, bad), dtype=torch.float32)
+    with pytest.raises(ValueError, match="unclassified"):
+        load_antideepfake(write_ckpt(tmp_path / "unused_added", cfg, bad), dtype=torch.float32)
+
+
+def test_load_refuses_a_missing_head_tensor(tmp_path, cfg, ckpt):
+    """R2: deleting the head-tuple guard turned this into a raw KeyError from `sd[...]`."""
+    bad = {k: v for k, v in ckpt.items() if k != "proj_fc.bias"}
+    with pytest.raises(ValueError, match="head tensors"):
+        load_antideepfake(write_ckpt(tmp_path / "nohead", cfg, bad), dtype=torch.float32)
+
+
+def test_load_enforces_injectivity_not_merely_tests_it(tmp_path, cfg, ckpt, monkeypatch):
+    """R3: `invert_map` had no caller outside tests, so a two-source collision would have been
+    a silent overwrite with every count still balancing.
+
+    The anchored index makes a natural collision unreachable, so the guard is exercised by
+    introducing one into the map itself -- which is what proves the loader consults it.
+    """
+    import hearsay.antideepfake as mod
+
+    collided = dict(mod.STATIC)
+    collided[f"{PREFIX}mask_emb"] = "feature_projection.projection.weight"
+    monkeypatch.setattr(mod, "STATIC", collided)
+    with pytest.raises(ValueError, match="not injective"):
+        load_antideepfake(write_ckpt(tmp_path / "collide", cfg, ckpt), dtype=torch.float32)
+
+
+def test_the_loader_loads_strictly():
+    """R2: the docstring names `strict=True` as the mechanism, so the contract gets a test.
+
+    The count and unclassified guards now catch missing and extra tensors before
+    `load_state_dict` sees them, which makes strictness redundant in practice -- but a
+    documented contract with nothing behind it is exactly what the audit faulted.
+    """
+    import inspect
+
+    import hearsay.antideepfake as mod
+
+    src = inspect.getsource(mod.load_antideepfake)
+    assert "load_state_dict(renamed, strict=True)" in src
+    assert "strict=False" not in src
 
 
 def test_load_refuses_a_wrong_shaped_head(tmp_path, cfg, ckpt):
@@ -862,12 +936,16 @@ def test_load_refuses_a_wrong_shaped_head(tmp_path, cfg, ckpt):
         load_antideepfake(write_ckpt(tmp_path / "head3", cfg, bad), dtype=torch.float32)
 
 
-def test_load_refuses_a_duplicate_target_via_a_padded_index(tmp_path, cfg, ckpt):
+def test_a_padded_layer_index_does_not_alias_a_real_layer(cfg):
     """F8: `layers.007` once mapped to the same target as `layers.7`, so the later write won
-    silently with every count still balancing. The index is now anchored."""
-    padded = f"{PREFIX}encoder.layers.00.fc1.weight"
-    km = map_keys([padded], cfg.num_hidden_layers, cfg.num_feat_extract_layers)
-    assert padded in km.unclassified, "a zero-padded index must not alias a real layer"
+    silently with every count still balancing. The index is anchored now.
+
+    Renamed from `test_load_refuses_...`: it asserts the classification, not a refusal by the
+    loader, and the old name claimed otherwise.
+    """
+    for padded in (f"{PREFIX}encoder.layers.00.fc1.weight", f"{PREFIX}encoder.layers.007.fc1.weight"):
+        km = map_keys([padded], cfg.num_hidden_layers, cfg.num_feat_extract_layers)
+        assert padded in km.unclassified, f"{padded} must not alias a real layer"
 
 
 def test_load_refuses_bad_architecture_flags(tmp_path, cfg, ckpt):
@@ -911,6 +989,14 @@ def test_k17_dtype_mismatch_is_refused_not_silently_honoured(tmp_path, cfg, ckpt
     with pytest.raises(ValueError, match="checkpoint is torch.float16"):
         load_antideepfake(root16, dtype=torch.float32)
 
+    # R9: an fp16 base with an fp32 head once loaded clean as fp32, silently upcasting the base,
+    # because the guard sampled a single tensor.
+    mixed = dict(half)
+    mixed["proj_fc.weight"] = mixed["proj_fc.weight"].float()
+    mixed["proj_fc.bias"] = mixed["proj_fc.bias"].float()
+    with pytest.raises(ValueError, match="mixed tensor dtypes"):
+        load_antideepfake(write_ckpt(tmp_path / "mixed", cfg, mixed), dtype=torch.float32)
+
 
 def test_reference_forward_refuses_a_missing_conv_bias(cfg, ckpt, audio):
     """F13: `sd.get` returned a finite, wrong answer from the one function whose entire
@@ -951,14 +1037,42 @@ def test_mps_reservation_blocks_a_second_claimant(tmp_path):
     assert not lock.exists(), "the lock must be released on exit"
 
 
-def test_mps_reservation_reclaims_a_stale_lock(tmp_path):
+def test_mps_reservation_reclaims_a_stale_lock_whose_owner_is_gone(tmp_path):
     """A killed job must not wedge the device forever."""
     from hearsay.antideepfake import mps_reservation
 
     lock = tmp_path / "MPS.lock"
-    lock.write_text("pid=1\n")
+    lock.write_text("pid=999999999\ntoken=deadbeef\n")  # a pid that cannot exist
     with mps_reservation(lock, scope="x", stale_s=0.0):
         assert lock.exists()
+
+
+def test_mps_reservation_will_not_steal_a_lock_from_a_live_owner(tmp_path):
+    """R5: it reclaimed purely on age, so a second claimant took the device out from under a
+    live holder still inside its `with` block -- reinstating the concurrent-2B condition."""
+    import os
+
+    from hearsay.antideepfake import mps_reservation
+
+    lock = tmp_path / "MPS.lock"
+    lock.write_text(f"pid={os.getpid()}\ntoken=other\n")  # alive by construction
+    with pytest.raises(TimeoutError, match="refusing to share"), mps_reservation(
+        lock, scope="thief", wait_s=0.1, stale_s=0.0
+    ):
+        pass
+    assert "token=other" in lock.read_text(), "a live owner's lock must survive"
+
+
+def test_mps_reservation_releases_only_its_own_lock(tmp_path):
+    """R6: release unlinked whatever was there, so after a reclaim our exit deleted the other
+    job's live lock -- two lanes ping-ponging the device."""
+    from hearsay.antideepfake import mps_reservation
+
+    lock = tmp_path / "MPS.lock"
+    with mps_reservation(lock, scope="first"):
+        lock.write_text("pid=1\ntoken=someone_else\n")  # someone else now holds it
+    assert lock.exists(), "we must not unlink a lock we no longer own"
+    assert "someone_else" in lock.read_text()
 
 
 @pytest.mark.needs_weights
@@ -979,6 +1093,8 @@ def test_w2_real_audio_scores_finite_at_every_length():
     from hearsay.audio import load_audio
     from hearsay.embed import prepare_segment
 
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg absent; hearsay.audio.load_audio needs it")
     rows = list(csv.DictReader(man.open()))[:4]
     paths = [REPO / r["path"] for r in rows]
     if not all(p.exists() for p in paths):
