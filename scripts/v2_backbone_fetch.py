@@ -107,15 +107,20 @@ def check_target(target: Path, need_bytes: int, repo: Path = REPO) -> Path:
     probe = resolved
     while not probe.exists():
         probe = probe.parent
-    if probe.stat().st_dev == repo.resolve().stat().st_dev:
-        raise SameVolume(
-            f"refusing: {resolved} is on the same volume as the repo (st_dev "
-            f"{probe.stat().st_dev}); weights must go on separate storage (A3/D8)"
-        )
+
+    # Capacity FIRST, and unconditionally. An earlier revision raised the placement error
+    # before ever computing free space, so the caller's `except SameVolume` override skipped
+    # capacity too: a 931 GiB download against zero free space cleared preflight with zero
+    # calls to `disk_usage`. Splitting the exception types did not fix that -- the order did.
     free = shutil.disk_usage(probe).free
     if free < 2 * need_bytes:
         raise NotEnoughSpace(
             f"refusing: {free / 2**30:.1f} GiB free at {probe} < 2x the {need_bytes / 2**30:.1f} GiB download"
+        )
+    if probe.stat().st_dev == repo.resolve().stat().st_dev:
+        raise SameVolume(
+            f"refusing: {resolved} is on the same volume as the repo (st_dev "
+            f"{probe.stat().st_dev}); weights must go on separate storage (A3/D8)"
         )
     return resolved
 
@@ -131,7 +136,16 @@ def fetch(model: str, dry_run: bool) -> dict:
     except SameVolume as e:
         if os.environ.get("HEARSAY_ALLOW_SAME_VOLUME") != "1":
             die(f"{e}\n       set HEARSAY_ALLOW_SAME_VOLUME=1 to override, and record it as a deviation")
-        print(f"WARNING: A3 overridden by HEARSAY_ALLOW_SAME_VOLUME -- {e}")
+        print(f"WARNING: A3's placement clause overridden by HEARSAY_ALLOW_SAME_VOLUME -- {e}")
+        # The override covers placement only. Capacity is re-asserted here so that no code path
+        # reaches a download without it having been checked.
+        probe = Path(hf_home).resolve()
+        while not probe.exists():
+            probe = probe.parent
+        free = shutil.disk_usage(probe).free
+        if free < 2 * need:
+            die(f"refusing: {free / 2**30:.1f} GiB free at {probe} < 2x the {need / 2**30:.1f} GiB download "
+                "(the override covers placement, never capacity)")
         target = Path(hf_home).resolve()
 
     print(f"{model}: revision {meta['revision'][:12]} | {need / 2**30:.2f} GiB | cache {target}")

@@ -514,21 +514,60 @@ def test_a3b_free_space_rule_is_two_times_the_download(tmp_path, monkeypatch):
         fetch.check_target(tmp_path, 10**9, repo=Path("/dev"))
 
 
-def test_a3c_the_override_does_not_also_disable_the_free_space_rule(tmp_path, monkeypatch):
-    """R4: both A3 clauses raised the same type and the caller caught the base class, so
-    HEARSAY_ALLOW_SAME_VOLUME silently bypassed "refuses below 2x the download" too -- the half
-    that exists because this project has already lost three builds to a full disk."""
+def test_a3c_capacity_is_checked_before_placement_and_always(tmp_path, monkeypatch):
+    """A3: capacity must be enforced on every path, including the overridden one.
+
+    The behavioural test, not a source-string one. Splitting the exception types was not the
+    fix: `check_target` raised the placement error *before* computing free space, so the
+    caller's override skipped capacity entirely -- a 931 GiB download against zero free space
+    cleared preflight with **zero calls to `disk_usage`**. This asserts the order and the call.
+    """
+    import shutil as _sh
+
     fetch = _fetch_module()
-    assert issubclass(fetch.SameVolume, fetch.TargetRefused)
-    assert issubclass(fetch.NotEnoughSpace, fetch.TargetRefused)
+    calls = []
+
+    class FakeUsage:
+        def __init__(self, free):
+            self.free = free
+
+    def spy(path):
+        calls.append(str(path))
+        return FakeUsage(0)
+
+    monkeypatch.setattr(_sh, "disk_usage", spy)
+    monkeypatch.setattr(fetch.shutil, "disk_usage", spy, raising=False)
+
+    # same volume AND no space: capacity must win, proving it runs first
+    with pytest.raises(fetch.NotEnoughSpace, match="free"):
+        fetch.check_target(tmp_path, 10**9, repo=REPO)
+    assert calls, "disk_usage was never called -- capacity was skipped"
     assert not issubclass(fetch.NotEnoughSpace, fetch.SameVolume), (
         "a full disk must not be overridable by a placement-policy flag"
     )
-    import inspect
 
-    src = inspect.getsource(fetch.fetch)
-    assert "except SameVolume" in src, "the override must catch only the placement clause"
-    assert "except TargetRefused" not in src
+
+def test_a6_loader_refuses_a_checkpoint_whose_bytes_do_not_match_the_record(tmp_path, cfg, ckpt):
+    """A1/A6 at load time, against the bytes on disk.
+
+    Fetch-time hashing alone let a structurally valid replacement checkpoint load under a
+    stale identity record, because `check_identity` had no production caller and only compared
+    dictionaries that were handed to it.
+    """
+    from hearsay.antideepfake import file_sha256
+
+    root = write_ckpt(tmp_path / "bound", cfg, ckpt)
+    good = {"file_sha256": {"model.safetensors": file_sha256(root / "model.safetensors")}}
+    assert load_antideepfake(root, dtype=torch.float32, identity=good) is not None
+
+    # a different but structurally valid checkpoint at the same path
+    other = synthetic_checkpoint(cfg, seed=99)
+    write_ckpt(root, cfg, other)
+    with pytest.raises(ValueError, match="does not match the identity record"):
+        load_antideepfake(root, dtype=torch.float32, identity=good)
+
+    with pytest.raises(ValueError, match="no sha256"):
+        load_antideepfake(root, dtype=torch.float32, identity={"file_sha256": {}})
 
 
 def test_file_sha256_matches_hashlib(tmp_path):
@@ -1112,3 +1151,61 @@ def test_w2_real_audio_scores_finite_at_every_length():
             assert logits.shape == (1, 2)
             assert np.isfinite(logits.numpy()).all()
             assert np.isfinite(synth_logit(logits[0]))
+
+
+def test_i6_clips_below_the_receptive_field_are_refused_by_name(tmp_path, cfg, ckpt):
+    """C4/I6: the declared short-input policy, at the boundary rather than "whatever the first
+    four manifest rows happen to be".
+
+    Below one encoder frame both paths used to raise an opaque
+    `RuntimeError: Kernel size can't be greater than actual input size`.
+    """
+    from hearsay.antideepfake import receptive_field
+
+    need = receptive_field(cfg.conv_kernel, cfg.conv_stride)
+    assert need == 400, f"shipped kernels/strides give 400 samples, got {need}"
+    port = port_from(cfg, ckpt, tmp_path)
+
+    for n in (1, need - 1):
+        x = torch.zeros(1, n)
+        with pytest.raises(ValueError, match="below the 400-sample"):
+            port(x)
+        with pytest.raises(ValueError, match="below the 400-sample"):
+            reference_forward(ckpt, cfg, x)
+
+    for n in (need, need + 1, need * 4):
+        x = torch.randn(1, n)
+        x = (x - x.mean()) / (x.var() + 1e-7).sqrt()
+        with torch.inference_mode():
+            out = port(x)
+            ref = reference_forward(ckpt, cfg, x)
+        assert out.shape == (1, 2) and np.isfinite(out.numpy()).all()
+        assert max_rel_deviation(out, ref) < GATE
+
+
+GOLDEN = Path(__file__).parent / "fixtures" / "backbone_golden.json"
+
+
+def test_w4b_golden_logits_are_persisted_not_just_self_consistent(tmp_path, cfg, ckpt):
+    """C4: comparing two reloads under the same installed libraries cannot see library drift.
+
+    The values are written to a committed fixture on first run and compared thereafter, so a
+    `transformers` or `torch` upgrade that moves the numbers is visible instead of silent.
+    """
+    port = port_from(cfg, ckpt, tmp_path)
+    torch.manual_seed(1234)
+    x = torch.randn(1, 16000)
+    x = (x - x.mean()) / (x.var() + 1e-7).sqrt()
+    with torch.inference_mode():
+        got = port(x).double().numpy().ravel().tolist()
+
+    if not GOLDEN.exists():
+        GOLDEN.parent.mkdir(parents=True, exist_ok=True)
+        GOLDEN.write_text(json.dumps({"tiny_cfg_seed0_logits": got}, indent=1) + "\n")
+        pytest.skip(f"golden written to {GOLDEN.name}; commit it and the comparison runs from now on")
+
+    want = json.loads(GOLDEN.read_text())["tiny_cfg_seed0_logits"]
+    assert np.allclose(got, want, rtol=1e-6, atol=1e-8), (
+        f"logits drifted from the committed golden: {got} vs {want}. If this is an intended "
+        "library upgrade, update the fixture and say so in the run spec."
+    )

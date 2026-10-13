@@ -48,6 +48,7 @@ Licence: the AntiDeepfake weights are CC BY-NC-SA 4.0 (non-commercial, share-ali
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -219,6 +220,31 @@ def _owner_alive(contents: str) -> bool:
     return False
 
 
+def receptive_field(conv_kernel, conv_stride) -> int:
+    """Samples needed for one encoder frame: the conv front end's receptive field.
+
+    For the shipped configs (kernels 10,3,3,3,3,2,2 / strides 5,2,2,2,2,2,2) this is **400
+    samples, 25 ms**. Below it both the model and `reference_forward` raised an opaque
+    `RuntimeError: Kernel size can't be greater than actual input size`, which is a bad answer
+    to a legitimate question about a very short clip. The declared policy is to refuse with a
+    named error (run spec `I5`/`I6`, Codex C4 amendment).
+    """
+    r = 1
+    for k, s in zip(reversed(list(conv_kernel)), reversed(list(conv_stride)), strict=True):
+        r = (r - 1) * s + k
+    return r
+
+
+def check_min_length(cfg: Wav2Vec2Config, n_samples: int) -> None:
+    """Refuse a clip shorter than one encoder frame, naming the limit."""
+    need = receptive_field(cfg.conv_kernel, cfg.conv_stride)
+    if n_samples < need:
+        raise ValueError(
+            f"{n_samples} samples is below the {need}-sample ({need / 16000 * 1000:.0f} ms) "
+            "convolutional receptive field; too short to produce a single encoder frame"
+        )
+
+
 def expected_mapped(n_layers: int, n_conv: int = 7) -> int:
     """How many base-SSL tensors a checkpoint of this shape must carry.
 
@@ -331,6 +357,7 @@ class AntiDeepfakeDetector(nn.Module):
         self.pooling = POOLING
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        check_min_length(self.wav2vec2.config, x.shape[-1])
         hidden = self.wav2vec2(x).last_hidden_state  # (B, T, H)
         if self.pooling != "time_mean_last_layer":  # pragma: no cover - guarded constant
             raise ValueError(f"unsupported pooling {self.pooling!r}")
@@ -346,8 +373,17 @@ def _read_state_dict(weights_dir: str | Path) -> dict[str, torch.Tensor]:
     return load_file(str(path))
 
 
+def file_sha256(path: Path, block: int = 1 << 20) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(block), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def load_antideepfake(
     weights_dir: str | Path, device: str | None = None, dtype: torch.dtype = torch.float32,
+    identity: dict | None = None,
 ) -> AntiDeepfakeDetector:  # fmt: skip
     """Load a checkpoint under the strict map, or raise.
 
@@ -361,6 +397,19 @@ def load_antideepfake(
     process. If fp16 is wanted, cast on **CPU** and then move to the device.
     """
     weights_dir = Path(weights_dir)
+    if identity is not None:
+        # A1/A6 at load time, against the bytes on disk. Fetch-time hashing alone let a
+        # structurally valid replacement checkpoint load under a stale identity record, because
+        # `check_identity` had no production caller and only compared supplied dictionaries.
+        recorded = (identity.get("file_sha256") or {}).get("model.safetensors")
+        if not recorded:
+            raise ValueError("identity record carries no sha256 for model.safetensors")
+        actual = file_sha256(weights_dir / "model.safetensors")
+        if actual != recorded:
+            raise ValueError(
+                f"{weights_dir.name}: model.safetensors sha256 {actual[:16]} does not match the "
+                f"identity record's {recorded[:16]}; refusing to load an unrecorded checkpoint"
+            )
     cfg = load_config(weights_dir)
     sd = _read_state_dict(weights_dir)
     n_expected_base = expected_mapped(cfg.num_hidden_layers, cfg.num_feat_extract_layers)
@@ -508,6 +557,7 @@ def reference_forward(sd: dict[str, torch.Tensor], cfg: Wav2Vec2Config, x: torch
     """
     if not cfg.do_stable_layer_norm or cfg.feat_extract_norm != "layer":
         raise ValueError("reference_forward covers do_stable_layer_norm=True, feat_extract_norm='layer' only")
+    check_min_length(cfg, x.shape[-1])
 
     h = x.unsqueeze(1) if x.dim() == 2 else x  # (B, 1, S)
     for i, (k, s) in enumerate(zip(cfg.conv_kernel, cfg.conv_stride, strict=True)):
