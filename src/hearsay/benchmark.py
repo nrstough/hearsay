@@ -663,7 +663,7 @@ def cluster_bootstrap(y, s_control, s_cand, cluster, stratum, *, n: int = 2000, 
     if not (len(y) == len(a) == len(b) == len(cluster) == len(stratum)):
         raise BenchmarkError("bootstrap: arrays differ in length")
     fixed_idx, groups = bootstrap_strata(cluster, stratum, lj_mode)
-    small = {k: len(v) for k, v in groups.items() if len(v) <= 2}
+    small = {str(k): len(v) for k, v in groups.items() if len(v) <= 2}
     point = {k: (reading(y, b, k), reading(y, a, k)) for k in readings_}
     point = {k: (None if None in v else v[0] - v[1]) for k, v in point.items()}
     if small:
@@ -705,7 +705,7 @@ def bootstrap_ci(y, s, cluster, stratum, *, n: int = 2000, seed: int = 0, lj_mod
     if not (len(y) == len(s) == len(cluster) == len(stratum)):
         raise BenchmarkError("bootstrap: arrays differ in length")
     fixed_idx, groups = bootstrap_strata(cluster, stratum, lj_mode)
-    small = {k: len(v) for k, v in groups.items() if len(v) <= 2}
+    small = {str(k): len(v) for k, v in groups.items() if len(v) <= 2}
     if small:
         return {"degenerate": True, "reason": f"stratum cluster counts {small} (<= 2)", "lj_mode": lj_mode}
     vals = {k: [] for k in readings_}
