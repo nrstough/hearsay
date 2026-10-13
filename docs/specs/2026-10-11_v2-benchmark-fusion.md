@@ -252,7 +252,10 @@ Output: `outputs/v2/benchmark/<name>.json` + a markdown scorecard row. Every rea
 - **2026-10-12, Nathan (STOP 3):** "No platt for now it'll overfit and not generalize". C2 drops the per-fold Platt step: C2 = E applied to the shrunk weighted rank. All candidates are scored on the post-E weighted rank. Calibration is deferred to V2-61. Recorded context: the ruling came after an early inner look in which C2 scored 0.376 package-0.5 without Platt and 0.514 with per-fold Platt (C0 0.3390). Other pre-run clarifications (K2–K13) are in `benchmarks/v2_60_candidates.json` and the plan.
 
 ## Test break check
-_To be filled in post-commit._
+
+- **Test:** `tests/test_benchmark.py::test_nested_refs_exclude_scored_fold`, the P2 candidate. It guards the leak that already happened (rows ranked against their own fold).
+- **Mutation:** `src/hearsay/benchmark.py` `nested_ranks`: `rank_vs(np.sort(logit[tr]), ...)` changed to `rank_vs(np.sort(logit), ...)` (rank against all inner rows, i.e. transductive). Made in a detached worktree under the session scratchpad at 231e36c, never committed, removed afterwards.
+- **Result:** Break check: `test_nested_refs_exclude_scored_fold` vs `src/hearsay/benchmark.py` `nested_ranks` (transductive references) → CAUGHT (assertion at the poisoned-fold check). No fix-and-recheck rounds.
 
 ## Results
 
