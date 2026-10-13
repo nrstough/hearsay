@@ -269,7 +269,7 @@ Output: `outputs/v2/benchmark/<name>.json` + a markdown scorecard row. Every rea
 2. The fusion ITW readout lacked intervals and without-E. **Fixed:** `itw_block` adds the stratified speaker-cluster bootstrap and the without-E readings (test `test_fusion_itw_block_has_bootstrap_and_without_e`). Holdout without-E is **not** added: it would need a second holdout read of the candidate set, and P2 requires the with/without-E pair on inner only.
 3. Follow-on on a provisional WIN. **Not changed; Nathan's decision** (see round 1, item 3, and the verdict report).
 4. Historical out-of-ledger cohort reads. **Labelled:** the holdout-cohort readouts of this experiment are exploratory; confirmatory cohort evidence needs a fresh, ledgered evaluation (both reports).
-5. Full suite not runnable in Codex's sandbox. Local result in round 1, re-run after these fixes (below).
+5. Full suite not runnable in Codex's sandbox. **Re-run locally after these fixes: 995 passed, 12 skipped (baseline 847 + 148 new), ruff clean.** (The audit record's absolute links broke the strict docs-site build; they are rewritten as code paths after each audit run.)
 6. Stale bookkeeping (ledger count, empty-reservation behaviour). **Fixed** in Results.
 
 ## Test break check
