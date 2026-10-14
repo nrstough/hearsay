@@ -80,9 +80,9 @@ Class-stratified cluster bootstrap, 2,000 draws, seed 0 (p5 to p95). Inner, prim
 
 The inner intervals are wide because they resample only 8 spoof generators: whether grad_tts is drawn moves the shipped rule's cost from near 0 to about 0.5. The sensitivity row in the JSON resamples LJ as one cluster among the real clusters; 719 of its 2,000 draws contain no LJ at all, which is why LJ is held fixed in the primary row. Use paired differences, not these marginal intervals, to compare rules.
 
-## Holdout perturbation cohort (report-only)
+## Holdout perturbation cohort (report-only, exploratory)
 
-500 holdout clips × 5 kinds, the four shipped columns only (`outputs/channel/m3_perturb.csv`). Pooled package-0.5 / brief per kind:
+500 holdout clips × 5 kinds: the four shipped columns from `outputs/channel/m3_perturb.csv`, plus WavLM and layer 20 scored on Oct 13 with the same segment recipe (`scripts/v2_cohort_scores.py`; its 20-clip pilot checks that recipe through layer 7 against the stored scores, max |Δlogit| 0.0004). Pooled package-0.5 / brief per kind:
 
 | Rule | none | mp3 | noise20 | speed | shift1 |
 |---|---|---|---|---|---|
@@ -90,8 +90,25 @@ The inner intervals are wide because they resample only 8 spoof generators: whet
 | m1b_v3 | 0.048 / 0.056 | 0.056 / 0.085 | 0.268 / 0.271 | 0.052 / 0.052 | 0.052 / 0.048 |
 | handcrafted_v5 | 0.084 / 0.048 | 0.104 / 0.088 | 1.000 / 0.996 | 0.076 / 0.089 | 0.084 / 0.048 |
 | m5_xlsr_ft | 0.264 / 0.433 | 0.280 / 0.432 | 0.380 / 0.487 | 0.280 / 0.425 | 0.260 / 0.428 |
+| wavlm_l | 0.020 / 0.028 | 0.024 / 0.036 | 0.240 / 0.469 | 0.024 / 0.008 | 0.020 / 0.024 |
+| xlsr_L20 | 0.012 / 0.024 | 0.012 / 0.036 | 0.168 / 0.403 | 0.008 / 0.012 | 0.012 / 0.024 |
 
-20 dB white noise remains the shipped rule's hole, and handcrafted_v5 collapses completely under it. The cohort's precomputed fused columns are never read (they used transductive references). Its clips are holdout clips with holdout labels, so this readout is its own ledgered read.
+20 dB white noise remains the shipped rule's hole, and handcrafted_v5 collapses completely under it. Layer 20 holds up best of the single columns under noise. The cohort's precomputed fused columns are never read (they used transductive references). Its clips are holdout clips with holdout labels, so this readout is a ledgered read.
+
+## ITW perturbation cohort (report-only)
+
+500 ITW rows (250 real, 250 fake; the bake-off cohort) × 5 kinds, scored Oct 13 with each column's original recipe: perturb the full clip, then the seed-200 test-length crop. Every column's 20-clip pilot on the clean kind matched its stored ITW scores (max |Δlogit| at most 4e-6; m1b_v3 and layer 20 come straight from the stored cohort embeddings). Pooled package-0.5 / brief per kind:
+
+| Rule | none | mp3 | noise20 | speed | shift1 |
+|---|---|---|---|---|---|
+| SHIP | 0.256 / 0.201 | 0.268 / 0.181 | 0.388 / 0.439 | 0.236 / 0.145 | 0.260 / 0.173 |
+| m1b_v3 | 0.324 / 0.289 | 0.324 / 0.269 | 0.488 / 0.485 | 0.252 / 0.275 | 0.336 / 0.273 |
+| handcrafted_v5 | 0.748 / 0.976 | 0.872 / 0.979 | 0.904 / 0.988 | 0.820 / 0.980 | 0.760 / 0.976 |
+| m5_xlsr_ft | 0.340 / 0.424 | 0.352 / 0.435 | 0.504 / 0.575 | 0.344 / 0.416 | 0.348 / 0.440 |
+| wavlm_l | 0.404 / 0.952 | 0.424 / 0.945 | 0.512 / 1.000 | 0.372 / 0.960 | 0.404 / 0.963 |
+| xlsr_L20 | 0.336 / 0.291 | 0.344 / 0.291 | 0.456 / 0.540 | 0.352 / 0.271 | 0.324 / 0.299 |
+
+ITW is spent as a selection set (rule 7); these are readouts only.
 
 ## MLAAD (report-only, in-sample for M5)
 
@@ -102,14 +119,14 @@ The inner intervals are wide because they resample only 8 spoof generators: whet
 - m1b_v3 and the shipped rule (all-inner references) are the two published holdout references and are exempt, but only for the registry-pinned files: a different file under the same name is ledgered.
 - The other five columns were read once as one ledgered set, "benchmark-v1 baseline", on Oct 12. The ledger key now includes each file's sha256; the new key is recorded as an alias of that read (same files), not a new read.
 - The holdout perturbation cohort is one ledgered read.
-- Ledger total for this lane: 4 distinct holdout reads (this baseline set, this cohort, and the V2-60 candidate set and its cohort). The tracked audit copy is `benchmarks/holdout_ledger.jsonl`; the authority files live in the shared `outputs/v2/benchmark/holdout_ledger/`.
+- Ledger total for this lane: 6 distinct holdout reads (this baseline set; the four-column cohort; the V2-60 candidate set and its four-column cohort; and, on Oct 13, the six-column cohort for this scorecard and for the V2-60 candidates). The tracked audit copy is `benchmarks/holdout_ledger.jsonl`; the authority files live in the shared `outputs/v2/benchmark/holdout_ledger/`.
 - **Holdout-cohort numbers in this report are exploratory.** Confirmatory cohort evidence needs a fresh, ledgered evaluation.
 - **This run's historical exception.** Before the pre-audit critique, the cohort readout ran outside the ledger: in the first scorecard run (Oct 12) and in the V2-60 dry run and first run. Nothing was selected on it. The ledger cannot certify those earlier reads after the fact.
 - **What the ledger guarantees from commit 0d9a6e4 on** (plus the per-key lock added after the Codex audit): every holdout and holdout-cohort read goes through `read_holdout`; a rule set is read at most once, even by two concurrent runs; only the two registry-pinned references are exempt.
 
 ## Pending and deferred
 
-- **Pending** (cohort scoring job, ask-first): the ITW perturbation cohort for every column, and WavLM and layer 20 on the holdout cohort. When they land the registry becomes v1.1 and this scorecard is regenerated without a new holdout read.
+- **Pending:** nothing. The cohort scoring job ran on Oct 13 (Nathan's approval); the registry is now **v1.1** (eight cohort score files pinned) and this scorecard was regenerated under it. WavLM and layer 20 have no MLAAD scores (not part of the approved compute).
 - **Deferred:** MLAAD held out by family, ASVspoof 5 eval, reverb / codec / telephony / short-crop cohorts, the sealed set, and actDCF (to V2-61).
 
 ## Limitations

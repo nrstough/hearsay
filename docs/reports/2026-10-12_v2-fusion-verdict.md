@@ -55,7 +55,7 @@ C2 is worse than C0 in almost every resample. The intervals are dominated by the
 
 ## Report-only populations
 
-These do not enter the verdict. Holdout was read once for the candidate set (ledger key 2ff99dee). The holdout perturbation cohort (holdout clips and labels) is a separate ledgered read (985d6109). Lane total: 4 distinct holdout reads. ITW is spent on v1 selection.
+These do not enter the verdict. Holdout was read once for the candidate set (ledger key 2ff99dee). The holdout perturbation cohort (holdout clips and labels) is a separate ledgered read: first with the four shipped columns (985d6109), then on Oct 13 with WavLM and layer 20 added (1e3f3722). Lane total: 6 distinct holdout reads. ITW is spent on v1 selection.
 
 | Candidate | holdout brief | holdout package-0.5 | ITW brief | ITW package-0.5 |
 |---|---|---|---|---|
@@ -66,8 +66,26 @@ These do not enter the verdict. Holdout was read once for the candidate set (led
 
 - **C1 and C3 look better off-inner.** They are the two that lose on inner, through the ElevenLabs fold. Holdout (PlayHT and WaveGrad2) and ITW contain no ElevenLabs-style generator, and both were already read for these columns in the bake-off. This is exactly the disagreement a sealed population has to settle; it is not a reason to re-pick.
 - **Test set** (unlabelled): decision flips against C0 at each rule's inner package-0.5 threshold: C1 287, C3 74, C2 16 of 1,671. Spearman with the shipped TSV: C1 0.921, C3 0.980, C2 0.996.
-- **Holdout perturbation cohort (exploratory, see Disclosures):** only C0 and C2 are scorable (C2's off-inner model gives zero weight to the unscored columns). 20 dB noise: C0 0.196, C2 0.192 package-0.5. C1 and C3 are not scored until the cohort job runs.
-- **MLAAD** (in-sample for M5): detected share at the inner threshold, C0 0.970, C2 0.972. C1 and C3 not scored.
+- **Perturbation cohorts** (Oct 13, after the cohort job; package-0.5 / brief per kind). Holdout cohort, exploratory (see Disclosures):
+
+| Candidate | none | mp3 | noise20 | speed | shift1 |
+|---|---|---|---|---|---|
+| C0 | 0.004 / 0.012 | 0.004 / 0.037 | 0.196 / 0.269 | 0.000 / 0.000 | 0.004 / 0.008 |
+| C1 | 0.000 / 0.000 | 0.000 / 0.000 | 0.088 / 0.193 | 0.000 / 0.000 | 0.000 / 0.000 |
+| C2 | 0.004 / 0.020 | 0.004 / 0.037 | 0.192 / 0.244 | 0.000 / 0.000 | 0.004 / 0.016 |
+| C3 | 0.004 / 0.004 | 0.004 / 0.012 | 0.132 / 0.177 | 0.000 / 0.000 | 0.000 / 0.000 |
+
+  ITW cohort:
+
+| Candidate | none | mp3 | noise20 | speed | shift1 |
+|---|---|---|---|---|---|
+| C0 | 0.256 / 0.201 | 0.268 / 0.181 | 0.388 / 0.439 | 0.236 / 0.145 | 0.260 / 0.173 |
+| C1 | 0.200 / 0.141 | 0.216 / 0.161 | 0.364 / 0.467 | 0.200 / 0.141 | 0.204 / 0.157 |
+| C2 | 0.256 / 0.177 | 0.268 / 0.165 | 0.388 / 0.451 | 0.224 / 0.137 | 0.268 / 0.161 |
+| C3 | 0.220 / 0.167 | 0.224 / 0.199 | 0.348 / 0.461 | 0.208 / 0.141 | 0.228 / 0.167 |
+
+  C1 and C3 are clearly better than C0 under 20 dB noise on both cohorts, and C1 is better on every ITW kind. This repeats the off-inner pattern above: the two blends that lose on inner (through the ElevenLabs fold) look better on everything that has no ElevenLabs-style generator. It does not change the verdict, which reads nested inner only; it sharpens the case for a sealed population.
+- **MLAAD** (in-sample for M5): detected share at the inner threshold, C0 0.970, C2 0.972. C1 and C3 not scored: WavLM and layer 20 have no MLAAD scores, and scoring them was not part of the approved compute.
 - **E** fires on 345 (C0), 332 (C1), 364 (C2) and 349 (C3) inner reals, and on no spoofs.
 
 ## What this means
@@ -89,7 +107,7 @@ Fusion of today's columns cannot beat the shipped rule on the selection metric. 
 - The folds are generator-held-out but not wholly speaker-disjoint (LJ chapters cross folds; generators share target voices).
 - Bootstrap intervals are conditional on LJ (one speaker, 63% of inner reals).
 - Not evaluated: telephony, reverb, codecs beyond mp3, short crops, physical replay, ASVspoof 5, MLAAD by family, and v1's duration, level, silence, container and single-speaker shortcut limits.
-- The ITW perturbation cohort and the option-B holdout cohort are pending (ask-first compute).
+- MLAAD has no WavLM or layer-20 scores, so C1 and C3 have no MLAAD readout.
 
 ## Decision needed: the sealed population
 

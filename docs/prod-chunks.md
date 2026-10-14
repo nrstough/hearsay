@@ -355,7 +355,8 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   - All three metric readings plus EER, nested rank references, a class-stratified cluster bootstrap, and a read-once holdout ledger.
   - All seven reference numbers reproduce; the shipped rule reproduces the shipped TSV to 1e-12.
   - Input contract for other lanes: the run spec's "Interface v1".
-  - Still open: the ITW perturbation cohort and the option-B holdout cohort (ask-first compute), items 3–6 below, and the sealed set.
+  - Perturbation cohorts: holdout and ITW, all six columns, scored Oct 13 (registry v1.1).
+  - Still open: items 3–6 below (MLAAD by family, ASVspoof 5, reverb/codec/telephony/short-crop cohorts) and the sealed set.
 - **Goal:** One script reports any detector or fused system on a fixed set of populations, under both costs, with confidence intervals.
 - **Why:** v1's three readouts disagreed by 11× and 3× around the one real number (B.6). In-the-Wild is spent as a selection set.
 - **Populations (proposed):**
