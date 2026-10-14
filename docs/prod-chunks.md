@@ -349,7 +349,14 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 - **Done when:** `uv run pytest` is green, the v1 reproduce check matches `submissions/log.csv`, and the log exists.
 - **Size:** S.
 
-### V2-01 ⬜ The v2 benchmark
+### V2-01 🟡 The v2 benchmark
+- **Status (Oct 12): V2-01-lite built** on branch `v2-benchmark-fusion` (`docs/specs/2026-10-11_v2-benchmark-fusion.md`, report `docs/reports/2026-10-11_benchmark-v1.md`).
+  - Covers the populations that exist today: nested inner (selectable), holdout (read once, ledgered), ITW (report-only), the holdout perturbation cohort, MLAAD (in-sample for M5), and the test set (agreement with the shipped TSV).
+  - All three metric readings plus EER, nested rank references, a class-stratified cluster bootstrap, and a read-once holdout ledger.
+  - All seven reference numbers reproduce; the shipped rule reproduces the shipped TSV to 1e-12.
+  - Input contract for other lanes: the run spec's "Interface v1".
+  - Perturbation cohorts: holdout and ITW, all six columns, scored Oct 13 (registry v1.1).
+  - Still open: items 3–6 below (MLAAD by family, ASVspoof 5, reverb/codec/telephony/short-crop cohorts) and the sealed set.
 - **Goal:** One script reports any detector or fused system on a fixed set of populations, under both costs, with confidence intervals.
 - **Why:** v1's three readouts disagreed by 11× and 3× around the one real number (B.6). In-the-Wild is spent as a selection set.
 - **Populations (proposed):**
@@ -363,8 +370,8 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   - Ask NSA whether the test key (labels) can be released after the event. If yes, it becomes the best sealed set we could have.
   - **NSA's cross-team analysis (organizer feedback, Oct 2026).** NSA plans to compare every team's submitted scores to find which test clips drew many false alarms or misses. Ask for the per-clip result (even just "hard real" / "hard fake" flags): it gives the test set partial labels and a difficulty map. Use it for the V2-02 error atlas, and as the sealed set if the full key is released.
   - Speaker-cluster bootstrap CIs (`scripts/fuse_sweep_v3.py` already has one).
-  - actDCF at a fixed threshold beside minDCF and EER.
-- **Deliverables:** `scripts/benchmark.py`, `benchmarks/v1.yaml` (population manifests + hashes), `docs/reports/<date>_benchmark-v1.md` with v1's full scorecard as the baseline.
+  - actDCF at a fixed threshold beside minDCF and EER. _Moved to V2-61 (Oct 12)._
+- **Deliverables:** `src/hearsay/benchmark.py` + `scripts/v2_benchmark.py` (replacing the planned `scripts/benchmark.py`), `benchmarks/v1.yaml` (population manifests + hashes), `docs/reports/<date>_benchmark-v1.md` with v1's full scorecard as the baseline.
 - **Done when:** the shipped v1 rule and each v1 column have a scorecard row, and re-running reproduces it bit for bit.
 - **Depends on:** V2-00.
 - **Size:** M.
@@ -625,12 +632,12 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 ## Phase 6: Fusion and decision
 
 ### V2-60 🟡 Neural fusion layer
-- **Status (Oct 10):** research done (`docs/reports/2026-10-10_v2-fusion-research.md`).
-  - Option A: the four shipped columns, with Spectra kept outside fitted parameters as the frozen E step.
-  - At most 4 pre-declared candidates.
-  - No condition gate until noisy or wild training data exists.
-  - A learned fusion currently ties the fixed blends on nested inner. It is paired with building V2-01.
-  - Handoff: `docs/handoffs/2026-10-10_v2-fusion-benchmark-handoff.md`.
+- **Status (Oct 12): pre-declared test run; no candidate beats the shipped rule** (`docs/reports/2026-10-12_v2-fusion-verdict.md`).
+  - Option B (Nathan, Oct 11): m1b_v3, handcrafted_v5, m5_xlsr_ft, WavLM and XLS-R layer 20, with Spectra only as the frozen E step.
+  - Four candidates (`benchmarks/v2_60_candidates.json`): shipped rule (control), equal weights (LOSE), a small learned non-negative weighting shrunk toward the shipped weights, no Platt (TIE, 0.3764 vs 0.3390 package-0.5), and shipped weights plus 0.1 WavLM and 0.1 layer 20 (LOSE).
+  - The learned fit puts ~0 weight on WavLM and layer 20, and α sits at the grid edge in every fold. The larger learned model is not triggered.
+  - Fusion needs new columns or data (V2-31, V2-33, V2-53) before it is worth revisiting. Adoption needs a sealed population.
+  - Earlier: research `docs/reports/2026-10-10_v2-fusion-research.md`; handoff `docs/handoffs/2026-10-10_v2-fusion-benchmark-handoff.md`.
 - **Goal:** Replace the hand-set rank blend with a small learned fusion network that beats it on the benchmark and stays explainable.
 - **Why:** v1's blend weights were chosen from a short pre-declared list, and the plan's stacker never shipped. Equal-weight fusion beat the shipped rule on every labeled readout (`outputs/fusion/orchestration_ablation_v2.md`), so the hand-set weights left performance on the table.
 - **Design (proposed, hand-built in PyTorch):**

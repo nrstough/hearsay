@@ -1,0 +1,47 @@
+{
+  "name": "V2-60 fusion test, pre-declared candidate set",
+  "spec": "docs/specs/2026-10-11_v2-benchmark-fusion.md",
+  "spec_commit": "8c66021",
+  "spec_frozen_region": {"start": "## P2 (frozen Oct 11", "end": "### Failure modes", "sha256": "3cadacba8262b8b10c375c44855f7a3e4208a436ed672548263e029317fb7863", "normalization": "LF line endings, trailing whitespace stripped per line"},
+  "plan": "docs/reports/2026-10-11_v2-benchmark-fusion-plan.md",
+  "columns": ["m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "wavlm_l", "xlsr_L20"],
+  "e_column": "spectra_aasist",
+  "e_rule": {"spectra_logit_below": -3.0, "base_above": 0.5, "multiply_by": 0.5, "strict": true},
+  "candidates": {
+    "C0": {"kind": "fixed", "weights": {"m1b_v3": 0.6, "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.2, "wavlm_l": 0.0, "xlsr_L20": 0.0}, "e": true},
+    "C1": {"kind": "fixed", "weights": {"m1b_v3": 0.2, "handcrafted_v5": 0.2, "m5_xlsr_ft": 0.2, "wavlm_l": 0.2, "xlsr_L20": 0.2}, "e": true},
+    "C2": {"kind": "nnlr_rank_shrunk", "shrink_target": "C0", "alpha_grid": [0.0, 0.25, 0.5, 0.75], "prior_fake": 0.8, "l2": 1e-6, "e": true, "platt": false},
+    "C3": {"kind": "fixed", "weights": {"m1b_v3": 0.48, "handcrafted_v5": 0.16, "m5_xlsr_ft": 0.16, "wavlm_l": 0.1, "xlsr_L20": 0.1}, "e": true}
+  },
+  "control": "C0",
+  "primary_reading": "package05",
+  "readings": {"brief": [0.3, 4.0, 1.0], "package05": [0.5, 1.0, 4.0], "package03": [0.3, 1.0, 4.0]},
+  "tie_bands": {"brief": 0.02, "package05": 0.05, "package03": 0.03},
+  "f4_guard": {"fold": "4", "reading": "package05", "max_above_control": 0.05, "inclusive": true},
+  "verdict": {
+    "population": "inner nested OOF, pooled, with E, 16,142 rows",
+    "arithmetic": "round each cost to 4 decimals, compare as integer ten-thousandths",
+    "win": "control - cand > band(package05), strict; AND cand - control <= band for every reading; AND f4 guard holds",
+    "lose": "cand - control > band on any reading",
+    "tie": "otherwise",
+    "c2_win_label": "provisional (second-order stacking leakage favours fitted candidates)",
+    "report_only": ["per-fold", "macro", "EER", "without E", "holdout", "itw", "cohorts", "mlaad", "test agreement"]
+  },
+  "clarifications": {
+    "K1": "No Platt in C2 (Nathan, 2026-10-12: \"No platt for now it'll overfit and not generalize\"). All metrics on the post-E weighted rank. Ruling made after the early inner look (C2 0.376 without, 0.514 with per-fold Platt).",
+    "K2": "Inner-inner references exclude both the outer fold f and the inner fold g.",
+    "K3": "alpha chosen on pooled package05 over the four g blocks, on the pre-E base; ties within 1e-12 go to the larger alpha; alpha_at_grid_max flagged.",
+    "K4": "w = alpha*w_C0 + (1-alpha)*w_fit/sum(w_fit); sum(w_fit)==0 raises; intercept dropped.",
+    "K5": "Off-inner C2: refit on all 16,142 inner rows with all-inner references; alpha by 5-fold LOFO on inner, same procedure; no Platt.",
+    "K6": "effective_params = 1 + (1-alpha)*(nnz(w_fit)-1); also report |w|_1, intercept, optimizer success and nit, in-sample vs nested OOF cost per fold.",
+    "K7": "Bootstrap paired, class-stratified, B=2000, seed 0; LJ one fixed stratum present once (conditional CIs) + LibriSpeech speakers resampled; spoof generators resampled; sensitivity row with LJ resampled as one cluster; holdout, inner f3 and f4 marked degenerate.",
+    "K8": "Holdout ledger: per-key O_EXCL reservation files under outputs/v2/benchmark/holdout_ledger/ are the authority; key excludes benchmark version; two-hash reference allowlist; fusion reads only rules in this file.",
+    "K9": "pandas default float parser for score CSVs.",
+    "K10": "Missing option-B columns -> 'not scored', never a partial blend.",
+    "K11": "Verdict scope as in 'verdict' above.",
+    "K12": "Dominance flag: Spearman(column, fused | inner reals) >= 0.95 with weight share < 0.5. Gap = population cost - nested inner cost per reading. Test cut = primary-reading threshold chosen on inner.",
+    "K13": "Log row: validation_score = package05 pooled nested inner; clean_only = same; csv_path = outputs/v2/fusion/v2_60_readout.json; benchmark_version = registry version; notes = brief, package03, EER, basis 16,142, verdict."
+  },
+  "followon": {"larger_model": "only if C2 verdict is WIN (provisional); its own pre-declared run"},
+  "early_look_disclosure": "A risk-exploration agent computed preview inner readouts after the candidate table was committed (8c66021): C1 0.452, C3 0.358 (f4 0.224 > guard 0.215), C2 prototype 0.376 package05. No holdout labels touched."
+}
