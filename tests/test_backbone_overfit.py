@@ -237,6 +237,28 @@ def test_h7_the_size_trend_is_computed_not_pre_declared():
     assert "not monotone" in jumbled["why"]
 
 
+def test_h7b_equal_sized_candidates_form_one_rung_not_two_steps():
+    """H7: two models of identical size are not consecutive rungs of a ladder.
+
+    XLS-R-1B and MMS-1B are both 962.5M. A first version sorted them into a sequence, so their
+    arbitrary order decided whether the ladder read "monotone" -- and on the real data it read
+    "not monotone" purely from that. A tie is one rung.
+    """
+    # same costs, opposite declaration order: the verdict must not depend on it
+    a = size_trend([("300m", 315, 0.110), ("xlsr1b", 962, 0.047), ("mms1b", 962, 0.068)], {"w": 0.04})
+    b = size_trend([("300m", 315, 0.110), ("mms1b", 962, 0.068), ("xlsr1b", 962, 0.047)], {"w": 0.04})
+    assert a["verdict"] == b["verdict"]
+    assert a["rung_means"] == b["rung_means"]
+    assert a["rung_params"] == [315, 962]
+    assert a["monotone"] is True, "300M -> 1B improves; the two 1B models are one rung"
+
+    # and the within-rung spread is surfaced as its own finding
+    spread = a["within_rung_spread"][962]
+    assert set(spread["members"]) == {"xlsr1b", "mms1b"}
+    assert abs(spread["spread"] - 0.021) < 1e-9
+    assert "architecture matters more than size" in a["note"]
+
+
 def test_h11_the_in_sample_arm_gets_its_own_interval():
     """H11: the gain bootstrap only covers the held-out arm, so the differential's own
     uncertainty went uncomputed. An earlier revision claimed H3 covered this; it did not."""

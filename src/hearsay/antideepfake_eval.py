@@ -173,29 +173,61 @@ def generalization_gap(cand_in: float, cand_out: float, base_in: float, base_out
 
 
 def size_trend(ladder: list[tuple[str, int, float]], widths: dict[str, float]) -> dict:
-    """Is the size ladder monotone **beyond** its intervals? (`H7`)
+    """Does cost improve with parameter count, **beyond** the intervals? (`H7`)
 
     Executable, with **no pre-declared outcome**. An earlier revision pre-declared "not
-    established" from a floor that had been derived by comparing a package-0.5 interval against
-    a package-0.3 spread -- a cross-reading error, retracted. Paired widths are pair-specific
-    (measured 0.158 to 0.336 at package-0.5 across three real pairs), so the floor is computed
-    here from the candidates actually in hand.
+    established" from a floor derived by comparing a package-0.5 interval against a package-0.3
+    spread -- a cross-reading error, retracted. Paired widths are pair-specific (measured 0.158
+    to 0.336 at package-0.5 across three real pairs), so the floor comes from the candidates
+    actually in hand.
+
+    **Ties in parameter count are grouped, not ordered.** A first version sorted every candidate
+    into a sequence, so two models of *identical* size (XLS-R-1B and MMS-1B are both 962.5M)
+    were compared as consecutive rungs and the ladder read "not monotone" purely from their
+    arbitrary order. That is an artifact of sorting a tie, not a result. Same-size candidates
+    now form one rung, the trend runs over rung means, and the spread *within* a rung is
+    reported separately -- because a within-rung spread wider than the interval is itself a
+    finding: it says architecture matters more than size at that scale.
     """
-    ordered = sorted(ladder, key=lambda r: r[1])
-    costs = [c for _, _, c in ordered]
-    names = [n for n, _, _ in ordered]
-    improving = all(b <= a for a, b in itertools.pairwise(costs))
-    span = max(costs) - min(costs) if costs else 0.0
+    rungs: dict[int, list[tuple[str, float]]] = {}
+    for name, params, cost in ladder:
+        rungs.setdefault(params, []).append((name, cost))
+    sizes = sorted(rungs)
+    means = [float(np.mean([c for _, c in rungs[s]])) for s in sizes]
     floor = max(widths.values()) / 2 if widths else float("inf")
-    established = improving and span > floor
+
+    improving = all(b <= a for a, b in itertools.pairwise(means))
+    span = max(means) - min(means) if means else 0.0
+    established = improving and span > floor and len(sizes) >= 2
+
+    within = {}
+    for s in sizes:
+        if len(rungs[s]) > 1:
+            costs = [c for _, c in rungs[s]]
+            within[s] = {
+                "members": {n: c for n, c in rungs[s]},
+                "spread": max(costs) - min(costs),
+                "exceeds_interval": (max(costs) - min(costs)) > floor,
+            }
+
+    if not improving:
+        why = "rung means are not monotone in parameter count"
+    elif span <= floor:
+        why = f"span {span:.4f} does not clear the largest half-width {floor:.4f}"
+    else:
+        why = f"span {span:.4f} clears the largest half-width {floor:.4f}"
+
     return {
-        "order_by_params": names, "costs": costs, "monotone": improving,
-        "span": span, "largest_half_width": floor,
+        "rungs": {str(s): {n: c for n, c in rungs[s]} for s in sizes},
+        "rung_params": sizes, "rung_means": means,
+        "monotone": improving, "span": span, "largest_half_width": floor,
         "established": established,
         "verdict": "size trend established" if established else "no size trend established",
-        "why": (
-            f"span {span:.4f} vs largest half-width {floor:.4f}"
-            if improving else "costs are not monotone in parameter count"
+        "why": why,
+        "within_rung_spread": within,
+        "note": (
+            "same-size candidates form one rung; a within-rung spread wider than the interval "
+            "means architecture matters more than size at that scale"
         ),
     }  # fmt: skip
 
