@@ -106,6 +106,47 @@ def surface_features(manifest: Path, cache: Path) -> pd.DataFrame:
     return out
 
 
+#: `P3b`: the published zero-shot In-the-Wild figures (package-0.3) for the models their
+#: write-up reports, and the pre-declared band — their value with the CI widened 2x for sample,
+#: crop and view differences. Corroboration only: a miss sets `usage_unverified`, never blocks
+#: the verdict (Codex C5 / the P3 deadlock).
+PUBLISHED_ITW_PKG03 = {
+    "xls-r-2b-anti-deepfake": 0.038,
+    "xls-r-1b-anti-deepfake": 0.050,
+    "mms-1b-anti-deepfake": 0.065,
+}
+P3B_BAND = (0.019, 0.098)
+P3B_MAX_EER = 0.05
+
+
+def corroborate_usage(model: str) -> dict:
+    """Score the **native** view against the published band.
+
+    The native view, not ours: their numbers were produced under the model's own recipe
+    (`APPROACH.md` 3.2, "the input is standardized per clip, as in the original recipe"), so
+    running the anchor on our band-matched view would miss even with correct pooling. Lead with
+    EER, which is prior-free, since their crop is irreproducible by design.
+    """
+    raw = LANE / f"{model}__itw.raw.csv"
+    man = REPO / "outputs" / "manifests" / "itw_stress.csv"
+    if not (raw.exists() and man.exists()):
+        return {"status": "no_data", "corroborated": False}
+    d = pd.read_csv(raw)
+    if "logit_native" not in d.columns:
+        return {"status": "no_native_view", "corroborated": False}
+    j = pd.read_csv(man).merge(d[["path", "logit_native"]], on="path")
+    if len(j) != len(d):
+        raise ValueError(f"{model}: P3b join lost {len(d) - len(j)} rows")
+    y = (j.label == "spoof").to_numpy(int)
+    r = readings(y, j.logit_native.to_numpy(float))
+    inside = P3B_BAND[0] <= r["package03"] <= P3B_BAND[1] and r["eer"] < P3B_MAX_EER
+    return {
+        "status": "ok", "native_package03": r["package03"], "native_eer": r["eer"],
+        "published": PUBLISHED_ITW_PKG03.get(model), "band": list(P3B_BAND),
+        "corroborated": bool(inside), "blocks_verdict": False,
+    }  # fmt: skip
+
+
 def load_scores(model: str, pop: str) -> pd.DataFrame | None:
     f = LANE / f"{model}__{pop}.csv"
     if not f.exists():
@@ -254,12 +295,15 @@ def main(argv=None) -> int:
         itw = r["arms"].get("itw")
         if not itw or itw.get("readings", {}).get("status") != "ok":
             continue
+        usage = corroborate_usage(m)
+        r["usage_corroboration"] = usage
         verdicts[m] = build_verdict(
             name=m, comparisons=n_comparisons, held_out=itw["readings"],
             gap=r.get("generalization_gap", {}), boot=itw.get("gain_over_baseline", {}),
             degradation={}, shortcuts=itw.get("shortcuts", {}),
-            usage_corroborated=False, sealed_set_exists=False,
-        )  # fmt: skip
+            usage_corroborated=usage.get("corroborated", False), sealed_set_exists=False,
+        )
+        verdicts[m]["usage_corroboration"] = usage  # fmt: skip
 
     report = {
         "spec": "docs/specs/2026-10-11_v2-backbone.md",
@@ -273,7 +317,7 @@ def main(argv=None) -> int:
         "caveats": {
             "gap": "descriptive generalization-gap difference, not an identified inflation estimate",
             "inference": "exploratory, not simultaneous; N recorded but not corrected for",
-            "usage": "P3b corroboration not yet run, so every verdict carries usage_unverified",
+            "usage": "P3b corroboration runs on the native view against the published band",
         },
     }
     dest = LANE / "report.json"
@@ -282,8 +326,10 @@ def main(argv=None) -> int:
     print(f"size trend: {trend.get('verdict')} ({trend.get('why', '')})")
     for m, v in verdicts.items():
         g = v.get("gain_over_baseline_interval", {})
+        u = v.get("usage_corroboration", {})
         print(f"  {m:26} verdict={v['verdict']:10} established={v['established']} "
-              f"p5={g.get('p5', float('nan')):.4f}")  # fmt: skip
+              f"p5={g.get('p5', float('nan')):+.4f} usage_unverified={v['usage_unverified']} "
+              f"native_pkg03={u.get('native_package03', float('nan')):.4f}")  # fmt: skip
     return 0
 
 
