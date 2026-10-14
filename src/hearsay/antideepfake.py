@@ -401,7 +401,7 @@ def file_sha256(path: Path, block: int = 1 << 20) -> str:
 
 def load_antideepfake(
     weights_dir: str | Path, device: str | None = None, dtype: torch.dtype = torch.float32,
-    identity: dict | None = None,
+    identity: dict | None = None, allow_cast: bool = False,
 ) -> AntiDeepfakeDetector:  # fmt: skip
     """Load a checkpoint under the strict map, or raise.
 
@@ -509,14 +509,19 @@ def load_antideepfake(
     on_disk = {v.dtype for v in sd.values() if v.is_floating_point()}
     if len(on_disk) != 1:
         raise ValueError(f"{weights_dir.name}: mixed tensor dtypes {sorted(map(str, on_disk))}; refusing to guess")
-    if {dtype} != on_disk:
+    if {dtype} != on_disk and not allow_cast:
         raise ValueError(
-            f"{weights_dir.name}: checkpoint is {next(iter(on_disk))}, {dtype} requested. Cast "
-            "explicitly with `.to(dtype)` on CPU before moving to the device -- casting on MPS "
-            "crosses the 13.32 GiB working set and costs 74 s per forward."
+            f"{weights_dir.name}: checkpoint is {next(iter(on_disk))}, {dtype} requested. Pass "
+            "`allow_cast=True` to cast deliberately -- the cast then happens on CPU before the "
+            "move, because casting after the weights are on MPS crosses the 13.32 GiB working "
+            "set and costs 74 s per forward instead of 0.55."
         )
-    # The cast is explicit and matches the file, having just been checked against it.
+    # Cast on CPU, **then** move. The order is the whole point: casting after the weights are
+    # on MPS drives allocation to 13.05 GiB against a 13.32 GiB ceiling and poisons the process
+    # for its lifetime (74.1 s per forward against 0.55). Measured; see run spec D7.
     model = model.to(dtype=dtype)
+    if allow_cast and {dtype} != on_disk:
+        print(f"CAST: {weights_dir.name} {next(iter(on_disk))} -> {dtype} on CPU before the move")
     # `None` means the repo's default, which is MPS when available -- matching
     # `hearsay.embed.default_device()`. Treating `None` as "leave it on CPU" silently ran a
     # multi-hour scoring job at ~10x the intended wall clock, at 136% CPU and no GPU at all.

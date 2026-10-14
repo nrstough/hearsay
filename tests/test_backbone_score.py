@@ -463,3 +463,47 @@ def test_h6_per_group_works_at_package05_unlike_by_group():
     assert out["excluded_below_min_rows"] == ["tiny"]
     assert out["worst_group"] in {"g1", "g2"}
     assert "worst_cost" in out and "mean_of_groups" in out
+
+
+def test_f_input_matches_the_models_dtype_not_only_its_device(mod):
+    """The input must follow the model's dtype as well as its device.
+
+    Moving it to the right device while leaving it float32 against an fp16 model fails with
+    `Input type (float) and bias type (c10::Half) should be the same` -- which is what happened
+    to **all 3,000 rows** of the 2B run after it was switched to fp16 to stop the machine
+    swapping. The flag recorded only `error:RuntimeError`, so the cause was invisible until it
+    was reproduced by hand; flags now carry the message too.
+    """
+    x = np.random.default_rng(0).normal(0, 0.1, 16000).astype(np.float32)
+    assert mod.standardize(x).dtype == torch.float32
+    assert mod.standardize(x, dtype=torch.float16).dtype == torch.float16
+
+    class HalfDetector(FakeDetector):
+        def __init__(self):
+            super().__init__()
+            self.w = nn.Parameter(torch.zeros(1, dtype=torch.float16))
+
+        def forward(self, t):
+            if t.dtype != self.w.dtype:
+                raise RuntimeError(
+                    f"Input type ({t.dtype}) and bias type ({self.w.dtype}) should be the same"
+                )
+            return super().forward(t)
+
+    m = HalfDetector()
+    _, dt = mod.model_place(m)
+    assert dt == torch.float16, "the lookup must report the dtype, not only the device"
+    out = mod.score_one(m, {"ours": x})
+    assert out["flag"] == "", f"an fp16 model must score an fp32 clip: {out}"
+
+
+def test_f_a_failed_row_records_why_not_just_the_exception_type(mod, repo):
+    """`error:RuntimeError` across every row is not a diagnosis."""
+    class Boom(FakeDetector):
+        def forward(self, t):
+            raise RuntimeError("a very specific cause")
+
+    rc = run_scorer(mod, repo, Boom())
+    assert rc == 3  # the failure gate refuses to publish
+    raw = pd.read_csv(repo / "outputs" / "v2" / "backbone" / "fakeweights__itw.raw.csv")
+    assert raw.flag.str.contains("a very specific cause").all(), raw.flag.unique()[:3]

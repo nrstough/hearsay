@@ -107,6 +107,8 @@ def parse_args(argv=None):
     ap.add_argument("--views", default=",".join(VIEWS))
     ap.add_argument("--device", default=None)
     ap.add_argument("--dtype", default="float32", choices=["float32", "float16"])
+    ap.add_argument("--allow-cast", action="store_true",
+                    help="cast the checkpoint to --dtype on CPU before moving to the device")
     ap.add_argument("--limit", type=int, default=0, help="pilot: score N rows and publish nothing")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--chunk", type=int, default=100)
@@ -117,6 +119,8 @@ def parse_args(argv=None):
     ap.add_argument("--out-name", default=None)
     ap.add_argument("--seed", type=int, default=200, help="crop seed; ITW's recorded seed is 200")
     ap.add_argument("--no-lock", action="store_true", help="tests only: skip the MPS reservation")
+    ap.add_argument("--repair", action="store_true",
+                    help="re-score only the flagged rows of an already-published export")
     return ap.parse_args(argv)
 
 
@@ -198,18 +202,21 @@ def prepare_views(x: np.ndarray, views, seed: int | None = None) -> dict[str, np
     return out
 
 
-def model_device(model) -> torch.device | None:
-    """The device a model's weights live on, or `None` for a parameterless model.
+def model_place(model) -> tuple[torch.device | None, torch.dtype | None]:
+    """Where a model's weights live and what dtype they are, or `(None, None)`.
 
-    `next(model.parameters())` raises `StopIteration` on a module with no parameters, which is
-    exactly what the hermetic tests' fake detector is -- so the lookup must tolerate it rather
-    than making the production path untestable.
+    Both, not just the device. Moving the input to the right device while leaving it float32
+    against an fp16 model fails every clip with `Input type (float) and bias type (c10::Half)
+    should be the same` -- which is exactly what happened to all 3,000 rows of the 2B run.
+
+    `next(model.parameters())` raises `StopIteration` on a parameterless module, which is what
+    the hermetic tests' fake detector is, so the lookup tolerates it.
     """
     p = next(model.parameters(), None)
-    return None if p is None else p.device
+    return (None, None) if p is None else (p.device, p.dtype)
 
 
-def standardize(x: np.ndarray, device=None) -> torch.Tensor:
+def standardize(x: np.ndarray, device=None, dtype=None) -> torch.Tensor:
     """Per-clip zero-mean unit-variance, matching `Wav2Vec2FeatureExtractor` (eps 1e-7).
 
     Standardise on CPU, then move: the statistics are identical either way, and the transfer is
@@ -217,8 +224,12 @@ def standardize(x: np.ndarray, device=None) -> torch.Tensor:
     the model's device, and an earlier revision left it on CPU, which only appeared to work
     because the loader was also leaving the model on CPU.
     """
+    # Standardise in float32 regardless of the target dtype: the statistics are the point, and
+    # computing a mean and variance in fp16 over 128k samples loses precision for no gain.
     t = torch.from_numpy(np.asarray(x, dtype=np.float32))[None]
     t = (t - t.mean()) / (t.var() + 1e-7).sqrt()
+    if dtype is not None:
+        t = t.to(dtype)
     return t if device is None else t.to(device)
 
 
@@ -239,7 +250,8 @@ def score_one(model, views: dict[str, np.ndarray]) -> dict:
         if x.size < need:
             return {"flag": f"below_receptive_field_{need}"}
         check_min_length(model.wav2vec2.config, x.size)
-        logits = model(standardize(x, device=model_device(model)))
+        dev, dt = model_place(model)
+        logits = model(standardize(x, device=dev, dtype=dt))
         if tuple(logits.shape) != (1, 2):
             raise RuntimeError(f"model returned {tuple(logits.shape)}, expected (1, 2)")
         arr = logits[0].float().cpu().numpy()
@@ -294,7 +306,12 @@ def score_rows(model, rows: pd.DataFrame, args, done: dict) -> tuple[list[dict],
                     # One bad clip must never lose a row: the row is kept with a flag and
                     # counted, the way `safe_run` handles a crashing detector. A narrower
                     # except would let an unanticipated decoder failure abort a multi-hour run.
-                    rec["flag"] = f"error:{type(e).__name__}"
+                    #
+                    # The flag carries the MESSAGE, not just the type. `error:RuntimeError`
+                    # on all 3,000 rows of the 2B run told me nothing; the actual text --
+                    # "Input type (float) and bias type (c10::Half) should be the same" --
+                    # named the bug on sight.
+                    rec["flag"] = f"error:{type(e).__name__}: {str(e)[:120]}"
                 results.append(rec)
             _write_partial(partial, list(done.values()) + results)
             pct = 100 * (start + len(block)) / max(1, len(todo))
@@ -333,6 +350,60 @@ def direction_ok(frame: pd.DataFrame, col: str) -> dict:
             "median_spoof": med_s, "median_bonafide": med_b, "n": int(m.sum())}  # fmt: skip
 
 
+def repair(args, root: Path, loader) -> int:
+    """Re-score only the flagged rows of a published export, in place.
+
+    The remedy this repo already uses for the same failure: `scripts/repair_decode_errors.py`
+    re-embeds only the rows an extraction flagged. Transient `DecodeError`s do happen -- three
+    In-the-Wild clips failed for XLS-R-1B that MMS-300M and MMS-1B both decoded fine, which is
+    the memory-pressure decode failure CLAUDE.md documents -- and a handful of NaN rows should
+    not cost a multi-hour run or, worse, be quietly averaged over.
+    """
+    export = lane_path(f"{args.out_name}.csv")
+    if not export.exists():
+        die(f"{export.name} absent; nothing to repair")
+    pub = pd.read_csv(export)
+    flagged = pub[pub.flag.fillna("") != ""]
+    if flagged.empty:
+        print(f"{export.name}: no flagged rows")
+        return 0
+    print(f"{export.name}: repairing {len(flagged)} flagged row(s)")
+
+    rows = build_rows(args, root)
+    rows = rows[rows.path.isin(set(flagged.path))].reset_index(drop=True)
+    weights, identity = resolve_weights(args.model)
+    args._partial = lane_path(f"{args.out_name}.repair.partial.csv")
+    with mps_reservation(lane_path("MPS.lock"), scope=f"repair:{args.out_name}", wait_s=1800.0):
+        model = loader(weights, device=args.device, dtype=getattr(torch, args.dtype),
+                       identity=identity, allow_cast=args.allow_cast)
+        results, code = score_rows(model, rows, args, {})
+    if code:
+        die(f"repair stopped early (code {code})", code)
+
+    fixed = pd.DataFrame(results)
+    still = fixed[fixed.flag.fillna("") != ""]
+    if not still.empty:
+        print(f"  {len(still)} row(s) still failing: {still.flag.tolist()}", file=sys.stderr)
+    primary = "logit_ours" if "ours" in args.views else f"logit_{args.views.split(',')[0]}"
+    from hearsay.metrics import sigmoid
+
+    by_path = {r["path"]: r for r in results}
+    for i, r in pub.iterrows():
+        rec = by_path.get(r.path)
+        if rec is None or rec.get("flag"):
+            continue
+        logit = float(rec[primary])
+        pub.at[i, "logit"] = logit
+        with np.errstate(over="ignore"):
+            pub.at[i, "score"] = float(sigmoid(np.array([logit]))[0])
+        pub.at[i, "flag"] = ""
+    pub.to_csv(export, index=False)
+    args._partial.unlink(missing_ok=True)
+    remaining = int((pub.flag.fillna("") != "").sum())
+    print(f"  rewrote {export.name}: {len(flagged) - remaining} repaired, {remaining} still flagged")
+    return 0 if remaining == 0 else 3
+
+
 def run(argv=None, loader=load_antideepfake) -> int:
     args = parse_args(argv)
     root = args.repo_root.resolve()
@@ -341,6 +412,8 @@ def run(argv=None, loader=load_antideepfake) -> int:
     # directory while reporting success. That is the E5 violation E5 exists to prevent.
     args.out_name = args.out_name or f"{Path(args.model).name}__{args.population}"
     args.out_name = Path(args.out_name).name
+    if args.repair:
+        return repair(args, root, loader)
     weights, identity = resolve_weights(args.model)
     rows = build_rows(args, root)
     if args.limit:
@@ -385,7 +458,8 @@ def run(argv=None, loader=load_antideepfake) -> int:
     )
     args._partial = partial
     with ctx:
-        model = loader(weights, device=args.device, dtype=getattr(torch, args.dtype), identity=identity)
+        model = loader(weights, device=args.device, dtype=getattr(torch, args.dtype),
+                       identity=identity, allow_cast=args.allow_cast)
         results, code = score_rows(model, rows, args, done)
     all_rows = list(done.values()) + results
     if code:
