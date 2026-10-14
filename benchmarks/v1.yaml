@@ -142,6 +142,38 @@
    "kind": "file",
    "sha256": "fd3cbcb0f4e301ae872b973e5f65f32f8e81a24c91965bb08a6ee3a8dc091285"
   },
+  "outputs/v2/benchmark/cohorts/holdout/wavlm_l.csv": {
+   "kind": "file",
+   "sha256": "ab1570a29d590ddf3bb336625f921be56ba5e493501059215ae97fa02ca52912"
+  },
+  "outputs/v2/benchmark/cohorts/holdout/xlsr_L20.csv": {
+   "kind": "file",
+   "sha256": "57a252c120485bfb0588c59bd19a7cfccfa823689c3172c766e5d7166a0ed530"
+  },
+  "outputs/v2/benchmark/cohorts/itw/handcrafted_v5.csv": {
+   "kind": "file",
+   "sha256": "3bbb8bc55b8a173fdb6629ea32428e90bb11965074cd16001dc700c237d18dd8"
+  },
+  "outputs/v2/benchmark/cohorts/itw/m1b_v3.csv": {
+   "kind": "file",
+   "sha256": "3db1023435074b66959696fd3cea8bffa3cbb66608d341a04152be422f6735af"
+  },
+  "outputs/v2/benchmark/cohorts/itw/m5_xlsr_ft.csv": {
+   "kind": "file",
+   "sha256": "dc5b46ffe68ce0883e645e97ac4066d97d0dfc9f3d52144ed8b74fc3f6b217ce"
+  },
+  "outputs/v2/benchmark/cohorts/itw/spectra_aasist.csv": {
+   "kind": "file",
+   "sha256": "4a2ba7358cab12ccb90d5a680b9adebc4c6d347db35b3c211346977aa69b5342"
+  },
+  "outputs/v2/benchmark/cohorts/itw/wavlm_l.csv": {
+   "kind": "file",
+   "sha256": "57a71eec8486b6ad5d6c911d95d38403ba5f8509ce3b5ebaec7e1cf5fb234c5a"
+  },
+  "outputs/v2/benchmark/cohorts/itw/xlsr_L20.csv": {
+   "kind": "file",
+   "sha256": "c5fe9c5e9a275523a1cbfc265cd66d8004c8c2526a02ee786d729f4cf7cae083"
+  },
   "outputs/v2/benchmark/scores/xlsr_L20.csv": {
    "kind": "file",
    "sha256": "05958447c1a371d9e4ef88a074bea44985d9717f385f80ca52fdeb32d3825fb7"
@@ -167,11 +199,7 @@
    "sha256": "eed8dc4875fe0087af62f57fb807e3bb64573a6b0cd4887425444bbb67a85187"
   }
  },
- "pending": {
-  "holdout_cohort.wavlm_l": "cohort scoring job (Step 6)",
-  "holdout_cohort.xlsr_L20": "cohort scoring job (Step 6)",
-  "itw_cohort": "all columns: cohort scoring job (Step 6), ask-first"
- },
+ "pending": {},
  "populations": {
   "holdout": {
    "role": "read_once",
@@ -214,5 +242,5 @@
   "sha256": "fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607"
  },
  "spec": "docs/specs/2026-10-11_v2-benchmark-fusion.md",
- "version": "v1"
+ "version": "v1.1"
 }
