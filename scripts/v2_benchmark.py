@@ -190,9 +190,9 @@ def build_registry(version: str = B.BENCHMARK_VERSION, pending=None) -> dict:
         "inputs": inputs,
         "shipped_tsv": {"path": "submissions/CrossExam_predictions.tsv (main checkout)", "sha256": B.sha256_file(tsv)},
         "pending": pending if pending is not None else {
-            "itw_cohort": "all columns: cohort scoring job (Step 6), ask-first",
-            "holdout_cohort.wavlm_l": "cohort scoring job (Step 6)",
-            "holdout_cohort.xlsr_L20": "cohort scoring job (Step 6)",
+            f"{cohort}_cohort.{col}": "cohort scoring job (scripts/v2_cohort_scores.py), ask-first"
+            for cohort, cols in EXPECTED_COHORT_FILES.items() for col in cols
+            if not (COHORT_DIR / cohort / f"{col}.csv").exists()
         },
         "deferred": DEFERRED,
     }
@@ -284,6 +284,8 @@ def cohort_holdout_frame(columns, pops):
 
 LEGACY_HOLDOUT_COHORT = ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist")
 COHORT_DIR = OUT / "cohorts"
+EXPECTED_COHORT_FILES = {"itw": ("m1b_v3", "handcrafted_v5", "m5_xlsr_ft", "spectra_aasist", "wavlm_l", "xlsr_L20"),
+                         "holdout": ("wavlm_l", "xlsr_L20")}
 
 
 def load_cohort_frames(cohort: str, pops, *, pinned: dict, cohort_dir: Path = COHORT_DIR, legacy: bool = True,
