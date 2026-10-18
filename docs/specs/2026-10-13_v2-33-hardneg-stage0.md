@@ -227,7 +227,34 @@ so the selection takes the easiest examples. One token, entirely realistic, and 
 produce a believable table, which is exactly the owner's stated risk. Alternate if implementation
 makes it the better fit: **C2** (wrong class up-weighted).
 
-_To be filled in post-commit: test, mutation, result, any fix-and-recheck rounds._
+**Record (Sat Oct 17, post-commit `7ba7faf`).** The design of record moved the check from H2 to
+**C2** (FINAL DESIGN, "Test-design changes": flipping the sort *improves* the table under the primary
+reading, so that mutation corrupts nothing visible). The frozen paragraph above stands as written.
+
+- **Test:** `tests/test_hardneg.py::test_c2_a_shape_applied_to_one_class_moves_that_classs_error_rate`,
+  three seeds. It did not exist at run 1 (the inventory named it; the file had H2, C1, C3, C4, C7, C9)
+  and was written at close-out, **before** this check ran. It fits two Gaussian classes with the real
+  arms and asserts that `hardest_reals` cuts the false-alarm rate (trading misses) and
+  `hardest_fakes` cuts the miss rate (trading false alarms), at the decision threshold.
+- **Mutation:** one line in `select_picks`, the class mapping
+  `{"both": (0, 1), "reals": (0,), "fakes": (1,)}` → `{"both": (0, 1), "reals": (1,), "fakes": (0,)}`,
+  so a one-sided arm up-weights the other class. Realistic and silent: the grid would still run
+  to completion and print a plausible table in which `hardest_reals` is a hardest-fakes recipe.
+  This is the owner's P1 risk ("a silent bug in the loop") in its literal form.
+- **Where:** a detached scratch worktree of `7ba7faf` under the session scratchpad, outside the repo
+  tree (the fusion lane's in-tree worktree once broke the docs-site tests). Never in the checkout.
+- **Result:** baseline 3 passed; against the mutation **3 failed on the first attempt (CAUGHT)**:
+  on every seed the mutated `hardest_reals` failed to cut false alarms and the mutated
+  `hardest_fakes` failed to cut misses. The whole lane file against the mutation: 5 failed, 85
+  passed, 4 `needs_data` skipped. The other two failures: `test_h2_side_selects_only_that_class`
+  (expected, the per-class pick counts land on the wrong class) and
+  `test_f2_fingerprint_changes_when_a_score_changing_input_changes`, which fails in *any* checkout
+  without the gitignored embedding manifests the fingerprint hashes, so it is unrelated to the
+  mutation; it is now guarded with the file's `HAVE_EMB` probe.
+- **Fix-and-recheck rounds:** none needed.
+- **Cleanup:** `git worktree remove --force`; `git worktree list` shows only the main checkout and the
+  two other lanes' worktrees; `git log -S'"reals": (1,), "fakes": (0,)' --all -- scripts/v2_hardneg_bakeoff.py`
+  returns nothing, so the mutation is in no commit.
 
 ---
 

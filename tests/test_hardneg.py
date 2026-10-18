@@ -911,8 +911,11 @@ def test_f_primary_family_is_exactly_the_four_layer_arms():
 
 
 @pytest.mark.needs_data
+@pytest.mark.skipif(not HAVE_EMB, reason="the fingerprint hashes the gitignored embedding manifests")
 def test_f2_fingerprint_changes_when_a_score_changing_input_changes():
-    """Codex #3: skip-if-exists must not accept a cell computed under different inputs."""
+    """Codex #3: skip-if-exists must not accept a cell computed under different inputs.
+    Needs the embedding manifests on disk: the break check's scratch worktree showed this test
+    fails for their absence alone, which is not the failure it exists to catch."""
     arm = hn.ARMS_BY_NAME["hardest_both"]
     mask = np.ones(10, bool)
     a = hn.fingerprint(arm, 7, "pool_full", 1.0, mask)
