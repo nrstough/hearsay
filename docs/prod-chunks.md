@@ -515,9 +515,12 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 - **Size:** M.
 
 ### V2-33 🟡 Hard-negative mining
-- **Status (Oct 10):** scoped in `docs/reports/2026-10-10_v2-fusion-research.md`.
-  - Stage 0 runs on the CPU over saved embeddings. Pilot: focal and OHEM reach about 0.250 inner and about 0.42 on f4, against 0.265 / 0.464.
-  - Stage 0.5 needs MPS. Stage 1 needs the drive. Stage 2 needs a GPU.
+- **Status (Oct 17): stage 0 run and reported; no recipe survives the pre-declared gate; nothing adopted.** Report `docs/reports/2026-10-13_v2-33-hardneg-stage0.md`; run spec `docs/specs/2026-10-13_v2-33-hardneg-stage0.md` (Codex-reviewed plan, HIGH stakes). A **diagnostic on the legacy split** (41 of 113 speakers cross folds), not a validation; 132 cells; exploratory inference.
+  - Reframed on Oct 13 to **hardest vs easiest vs random at matched regularization**, after the pre-run exploration showed the pilot's two "direction" arms were one model at two regularization strengths and that the probe is perfectly separable in-sample (so an in-sample "hardest" does not exist). The pilot's focal / OHEM / `mine_nested` gains (0.250 inner, 0.42 on f4) do not reproduce under pooled package-0.5.
+  - **Result:** up-weighting the hardest 5% does nothing on average (+0.004 package-0.5 vs none over 24 strata, indistinguishable from the random control); up-weighting the **easiest** 5% helps modestly and consistently (−0.026, better in 22 of 24 strata, at every C, both pools, all four layers); the regularization constant `C` is the larger lever (0.023 to 0.203 from C=1 to C=256, descriptive only); focal γ=2 is worse everywhere. Nine single-layer gate passes, one of them the random control; no (arm, pool, C) clears R5, so no survivor.
+  - Three readout defects found at close-out (R7 read the population, R4 lost its fold keys in a JSON round-trip, H5 saturates as frozen) were fixed and the deterministic grid re-run Oct 17 with byte-identical scores; H5 left as frozen and reported.
+  - **Leads handed to V2-01, not adopted:** the easiest-side direction; `hardest_reals` on the NSA-only pool at L7 (reverses with the ASVspoof 2019 rows in the fit); the C curve. Adoption blocked until NSA's cost convention is settled and a speaker-disjoint benchmark row exists.
+  - Stage 0.5 needs MPS. Stage 1 needs the drive. Stage 2 needs a GPU. Stage 0.5 should carry the easiest-side hypothesis with hardest as the comparison and random as the control, a scale-anchored H5, and C as an explicit axis.
   - Handoff: `docs/handoffs/2026-10-10_v2-hard-negatives-handoff.md`.
 - **Goal:** Train on the examples the current models find hardest under rule 5's metric (P_FA + 4·P_miss, where misses cost 4×): fakes that score real, and real clips that score fake.
 - **Why:**

@@ -1,0 +1,730 @@
+# V2-33 stage 0: hard-example bake-off (run spec)
+
+**Lane:** hard negatives (V2-33). **Branch:** `v2`. **Date opened:** Mon Oct 13, 2026.
+**Handoff:** `docs/handoffs/2026-10-10_v2-hard-negatives-handoff.md`.
+**Pipeline:** `/plan-review`, deep mode. P1 frozen Oct 13; P2 frozen Oct 13 ("freeze deep").
+
+**Stakes:** HIGH — it decides how a scoring model is trained, and its recommendation feeds a
+benchmark row. The handoff classified it HIGH; Nathan did not downgrade.
+
+---
+
+## Owner's statement
+
+Verbatim, as typed. Never edited, paraphrased or tidied.
+
+### P1
+
+**What it does:**
+
+> "This step decides. How we use RL and hard negatives, and how we are benchmarking everything so that we can notice progress from step to step."
+
+**Most likely way it is wrong:**
+
+> "Most likely why this goes wrong is a silent bug in the RL loop."
+
+### P2
+
+**What the tests prove:**
+
+> "These tests make sure that the benchmark is correct and works right generally. Make sure the folds match up correctly and then all the data gets loaded in right because like if data gets loaded in like one row off it can kind of screw everything over. The loop makes sure that the weights are changed in the right way. RL is great because, okay, I'm voice typing and it's not working super well. RL is great because its batch efficiency is so high, so we can get some good results out of even the small number of clips. Also looks at other somewhat boilerplate stuff, but it makes sure that the right things are selected and the outputs come out correctly."
+
+**A failure the tests could miss:**
+
+> "One thing I don't see in here that I feel like should be there in a test is we're looking for hard negatives to data mine, but I don't think we talk about how to find those hard negatives in the first place. Like, is there some interpretability or something that we need to do, or is it as simple as looking at whether a clip is real or fake and finding ones that it's confidently wrong on, or even hedging on. Those are the two things that we really don't want. I feel like each is equally bad. And I guess the overall worst thing is a confidently wrong false positive."
+
+### Where the risks went
+
+- **P1 risk (silent bug in the loop)** → failure-mode group **C** (recipes and mining loop,
+  8 tests) for stage 0, and group **G1** (pre-declared bandit-loop test contract) for stage 1.
+- **P2 risk (how hard negatives are found in the first place)** → failure-mode group **H**
+  (6 tests), a new pre-declared **mining-definition axis** with three arms, and the
+  **test break check** slot (H2).
+
+---
+
+## Phase 0: resolved conventions
+
+| Thing | Resolved | Source |
+|---|---|---|
+| Run spec dir | `docs/specs/` | CLAUDE.md "Doc layout" |
+| Feature spec dir | **none** — this project has no feature-spec layer | CLAUDE.md, explicit |
+| Plan / report dir | `docs/reports/` | CLAUDE.md |
+| Super docs | `docs/prod-chunks.md` (V2-33 section only; shared file), `CLAUDE.md` | handoff ownership table |
+| Bug log | **none** (no `BUGS.md`); historical sweep used reports, specs and the research report's failure lists | checked Oct 11 |
+| Full test command | `uv run pytest -q`; lint `uv run ruff check .` | CLAUDE.md |
+| Codex scripts | `.claude/review-plan.sh`, `.claude/review-audit.sh` (project copies, HEARSAY rubrics) | present, executable |
+
+---
+
+## P1 (frozen)
+
+### Problem
+
+v1 trained its scoring model treating every training clip as equally important. Other teams
+reportedly gained from focusing training on the hardest clips, including an RL-driven variant
+(organizer feedback, Oct 2026). v1 never did it. The Oct 10 research pilot said it helps, but was
+read on a cost convention we no longer trust; re-read on rule 5's reading the pilot's ranking
+inverts. We have no trustworthy answer to whether hard-example training helps, or in which
+direction to lean it.
+
+### Approach
+
+Pre-declare and commit every recipe, the selection rule and the tie bands before reading any
+number. Execute stage 0 on saved embeddings, CPU only, four layers, both row populations, all
+three cost readings. Then pre-declare the design of stages 0.5, 1 and 2 — including the RL
+(bandit) loop — each gated on resources only Nathan releases (MPS go-ahead, the external drive,
+GPU rental). The output is a **recommendation**; adoption waits for a V2-01 benchmark row beside
+an unmined twin and a sealed population (rule 7).
+
+### Design decisions
+
+- **D1 — ASVspoof 2019 train/dev policy: measure, don't rule.** The handoff's named P1 question
+  ("may these 7,648 rows be mined and scored?") is answered empirically: run **both training
+  pools** (with and without them) and read both on the NSA-only basis the benchmark uses.
+  Fold assignments agree across the two split files on all 20,000 shared paths (verified Oct 11).
+- **D2 — Selection statistic: pooled, one threshold.** Primary statistic is **pooled** package-0.5
+  minDCF on inner OOF, because NSA scores one pile with one threshold. The per-fold mean is
+  reported as a stability readout only.
+  - Evidence for the choice (verified Oct 11, pilot OOFs): the per-fold mean is the only one of
+    four statistics under which focal γ=2 ranks first, while pooled, z-pooled and rank-pooled all
+    rank it below base. The per-fold mean also ranks OC-softmax mid-field (0.2354) where pooled
+    reads 0.5763. Fold-mean grants five private thresholds; deployment and NSA grant one.
+- **D3 — The read-once holdout is not spent in stage 0.** Stage 0 produces a recommendation, not
+  an adoption decision; the one-shot holdout is reserved for V2-01. ITW and the local MLAAD cohort
+  stay report-only (rules 3 and 7). Nathan's note recorded: "spent" is about the decisions made on
+  a population, not the bytes — a clean v2 fork that inherits none of v1's choices would largely
+  restore In-the-Wild's value, and that is the cheapest route back to a clean evaluation set.
+- **D4 — Four layers now; a recipe must hold across layers.** Nathan overrode the original
+  recommendation (L7 primary, L6/L8 confirmatory) on the grounds that the test is needed eventually
+  and time is not the constraint. Layers **6, 7, 8 and 20** all run. The multiple-comparison
+  protection is kept as rule R5: a recipe must pass on at least 3 of 4 layers. Any *layer*
+  preference emerging here is recorded as a lead for separate confirmation, never as a selection
+  (this is the L7+WavLM trap, `docs/reports/2026-10-03_layer-diversity.md`).
+- **D5 — The cost convention is unresolved; stage 0 is built to survive either answer.**
+  NSA's document says a false alarm costs 4× a miss (confirmed by Nathan via NSA, Sat Sep 26
+  ~11:50, `docs/reports/2026-09-25_sponsor-questions.md:103`). NSA's shipped code puts the 4 on
+  `Cfa`, defined in its own comment as *falsely accepting a nontarget speaker* — our miss
+  (`data/nsa/HackGTMinDCF/asvspoof5/evaluation-package/calculate_metrics.py:16-21`,
+  `calculate_modules.py:111-125`). These are opposite. Rule 5 chose the code. Verified Oct 11: run
+  unmodified on our synthetic-high scores the sponsor code returns **1.0**, the worst possible
+  value, so the direction was handled somewhere before our 0.0733 came back; that tells us nothing
+  about which cost convention was applied.
+  - **Consequence for stage 0:** all three readings are reported for every cell, and rule R3 refuses
+    any candidate whose advantage does not survive the brief reading. **Adoption is blocked until
+    NSA answers.** The question belongs on the list already open in
+    `docs/reports/2026-10-10_v2-fusion-research.md`, "Completeness check".
+  - Nathan's 70/30 observation is correct and lands on `Pspoof`, a declared weight rather than a
+    measurement: `frr` and `far` are per-class rates, so the test set's actual class balance
+    cancels out of the arithmetic. Verified Oct 11: moving the prior from 0.5 to 0.3 does **not**
+    change the pilot's winner (reals ×4 wins both).
+- **D6 — Benchmark ownership.** Nathan's P1 sentence includes "how we are benchmarking everything".
+  The benchmark is V2-01, owned by the benchmark + fusion lane, and does not exist yet (no
+  `outputs/v2/benchmark/`). This lane defines its outputs to be benchmark-ready and pre-declares
+  what it reports; it does not build the benchmark. Default taken, Nathan informed, open to change.
+
+---
+
+## P2 (frozen)
+
+### Failure-mode inventory
+
+Groups A–H below; every row has at least one test. Sources are this project's own incident record.
+
+**A. Load and row alignment** (6 tests) — A1 row misalignment, caught by a *monotone-invariant*
+rebuild check against the shipped probe (Spearman == 1.0 and minDCF equal to <1e-12); the pilot's
+`max|diff|` check was mis-specified and read 57.4 on an identical ranking because the shipped OOF is
+Platt-rescaled (`scripts/bakeoff_layers.py:132-138`; relation verified Oct 11 as
+`shipped = 0.34480497 x pilot + 1.99776021`, residual 1e-14). A2 absolute-vs-relative path forms
+through the `data/` symlinks silently dropping rows (`scripts/fuse_sweep.py:31-33`). A3 duplicate
+paths silently deduped. A4 `decode_error` zero-rows trained and up-weighted as "hard" (the real
+99/32,319 WavLM incident). A5 an empty `flag` cell read as NaN so the comparison never matches.
+A6 off-by-one on the 25-layer stack.
+
+**B. Fold machinery** (5 tests) — B1 generator or speaker crossing folds, with a clip-level-split
+counterfactual. **B2 nested inner-inner folds leaking so a fold mines its own hard examples**, with
+an un-nested counterfactual. B3 fold ids disagreeing with the split file. B4 holdout rows in the
+inner population. B5 a barred population entering any path (LA eval `asv19_eval_probe`, ITW,
+MLAAD, test), enforced by an allow-list.
+
+**C. Recipes and the mining loop** (8 tests; owner's P1 risk) — **C1 weights computed and never
+applied**, caught by requiring each recipe at its identity setting (k=1, gamma=0, top-0%) to
+reproduce base exactly *and* each active recipe's coefficients to differ from base. **C2 mining the
+wrong class**, caught by a directional test. C3 the hand-derived focal gradient wrong, caught by
+finite differences to 1e-6. C4 focal gamma=0 not reducing to weighted logistic. C5 OHEM selecting
+off the wrong margin sign or pooling classes. C6 the optimizer silently not converging on 1024-dim
+near-separable data. C7 a fold model scoring a row it trained on. C8 non-determinism.
+
+**D. Readings and thresholds** (6 tests) — D1 a count taken at the wrong threshold: the same L7
+scores give **2,348 FA / 351 miss** at the package-0.5 threshold and **61 / 2,335** at the brief
+threshold (both verified Oct 11). D2 `min_cost` drifting from `sponsor_min_dcf`. D3 a reading
+mislabeled, caught by weight recovery (1:4, 1:1.714, 9.33:1). D4 a basis mislabeled. D5 pooled and
+per-fold columns swapped. D6 a NaN reading comparing as a pass.
+
+**E. The selection gate** (8 tests, one counterfactual per rule) — E1 a rule nothing can fail.
+E2 boundary ambiguity. E3 rounding before comparison. E4 a rule satisfiable by one lucky layer.
+E5 the convention-robustness rule unenforced. E6 the gate reading a barred population.
+
+**F. Outputs and provenance** (4 tests) — F1 overwriting the pilot in `outputs/v2/research/`.
+F2 a stale artifact silently reused, caught by a config hash. **F3 a test writing a tracked file** —
+this has happened here: six fabricated rows once landed in the expense ledger. F4 a log row missing
+its basis or readings.
+
+**G. Stages 0.5 / 1 / 2 — contracts pre-declared now, built later** (4) — **G1 a silent bug in the
+bandit loop**: a synthetic bandit with a known-best arm must converge to it, a constant-reward arm
+must never be preferred, and the reward sign is pinned by a directional test. G2 one-sided
+augmentation teaching "degraded means real", with a shortcut gate (codec+noise features alone must
+give AUC < 0.6). G3 augmented ASVspoof reals scored by models trained on their clean twins.
+G4 severity drifting past the SNR >= 5 dB cap.
+
+**H. The definition of "hard"** (6 tests; owner's P2 risk) — H1 the definition baked in, answering
+only one version of the question. **H2 the sort running the wrong way so the *easiest* examples are
+mined** — one token, and the table still looks plausible. H3 two arms silently collapsing to the
+same clips. H4 a mined set that is label noise or one speaker rather than a phenomenon, caught by a
+required characterization readout. **H5 confidently-wrong false positives — the case Nathan called
+worst — not separately visible**, so they are counted and named in every readout at every threshold.
+H6 hedging mining concentrating on one voice.
+
+Measured Oct 11 on the shipped L7 OOF, top 5% per class at the package-0.5 threshold, which is why
+H exists: **confidently-wrong and hedging reals share zero clips** (Jaccard 0.000, 0 of 663), and
+their source composition differs (confidently wrong: LibriSpeech 252 / ASVspoof 213 / LJSpeech 198
+over 57 speakers; hedging: LJSpeech **383** / ASVspoof 179 / LibriSpeech 101 over 70 speakers, and
+LJSpeech is a single speaker). On fakes the two largely coincide (Jaccard 0.527, 363 of 526).
+
+### Test commands
+
+```bash
+uv run pytest tests/test_hardneg.py -q
+uv run pytest -q && uv run ruff check .
+```
+
+Baseline suite: **859 tests collected** (Oct 11). The new file contributes ~70; expected ~930 with
+zero failures and clean lint.
+
+### Acceptance criteria
+
+1. Every pre-declared cell present: 12 recipes x 4 layers (6, 7, 8, 20) x 2 training pools x
+   3 readings x 2 bases, with any N/A cell declared in advance rather than discovered.
+2. The base recipe reproduces the shipped L7 probe under the monotone-invariant check (A1).
+3. Zero `decode_error` rows, zero all-zero rows, full join coverage asserted (A2-A5).
+4. The gate verdict computed, survivors named, and each survivor's status stated under all three
+   readings (R1-R8).
+5. Every mining arm reports its characterization readout, and confidently-wrong false positives are
+   counted separately at each threshold (H4, H5).
+6. Run spec and report written; one `experiments/log.csv` row whose `notes` names the basis and all
+   three readings.
+7. `outputs/v2/research/` byte-identical to before the run.
+
+### Regression
+
+Any of: a previously-passing test fails; `ruff check .` regresses; the research directory changes;
+any tracked file is modified by the test suite; the base recipe stops reproducing the shipped probe.
+
+### Test break check
+
+**Candidate: H2** — the mined set is the hardest, not the easiest. Mutation: flip the sort direction
+so the selection takes the easiest examples. One token, entirely realistic, and it would still
+produce a believable table, which is exactly the owner's stated risk. Alternate if implementation
+makes it the better fit: **C2** (wrong class up-weighted).
+
+_To be filled in post-commit: test, mutation, result, any fix-and-recheck rounds._
+
+---
+
+## Technical spec
+
+### The grid
+
+**Recipes (12).** base; cost-weighted reals xk; cost-weighted fakes xk; focal gamma=2;
+OHEM x 3 mining definitions; nested mine-and-retrain x 3 mining definitions; source-balanced;
+speaker-balanced.
+
+**Mining definitions (3), the new pre-declared axis.** `conf_wrong` (worst signed margin);
+`hedging` (smallest absolute distance to the operating threshold); `wrong_at_thr` (misclassified at
+the pre-declared threshold). Applied per class and reported per class.
+
+**Layers (4).** 6, 7, 8, 20 — all four probes exist under `outputs/v2/bakeoff/probes/`.
+
+**Training pools (2).** `pool_full` = 23,790 rows (NSA + ASVspoof 2019, `splits/nsa_folds_plus_asv19.csv`);
+`pool_nsa` = 16,142 NSA-only rows (`splits/nsa_folds.csv`). Verified Oct 11: the NSA-only subset of
+the inner population is exactly 16,142 rows, and f4 remains the ElevenLabs fold on both
+(pool_full f4: 2,647 bona fide + 1,000 ElevenLabs + 420 A04; pool_nsa f4: 1,632 + 1,000).
+
+**Readings (3).** package-0.5 `min_cost(y, s, 0.5, c_fa=1.0, c_miss=4.0)` — primary;
+package-0.3 `min_cost(y, s, 0.3, c_fa=1.0, c_miss=4.0)`; brief `min_cost(y, s)`. EER beside them.
+
+**Bases for reading (2).** The full 23,790 rows and the NSA-only 16,142. Primary basis for
+selection: **NSA-only**, matching what the V2-01 benchmark will use (rule 2).
+
+### The gate (pre-declared, with bands)
+
+A candidate is a (recipe, mining-definition) pair, evaluated per layer and per training pool.
+
+| Rule | Statement |
+|---|---|
+| **R1** | Pooled package-0.5 on the primary basis beats base, with speaker-cluster bootstrap P(better) >= 0.90 |
+| **R2** | Pooled package-0.3 also beats base. Both package readings must agree in direction |
+| **R3** | Brief does not regress beyond **0.010** vs base (convention robustness, D5) |
+| **R4** | Fold-4 (ElevenLabs) package-0.5 not worse than base's f4 by more than **0.010** |
+| **R5** | R1-R4 hold on at least **3 of the 4** layers. Passing on 1-2 layers is a lead, not a survivor (D4) |
+| **R6** | Inner false alarms at the pooled package-0.5-optimal threshold <= base + **10% relative** (base = 2,348 on the full basis) |
+| **R7** | Any mined set: no single speaker > **25%** of the set; characterization readout present; confidently-wrong false alarms counted (H4-H6) |
+| **R8** | All integrity asserts pass: zero `decode_error`, zero all-zero rows, full join coverage, nested-fold disjointness, no NaN reading (A, B, D6) |
+
+**Primary question:** does any recipe survive R1-R8, and in which direction (real-side or
+fake-side emphasis). **Secondary question, reported in full but not permitted to generate the
+headline claim:** which definition of "hard" works best.
+
+Bands are declared here and are not to be revised after any number is read. The bootstrap in R1
+follows the existing speaker-cluster pattern (`frac_better` in
+`outputs/v2/research/hard-negative-rl/oneclass.json`).
+
+### Files
+
+**Created by this lane:**
+
+| Path | What |
+|---|---|
+| `scripts/v2_hardneg_bakeoff.py` | The bake-off: load, fit, score, gate, write |
+| `tests/test_hardneg.py` | ~70 tests, groups A-H |
+| `outputs/v2/hardneg/` | Results table, per-candidate OOFs, characterization readouts, config hash |
+| `docs/specs/2026-10-13_v2-33-hardneg-stage0.md` | This run spec |
+| `docs/reports/2026-10-13_v2-33-hardneg-stage0-plan.md` | Implementation plan (Codex-reviewed) |
+| `docs/reports/2026-10-13_v2-33-hardneg-stage0.md` | Results and readouts |
+
+**Edited:** `docs/prod-chunks.md` V2-33 section only, committed only when the diff shows only this
+lane's hunks. `experiments/log.csv`, one appended row. `CLAUDE.md` AI-use disclosure — conditional,
+confirmed at execution.
+
+**Read-only, never written:** `models/`, `submissions/`, `splits/`, `outputs/detector_scores/`,
+`outputs/embeddings/`, `outputs/v2/research/`, `outputs/v2/bakeoff/`, `outputs/v2/layer_diversity/`,
+`src/hearsay/metrics.py`, `src/hearsay/augment.py`, `scripts/extract_embeddings.py`, the hackathon
+scripts, and the other two lanes' files. `scripts/train_probe.py` and
+`scripts/export_probe_scores.py` are never run. The five uncommitted files belonging to other lanes
+(`.claude/codex-audit-prompt.md`, `.claude/launch.json`,
+`docs/specs/2026-09-26_m5-xlsr-finetune-audit.md`, `next-env.d.ts`, `tsconfig.json`) are left alone.
+
+**The pilot is never re-run in place.** `outputs/v2/research/hard-negative-rl/hn_*.py` write into
+their own directory and would overwrite the pilot. Their logic is copied into this lane's script.
+Backup confirmed present: `~/hearsay-v2-research-2026-10-10.tgz`, 33 MB, Oct 11 01:16.
+
+### Compute and constraints
+
+CPU only. n_jobs <= 4 (18 GB Mac, shared with two other lanes). No MPS, no torch, no GPU, no
+downloads, no new audio. No process is stopped except by explicit PID. Pilot timing: 5 recipes x
+1 layer x 5 folds took 74 s, so the full grid is estimated at 45-90 min. Time box 3 h, then stop
+and report. Verified Oct 11: no MPS or extraction jobs running; ~16 GiB free on the home volume,
+down from the 27-29 GiB the handoff records for Oct 10 — relevant to stage 1's 12.3 GB of downloads,
+not to stage 0.
+
+---
+
+## Results
+
+Full write-up: `docs/reports/2026-10-13_v2-33-hardneg-stage0.md`. Everything below is the
+execution record; the numbers are in the report, and `outputs/` is gitignored.
+
+### Execution record
+
+- **Run 1, Mon Oct 13, 17:11 to 19:38 EDT.** `fit --jobs 4` (132 of 132 declared cells in 18 min,
+  131 OK, 1 INVALID: `focal_g2` L7 `pool_full` C=64, gradient norm 0.0112 > 0.01 on fold 2), then
+  `csweep` (64 rows, complete), `gate`, `report`. Self-check passed: Spearman exactly 1.0 against
+  the shipped L7 probe, package-0.5 gap 0.0. Persisted 3 h deadline not reached. Outputs preserved
+  unchanged at `outputs/v2/hardneg_run1_20261013/` before run 2.
+- **Close-out, Sat Oct 17.** Writing the report from run 1's outputs found three defects in the
+  readout and gate code (none in a fit, a score or a band). Fixed, tested, and the deterministic
+  grid re-run as **run 2** with the committed script; the gate re-run; the C sweep not re-run
+  (nothing in the fixes touches it). The byte-identity of run 2's OOF scores against run 1 is the
+  report's "Run record" row (all 132 cells byte-identical in `oof` and `mask`; 131 OK cells identical in every primary reading; the one INVALID cell INVALID for the same reason).
+
+### Defects found at close-out (details and tests in the report's defects table)
+
+| # | Defect | Run-1 consequence | Disposition |
+|---|---|---|---|
+| 1 | R7 / H4 computed group concentration over the basis population, not the mined set; no mined-set characterisation or H3 overlap existed | R7 could never fail (E1); every cell read 0.0316 / `lj:LJ028` | Fixed: picks stored per fold, `characterise()` on the mined rows, R7 reads it, H3 Jaccard added; re-run |
+| 2 | R4a/R4b looked up `int` fold keys on JSON-loaded cells (keys are strings after `clean()` + `json`) | R4a and R4b failed in **all 107** non-base cells, 13 on R4 alone; run 1's verdict column is wrong wherever R4 decided | Fixed: keys normalised; round-trip test; gate re-run |
+| 3 | H5 "confidently wrong" as frozen saturates whenever false alarms cover the real decile | 815 in every NSA-basis cell, 1,327 on the full basis; no information | **Not redefined** (frozen); reported as saturated; `report.json` records the check; stage 0.5 item |
+
+Also found: the designated break-check test **C2 did not exist** in the committed test file
+(the inventory named it; the file had H2, C1, C3, C4, C7, C9). Written at close-out as
+`test_c2_a_shape_applied_to_one_class_moves_that_classs_error_rate` (three seeds) before the
+break check ran. The characterisation's promised **duration** field is unavailable: the embedding
+manifests carry no duration column and this lane may not read audio.
+
+### Acceptance criteria, checked
+
+| # | Criterion | State |
+|---|---|---|
+| 1 | Every pre-declared cell present; N/A declared in advance | 132 / 132; `pool_nsa` x full basis N/A by declaration |
+| 2 | Base reproduces the shipped L7 probe under the monotone-invariant check, and the check **blocks** | Spearman 1.0, gap 0.0, both runs; `self_check` raises `SystemExit` |
+| 3 | Zero `decode_error`, zero all-zero rows, full join coverage | Enforced by `load_layer` / `load_world` guards; both runs loaded 23,790 inner rows in `bakeoff/rows.json` order |
+| 4 | Gate verdict computed, survivors named, status under all three readings | Computed for all 132 cells (`outputs/v2/hardneg/report.json`): 24 BASE, 98 FAIL, **9 PASS**, 1 INVALID. No (arm, pool, C) passes R5 (each pass is on one layer, never L20), so **no survivor**; the nine single-layer passes, one of them the random control, are named in the report's gate section with all three readings, fold 0 / fold 4, false alarms and P(better) ± SE. Eight R1 verdicts are indeterminate (within 2 SE of 0.90) and are listed |
+| 5 | Every mining arm reports its characterisation; confidently-wrong FA counted per cell | Characterisation present for all 107 mined cells after the fix; H5 counted but saturated (defect 3) |
+| 6 | Run spec and report written; one `experiments/log.csv` row naming basis and readings | This section; the report; row appended by `v2_hardneg_bakeoff.py log` (appended 2026-10-18T01:13:15+00:00 = Oct 17 21:13 EDT: `validation_score` 0.240507, the reference cell `none` L7 `pool_nsa` C=1 on the NSA-only basis; notes carry the basis, all three readings, EER, cell counts, the PASS count and the two primary contrast means; `benchmark_version` "none (pre-V2-01)") |
+| 7 | `outputs/v2/research/` byte-identical | 48 MB, no file newer than run 1's start; the test suite's autouse guard covers the directory |
+
+`CLAUDE.md` AI-use disclosure: **conditional not triggered.** The lane uses no new pretrained
+model, dataset or tool, and the other v2 lanes have not added by-lane bullets, so the disclosure is
+unchanged.
+
+### Verification before commit (plan Step 9)
+
+```text
+uv run pytest tests/test_hardneg.py -q      -> 94 passed (82 at run 1; +12 written at close-out)
+uv run pytest -q                            -> 1234 passed, 3 skipped (needs_weights / MPS, not this lane's), 2 warnings, 6 min 15 s
+uv run ruff check .                         -> All checks passed
+grep -nE "9\.3333|min_cost\(|c_fa=4|PI_SYNTH|class_weight=.balanced.*sample_weight" scripts/v2_hardneg_bakeoff.py
+                                            -> hits only at lines 88-102 (the comment and the three named
+                                               wrappers brief / package05 / package03) and the W1 docstring
+                                               at line 221; nowhere else (Codex #10's corrected form)
+git diff --stat docs/prod-chunks.md         -> one hunk, lines 518-523, the V2-33 status block only
+shasum -a 256 splits/*.csv                  -> nsa_folds a607d3ec…, nsa_folds_plus_asv19 7bcd377d…, unchanged
+du -sh outputs/v2/research                  -> 48M; no file newer than run 1's start (find -newer)
+```
+
+The docs-site test `tests/test_build_site.py::test_every_page_has_shell_invariants` had been failing
+on this lane's uncommitted plan and spec (more than one `#` heading each, rendered as two `<h1>`); the
+extra headings are now `##` and the test passes. The five other-lane modified files
+(`.claude/codex-audit-prompt.md`, `.claude/launch.json`, `docs/specs/2026-09-26_m5-xlsr-finetune-audit.md`,
+`next-env.d.ts`, `tsconfig.json`) are left uncommitted, as the Files section says.
+
+## Review scorecards
+
+_Claude critique and Codex audit results, filled in post-commit._
+
+---
+
+## Phase 3 additions and corrections (Oct 13, deep-mode exploration)
+
+Added after P2 froze, by the three exploration agents plus local verification. **No candidate has
+been fitted and no candidate number has been read**, so the bands below are still pre-declared; the
+corrections are to reference values and rule construction, not to results. The frozen P1/P2 text
+above is unedited. Where a rule here conflicts with the earlier gate table, **this section
+supersedes it.**
+
+## Verified reference values (base = L7, shipped probe, package-0.5)
+
+| | n | reals | fakes | pkg-0.5 | threshold | FA | miss | FA rate |
+|---|---|---|---|---|---|---|---|---|
+| `pool_full` (23,790) | 23,790 | 13,270 | 10,520 | 0.3104 | −1.4414 | 2,348 | 351 | 17.69% |
+| `pool_nsa` (16,142) | 16,142 | 8,142 | 8,000 | **0.3307** | −1.4414 | **1,642** | 258 | 20.17% |
+
+`pool_nsa` 0.3307 matches the handoff's independently recorded export figure exactly.
+
+Per-fold package-0.5 on `pool_nsa`: f0 **0.4735**, f1 0.0503, f2 0.0067, f3 0.0012, f4 **0.3950**.
+**Fold 0 is harder than fold 4 under the primary reading** (the brief reading has them near-tied at
+0.5432 / 0.5424). Folds 2 and 3 are at the floor on both readings, which is the quantitative reason
+D2 rejects the per-fold mean: that statistic is nearly a linear function of f0 and f4 alone, and
+would double-count the ElevenLabs fold while making f1-f3 movement invisible.
+
+Base f0/f4 package-0.5: `pool_full` 0.4696 / 0.3450; `pool_nsa` 0.4735 / 0.3950.
+
+## Verified structural facts that change rule construction
+
+- **Class balance differs by pool.** `pool_full` 13,270 real / 10,520 fake (ratio 1.2614);
+  `pool_nsa` 8,142 / 8,000 (ratio 1.0177, nearly balanced). `make_clf` hard-codes
+  `class_weight="balanced"`, and sklearn **multiplies** that by `sample_weight`, so the same nominal
+  k is a materially different intervention on each pool. Declared, not corrected.
+- **The group-weighting arms change definition between pools.** Real sources 3 → 2; real speakers
+  103 → 63; LJSpeech's share of reals 38.55% → **62.82%**, all under the single `speaker` token
+  `lj`. So "source-balanced" gives LJ 1/3 of real weight on one pool and 1/2 on the other, and
+  "speaker-balanced" crushes 62.8% of reals to 1/63 on `pool_nsa`. This is the shortcut-ledger entry
+  "LJ single speaker — one voice on both sides of every fold" (`docs/architecture.md:267`) and it is
+  why speaker-balanced was the worst pilot variant (f4 0.5059).
+- **Bootstrap units must be the fold file's `group` column, not `speaker`.** 158 inner groups
+  (`spk:` / `gen:` prefixed). LJSpeech is **one** speaker token but **42** groups spread across all
+  five folds. Fold 4's spoof side is 40 speaker tokens but **2 groups** on `pool_full` and
+  **1 group** on `pool_nsa`. Clustering by speaker would resample fake clips as ~20x more
+  independent units than the fold design admits, and make LJ a single all-or-nothing real cluster.
+- **`cv_groups()` does not reproduce the fold file's `group` column** — 117 groups vs 158. It splits
+  no fold-file group (a strict coarsening), so it is safe for leakage but is a *different*
+  partition. A fold-integrity test written against `cv_groups()` would not be testing the fold file.
+  **B1 checks the `group` column.**
+- **`min_cost(y, s, 0.5)` with default kwargs is a fourth, undeclared reading** (4·P_FA + P_miss),
+  numerically distinct from package-0.5. The donor code hard-codes the brief cost at eight sites,
+  including **inside the mining selection step** (`hn_reweight.py:74`), so the pilot selected its
+  hard examples under the brief cost. Verified locally.
+- **`min_cost` saturates at exactly 1.0.** A sign-inverted detector and a zero-information detector
+  both read `1.0000`, so a delta of 0 between saturated cells is not evidence of equality.
+- **`cost_at` returns NaN (not an exception) on an empty class slice**, and `not (nan > band)` is
+  `True` — a silent pass. Verified locally.
+- **`PredefinedSplit` with `test_fold == -1`** puts those rows in **every** training split and
+  leaves their score at the array's initial value. Verified: `folds=[0,0,1,1,-1,-1]` gives
+  `n_splits=2` and `oof=[99,99,99,99,0.0,0.0]`. With `np.zeros` the bug is invisible because 0.0 is
+  a legal decision value.
+- **`LogisticRegression` convergence is not the binding numerical risk** (~3 s per fit on
+  23,790x1024 at `max_iter=3000`, terminating on tolerance). The real risk is the hand-rolled focal
+  optimizer, whose `minimize(...).success` is never checked in the donor code. The focal **gradient
+  is correct** — verified against finite differences to 5e-7 relative at gamma = 0, 1, 2 — so C3
+  will pass and cannot catch non-convergence; C6 must assert on `success` and the gradient norm.
+- **`StandardScaler` ignores `sample_weight`**, so a weighted arm standardises on unweighted
+  moments. Harmless, but it means a weighted arm is not "the same recipe at a different prior".
+
+## Additional failure modes (each gets at least one test)
+
+| # | What could go wrong | Test |
+|---|---|---|
+| **B6** | A sentinel fold id (`-1`) trains on a row in every fold and leaves its score silently unset | Score arrays initialise to **NaN**, never `zeros`; assert no NaN survives; counterfactual asserts a `-1` row is detected |
+| **B7** | Fold-integrity tested against `cv_groups()` rather than the fold file | B1 asserts on the `group` column; a test pins that the two partitions differ (158 vs 117) so the substitution can't pass silently |
+| **C9** | A fold is never written, leaving exact 0.0 that still scores | Per-candidate coverage assert mirroring `probe.py:34` / `hn_common.py:9-12`. **Closest test to the owner's literal risk** |
+| **C10** | The focal optimizer stops early and returns a plausible score column | Assert `result.success` and a gradient-norm bound; a non-converged fit is INVALID, not a number |
+| **D7** | A saturated reading (exactly 1.0) compared as if measurable | Explicit saturation flag; two saturated cells may not be called equal |
+| **D8** | A reading computed with default kwargs, or the mining step selecting under the wrong cost | Every reading goes through one named helper; assert the three helpers are pairwise distinct on real data; assert `package05 == sponsor_min_dcf(flip=True)`; assert the mining threshold uses the declared cost |
+| **E7** | **The whole gate is decorative** | A synthetic candidate built to be overfit (label signal leaked into f0 and f4 only, chance elsewhere) **must be rejected** by R1-R10. This single test exercises D7, D8, C9, R6's basis and R10 at once |
+| **E8** | A broken candidate passes instead of being refused | INVALID checklist per candidate: inner AUC < 0.5 (direction inverted), duplicate paths, fold disagreement, non-finite scores, incomplete coverage. INVALID never passes |
+| **E9** | Two passers and no tie-break | Pareto rule: recommend none unless one passer dominates every other across all declared cells |
+| **H7** | A margin-based arm silently means a different band *width* per candidate, because cost-weighting and focal change the logit scale | All margin-based selection on a per-candidate scale-normalised score; one declared scale for every R6/R7/H5 count. (The Oct-11 Jaccard 0.000 measurement is scale-dependent and was taken on the shipped Platt scale) |
+
+## Declared free parameters (previously undeclared)
+
+Fixed now, before any fit. Not swept; a sweep would break the freeze.
+
+| Parameter | Value | Source |
+|---|---|---|
+| Cost-weight multiplier `k` | **4** | matches the pilot |
+| OHEM selection fraction / weight | top **5%** per class, weight **x5** | matches the pilot |
+| OHEM margin | **in-sample** (the fold model's own margin on its training rows), named `ohem_insample` | matches the pilot; in-sample and nested are different recipes |
+| Mine-and-retrain fraction / weight | top **5%** per class by the declared definition, weight **x5**, nested inner-inner | matches the pilot's weight |
+| Focal gamma | **2** | matches the pilot |
+| Bootstrap replicates | **1,000**, paired, shared RNG, seed 0, resampling `group` units | the pre-declared precedent (`docs/specs/2026-10-03_layer-bakeoff.md:43,61`) |
+
+**Recipes: 13** (was 12). The added one is `mine_nested_pilot` — reals above the 98th percentile,
+fakes in the bottom 5%, weight x5 — which reproduces the pilot's `mine_nested` row. None of the
+three declared mining definitions matches that quantile rule, so without this arm no cell in the
+grid would be comparable to the pilot's published number. **It is labelled pilot-comparable and is
+not eligible for recommendation.**
+
+## Gate, superseding the earlier table
+
+| Rule | Statement |
+|---|---|
+| **R1** | Pooled package-0.5 on the primary basis beats base, with a paired `group`-cluster bootstrap (1,000 replicates, seed 0) giving P(better) >= 0.90 |
+| **R2** | Pooled package-0.3 also beats base; both package readings agree in direction |
+| **R3** | Brief does not regress beyond **0.010** vs base (convention robustness, D5) |
+| **R4a** | Fold **0** package-0.5 not worse than base by more than **0.010** (`pool_nsa` base 0.4735, `pool_full` 0.4696) |
+| **R4b** | Fold **4** package-0.5 not worse than base by more than **0.010** (`pool_nsa` base 0.3950, `pool_full` 0.3450). **A tripwire, not a statistical test**: f4's spoof side is 1 group on `pool_nsa` and 2 on `pool_full`, so a group bootstrap is not available there. Stated, not hidden |
+| **R5** | R1-R4b hold on at least **3 of the 4** layers, **and the 3 must include at least one of {L7, L20}**. L6/L7/L8 are near-duplicates (ITW error Jaccard 0.6-0.7, `docs/reports/2026-10-03_layer-diversity.md:102-110`); L20 is the only genuinely independent cell, so "3 of 4" would otherwise be satisfiable by three copies of one probe |
+| **R6** | False alarms at the candidate's **own** pooled package-0.5-optimal threshold <= base + **10% relative**. Base: `pool_nsa` **1,642**, `pool_full` **2,348**. The band is relative, so it is basis-portable; the threshold is found by an exact re-sweep over `unique(s) + inf`, never from `roc_curve`'s thresholds (incomplete under `drop_intermediate=True`) |
+| **R7** | Any mined set: no single `group` > **25%**; characterization readout present (source, generator, `group`, duration, speaker concentration); confidently-wrong false alarms counted |
+| **R8** | Integrity: zero `decode_error`, zero all-zero rows, full join coverage, full per-candidate score coverage (no NaN, no unwritten fold), nested-fold disjointness, no NaN reading, no saturated reading treated as measurable |
+| **R9** | **Degenerate-candidate refusal:** constant scores, non-finite scores, inner AUC <= 0.5, a reading saturated at 1.0, or a focal fit with `success == False` makes the candidate **INVALID**, never a pass |
+| **R10** | **Multiplicity declared:** N recorded in the report, inference stated as **exploratory**, and the Pareto tie-break (E9) applied before anything is called a winner |
+
+## Multiplicity: the recommendation is a direction, not a cell
+
+13 recipes x 4 layers x 2 pools = **104 gate evaluations**, against a documented cap of
+*"four candidates against one gate ... do not add a fifth after seeing results"*
+(`docs/handoffs/2026-09-26_post-draft-gate-handoff.md:49`) and
+*"cap the candidate count in the manifest"* (`docs/consults/2026-09-26_post-draft-review_RESPONSE.md:75`).
+
+Resolution, pre-declared:
+
+- The **primary question** — does hard-example training help, and in which direction — is answered
+  by a pre-declared **aggregate** comparison: real-side arms versus fake-side arms, averaged across
+  layers and pools. That is **one** comparison, not 104.
+- **No single cell is ever the recommendation.** A cell that passes R1-R10 is reported as a **lead
+  requiring confirmation**, in the same language the layer bake-off used for its pair blends.
+- The secondary question (which definition of "hard") is reported in full and may not generate the
+  headline claim.
+- This is consistent with the owner's P1 statement, which describes a decision about *how* to use
+  hard negatives — a direction — not a model selection.
+
+## Self-check must block, not print
+
+Acceptance criterion 2 is strengthened: the base-reproduction check **raises** and halts the run
+before any candidate is read. Precedent and the reason: the pilot's equivalent check was a `print`,
+it emitted `max|diff| 57.4`, and the run continued to produce the table that has been quoted since
+(`hn_reweight.py:87`, `reweight.log:7`). The rule it should have followed:
+*"If the self-check fails, no candidate is read until it is fixed"*
+(`docs/reports/2026-09-26_post-draft-manifest.md:89`).
+
+## Engineering constraints added
+
+- Slice the four layers **at load**, per set, never materialising the 25-layer stack (2.83 GB for
+  both training sets vs ~450 MB for four layers). The 18 GB Mac is shared with two active lanes, and
+  the documented memory incident put it into ~16 GB of swap.
+- `n_jobs` a module constant, **<= 4**, with `pre_dispatch="n_jobs"`; `OMP_NUM_THREADS=1` in workers
+  to avoid process x BLAS oversubscription (nothing in the repo sets it for CPU probe scripts).
+- Per-cell `try/except` marking that cell INVALID so one divergent fit cannot kill the grid, and
+  per-cell `.npz` resume so the run is restartable inside the time box.
+- Stop processes by explicit PID only. joblib's workers are Loky processes, and a pattern-kill on
+  this shared Mac has already hit another agent's workers once
+  (`docs/reports/2026-10-10_v2-fusion-research.md:288`).
+- The config hash covers the **realized** candidate list, so a partial table can never be read as
+  the full grid.
+- **Time box: a wall-clock cutoff that checkpoints, stops and reports** — not an estimate. 3 h.
+
+---
+
+## Phase 3 round 2 — FINAL DESIGN (supersedes every earlier grid and gate statement)
+
+Reframed on Nathan's instruction, Oct 13: **"yeah reframe it, hard vs easy vs random"**.
+
+An adversarial critique pass plus local verification found that the earlier design could not answer
+its own question. This section is self-contained and is the design of record. The frozen P1/P2 text
+and the earlier Phase 3 section remain above as the audit trail.
+
+## Why the earlier design was withdrawn (all verified locally, Oct 13)
+
+| # | Finding | Evidence |
+|---|---|---|
+| **W1** | **The two arms that were to answer the direction question were the same model at two regularization strengths.** `class_weight="balanced"` is computed by sklearn on the **sample-weighted** class counts, which exactly cancels a per-class `sample_weight` and leaves a single global scale; a global scale on `sample_weight` is exactly equivalent to scaling `C`. | Effective-weight ratio is one constant for every row, = (k·n_r + n_f)/n: **2.6734** (`pool_full` reals x4), 2.3266 (fakes x4), **2.5132 / 2.4868** on `pool_nsa` — a **1% difference on the primary basis**. `reals x4` at C=1 equals base at **C=2.8** to **5.6e-16** on coefficients. So the pilot's `cost4` row (0.2779) measures a looser prior, not cost weighting. |
+| **W2** | **The in-sample mining family is degenerate.** The L7 probe is perfectly separable in-sample: **0 in-sample errors in all five folds** (min margin 0.76-1.95). So `conf_wrong` and `hedging` select identical clips and `wrong_at_thr` mines the empty set, i.e. two of three declared arms collapse and the third equals base. | Measured per fold. |
+| **W3** | **R7's 25% group cap was unsatisfiable on the fake side by construction.** There are only **14** spoof groups (vs 144 real). The hardest fakes are **61-70% `gen:grad_tts`**. Every mining recipe would have failed R7 before any score was read, while the non-mining recipes satisfied it vacuously — so it could never fail independently either. | top group share: reals 3.3-6.9% (pass), fakes 61.3-69.6% (fail). |
+| **W4** | **R5's cross-layer clause could not fail.** All four 3-subsets of {6,7,8,20} contain L7 or L20. | Enumerated. |
+| **W5** | **The reference table pinned *basis* values under *pool* names, and `base` was never declared per layer.** The shipped L7 probe trains on all 23,790 rows; 0.3307 is that model read on the 16,142 NSA rows — a basis, not a pool. Per-layer bases are far apart (L20 pooled 0.5943), so a +/-0.010 band against L7's values would have failed every L6/L8/L20 candidate for reasons unrelated to the candidate. | L06 0.3517 / L07 0.3104 / L08 0.3812 / L20 0.5943 (`pool_full`). |
+| **W6** | **83% of inner rows sit in a speaker that crosses folds**, so B1's speaker half was untestable. **41 of 113** speakers span >1 fold, covering **19,699 of 23,790 rows**. Groups cross 0 folds; one generator crosses. This is structural to ASVspoof 2019 LA (its spoofs are built from its bona fide speakers: `LA_0069` is bona fide in fold 1 and the source of A01-A06 spread across all five folds). | Measured. |
+| **W7** | **The dominant effect is the regularization constant, not which examples are up-weighted.** | See below. |
+
+## W7, the finding that sets the design
+
+Base probe, L7, `pool_full`, 5 folds, pooled package-0.5:
+
+| C | package-0.5 | package-0.3 | brief |
+|---|---|---|---|
+| 0.25 | 0.3852 | 0.2353 | 0.2597 |
+| **1.0** (v1's inherited value) | **0.3104** | 0.2082 | **0.2649** |
+| 8.0 | 0.2514 | 0.1770 | 0.2728 |
+| 64.0 | 0.2333 | 0.1651 | 0.2768 |
+| 256.0 | **0.2304** | **0.1634** | 0.2775 |
+
+Monotone to C=256 under both package readings (**-0.080**), and **slightly worse** under brief
+(+0.013). Per-fold at C=1 -> 64: f0 0.4696 -> 0.4332, f4 0.3450 -> 0.3354, f1 0.1990 -> 0.2032,
+f2 0.0057 -> 0.0108 — the gain is in the two error-carrying folds, not one fold.
+
+Weighting shape with `sum(sample_weight)` held at n (pure shape, no scale change):
+
+| | base | easiest | hardest | random |
+|---|---|---|---|---|
+| at C = 1 | 0.3104 | **0.2814 (-0.029)** | 0.3204 (+0.010) | 0.3337 (+0.023) |
+| at C = 64 | 0.2333 | 0.2381 (+0.005) | 0.2305 (-0.003) | — |
+
+**The easy-mining gain is an artifact of over-regularization.** At a tuned C every shape moves the
+score by < 0.005 and the signs flip. v1 fixed C = 1.0 (`src/hearsay/probe.py:43-47`) under the brief
+reading, where C barely matters; under rule 5's reading that choice is the largest single lever in
+this lane.
+
+**Consequence for the design:** a weighting-shape comparison at a single C answers the wrong
+question, and any comparison not at matched C is confounded with regularization.
+
+## The reframed question
+
+**Primary:** at **matched regularization**, does up-weighting a 5% subset of training examples change
+the score, and does the selection rule matter — **hardest vs easiest vs random**?
+`random` is the control that makes the other two interpretable.
+
+**Secondary, descriptive, explicitly not a selection:** how does the score move with C? Selecting C
+on inner OOF is the L7+WavLM trap (`docs/reports/2026-10-03_layer-diversity.md:64-80`:
+*"Inner CV contains no wild real speech, so it cannot see WavLM's false alarms"*). The C curve is
+reported as a **lead for the V2-01 benchmark lane**, never adopted here.
+
+## Final grid
+
+**All shape selection uses nested inner-inner out-of-fold margins**, never in-sample (W2). A fold
+never selects its own hard examples, and out-of-fold errors actually exist (2,348 FA / 351 miss at
+the package-0.5 threshold).
+
+**All arms hold `sum(sample_weight) = n`**, so every comparison is at matched effective
+regularization. Class balancing is computed once on **unweighted** counts and multiplied by the
+arm's shape, then renormalised (W1).
+
+| Arm | Layers | Note |
+|---|---|---|
+| `none` (base) | 6, 7, 8, 20 | reference, per layer x pool x C |
+| `hardest_both`, `easiest_both`, `random_both` | 6, 7, 8, 20 | the primary three-way question |
+| `hardest_reals`, `hardest_fakes`, `easiest_reals`, `easiest_fakes` | 7 | direction probe |
+| `focal_g2` | 7 | continuous hard-example emphasis; the one arm with literature behind it |
+| `pilot_quantile` | 7 | reals above the 98th pct, fakes bottom 5%; reproduces the pilot's `mine_nested` row for comparability. **Not eligible for recommendation** |
+
+**C: {1.0, 8.0, 64.0}** — v1's inherited value, a middle, and the near-asymptote.
+**Pools: `pool_full` (23,790 fitted), `pool_nsa` (16,142 fitted).**
+**Bases for reading: both, every number labelled with its basis.** `pool_nsa` x full-basis does not
+exist (a `pool_nsa` fit has no OOF for the 7,648 ASV19 rows) and is **declared N/A in advance**.
+**C descriptive sweep: C in {0.25, 1, 2, 4, 8, 16, 64, 256} x 4 layers x 2 pools**, base arm only.
+
+Cells: 4 arms x 4 layers x 2 pools x 3 C = 96, plus 6 arms x 1 layer x 2 pools x 3 C = 36, plus the
+64-cell descriptive C sweep. Each cell is ~5 cheap fits (verified: an LR fit on 18,256x1024 is
+~0.05 s; the focal fit is ~9 s), so the grid is minutes, not hours.
+
+## Final gate
+
+A candidate is an (arm, layer, pool, C) cell. **`base` always means the `none` arm at the same
+layer, pool, basis and C** (fixes W5). Every comparison is within a matched (layer, pool, C) stratum.
+
+| Rule | Statement |
+|---|---|
+| **R1** | Pooled package-0.5 on the primary basis beats matched `base`, with a paired `group`-cluster bootstrap (1,000 replicates, seed 0, identical resamples for arm and base) giving P(better) >= 0.90. The Monte-Carlo SE of P(better) at 1,000 replicates is ~0.0095 and **is reported beside it**; a verdict within 2 SE of the 0.90 boundary is reported as **indeterminate**, not as a pass |
+| **R2** | Pooled package-0.3 agrees in direction with R1 |
+| **R3** | Brief does not regress beyond **0.010** vs matched base |
+| **R3b** | **Direction agreement (new):** the sign of the arm-vs-base delta must agree across all three readings. A sign flip is reported as **convention-dependent** and cannot be a recommendation — this lane's cost convention is unresolved (D5), and the verified example is `reals x4` vs `fakes x4`, which disagree between package-0.5 and brief |
+| **R4a / R4b** | Fold 0 and fold 4 package-0.5 not worse than matched base by more than **0.010**. **Tripwires, not statistical tests**: f4's spoof side is 1 group on `pool_nsa` and 2 on `pool_full`, so no group bootstrap exists there. Stated, not hidden |
+| **R5** | R1-R4b hold on at least 3 of the 4 layers **and must include L20**. L6/L7/L8 are near-duplicates (ITW error Jaccard 0.6-0.7); L20 is the only independent cell, so requiring "L7 or L20" could not fail (W4) |
+| **R6** | False alarms at the candidate's **own** pooled package-0.5-optimal threshold <= matched base + **10% relative**. Per-layer/pool/C base counts are computed with the base arm in the same run, never pinned from a prior run. Threshold by exact re-sweep over `unique(s) + inf`, with ties resolved to the **highest** threshold (declared; `min()` over a sorted candidate list would take the lowest and maximise FA among tied optima) |
+| **R7** | **Real side:** no single `group` > 25% of the mined set. **Fake side: reported, not gated** — there are only 14 spoof groups and whole generators are groups, so any cap is unsatisfiable by construction (W3). The fake-side concentration and its top group are reported for every mined set |
+| **R8** | Run preconditions, checked once, not per candidate: zero `decode_error`, zero all-zero rows, full join coverage, nested-fold disjointness, speaker-crossing documented (W6). A failure halts the run |
+| **R9** | Per-candidate refusal -> **INVALID**, never a pass: non-finite or constant scores, inner AUC **< 0.5** (one convention, matching E8), any reading saturated at 1.0, incomplete score coverage, a mined set below a minimum size of **20 per class**, or a focal fit whose final gradient norm exceeds **1e-2** (`result.success` alone is insufficient — L-BFGS-B returns success on the f-reduction criterion with gradient norms of 4e-3 to 9.5e-4, verified) |
+| **R10** | Multiplicity declared: the realized cell count, the N/A cells, and the statement that inference is **exploratory** |
+
+**What the gate is for, and what it is not.** R1-R10 decide, per stratum, whether a weighting shape
+beats no weighting. The **answer to the primary question** is the three-way comparison of
+`hardest` / `easiest` / `random` against `none`, aggregated across layers and pools with the paired
+group bootstrap, and reported with its uncertainty. **No single cell is a recommendation and no cell
+is adopted**; a passing cell is a lead. The Pareto tie-break is withdrawn — it selected a cell,
+which contradicted that.
+
+## Test-design changes
+
+- **Break check moves from H2 to C2.** Verified: flipping the mining sort direction produces a
+  *better* table under the primary reading (0.2798 vs 0.3139), so that mutation would be caught only
+  by a test that mirrors the mutated line, and it improves the deliverable rather than corrupting
+  it. **C2** (the directional test: a shape applied to one class must move that class's error rate)
+  is the mutation whose failure is both realistic and damaging. E7 stays as the whole-gate
+  counterfactual.
+- **B1's speaker clause is replaced, not deleted.** Groups and generators are fold-disjoint and are
+  asserted. Speakers are **not** (W6), so the test asserts the measured, documented state — 41
+  speakers across >1 fold covering 19,699 rows — and fails if it changes. CLAUDE.md's
+  "validate by generator **and** speaker" is not satisfied by this fold file; that is now recorded
+  rather than assumed.
+- **Rules that are not per-candidate are not given per-candidate counterfactuals.** R8 is a run
+  precondition and R10 is a reporting checklist; E1's per-rule counterfactual applies to
+  R1-R7 and R9 only. The earlier plan promised one-per-rule for all ten, which is undeliverable.
+- **D7 is withdrawn** as unreachable: R9 makes any saturated candidate INVALID, so "two saturated
+  cells compared as equal" cannot arise.
+- **Baseline test count is 906**, not 859 (commit `735d0a3` added 47).
+- Embeddings load with a **per-shard single-layer loader**, not `load_embeddings` + slice:
+  `probe.load_embeddings` materialises the full 25-layer fp32 array and a second copy inside the
+  call, so slicing afterwards does not avoid the peak. Verified: the per-shard loader reads L7 for
+  27,648 rows in **0.5 s**.
+- `sample_weight` cannot pass through `make_clf`'s Pipeline (verified: `Pipeline.fit` rejects it).
+  Arms scale explicitly and fit a bare `LogisticRegression`, so no arm double-scales.
+
+---
+
+## Codex plan review round 1 — disposition
+
+Review: `docs/reports/2026-10-13_v2-33-hardneg-stage0-plan-review.md` (7 Critical, 4 Suggestions).
+**All eleven accepted**; resolutions are in the plan's "Codex plan review round 1" section. The three
+that change this spec:
+
+1. **Stage 0 is a diagnostic on the legacy split, not a validation** (Codex #1). The fold file has
+   known speaker overlap (41 of 113 speakers across >1 fold, 19,699 of 23,790 rows) and is read-only
+   to this lane. Recording that is not the same as fixing it, so no validation conclusion is drawn
+   here. **V2-33 stays open** pending a V2-01 benchmark row on generator- **and** speaker-disjoint
+   folds, and that requirement is raised with the benchmark lane.
+2. **The primary comparison is now fully specified** (Codex #2): basis NSA-only; strata
+   (layer, pool, C) with C never averaged over; equal stratum weights; INVALID cells excluded and
+   counted; **four pre-declared paired contrasts** — `hardest−none`, `easiest−none`,
+   `hardest−random`, `easiest−random` — with one shared group resample reused across strata so
+   overlapping pools and near-duplicate layers are not counted as independent evidence.
+3. **R5 eligibility is declared** (Codex #7): it applies only to the four-layer primary family
+   (`none`, `hardest_both`, `easiest_both`, `random_both`). The L7-only arms are descriptive with
+   cross-layer eligibility N/A, so their failure is never predetermined by a missing experiment.
+
+Also accepted and specified in the plan: per-checkpoint input/config fingerprints with atomic writes
+and grid-derived completeness (#3); the join takes only `fold` and `group` and asserts the
+overlapping manifest columns agree (#4, verified to raise otherwise); the loader keeps
+`probe.load_embeddings`' exact-permutation guarantee (#5, verified that `seen.all()` admits a
+negative index); frozen definitions for margin normalisation and for H5 "confidently wrong" (#6); one
+persisted run deadline covering every subcommand (#8); a semantic hardest-vs-easiest fixture test
+beside C2 (#9); a corrected verification grep (#10); and an explicit "what this does not measure"
+section in the report (#11).
