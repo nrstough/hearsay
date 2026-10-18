@@ -2,26 +2,22 @@
 
 | Dimension | Grade | Notes |
 |-----------|-------|-------|
-| Plan adherence | Fail | Primary analysis and gate differ materially from the final design. |
-| Scope discipline | Excellent | Changes stay within lane-owned files; detector and submission paths untouched. |
-| Test coverage | Fail | Passing tests miss required gate behavior and aggregate inference. |
-| Review compliance | Fail | Accepted findings #2, #3 and #8 remain incompletely implemented. |
-| Freeze integrity | Acceptable | No freeze hashes recorded. Owner statements include both risks; pre-run frozen text cannot be independently verified. |
-| Regression check | Acceptable | Recorded full suite: 1,234 passed, 3 skipped. Independently verified 26 targeted tests and repository lint; full suite not rerun in this read-only environment. |
-| Documentation | Fail | Report and status document propagate an incorrect pass count and unsupported aggregate conclusions. |
-| Test sensitivity | Excellent | Recorded C2 mutation caught on the first attempt across three seeds; mutation absent from script history. |
-| **Overall** | **Fail** | |
+| Plan adherence | Fail | Checkpoint integrity requirements remain incomplete. |
+| Scope discipline | Excellent | Changes stay within lane-owned files; detector contract and submissions untouched. |
+| Test coverage | Fail | Tests miss incomplete score masks and truncated checkpoint JSON at gate time. |
+| Review compliance | Fail | Accepted checkpoint-validation finding #3 is only partially resolved. |
+| Freeze integrity | Acceptable | No freeze hashes; owner statements present. Pre-run declaration cannot be verified from git. |
+| Regression check | Acceptable | 31 targeted tests and lint passed independently; full-suite success is recorded. |
+| Documentation | Acceptable | Results match saved artifacts; diagnostic limitations and unavailable duration readout are disclosed. |
+| Test sensitivity | Excellent | Independently reproduced both mutation catches in memory; neither mutation appears in the change’s commits. |
+| **Overall** | **Fail** | Remaining defects concern checkpoint refusal, not evidence that the saved results are wrong. |
 
 ### Commentary
 
-1. **Plan adherence / Review compliance / Documentation — causes Fail.** The primary comparison is not implemented as specified. [The aggregation](/Users/nathanstough/Projects/hearsay/scripts/v2_hardneg_bakeoff.py:823) averages all 24 strata, including different C values, while its output says “C … never averaged over.” Bootstrap results are summarized separately for each stratum; no replicate-level aggregate distribution or aggregate uncertainty is produced. The report nevertheless uses these averages to conclude “does nothing” and “indistinguishable from random.” Compute each contrast separately at each C, averaging layers and pools within shared bootstrap replicates, and update the report, status and log.
+1. **Plan adherence / Review compliance / Test coverage — causes Fail.** [validate_cells()](/Users/nathanstough/Projects/hearsay/scripts/v2_hardneg_bakeoff.py:864) trusts the checkpoint’s own mask when checking score coverage. In a read-only reproduction, removing one NSA row from that mask and setting its score to NaN still returned **OK**: 16,141 scored rows against the stored reading’s 16,142. The gate can consequently bootstrap a different population from the cached readings. Validate array dimensions, Boolean mask type, and exact mask equality against the authoritative row index and training pool. Add a regression test requiring this checkpoint to become INVALID.
 
-2. **Plan adherence / Test coverage / Documentation — causes Fail.** [R1 indeterminacy does not prevent PASS](/Users/nathanstough/Projects/hearsay/scripts/v2_hardneg_bakeoff.py:531). The saved `easiest_both`, L7, `pool_nsa`, C=8 cell is marked both indeterminate and PASS at P(better)=0.903904. This violates the explicit final rule. Enforcing it reduces the reported nine passes to eight; the no-survivor conclusion remains unchanged. Make indeterminacy block PASS and R5 eligibility. The [existing test](/Users/nathanstough/Projects/hearsay/tests/test_hardneg.py:759) checks only the flag, allowing this defect to pass.
+2. **Plan adherence / Review compliance / Test coverage — causes Fail.** [load_cells()](/Users/nathanstough/Projects/hearsay/scripts/v2_hardneg_bakeoff.py:844) parses every JSON checkpoint before `validate_cells()` can handle errors. A truncated JSON raises `JSONDecodeError`, aborting the gate without producing the promised refusal report. The [truncation test](/Users/nathanstough/Projects/hearsay/tests/test_hardneg.py:1102) corrupts only the NPZ file; JSON truncation is tested only for fit resume. Handle malformed JSON during loading, identify the affected declared cell, and test the gate’s INVALID or explicit-refusal result.
 
-3. **Plan adherence / Review compliance — causes Fail.** Checkpoint protection remains incomplete. [The fingerprint](/Users/nathanstough/Projects/hearsay/scripts/v2_hardneg_bakeoff.py:579) hashes manifests but not embedding contents; repaired embeddings can therefore reuse stale scores. NPZ writes are non-atomic, and `stage_gate()` neither validates fingerprints nor refuses incomplete grids. Current readable checkpoint fingerprints match, so this is a reproducibility defect rather than evidence that this run mixed inputs. Hash embedding contents, validate checkpoint pairs before reuse and gating, and test changed shards, missing/truncated NPZ files and incomplete grids.
+3. **Freeze integrity — limits grade to Acceptable.** The first declaration commit follows execution, as [disclosed](/Users/nathanstough/Projects/hearsay/docs/reports/2026-10-13_v2-33-hardneg-stage0.md:389). No P1/P2/P3 freeze hashes exist. The owner statements contain both required risks, but the claimed pre-run text cannot be independently authenticated. Future confirmation runs need the declaration committed before execution.
 
-4. **Plan adherence / Test coverage — causes Fail.** [R9](/Users/nathanstough/Projects/hearsay/scripts/v2_hardneg_bakeoff.py:567) turns detected degeneracy into ordinary FAIL, not INVALID. It also omits explicit constant-score refusal and complete checks across all readings. Such cells retain `status="OK"` and remain eligible for the primary contrasts. Centralize refusal before gate evaluation and aggregation; test both INVALID classification and exclusion from contrasts.
-
-5. **Review compliance — contributes to Fail.** The persisted deadline is consulted by fitting and the C sweep, but [gate execution](/Users/nathanstough/Projects/hearsay/scripts/v2_hardneg_bakeoff.py:743) never checks it. Bootstrap work can continue beyond the declared cutoff, contrary to accepted finding #8. Check the deadline during bootstrap scheduling and produce an incomplete report when it expires. The recorded runs finished within the limit, so no actual overrun is established.
-
-6. **Plan adherence — contributes to Fail.** P1 required committing recipes, selection rules and bands before reading results. Git history first adds the script, run spec and review artifacts in `7ba7faf` on October 17, after both recorded runs. This does not prove retrospective editing, but it does establish that the promised pre-run commit record is missing. Record that limitation explicitly; future confirmation runs need a committed declaration before execution.
+4. **Regression check — limits grade to Acceptable; no observed regression.** Independent checks found 132 cells, matching current fingerprints, 131 unchanged OOF/mask arrays versus run 1, and no saved mask/shape mismatch. Verdict counts match the report: 24 BASE, 93 FAIL, 8 PASS, 6 INDETERMINATE, 1 INVALID. The 31 targeted tests and repository lint passed. The recorded 1,248-pass full suite was not rerun in this read-only environment.

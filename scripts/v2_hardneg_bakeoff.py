@@ -26,6 +26,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -672,7 +673,13 @@ def reusable_checkpoint(path: Path, fp: str) -> bool:
         return False
     if rec.get("fingerprint") != fp:
         return False
-    return not (rec.get("status") == "OK" and not path.with_suffix(".npz").exists())
+    if rec.get("status") != "OK":
+        return True                                  # a deterministic INVALID is reusable
+    try:
+        z = np.load(path.with_suffix(".npz"))
+        return bool({"oof", "mask"} <= set(z.files))
+    except Exception:  # noqa: BLE001 - missing or truncated score file (BadZipFile etc.): recompute
+        return False
 
 
 def declared_grid() -> list[tuple[str, int, str, float]]:
@@ -841,11 +848,28 @@ def stage_csweep(layers: tuple[int, ...]) -> None:
     atomic_write_json(OUT / "csweep.json", out)
 
 
+def key_from_name(stem: str) -> tuple[str, int, str, float] | None:
+    """`L07_pool_nsa_C1_hardest_both` -> ("hardest_both", 7, "pool_nsa", 1.0); None if malformed."""
+    m = re.match(r"^L(\d{2})_(pool_full|pool_nsa)_C([0-9.]+)_(.+)$", stem)
+    if not m:
+        return None
+    return m.group(4), int(m.group(1)), m.group(2), float(m.group(3))
+
+
 def load_cells() -> dict:
+    """Codex audit round 2, #2: a checkpoint whose JSON does not parse is an INVALID cell with the
+    reason, keyed from its filename, so the gate can refuse it instead of dying on it."""
     cells = {}
     for f in sorted((OUT / "cells").glob("*.json")):
-        d = json.loads(f.read_text())
-        cells[(d["arm"], d["layer"], d["pool"], d["C"])] = d
+        key = key_from_name(f.stem)
+        try:
+            d = json.loads(f.read_text())
+            cells[(d["arm"], d["layer"], d["pool"], d["C"])] = d
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            if key is not None:
+                cells[key] = {"arm": key[0], "layer": key[1], "pool": key[2], "C": key[3],
+                              "status": "INVALID",
+                              "reason": f"unreadable checkpoint JSON: {type(e).__name__}: {e}"}
     return cells
 
 
@@ -861,13 +885,23 @@ def expected_fingerprints() -> dict:
             for a in ARMS for layer in a.layers for pool in POOLS for c in C_GRID}
 
 
-def validate_cells(cells: dict, expected: dict | None) -> dict:
-    """Codex audit round 1, #3 and #4: a checkpoint is usable only if its fingerprint matches what
-    this script would compute now, its score file loads whole, and its scores are not degenerate.
-    Anything else becomes INVALID with a reason -- never silently reused, never an ordinary FAIL,
-    never a contrast stratum."""
+def pool_masks(rows: dict) -> dict:
+    """The authoritative pool masks, from the run's own row index (rows.json), not from a checkpoint."""
+    source = np.asarray(rows["inner_source"])
+    return {"pool_full": np.ones(len(source), bool), "pool_nsa": source != "asvspoof2019"}
+
+
+def validate_cells(cells: dict, expected: dict | None, masks: dict | None = None) -> dict:
+    """Codex audit round 1, #3 and #4, and round 2, #1: a checkpoint is usable only if its
+    fingerprint matches what this script would compute now, its score file loads whole, its mask is
+    EXACTLY the authoritative pool mask (a checkpoint's own mask is never trusted), every masked
+    score is finite, and its scores are not degenerate. Anything else becomes INVALID with a reason
+    -- never silently reused, never an ordinary FAIL, never a contrast stratum."""
     out: dict = {}
     for key, cell in cells.items():
+        if cell.get("fingerprint") is None and cell.get("status") != "OK":
+            out[key] = cell                           # an unreadable-JSON placeholder keeps its reason
+            continue
         if expected is not None and key in expected and cell.get("fingerprint") != expected[key]:
             out[key] = {**cell, "status": "INVALID",
                         "reason": "stale checkpoint: fingerprint does not match the current inputs"}
@@ -876,7 +910,13 @@ def validate_cells(cells: dict, expected: dict | None) -> dict:
             try:
                 z = np.load(_npz_path(key))
                 oof, mask = z["oof"], z["mask"]
-                if oof.shape != mask.shape or not np.isfinite(oof[mask]).all():
+                if mask.dtype != np.bool_ or oof.ndim != 1 or oof.shape != mask.shape:
+                    raise ValueError("checkpoint arrays have the wrong shape or dtype")
+                if masks is not None:
+                    ref = masks[key[2]]
+                    if mask.shape != ref.shape or not np.array_equal(mask, ref):
+                        raise ValueError("checkpoint mask is not the pool's authoritative mask")
+                if not np.isfinite(oof[mask]).all():
                     raise ValueError("score coverage incomplete")
                 readings = [cell["primary"]] + ([cell["secondary"]]
                                                 if isinstance(cell.get("secondary"), dict) else [])
@@ -934,8 +974,9 @@ def stage_gate(expected: dict | None = None, dl: Deadline | None = None) -> dict
     and the H5 saturation check. Refuses a partial grid; honours the persisted deadline (Codex #8:
     an expiry mid-way keeps what was computed and says so, and makes no completeness claim)."""
     dl = dl or Deadline()
-    cells = validate_cells(load_cells(), expected_fingerprints() if expected is None else expected)
     rows = json.loads((OUT / "rows.json").read_text())
+    cells = validate_cells(load_cells(), expected_fingerprints() if expected is None else expected,
+                           pool_masks(rows))
     y = np.asarray(rows["inner_y"], dtype=int)
     groups = np.asarray(rows["inner_group"])
     source = np.asarray(rows["inner_source"])

@@ -42,7 +42,7 @@ The descriptive all-strata means, which pool C and were the first commit's headl
 
 | | Run 1 | Run 2 | Run 4 (final) |
 |---|---|---|---|
-| When | Mon Oct 13, 17:11 to 19:38 EDT | Sat Oct 17, 20:48 to 21:12 EDT | Sat Oct 17, 21:43 to 22:12 EDT |
+| When | Mon Oct 13, 17:11 to 19:38 EDT | Sat Oct 17, 20:46 to 21:12 EDT (the deadline file set by an interrupted first attempt; the complete run began about two minutes later) | Sat Oct 17, 21:43 to 22:12 EDT |
 | Script | the committed script minus every Oct 17 fix | after the three readout fixes (defects 1 to 3 below) | the committed script, after the audit-round-1 fixes |
 | Cells | 132 of 132 declared; 131 OK, 1 INVALID | 132 of 132; 131 OK, 1 INVALID (same cell, same reason) | 132 of 132; 131 OK, 1 INVALID (same cell, same reason); 131 computed, 0 reused |
 | Fit wall time | 17:11 to 17:29 (18 min) | 878 s, then the gate 21:02 to 21:12 | 868 s (14.5 min), then the gate 21:58 to 22:12 (14.5 min: per-cell bootstraps, the per-C aggregates for four contrasts, H3) |
@@ -50,7 +50,7 @@ The descriptive all-strata means, which pool C and were the first commit's headl
 | Time box | 3 h persisted deadline, not reached | 3 h, not reached | 3 h, not reached (the gate now checks it too) |
 | Preserved at | `outputs/v2/hardneg_run1_20261013/` (31 MB copy taken before run 2) | its `report.json`, beside run 1 as `report_run2_20261017.json` | `outputs/v2/hardneg/` |
 
-A third attempt (run 3, Oct 17 21:58) was stopped after 64 cells, by PID, when the Claude critique
+A third attempt (run 3, Oct 17 21:36 to 21:40) was stopped after 64 cells, by PID, when the Claude critique
 arrived with fixes that touch the script: at that point the fingerprint still hashed the whole file,
 so any edit mid-run would have made the earlier cells "stale" under the new validation rule. The
 fingerprint now hashes the fitting-path source instead (see the disclosures), and run 4 is the
@@ -81,7 +81,7 @@ One promised readout is unavailable rather than wrong: the characterisation's **
 
 ## The primary answer: four paired contrasts
 
-Each stratum compares the arm with the `none` cell at the same layer, pool and C on the NSA-only basis. P(better) is the share of 1,000 paired `group`-resamples (seed 0; 999 usable, 1 single-class draw skipped) in which the arm's pooled package-0.5 is lower than base's; its Monte-Carlo SE is 0.005 to 0.016. The one INVALID cell is a `focal_g2` cell and touches no contrast, so all 24 strata are present in each.
+Each stratum compares the arm with the `none` cell at the same layer, pool and C on the NSA-only basis. P(better) is the share of 1,000 paired `group`-resamples (seed 0; 999 usable, 1 single-class draw skipped) in which the arm's pooled package-0.5 is lower than base's; its Monte-Carlo SE is 0.004 to 0.016 over the 96 contrast strata. The one INVALID cell is a `focal_g2` cell and touches no contrast, so all 24 strata are present in each.
 
 **The pre-declared inference, per C.** Within one C, the eight (layer, pool) strata are averaged inside each resample; the 24 strata of a contrast are never pooled across C. Gain = base − arm (positive = arm better):
 
@@ -146,7 +146,7 @@ The hardest arm's one systematic pattern is a layer effect: it helps at L6 and h
 
 Verdicts over the 132 cells, final gate: **24 BASE, 93 FAIL, 8 PASS, 6 INDETERMINATE, 1 INVALID.** (Run 1 had read 107 FAIL and 0 PASS because R4a/R4b failed in every cell, defect 2; the first commit read 9 PASS because an R1-indeterminate cell was counted as a pass, Codex audit round 1 #2.)
 
-**The eight passing cells.** Each passes on exactly one layer: four at L6, four at L7, none at L8 or L20; so no (arm, pool, C) reaches R5's three layers including L20, and no arm is a survivor. The random control is among them.
+**The eight passing cells.** Each passes on exactly one layer: five at L6, three at L7, none at L8 or L20; so no (arm, pool, C) reaches R5's three layers including L20, and no arm is a survivor. The random control is among them.
 
 | PASS cell | pkg-0.5 | base | Δ | P(better) ± SE | f0 (base) | f4 (base) | FA (base) | brief Δ | mined real top group (share) |
 |---|---|---|---|---|---|---|---|---|---|
@@ -159,7 +159,7 @@ Verdicts over the 132 cells, final gate: **24 BASE, 93 FAIL, 8 PASS, 6 INDETERMI
 | hardest_reals L7 pool_nsa C=1 | 0.2215 | 0.2405 | -0.0190 | 0.961 ± 0.006 | 0.3837 (0.4116) | 0.3443 (0.3394) | 1095 (1258) | -0.0057 | spk:libri_6295 (0.068266) |
 | hardest_reals L7 pool_nsa C=8 | 0.1988 | 0.2219 | -0.0231 | 0.965 ± 0.006 | 0.3808 (0.4002) | 0.3368 (0.3825) | 1081 (1155) | -0.0120 | spk:libri_6295 (0.064576) |
 
-**The six INDETERMINATE cells**, where every rule but R1 passes and P(better) lies within 2 SE of 0.90: `hardest_both` L7 `pool_nsa` at all three C (0.893 / 0.884 / 0.883), `easiest_both` L7 `pool_nsa` C=8 (0.904, the cell the first commit counted as a pass), `hardest_reals` L7 `pool_nsa` C=64 (0.900) and `pilot_quantile` L7 `pool_nsa` C=8 (0.887). Two further cells carry the indeterminate flag but fail R4a as well and are FAILs (`easiest_both` L7 `pool_nsa` C=64 at 0.901; `easiest_both` L20 `pool_nsa` C=8 at 0.917). The 0.90 band alone decides nothing in that region, as the plan said it would not.
+**The six INDETERMINATE cells**, where every rule but R1 passes and P(better) lies within 2 SE of 0.90: `hardest_both` L7 `pool_nsa` at all three C (0.893 / 0.884 / 0.883), `easiest_both` L7 `pool_nsa` C=8 (0.904, the cell the first commit counted as a pass), `hardest_reals` L7 `pool_nsa` C=64 (0.900) and `pilot_quantile` L7 `pool_nsa` C=8 (0.887). Two further cells carry the indeterminate flag but fail R4a as well and are FAILs (`easiest_both` L7 `pool_nsa` C=64 at 0.901; `easiest_both` L20 `pool_nsa` C=8 at 0.917). The 0.90 band alone decides nothing in that region, as the plan said it would not. **A post-read interpretation, stated:** the FINAL DESIGN says a verdict within 2 SE of the band is "indeterminate, not a pass"; the gate applies the clause symmetrically, so a cell *below* 0.90 but within 2 SE with every other rule passing is INDETERMINATE rather than FAIL. Five of the six INDETERMINATE cells were FAILs under the first commit's gate, which is why the FAIL count moved from 98 to 93 while the PASS count moved from 9 to 8.
 
 **R5**, the cross-layer rule, for every primary-family (arm, pool, C) with at least one passing layer: `hardest_both|pool_full|C8` [6], `hardest_both|pool_full|C64` [6], `hardest_both|pool_nsa|C1` [6], `easiest_both|pool_full|C1` [7], `easiest_both|pool_full|C64` [6], `random_both|pool_full|C8` [6]; all `n = 1`, none includes L20, all **false**. The L7-only arms are descriptive with R5 N/A by declaration (Codex #7).
 
@@ -394,7 +394,7 @@ Run preconditions (R8) held: zero `decode_error` rows, zero all-zero embedding r
 - Run 2 happened after run 1's numbers had been read. The fixes change what R7 and R4 *test*, not any score, and the identity check above is the evidence. The deadline file was reset for run 2 (run 1's is preserved with its outputs).
 - The log row's `validation_score` is the reference cell (`none`, L7, `pool_nsa`, C=1, NSA-only basis), because no candidate passed and nothing was adopted; the notes name the basis and all three readings.
 - Codex's eleven plan-review findings were all accepted; the gate and tests implement them (spec, "Codex plan review round 1, disposition"). The stage-1 bandit contract (G1), the one-sided-augmentation gate (G2) and the SNR cap (G4) are pre-declared in the spec but have no code yet; they are stage 0.5 / 1 work.
-- The lane's test file grew from 82 to 94 tests on Oct 17: the eight named in the defects table, the three-seed C2 directional test the break check needed (it had been named in the inventory but never written), and an F4 test that the log row carries the basis and every reading. The full suite's one failure at the start of the close-out, `test_build_site.py::test_every_page_has_shell_invariants`, was this lane's: the plan and spec each had more than one top-level heading, so the docs site rendered two `<h1>`s; the extra headings are now `##`.
+- The lane's test file grew from 82 tests at run 1 to 94 at the first commit (the eight named in the defects table, the three-seed C2 directional test the break check needed, which the inventory had named but nobody had written, and an F4 test that the log row carries the basis and every reading), then to 114 after the two audit rounds (one test per disposition; see the spec's scorecards). The full suite's one failure at the start of the close-out, `test_build_site.py::test_every_page_has_shell_invariants`, was this lane's: the plan and spec each had more than one top-level heading, so the docs site rendered two `<h1>`s; the extra headings are now `##`.
 
 ## Appendix A: every cell
 

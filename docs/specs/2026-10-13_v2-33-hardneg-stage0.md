@@ -387,7 +387,7 @@ execution record; the numbers are in the report, and `outputs/` is gitignored.
   report's "Run record" row (all 131 OK cells byte-identical in `oof` and `mask` and identical in every
   primary reading; the one INVALID cell, which writes no score file, INVALID for the same reason; 132 of
   132 agree).
-- **Run 3, Sat Oct 17 21:43 EDT, interrupted** after 64 cells (stopped by PID) when the Claude critique
+- **Run 3, Sat Oct 17 21:36 EDT, interrupted** after 64 cells at 21:40 (stopped by PID) when the Claude critique
   arrived with fixes that touch the script, which the whole-file fingerprint would have turned into
   "stale" checkpoints mid-run. Log kept as `fit_run3_interrupted.log`.
 - **Run 4, Sat Oct 17, 21:43 to 22:12 EDT, final.** After the audit-round-1 fixes, under the
@@ -395,6 +395,8 @@ execution record; the numbers are in the report, and `outputs/` is gitignored.
   868 s; self-check Spearman 1.0, gap 0.0; the validated gate 21:58 to 22:12 (14.5 min); persisted 3 h
   deadline not reached. Identity against run 1 as above: 132 of 132 agree. Verdicts: 24 BASE, 93 FAIL,
   **8 PASS, 6 INDETERMINATE**, 1 INVALID; no R5 survivor.
+- **Run 4b, Sat Oct 17 22:40 to 22:54 EDT, gate only.** After the Codex round-2 fixes to the gate's validation
+  layer (outside `FINGERPRINT_SOURCES`, so every run-4 checkpoint stays valid): gate 22:40 to 22:54 EDT; `report.json` identical to run 4's in every key (gate, contrasts, H3, H5, base reference, invalid reasons; run 4's copy preserved as `report_run4_20261017.json` beside run 1), verdicts 24 BASE, 93 FAIL, 8 PASS, 6 INDETERMINATE, 1 INVALID. This is the report the results describe.
 
 - **Pre-run commit record: missing** (Codex audit round 1, #6). The declaration was frozen in files on disk
   on Oct 13 but not committed until Oct 17; recorded as a limitation, see the report's disclosures.
@@ -456,6 +458,14 @@ git diff docs/prod-chunks.md                -> the V2-33 status block only (line
 outputs/v2/research                         -> 48M, untouched through runs 2 to 4
 ```
 
+Round 3 (after the Codex round-2 and critique round-2 fixes):
+
+```text
+uv run pytest tests/test_hardneg.py -q      -> 114 passed (+6: the round-2 dispositions' tests)
+uv run pytest -q                            -> 1254 passed, 3 skipped, 2 warnings, 6 min 40 s
+uv run ruff check .                         -> All checks passed
+```
+
 The docs-site test `tests/test_build_site.py::test_every_page_has_shell_invariants` had been failing
 on this lane's uncommitted plan and spec (more than one `#` heading each, rendered as two `<h1>`); the
 extra headings are now `##` and the test passes. The five other-lane modified files
@@ -485,7 +495,7 @@ Artifact: `docs/specs/2026-10-13_v2-33-hardneg-stage0-audit.md` (round 1 copy pr
 | # | Finding | Fix | Test |
 |---|---|---|---|
 | 1 | The primary contrast averaged all 24 strata, C included, while claiming "C never averaged over"; no replicate-level aggregate or aggregate uncertainty | `aggregate_contrast()`: per C, the (layer, pool) strata are averaged **inside** each shared group-resample (same draw plan and seed as the per-stratum bootstraps), giving P(better), its SE, median, p5/p95 per C. The all-strata mean is kept as `mean_delta_package05_all_strata`, labelled descriptive. Report, status and log row re-stated on the per-C aggregates | `test_gate_contrast_is_aggregated_per_c_inside_shared_resamples` (on one stratum the aggregate must coincide with that stratum's own bootstrap) |
-| 2 | An R1-indeterminate cell could still PASS (`easiest_both` L7 `pool_nsa` C=8 at 0.904) | `gate_cell` returns **INDETERMINATE** when R1 is within 2 SE of the band and no other rule fails; R5 counts PASS only | `test_e_r1_indeterminate_is_not_a_pass_and_not_r5_eligible` |
+| 2 | An R1-indeterminate cell could still PASS (`easiest_both` L7 `pool_nsa` C=8 at 0.904) | `gate_cell` returns **INDETERMINATE** when R1 is within 2 SE of the band and no other rule fails; R5 counts PASS only. **Interpretation stated:** the clause is applied symmetrically, so a cell below 0.90 but within 2 SE is INDETERMINATE rather than FAIL (five such cells; FAIL 98 → 93, PASS 9 → 8) | `test_e_r1_indeterminate_is_not_a_pass_and_not_r5_eligible` |
 | 3 | Fingerprint hashed manifests but not shard contents; npz writes non-atomic; the gate never validated fingerprints nor refused an incomplete grid; a truncated checkpoint JSON aborted the whole fit at resume (Claude critique #5) | `shard_digest()` hashes manifest **and** every shard (cached per process, keyed on size and mtime); the script's own contribution to the fingerprint is now the **source of the fitting-path functions** (`FINGERPRINT_SOURCES`, taken from the file's AST) rather than the whole file, so a gate or report edit no longer forces a refit while a fitting change still does; `atomic_savez()`; `reusable_checkpoint()` treats a stale, truncated or npz-less checkpoint as "recompute", never as an abort; `validate_cells()` at gate time refuses stale (fingerprint mismatch), unreadable / truncated and incomplete-coverage checkpoints as INVALID with the reason; `stage_gate` refuses a partial grid outright (no verdicts, `refused` recorded, exit 2) | `test_f3_fingerprint_covers_shard_contents_not_just_the_manifest`, `test_f3_fingerprint_hashes_the_fitting_path_source`, `test_f3_resume_rule_recomputes_a_stale_or_truncated_checkpoint`, `test_f3_atomic_savez_writes_whole_or_not_at_all`, `test_gate_refuses_a_stale_checkpoint`, `test_gate_refuses_a_truncated_checkpoint`, `test_gate_refuses_an_incomplete_grid_instead_of_gating_it` |
 | 4 | R9 degeneracy was an ordinary FAIL with `status = OK`, still eligible for contrasts; no constant-score refusal; saturation not checked on every reading; a null reading after the JSON round-trip raised `TypeError` in the gate (Claude critique #14) | `degenerate_reason()` centralises R9 (non-finite or null, **constant**, AUC < 0.5, any of the three readings saturated, on every basis); applied at fit (cell written INVALID) and again at gate from the checkpoint; INVALID cells never enter a contrast; `gate_cell` reads every number through a null-safe accessor | `test_r9_degenerate_reason_covers_constant_scores_and_every_reading`, `test_gate_marks_a_degenerate_cell_invalid_and_excludes_it_from_contrasts`, `test_e_r9_null_reading_after_the_round_trip_is_refused_not_a_crash` |
 | 5 | The gate never consulted the persisted deadline | `stage_gate` ticks the deadline before every bootstrap; on expiry it keeps what it has, records `incomplete` and claims no completeness; `main` exits 2 | `test_gate_honours_the_persisted_deadline` |
@@ -493,8 +503,9 @@ Artifact: `docs/specs/2026-10-13_v2-33-hardneg-stage0-audit.md` (round 1 copy pr
 | (Codex #10 / critique #7) | The `min_cost(` grep gate was a manual check, not a test | Pinned as an AST test: every `min_cost` call must sit inside `brief`, `package05` or `package03` | `test_a1_min_cost_is_called_only_inside_the_three_named_wrappers` |
 
 The fixes to #1 to #4 change what the gate and the contrasts *compute*, not any fit, so the grid was
-re-run as **run 3** under the new fingerprint (which the shard digests change) and the OOF scores
-checked against run 1 a third time; the re-gated numbers are in the Results section and the report.
+re-run as **run 4** under the new fingerprint (which the shard digests change; run 3 was interrupted,
+see the execution record) and the OOF scores checked against run 1 again; the re-gated numbers are in
+the Results section and the report.
 
 ### Claude critique, round 1 (Sat Oct 17, on `5820143`, same rubric): Overall **Fail**
 
@@ -536,9 +547,71 @@ Findings and dispositions (its numbering):
 | 14 | A null reading after the JSON round-trip raises `TypeError` in `gate_cell` | Null-safe accessor; `degenerate_reason` refuses null readings; test added |
 | 15 | Serial grid instead of the plan's `Parallel` pool; INVALID strata "counted" only implicitly | Justified deviation (one LR fit is 0.05 s); `invalid_reasons` now lists every excluded cell in `report.json` |
 
-### Codex audit, round 2
+### Codex audit, round 2 (Sat Oct 17, on `ba19d54`): Overall **Fail**, two findings
 
-_Run after the round-1 fixes were committed; recorded below._
+Artifact preserved as `…-audit-round2.md`.
+
+| Dimension | Grade | Codex's note |
+|---|---|---|
+| Plan adherence | Fail | Checkpoint integrity requirements remain incomplete |
+| Scope discipline | Excellent | Lane-owned files only |
+| Test coverage | Fail | Tests miss incomplete score masks and truncated checkpoint JSON at gate time |
+| Review compliance | Fail | Accepted finding #3 only partially resolved |
+| Freeze integrity | Acceptable | No hashes; pre-run declaration cannot be verified from git |
+| Regression check | Acceptable | 31 targeted tests and lint passed independently; 132 cells match current fingerprints; 131 OOF/mask arrays unchanged vs run 1; verdict counts match |
+| Documentation | Acceptable | Results match saved artifacts; limitations disclosed |
+| Test sensitivity | Excellent | Both mutation catches reproduced; neither mutation in the change's commits |
+
+Codex's own summary: "Remaining defects concern checkpoint refusal, not evidence that the saved
+results are wrong." Both accepted and fixed:
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 1 | `validate_cells` trusted the checkpoint's own mask: dropping one row from the mask (score NaN) still read OK, so the gate could bootstrap a different population from the cached readings | The authoritative pool masks are rebuilt from `rows.json` (`pool_masks()`), and a checkpoint is INVALID unless its mask is boolean, one-dimensional, the right shape and **exactly equal** to the pool's | `test_gate_refuses_a_checkpoint_whose_mask_is_not_the_pools` (one row dropped; and a non-boolean mask) |
+| 2 | `load_cells` parsed every JSON before validation, so a truncated cell JSON aborted the gate with no refusal report | `load_cells` turns an unparseable checkpoint into an INVALID cell keyed from its filename (`key_from_name`) with the reason; the gate then refuses it like any INVALID cell | `test_gate_turns_a_truncated_checkpoint_json_into_an_invalid_cell`, `test_key_from_name_round_trips_every_declared_cell` |
+
+These touch only the gate's validation layer, which is outside `FINGERPRINT_SOURCES`, so the
+run-4 checkpoints stay valid and only the gate was re-run (run 4b); every number is unchanged.
+
+### Claude critique, round 2 (Sat Oct 17, on `ba19d54`): Overall **Acceptable**
+
+Same adversarial brief as round 1, asked to check every round-1 disposition. It recomputed the per-C
+aggregates from the npz scores with the shared resample plan (identical to `report.json` to 6 dp),
+the per-stratum bootstrap for the formerly-passing cell (0.903904 ± 0.009325), every verdict,
+R5, the run-1 identity (131/131 OK arrays), both break checks on scratch copies, and every number
+in the Verdict, primary-answer, gate and L7 sections, Appendices A/B/D, prod-chunks and both log rows.
+
+| Dimension | Grade | Note |
+|---|---|---|
+| Plan adherence | Acceptable | All six round-1 dispositions implemented and verified; pre-run commit still missing (recorded); symmetric indeterminacy reading is a post-read interpretation |
+| Scope discipline | Excellent | |
+| Test coverage | Acceptable | Two disposition tests could not fail on the defect they name; truncated npz at resume untested |
+| Review compliance | Acceptable | All dispositions delivered as described except the "truncated" clause of #3 (JSON only) |
+| Freeze integrity | Acceptable | |
+| Regression check | Acceptable | |
+| Documentation | Acceptable | Cosmetic errors only |
+| Test sensitivity | Excellent | Both mutations reproduced, caught first time, absent from history |
+
+Findings and dispositions (its numbering):
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | "four at L6, four at L7" is five and three | Fixed |
+| 2 | Run 3 started 21:36 (not 21:58 / 21:43); run 2's deadline file is 20:46; spec said "re-run as run 3" | Fixed in report and spec |
+| 3 | SE range over the 96 strata is 0.0041-0.0158; test count stale | Fixed |
+| 4 | The per-C aggregation test used one C and could not catch a reversion to pooling | Two-C fixture: `test_gate_aggregates_per_c_and_never_pools_c` (hardest beats base at C=1, loses at C=8; the two aggregates must differ) |
+| 5 | The fitting-path digest test asserted membership only | `test_f3_fitting_path_digest_reacts_to_a_fitting_edit_and_ignores_a_gate_edit` (a one-token edit in `shaped_weights` changes it; a comment in `gate_cell` does not) |
+| 6 | `reusable_checkpoint` reused a truncated npz; only validation caught it later | It now loads the npz and recomputes on any failure; `test_f3_resume_rule_recomputes_a_truncated_score_file` |
+| 7 | No pre-run commit (already recorded) | none |
+| 8 | The symmetric reading of R1 indeterminacy is a post-read interpretation and the FAIL count change (98 → 93) was not stated | Stated in the report's gate section and in the Codex #2 disposition row |
+| 9 | Both log rows verified | none |
+| 10 | Speaker-disjointness not met; conclusions correctly labelled diagnostic | none |
+| 11 | Both break checks reproduced | none |
+| 12 | Every regenerated table matches | none |
+
+### Codex audit, round 3
+
+_Run after the round-2 fixes were committed; recorded below._
 
 ---
 

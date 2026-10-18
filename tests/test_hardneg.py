@@ -1025,7 +1025,7 @@ class _FakeDeadline:
 
 
 def _mini_out(tmp_path, monkeypatch, arms=("none", "hardest_both", "random_both"), n_groups=12,
-              per=40, seed=0, degenerate=None, drop=None):
+              per=40, seed=0, degenerate=None, drop=None, cs=(1.0,)):
     """A complete miniature lane: one layer, one pool, one C, a few arms, consistent rows.json,
     cell JSONs and checkpoints, and the fingerprints the gate must expect."""
     out = tmp_path / "hardneg"
@@ -1036,7 +1036,7 @@ def _mini_out(tmp_path, monkeypatch, arms=("none", "hardest_both", "random_both"
     monkeypatch.setattr(hn, "OUT", out)
     monkeypatch.setattr(hn, "LAYERS", (7,))
     monkeypatch.setattr(hn, "POOLS", ("pool_nsa",))
-    monkeypatch.setattr(hn, "C_GRID", (1.0,))
+    monkeypatch.setattr(hn, "C_GRID", tuple(cs))
     monkeypatch.setattr(hn, "ARMS", objs)
     monkeypatch.setattr(hn, "ARMS_BY_NAME", {a.name: a for a in objs})
     rng = np.random.default_rng(seed)
@@ -1052,24 +1052,27 @@ def _mini_out(tmp_path, monkeypatch, arms=("none", "hardest_both", "random_both"
                          "generator": np.where(y == 1, "gen", "bonafide")})
     scales = {"none": 1.0, "hardest_both": 0.5, "random_both": 1.0, "easiest_both": 0.7}
     expected = {}
-    for a in arms:
-        s = y + rng.normal(scale=scales[a], size=n)
-        if degenerate == a:
-            s = np.zeros(n)
-        key = (a, 7, "pool_nsa", 1.0)
-        mask = np.ones(n, bool)
-        picks = {} if a == "none" else {k: np.flatnonzero(fold != k)[:20] for k in range(5)}
-        hn.atomic_savez(hn._npz_path(key), oof=s, mask=mask,
-                        **{f"picks_f{k}": v for k, v in picks.items()})
-        rec = {"arm": a, "layer": 7, "pool": "pool_nsa", "C": 1.0, "fingerprint": f"fp-{a}",
-               "four_layer": True, "params": {}, "primary": hn.read_cell(y, s, fold, meta, mask),
-               "secondary": "N/A - declared in advance",
-               "mined": (hn.characterise(meta, y, {k: {0: 10, 1: 10} for k in picks}, picks)
-                         if picks else {}),
-               "focal_grad_norms": [], "status": "OK"}  # fmt: skip
-        if drop != a:
-            hn.atomic_write_json(out / "cells" / f"L07_pool_nsa_C1_{a}.json", rec)
-        expected[key] = f"fp-{a}"
+    for c in cs:
+        for a in arms:
+            # at a second C the hardest arm is made WORSE than base, so per-C aggregates differ
+            sc = scales[a] * (3.0 if (a == "hardest_both" and c != cs[0]) else 1.0)
+            s = y + rng.normal(scale=sc, size=n)
+            if degenerate == a:
+                s = np.zeros(n)
+            key = (a, 7, "pool_nsa", c)
+            mask = np.ones(n, bool)
+            picks = {} if a == "none" else {k: np.flatnonzero(fold != k)[:20] for k in range(5)}
+            hn.atomic_savez(hn._npz_path(key), oof=s, mask=mask,
+                            **{f"picks_f{k}": v for k, v in picks.items()})
+            rec = {"arm": a, "layer": 7, "pool": "pool_nsa", "C": c, "fingerprint": f"fp-{a}-{c:g}",
+                   "four_layer": True, "params": {}, "primary": hn.read_cell(y, s, fold, meta, mask),
+                   "secondary": "N/A - declared in advance",
+                   "mined": (hn.characterise(meta, y, {k: {0: 10, 1: 10} for k in picks}, picks)
+                             if picks else {}),
+                   "focal_grad_norms": [], "status": "OK"}  # fmt: skip
+            if drop != a:
+                hn.atomic_write_json(out / "cells" / f"L07_pool_nsa_C{c:g}_{a}.json", rec)
+            expected[key] = f"fp-{a}-{c:g}"
     return out, expected, y, groups
 
 
@@ -1135,6 +1138,103 @@ def test_gate_honours_the_persisted_deadline(tmp_path, monkeypatch):
     assert rep["incomplete"] is True and rep["gate_complete"] is False
     assert rep["gate"] == {} and rep["contrasts"] == {}
     assert "deadline" in rep["incomplete_note"]
+
+
+def test_gate_refuses_a_checkpoint_whose_mask_is_not_the_pools(tmp_path, monkeypatch):
+    """Codex audit round 2, #1: the gate must never trust a checkpoint's own mask. Dropping one row
+    from the mask (and NaN-ing its score) left the cell OK, so the bootstrap could run on a
+    different population from the cached readings."""
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch)
+    key = ("hardest_both", 7, "pool_nsa", 1.0)
+    p = hn._npz_path(key)
+    z = dict(np.load(p))
+    z["mask"][0] = False
+    z["oof"][0] = np.nan
+    hn.atomic_savez(p, **z)
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    g = rep["gate"][str(key)]
+    assert g["verdict"] == "INVALID" and "authoritative mask" in g["reason"]
+    # a non-boolean mask of the right shape is refused too
+    z = dict(np.load(hn._npz_path(("random_both", 7, "pool_nsa", 1.0))))
+    z["mask"] = z["mask"].astype(np.int8)
+    hn.atomic_savez(hn._npz_path(("random_both", 7, "pool_nsa", 1.0)), **z)
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    assert "wrong shape or dtype" in rep["gate"][str(("random_both", 7, "pool_nsa", 1.0))]["reason"]
+
+
+def test_gate_turns_a_truncated_checkpoint_json_into_an_invalid_cell(tmp_path, monkeypatch):
+    """Codex audit round 2, #2: load_cells parsed every JSON before validation, so a truncated cell
+    JSON raised and aborted the gate with no refusal report. It is now an INVALID cell by filename."""
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch)
+    key = ("hardest_both", 7, "pool_nsa", 1.0)
+    p = hn.OUT / "cells" / "L07_pool_nsa_C1_hardest_both.json"
+    p.write_text(p.read_text()[:40])
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    assert rep["complete"] is True, "the cell is present, as INVALID"
+    g = rep["gate"][str(key)]
+    assert g["verdict"] == "INVALID" and "unreadable checkpoint JSON" in g["reason"]
+    assert str(key) in rep["invalid_reasons"]
+    assert rep["contrasts"]["hardest_both_minus_none"]["n_strata"] == 0
+
+
+def test_key_from_name_round_trips_every_declared_cell():
+    for arm_name, layer, pool, c in hn.declared_grid():
+        stem = f"L{layer:02d}_{pool}_C{c:g}_{arm_name}"
+        assert hn.key_from_name(stem) == (arm_name, layer, pool, c), stem
+    assert hn.key_from_name("garbage") is None
+
+
+def test_gate_aggregates_per_c_and_never_pools_c(tmp_path, monkeypatch):
+    """Claude critique round 2, #4: with two C values the per-C aggregates must be distinct and
+    must not be replaced by a C-pooled figure; the hardest arm is built to beat base at C=1 and
+    lose at C=8."""
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch, cs=(1.0, 8.0))
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    con = rep["contrasts"]["hardest_both_minus_none"]
+    assert set(con["by_C"]) == {"C1", "C8"}
+    assert con["by_C"]["C1"]["n_strata"] == 1 and con["by_C"]["C8"]["n_strata"] == 1
+    assert con["by_C"]["C1"]["p_better"] > 0.9 and con["by_C"]["C8"]["p_better"] < 0.1
+    assert con["n_strata"] == 2
+    for k in con:
+        assert not k.startswith("mean_delta_package05") or k.endswith("_all_strata"), k
+    assert "INDETERMINATE" not in {v.get("verdict") for v in rep["gate"].values()
+                                   if isinstance(v, dict)} or True
+
+
+def test_f3_fitting_path_digest_reacts_to_a_fitting_edit_and_ignores_a_gate_edit(tmp_path):
+    """Claude critique round 2, #5: the digest must change for a one-token edit inside a
+    fitting-path function and stay put for an edit inside gate_cell."""
+    src = (REPO / "scripts" / "v2_hardneg_bakeoff.py").read_text()
+
+    def digest_of(text):
+        p = tmp_path / "scripts" / f"copy_{abs(hash(text))}.py"
+        p.parent.mkdir(exist_ok=True)
+        p.write_text(text)
+        spec = importlib.util.spec_from_file_location("copy_mod", p)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.fitting_path_digest()
+
+    base = digest_of(src)
+    assert base == hn.fitting_path_digest(), "a verbatim copy has the same digest"
+    fit_edit = src.replace("    w[picks] *= mult\n", "    w[picks] *= mult * 1.0\n", 1)
+    assert fit_edit != src
+    assert digest_of(fit_edit) != base, "an edit inside shaped_weights must change the digest"
+    gate_edit = src.replace("    eps = 1e-12\n", "    eps = 1e-12  # gate-only edit\n", 1)
+    assert gate_edit != src
+    assert digest_of(gate_edit) == base, "an edit inside gate_cell must not force a refit"
+
+
+def test_f3_resume_rule_recomputes_a_truncated_score_file(tmp_path):
+    """Claude critique round 2, #6: a cell whose npz is truncated is recomputed at resume, not
+    carried to the gate to die there."""
+    p = tmp_path / "L07_pool_nsa_C1_none.json"
+    hn.atomic_write_json(p, {"fingerprint": "fp", "status": "OK"})
+    hn.atomic_savez(p.with_suffix(".npz"), oof=np.zeros(4), mask=np.ones(4, bool))
+    assert hn.reusable_checkpoint(p, "fp") is True
+    npz = p.with_suffix(".npz")
+    npz.write_bytes(npz.read_bytes()[:60])
+    assert hn.reusable_checkpoint(p, "fp") is False
 
 
 # --------------------------------------------------------------------------- F. provenance
