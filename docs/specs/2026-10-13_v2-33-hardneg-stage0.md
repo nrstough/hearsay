@@ -256,6 +256,28 @@ reading, so that mutation corrupts nothing visible). The frozen paragraph above 
   two other lanes' worktrees; `git log -S'"reals": (1,), "fakes": (0,)' --all -- scripts/v2_hardneg_bakeoff.py`
   returns nothing, so the mutation is in no commit.
 
+**Round 2, the gate layer (Sat Oct 17, post-commit `ce60219`).** The Claude critique (finding 13)
+observed that all three close-out defects sat in the gate and readout layer, where no mutation had
+been tried, and that a mutation making `R1_indeterminate` irrelevant would have been caught by
+nothing. After the audit-round-1 fixes:
+
+- **Test:** `tests/test_hardneg.py::test_e_r1_indeterminate_is_not_a_pass_and_not_r5_eligible`, the
+  test most tied to the gate change (it asserts the *verdict*, where the earlier test asserted only
+  the flag).
+- **Mutation:** one token in `gate_cell`: `elif r["R1_indeterminate"]:` → `elif False:`, so the
+  indeterminacy clause never fires and a P(better) of 0.904 passes again. Realistic and silent: the
+  grid, the report and every other rule are unaffected; the headline would read 9 passes.
+- **Where:** a detached scratch worktree of `ce60219` under the session scratchpad, outside the repo.
+- **Result:** baseline 1 passed; against the mutation **1 failed, first attempt (CAUGHT)**. Whole lane
+  file against the mutation: 2 failed, 101 passed, 5 skipped; the second failure,
+  `test_f3_fingerprint_covers_shard_contents_not_just_the_manifest`, fails in any checkout without
+  the gitignored `outputs/v2/bakeoff/rows.json` the fingerprint hashes, unrelated to the mutation,
+  and now carries the file's `HAVE_BAKEOFF` skip guard (same class as the round-1 `test_f2` finding).
+- **Fix-and-recheck rounds:** none needed.
+- **Cleanup:** worktree removed; `git worktree list` shows only the main checkout and the two other
+  lanes' worktrees; `git log -S'elif False:  # mutated' --all -- scripts/v2_hardneg_bakeoff.py`
+  returns nothing.
+
 ---
 
 ## Technical spec

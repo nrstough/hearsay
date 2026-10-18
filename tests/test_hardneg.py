@@ -923,9 +923,11 @@ def test_r9_degenerate_reason_covers_constant_scores_and_every_reading():
         "the secondary basis is checked too")
 
 
+@pytest.mark.skipif(not HAVE_BAKEOFF, reason="the fingerprint also hashes the gitignored bake-off row index")
 def test_f3_fingerprint_covers_shard_contents_not_just_the_manifest(tmp_path):
     """Codex audit round 1, #3: a shard rewritten in place with an unchanged manifest must change
-    the fingerprint, or a stale checkpoint would be reused against new embeddings."""
+    the fingerprint, or a stale checkpoint would be reused against new embeddings. Needs
+    outputs/v2/bakeoff/rows.json on disk (break check round 2 showed it fails for its absence)."""
     root, _X, _y, _fold, _m = _world(tmp_path)
     arm = hn.ARMS_BY_NAME["hardest_both"]
     mask = np.ones(10, bool)
