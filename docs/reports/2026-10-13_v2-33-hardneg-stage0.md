@@ -20,37 +20,54 @@ Design, all pre-declared:
 
 ## Verdict
 
-**No recipe survives the pre-declared gate.** Nine of the 107 candidate cells pass R1 to R4b, R6, R7 and R9 individually, but each passes on a single layer and none on L20, so R5 fails for every (arm, pool, C) and there is no survivor. One of the nine is the **random control** (`random_both`, L6, `pool_full`, C=8), which sets the scale: a cell-level pass at this gate is something a random 5% up-weighting can produce.
+**No recipe survives the pre-declared gate.** Of the 107 candidate cells, **8 pass** R1 to R4b, R6, R7 and R9, **6 are INDETERMINATE** (R1's P(better) within 2 SE of the 0.90 band with every other rule passing) and 93 fail. Each pass is on a single layer and none on L20, so R5 fails for every (arm, pool, C) and there is no survivor. One of the eight passes is the **random control** (`random_both`, L6, `pool_full`, C=8), which sets the scale: a cell-level pass at this gate is something a random 5% up-weighting can produce.
 
-The three-way answer, 24 strata (4 layers x 2 pools x 3 C) each, NSA-only basis, pooled package-0.5, paired `group` bootstrap:
+The three-way answer, read the way the design of record specified: **per C**, the pre-declared unit, each C's eight (layer, pool) strata averaged inside 1,000 shared `group`-resamples (seed 0), NSA-only basis, pooled package-0.5. Gain = base − arm, so positive means the arm is better; the interval is the 5th to 95th percentile of the replicate means.
 
-| Contrast | Mean Δ package-0.5 | Median Δ | Strata where the arm is better | P(better) ≥ 0.90 | P(better) ≤ 0.10 |
-|---|---|---|---|---|---|
-| hardest − none | +0.0040 | −0.0056 | 13 of 24 | 3 | 3 |
-| easiest − none | **−0.0261** | −0.0269 | **22 of 24** | 6 | 0 |
-| hardest − random | +0.0043 | +0.0008 | 11 of 24 | 1 | 2 |
-| easiest − random | **−0.0258** | −0.0198 | **22 of 24** | 5 | 0 |
+| Contrast | C=1 (v1's value): P(better), median gain, 90% interval | C=8 | C=64 |
+|---|---|---|---|
+| hardest − none | **0.025**, −0.0086, [−0.0140, −0.0008] | 0.785, +0.0028, [−0.0018, +0.0089] | 0.415, −0.0012, [−0.0112, +0.0085] |
+| easiest − none | **0.971**, +0.0211, [+0.0004, +0.0376] | **0.975**, +0.0290, [+0.0005, +0.0447] | **0.987**, +0.0198, [+0.0012, +0.0304] |
+| hardest − random | 0.090, −0.0032, [−0.0082, +0.0008] | 0.413, −0.0012, [−0.0107, +0.0093] | 0.404, −0.0032, [−0.0185, +0.0150] |
+| easiest − random | **0.998**, +0.0268, [+0.0011, +0.0441] | **0.986**, +0.0248, [+0.0006, +0.0380] | **0.984**, +0.0191, [+0.0014, +0.0337] |
 
-- **Up-weighting the hardest 5% does nothing on average.** Mean +0.004; the sign depends on the layer (better at L6 in 6 of 6 strata, worse at L20 in 6 of 6) and it is indistinguishable from the random control (+0.004, 11 of 24).
-- **Up-weighting the easiest 5% helps, modestly and consistently.** 0.026 better than base and than random, in 22 of 24 strata, at every C (−0.025 / −0.032 / −0.022 at C = 1 / 8 / 64), on both pools (`pool_full` −0.022 in 10 of 12, `pool_nsa` −0.030 in 12 of 12) and on all four layers. It is not the over-regularization artifact the design feared (spec W7), because every arm here holds `sum(w) = n`. It is also **not a recommendation**: no (arm, pool, C) clears R5, the effect is the size of one C step, and this is inner OOF on a split with speaker overlap.
+- **Up-weighting the hardest 5% does not help, and at v1's C it hurts.** At C=1 the aggregate says the hardest arm is *worse* than base with P 0.975 (median −0.0086, the whole interval below zero) and worse than random with P 0.91. At C=8 and C=64 it is a wash (P(better) 0.785 and 0.415, intervals straddling zero). The sign depends on the layer: better at L6 in 6 of 6 strata, worse at L20 in 6 of 6.
+- **Up-weighting the easiest 5% is better than base and than random at every C**, with P(better) 0.971 to 0.998 and median gains of 0.019 to 0.029 package-0.5. The lower ends of the 90% intervals sit at +0.0004 to +0.0014, so the effect is consistently signed but small: about one C-step's worth, and the interval nearly touches zero at C=1 and C=8. It holds on both pools and all four layers (22 of 24 strata individually). It is not the over-regularization artifact the design feared (spec W7), because every arm holds `sum(w) = n`. It is also **not a recommendation**: no (arm, pool, C) clears R5, and this is inner OOF on a split with speaker overlap.
 - **The regularization constant is the larger lever**: 0.023 to 0.203 of package-0.5 between C=1 and C=256 depending on layer and pool. Descriptive only (below).
 - **Nothing is adopted.** The direction finding (easiest, not hardest), the one consistent single-layer lead (`hardest_reals` on `pool_nsa`, L7) and the C curve go to the V2-01 benchmark lane, to be read on the holdout cohort and In-the-Wild under the read-once ledger, on speaker-disjoint folds.
 
+The descriptive all-strata means, which pool C and were the first commit's headline, are +0.0040 (hardest − none), −0.0261 (easiest − none), +0.0043 (hardest − random) and −0.0258 (easiest − random); they are kept in `report.json` as `mean_delta_package05_all_strata` and carry no inference.
+
 ## Run record
 
-| | Run 1 | Run 2 |
-|---|---|---|
-| When | Mon Oct 13, 17:11 to 19:38 EDT | Sat Oct 17, 20:48 to 21:12 EDT |
-| Script | the committed script minus the Oct 17 fixes below | the committed script |
-| Cells | 132 of 132 declared; 131 OK, 1 INVALID | 132 of 132 declared; 131 OK, 1 INVALID (the same cell, same reason); 127 computed, 4 reused from an interrupted first attempt of run 2 that ran the same fitting code |
-| Fit wall time | 17:11 to 17:29 (18 min) | 878 s (14.6 min), then the gate 21:02 to 21:12 (9.5 min, including the 1,000-replicate bootstraps for 107 cells and 96 contrast strata) |
-| Self-check (base reproduces the shipped L7 probe) | passed: Spearman exactly 1.0, package-0.5 gap below 1e-12 | passed: Spearman 1.0, package-0.5 gap 0.0e+00 (`fit_run2.log`) |
-| Time box | 3 h persisted deadline, not reached | 3 h persisted deadline, not reached |
-| Preserved at | `outputs/v2/hardneg_run1_20261013/` (31 MB copy taken before run 2) | `outputs/v2/hardneg/` |
+| | Run 1 | Run 2 | Run 4 (final) |
+|---|---|---|---|
+| When | Mon Oct 13, 17:11 to 19:38 EDT | Sat Oct 17, 20:48 to 21:12 EDT | Sat Oct 17, 21:43 to 22:12 EDT |
+| Script | the committed script minus every Oct 17 fix | after the three readout fixes (defects 1 to 3 below) | the committed script, after the audit-round-1 fixes |
+| Cells | 132 of 132 declared; 131 OK, 1 INVALID | 132 of 132; 131 OK, 1 INVALID (same cell, same reason) | 132 of 132; 131 OK, 1 INVALID (same cell, same reason); 131 computed, 0 reused |
+| Fit wall time | 17:11 to 17:29 (18 min) | 878 s, then the gate 21:02 to 21:12 | 868 s (14.5 min), then the gate 21:58 to 22:12 (14.5 min: per-cell bootstraps, the per-C aggregates for four contrasts, H3) |
+| Self-check (base reproduces the shipped L7 probe) | passed: Spearman exactly 1.0, package-0.5 gap below 1e-12 | passed: Spearman 1.0, gap 0.0e+00 | passed: Spearman 1.0, gap 0.0e+00 (`fit_run4.log`) |
+| Time box | 3 h persisted deadline, not reached | 3 h, not reached | 3 h, not reached (the gate now checks it too) |
+| Preserved at | `outputs/v2/hardneg_run1_20261013/` (31 MB copy taken before run 2) | its `report.json`, beside run 1 as `report_run2_20261017.json` | `outputs/v2/hardneg/` |
 
-The descriptive C sweep (`csweep.json`, 64 rows, complete) ran once, in run 1; nothing in the Oct 17 fixes touches it, and its rows are copied unchanged.
+A third attempt (run 3, Oct 17 21:58) was stopped after 64 cells, by PID, when the Claude critique
+arrived with fixes that touch the script: at that point the fingerprint still hashed the whole file,
+so any edit mid-run would have made the earlier cells "stale" under the new validation rule. The
+fingerprint now hashes the fitting-path source instead (see the disclosures), and run 4 is the
+complete run under the final script. The descriptive C sweep (`csweep.json`, 64 rows, complete) ran
+once, in run 1; nothing in any Oct 17 fix touches it, and its rows are carried unchanged.
 
-**Why there are two runs.** While writing this report from run 1's outputs, three defects were found in the readout and gate code. None touches a fitted model, a score or a pre-declared band, so the deterministic grid was re-run with the fixed script and checked cell by cell against the preserved run 1: all **132 of 132** cells have byte-identical `oof` and `mask` arrays, 131 OK cells have identical primary readings field for field once the renamed population fields are set aside, and the one INVALID cell is INVALID for the same reason (`focal_g2`, L7, `pool_full`, C=64, gradient norm 0.0112). Fixing the code to compute what the pre-declaration said, and re-running without changing any band or definition, is the disposition the manifest rule allows ("if the self-check fails, no candidate is read until it is fixed"); redefining H5 after reading would not be, so H5 is reported as frozen.
+**Why there are several runs.** While writing this report from run 1's outputs, three defects were
+found in the readout and gate code (table below); the Codex audit and the Claude critique of the
+first commit then found six more in the gate and the inference layer (recorded in the spec's
+scorecards). None touches a fitted model, a score or a pre-declared band, so the deterministic grid
+was re-run with the fixed script and checked cell by cell against the preserved run 1 each time:
+run 4 against run 1, all 131 OK cells byte-identical in `oof` and `mask` and identical in every primary reading (the renamed population fields aside), the INVALID cell INVALID for the same reason, so 132 of 132 agree; run 2 had given the same result. Fixing the code to compute what the pre-declaration said, and re-running
+without changing any band or definition, is the disposition the manifest rule allows ("if the
+self-check fails, no candidate is read until it is fixed"); redefining H5 after reading would not be,
+so H5 is reported as frozen. One change is to the *inference layer* and is stated as such: the
+primary answer is now aggregated per C inside shared bootstrap resamples, which is what the design
+of record and the Codex plan review specified, where the first commit had reported stratum counts.
 
 ### The three defects, and what changed
 
@@ -64,9 +81,28 @@ One promised readout is unavailable rather than wrong: the characterisation's **
 
 ## The primary answer: four paired contrasts
 
-Each stratum compares the arm with the `none` cell at the same layer, pool and C on the NSA-only basis; P(better) is the share of 1,000 paired `group`-resamples (seed 0; 999 usable, 1 single-class draw skipped) in which the arm's pooled package-0.5 is lower than base's; its Monte-Carlo SE is 0.006 to 0.016. C is a stratum and is never averaged over; the one INVALID cell is a `focal_g2` cell and touches no contrast, so all 24 strata are present in each.
+Each stratum compares the arm with the `none` cell at the same layer, pool and C on the NSA-only basis. P(better) is the share of 1,000 paired `group`-resamples (seed 0; 999 usable, 1 single-class draw skipped) in which the arm's pooled package-0.5 is lower than base's; its Monte-Carlo SE is 0.005 to 0.016. The one INVALID cell is a `focal_g2` cell and touches no contrast, so all 24 strata are present in each.
 
-**By C, layer and pool** (mean Δ and the number of strata where the arm is better):
+**The pre-declared inference, per C.** Within one C, the eight (layer, pool) strata are averaged inside each resample; the 24 strata of a contrast are never pooled across C. Gain = base − arm (positive = arm better):
+
+| Contrast | C | strata | P(better) ± SE | median Δ | p5 | p95 |
+|---|---|---|---|---|---|---|
+| hardest − none | 1 | 8 | 0.025 ± 0.005 | -0.0086 | -0.0140 | -0.0008 |
+| hardest − none | 8 | 8 | 0.785 ± 0.013 | +0.0028 | -0.0018 | +0.0089 |
+| hardest − none | 64 | 8 | 0.415 ± 0.016 | -0.0012 | -0.0112 | +0.0085 |
+| easiest − none | 1 | 8 | 0.971 ± 0.005 | +0.0211 | +0.0004 | +0.0376 |
+| easiest − none | 8 | 8 | 0.975 ± 0.005 | +0.0290 | +0.0005 | +0.0447 |
+| easiest − none | 64 | 8 | 0.987 ± 0.004 | +0.0198 | +0.0012 | +0.0304 |
+| hardest − random | 1 | 8 | 0.090 ± 0.009 | -0.0032 | -0.0082 | +0.0008 |
+| hardest − random | 8 | 8 | 0.413 ± 0.016 | -0.0012 | -0.0107 | +0.0093 |
+| hardest − random | 64 | 8 | 0.404 ± 0.016 | -0.0032 | -0.0185 | +0.0150 |
+| easiest − random | 1 | 8 | 0.998 ± 0.001 | +0.0268 | +0.0011 | +0.0441 |
+| easiest − random | 8 | 8 | 0.986 ± 0.004 | +0.0248 | +0.0006 | +0.0380 |
+| easiest − random | 64 | 8 | 0.984 ± 0.004 | +0.0191 | +0.0014 | +0.0337 |
+
+The first commit of this report had no aggregate and read stratum counts instead ("22 of 24 strata better"); both the Codex audit and the Claude critique flagged that as stratum-counting the pre-declaration had ruled out. The counts are kept below as a descriptive view only.
+
+**Descriptive: by C, layer and pool** (mean Δ = arm − base, negative better, and the number of strata where the arm is better):
 
 | Contrast | C=1 | C=8 | C=64 | L6 | L7 | L8 | L20 | `pool_full` | `pool_nsa` |
 |---|---|---|---|---|---|---|---|---|---|
@@ -77,7 +113,7 @@ Each stratum compares the arm with the `none` cell at the same layer, pool and C
 
 The hardest arm's one systematic pattern is a layer effect: it helps at L6 and hurts at L20 in every stratum, with L7 and L8 split. The easiest arm's two misses are both L20 `pool_full` (C=1 +0.0004, C=64 +0.039), the layer with the worst base (0.59 to 0.66) and the most false alarms.
 
-**Every stratum** (Δ = arm − base package-0.5, negative is better; P = P(better)):
+**Every stratum** (Δ = arm − base package-0.5, negative is better; P = that stratum's own P(better)):
 
 | L | pool | C | hardest − none | P | easiest − none | P | hardest − random | P | easiest − random | P |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -108,9 +144,9 @@ The hardest arm's one systematic pattern is a layer effect: it helps at L6 and h
 
 ## The gate
 
-Verdicts over the 132 cells, after the Oct 17 fixes: **24 BASE, 98 FAIL, 9 PASS, 1 INVALID.** (Run 1 had read 107 FAIL and 0 PASS, because R4a/R4b failed in every cell; see defect 2.)
+Verdicts over the 132 cells, final gate: **24 BASE, 93 FAIL, 8 PASS, 6 INDETERMINATE, 1 INVALID.** (Run 1 had read 107 FAIL and 0 PASS because R4a/R4b failed in every cell, defect 2; the first commit read 9 PASS because an R1-indeterminate cell was counted as a pass, Codex audit round 1 #2.)
 
-**The nine passing cells.** Each passes on exactly one layer. Four pass at L6 and five at L7; none at L8 or L20; so no (arm, pool, C) reaches R5's three layers including L20, and no arm is a survivor. The random control is among them.
+**The eight passing cells.** Each passes on exactly one layer: four at L6, four at L7, none at L8 or L20; so no (arm, pool, C) reaches R5's three layers including L20, and no arm is a survivor. The random control is among them.
 
 | PASS cell | pkg-0.5 | base | Δ | P(better) ± SE | f0 (base) | f4 (base) | FA (base) | brief Δ | mined real top group (share) |
 |---|---|---|---|---|---|---|---|---|---|
@@ -119,14 +155,15 @@ Verdicts over the 132 cells, after the Oct 17 fixes: **24 BASE, 98 FAIL, 9 PASS,
 | hardest_both L6 pool_nsa C=1 | 0.2379 | 0.2573 | -0.0194 | 0.927 ± 0.008 | 0.4437 (0.4717) | 0.2524 (0.2677) | 1412 (1509) | -0.0081 | spk:libri_8555 (0.065806) |
 | easiest_both L6 pool_full C=64 | 0.2374 | 0.2697 | -0.0324 | 0.968 ± 0.006 | 0.4746 (0.5487) | 0.2653 (0.3079) | 1273 (1622) | -0.0152 | asvspoof2019:LA_0078 (0.084465) |
 | easiest_both L7 pool_full C=1 | 0.2851 | 0.3307 | -0.0455 | 0.931 ± 0.008 | 0.4232 (0.4735) | 0.3803 (0.3950) | 1426 (1642) | -0.0016 | asvspoof2019:LA_0108 (0.082202) |
-| easiest_both L7 pool_nsa C=8 | 0.1942 | 0.2219 | -0.0276 | 0.904 ± 0.009 | 0.4102 (0.4002) | 0.2423 (0.3825) | 1154 (1155) | -0.0136 | spk:libri_2277 (0.111316) |
 | random_both L6 pool_full C=8 | 0.2579 | 0.2805 | -0.0225 | 0.967 ± 0.006 | 0.5321 (0.5472) | 0.2918 (0.3057) | 1400 (1445) | -0.0012 | lj:LJ028 (0.015837) |
 | hardest_reals L7 pool_nsa C=1 | 0.2215 | 0.2405 | -0.0190 | 0.961 ± 0.006 | 0.3837 (0.4116) | 0.3443 (0.3394) | 1095 (1258) | -0.0057 | spk:libri_6295 (0.068266) |
 | hardest_reals L7 pool_nsa C=8 | 0.1988 | 0.2219 | -0.0231 | 0.965 ± 0.006 | 0.3808 (0.4002) | 0.3368 (0.3825) | 1081 (1155) | -0.0120 | spk:libri_6295 (0.064576) |
 
-**R5**, the cross-layer rule, for every primary-family (arm, pool, C) that had at least one passing layer: `hardest_both|pool_full|C8` [6], `hardest_both|pool_full|C64` [6], `hardest_both|pool_nsa|C1` [6], `easiest_both|pool_full|C1` [7], `easiest_both|pool_full|C64` [6], `easiest_both|pool_nsa|C8` [7], `random_both|pool_full|C8` [6]; all `n = 1`, none includes L20, all **false**. The L7-only arms are descriptive with R5 N/A by declaration (Codex #7).
+**The six INDETERMINATE cells**, where every rule but R1 passes and P(better) lies within 2 SE of 0.90: `hardest_both` L7 `pool_nsa` at all three C (0.893 / 0.884 / 0.883), `easiest_both` L7 `pool_nsa` C=8 (0.904, the cell the first commit counted as a pass), `hardest_reals` L7 `pool_nsa` C=64 (0.900) and `pilot_quantile` L7 `pool_nsa` C=8 (0.887). Two further cells carry the indeterminate flag but fail R4a as well and are FAILs (`easiest_both` L7 `pool_nsa` C=64 at 0.901; `easiest_both` L20 `pool_nsa` C=8 at 0.917). The 0.90 band alone decides nothing in that region, as the plan said it would not.
 
-**Which rules did the work.** Over the 98 FAIL cells: R1 (P(better) ≥ 0.90 with a better pooled reading) fails in 93; R4a (fold 0 within 0.010) in 55; R3b (sign agreement across readings) in 41; R2 in 40; R4b (fold 4) in 39; R6 (false alarms within 10% relative) in 17; R3 (brief within 0.010) in 2. R7 never fails: now that it reads the mined set, the largest real-side top-group share in any mined set is 0.139 against the 0.25 cap (the fake side is reported, not gated; see the characterisation). R9 refuses only the INVALID focal cell. Eight cells are **indeterminate** under R1 (P(better) within 2 SE of 0.90): `hardest_both` L7 `pool_nsa` at all three C (0.893 / 0.884 / 0.883), `easiest_both` L7 `pool_nsa` C=8 and C=64 (0.904 / 0.901, both counted as passes), `easiest_both` L20 `pool_nsa` C=8 (0.917), `hardest_reals` L7 `pool_nsa` C=64 (0.900) and `pilot_quantile` L7 `pool_nsa` C=8 (0.887). The 0.90 band alone decides nothing in that region, as the plan said it would not.
+**R5**, the cross-layer rule, for every primary-family (arm, pool, C) with at least one passing layer: `hardest_both|pool_full|C8` [6], `hardest_both|pool_full|C64` [6], `hardest_both|pool_nsa|C1` [6], `easiest_both|pool_full|C1` [7], `easiest_both|pool_full|C64` [6], `random_both|pool_full|C8` [6]; all `n = 1`, none includes L20, all **false**. The L7-only arms are descriptive with R5 N/A by declaration (Codex #7).
+
+**Which rules did the work.** Over the 93 FAIL cells: R1 (P(better) ≥ 0.90 with a better pooled reading) fails in 88; R4a (fold 0 within 0.010) in 55; R3b (sign agreement across readings) in 41; R2 in 40; R4b (fold 4) in 39; R6 (false alarms within 10% relative) in 17; R3 (brief within 0.010) in 2. R7 never fails: now that it reads the mined set, the largest real-side top-group share in any mined set is 0.139 against the 0.25 cap (the fake side is reported, not gated; see the characterisation). R9 refuses only the INVALID focal cell, now at validation time rather than as a FAIL.
 
 **R3b, the convention rule.** 41 cells show a sign flip between the package readings and the brief reading, i.e. they are better under rule 5's cost and worse under v1's, or the reverse. None could be a recommendation while the cost convention is open (D5).
 
@@ -141,7 +178,7 @@ Six arms run at L7 only, by design: four one-sided direction probes, focal loss,
 | hardest_reals | 7 | pool_full | 64 | 0.2722 | 0.1969 | 0.2971 | 7.56% | 0.5323 | 0.4068 | 1500 | +0.0375 | 0.048 ± 0.007 | FAIL | R1,R2,R3b,R4a,R4b,R6 |
 | hardest_reals | 7 | pool_nsa | 1 | 0.2215 | 0.1620 | 0.2509 | 6.28% | 0.3837 | 0.3443 | 1095 | -0.0190 | 0.961 ± 0.006 | PASS |  |
 | hardest_reals | 7 | pool_nsa | 8 | 0.1988 | 0.1482 | 0.2532 | 5.85% | 0.3808 | 0.3368 | 1081 | -0.0231 | 0.965 ± 0.006 | PASS |  |
-| hardest_reals | 7 | pool_nsa | 64 | 0.1914 | 0.1427 | 0.2544 | 5.71% | 0.3799 | 0.3319 | 1001 | -0.0265 | 0.900 ± 0.009 | FAIL | R1 |
+| hardest_reals | 7 | pool_nsa | 64 | 0.1914 | 0.1427 | 0.2544 | 5.71% | 0.3799 | 0.3319 | 1001 | -0.0265 | 0.900 ± 0.009 | INDETERMINATE | R1 |
 | hardest_fakes | 7 | pool_full | 1 | 0.3012 | 0.2175 | 0.3126 | 8.21% | 0.4845 | 0.4166 | 1638 | -0.0295 | 0.649 ± 0.015 | FAIL | R1,R3,R3b,R4a,R4b |
 | hardest_fakes | 7 | pool_full | 8 | 0.2229 | 0.1663 | 0.3047 | 6.76% | 0.4773 | 0.3851 | 1151 | -0.0339 | 0.654 ± 0.015 | FAIL | R1,R4a,R4b |
 | hardest_fakes | 7 | pool_full | 64 | 0.2272 | 0.1643 | 0.3128 | 6.84% | 0.4762 | 0.3987 | 1158 | -0.0075 | 0.527 ± 0.016 | FAIL | R1,R3b,R4a,R4b |
@@ -170,14 +207,14 @@ Six arms run at L7 only, by design: four one-sided direction probes, focal loss,
 | pilot_quantile | 7 | pool_full | 8 | 0.2274 | 0.1721 | 0.3011 | 6.79% | 0.4648 | 0.3751 | 1269 | -0.0294 | 0.660 ± 0.015 | FAIL | R1 |
 | pilot_quantile | 7 | pool_full | 64 | 0.2255 | 0.1696 | 0.3040 | 6.82% | 0.4830 | 0.3964 | 1205 | -0.0093 | 0.522 ± 0.016 | FAIL | R1,R4a,R4b |
 | pilot_quantile | 7 | pool_nsa | 1 | 0.2626 | 0.1867 | 0.2554 | 7.03% | 0.3933 | 0.3138 | 1385 | +0.0221 | 0.305 ± 0.015 | FAIL | R1,R2,R3b,R6 |
-| pilot_quantile | 7 | pool_nsa | 8 | 0.2122 | 0.1561 | 0.2586 | 6.25% | 0.3895 | 0.3518 | 1109 | -0.0096 | 0.887 ± 0.010 | FAIL | R1 |
+| pilot_quantile | 7 | pool_nsa | 8 | 0.2122 | 0.1561 | 0.2586 | 6.25% | 0.3895 | 0.3518 | 1109 | -0.0096 | 0.887 ± 0.010 | INDETERMINATE | R1 |
 | pilot_quantile | 7 | pool_nsa | 64 | 0.2104 | 0.1546 | 0.2585 | 6.18% | 0.3931 | 0.3493 | 1115 | -0.0075 | 0.852 ± 0.011 | FAIL | R1 |
 
-- **`hardest_reals` is the one consistent single-layer lead, and it is pool-dependent.** On `pool_nsa` it is better at every C (−0.019 / −0.023 / −0.027, P(better) 0.961 / 0.965 / 0.900), passing the gate at C=1 and C=8 and failing only R1 at C=64, indeterminately. On `pool_full` the same recipe is **worse** at C=1 and C=64 (+0.051, +0.038; P 0.10, 0.05). The mined set explains why: on `pool_full` 39% of the hardest reals are ASVspoof 2019 bona fide rows, and up-weighting them moves the boundary for a population the NSA basis does not contain. The pilot's "reals x4 wins" was a `pool_full` finding under a looser prior (W1); this is the matched-regularization, NSA-basis version, and it only holds without the ASVspoof rows in the fit.
+- **`hardest_reals` is the one consistent single-layer lead, and it is pool-dependent.** On `pool_nsa` it is better at every C (−0.019 / −0.023 / −0.027, P(better) 0.961 / 0.965 / 0.900), passing the gate at C=1 and C=8 and INDETERMINATE at C=64 (P(better) exactly 0.900, within 2 SE of the band). On `pool_full` the same recipe is **worse** at C=1 and C=64 (+0.051, +0.038; P 0.10, 0.05). The mined set explains why: on `pool_full` 39% of the hardest reals are ASVspoof 2019 bona fide rows, and up-weighting them moves the boundary for a population the NSA basis does not contain. The pilot's "reals x4 wins" was a `pool_full` finding under a looser prior (W1); this is the matched-regularization, NSA-basis version, and it only holds without the ASVspoof rows in the fit.
 - **`hardest_fakes` does nothing reliable** (`pool_full` −0.030 / −0.034 / −0.008 with P 0.65 / 0.65 / 0.53; `pool_nsa` slightly worse at every C).
 - **`easiest_fakes` has the largest raw deltas on `pool_full`** (−0.054 / −0.059 / −0.049) with P(better) only 0.71 to 0.73: the gain concentrates in a few of the 14 spoof groups, so a group bootstrap is wide. `easiest_reals` is small and positive-direction throughout (−0.003 to −0.025, P 0.60 to 0.94).
 - **Focal loss (γ=2) is worse everywhere**: +0.040 and +0.101 on `pool_full` (C=64 INVALID: final gradient norm 0.0112 > 0.01 on fold 2), +0.089 / +0.089 / +0.084 on `pool_nsa`, with 30 to 40% more false alarms at its own threshold and P(better) 0.12 to 0.36. The pilot had focal first *only* under the per-fold mean (spec D2); under pooled package-0.5 it is the worst arm in the grid. Focal is also the one arm not on the matched `sum(w) = n` footing, so part of this is a regularization difference; it is reported as descriptive for that reason.
-- **The pilot-comparable arm does not reproduce the pilot's gain.** `pilot_quantile` is worse than base at C=1 on both pools (+0.008, +0.022) and modestly better at C=8 and C=64 (−0.029 / −0.009, −0.010 / −0.008) with P(better) at most 0.887. Its mined rows are two-thirds the same clips as `hardest_both` (Jaccard 0.66 to 0.71), so the pilot's `mine_nested` row was a hardest-example recipe on the full basis read under the per-fold mean; none of those three choices survives here.
+- **The pilot-comparable arm does not reproduce the pilot's gain.** `pilot_quantile` is worse than base at C=1 on both pools (+0.008, +0.022) and modestly better at C=8 and C=64 (−0.029 / −0.009, −0.010 / −0.008) with P(better) at most 0.887 (INDETERMINATE at C=8, FAIL elsewhere). Its mined rows are two-thirds the same clips as `hardest_both` (Jaccard 0.66 to 0.71), so the pilot's `mine_nested` row was a hardest-example recipe on the full basis read under the per-fold mean; none of those three choices survives here.
 
 ## The regularization constant is the larger lever (descriptive; a lead for V2-01, not a selection)
 
@@ -202,7 +239,7 @@ The full 64-row sweep is in the appendix.
 
 ## Mined-set characterisation (R7, H4) and arm overlap (H3)
 
-Every mined cell now carries a characterisation of the rows it actually up-weighted (pooled over the five outer folds; each pick counted once per fold that selected it, so a row can appear up to four times). Summary over the 107 mined cells, with the full table in Appendix D:
+Every mined cell now carries a characterisation of the rows it actually up-weighted (pooled over the five outer folds; each pick counted once per fold that selected it, so a row can appear up to four times). Summary over the 102 cells that mine rows (the five OK `focal_g2` cells are a continuous loss with no picks, so they carry no mined set), with the full table in Appendix D:
 
 | | hardest (both / reals) | easiest (both / reals) | random | pilot_quantile |
 |---|---|---|---|---|
@@ -317,7 +354,7 @@ Full H3 table (72 pairs):
 
 ## H5 as frozen
 
-The frozen definition counts, per cell, the false alarms at the package-0.5 threshold whose normalised real-side margin lies in the worst decile of all reals. On the NSA basis the decile is 814 of 8,142 reals; the fewest false alarms any cell has at its own threshold is 996 (`easiest_reals`, L7, `pool_nsa`, C=64). Whenever the false alarms cover the decile, every worst-decile real is a false alarm and the count is the decile: **815 in all 131 OK cells on the NSA basis, 1,327 in every full-basis reading.** `report.json` records this (`h5_saturation.saturated = true`). The count therefore says nothing about any arm, and the question Nathan asked in P2, whether confidently-wrong false positives are *separately visible*, is answered "not by this definition." It is left as frozen rather than redefined after the read. A definition that can move, for stage 0.5: the number of false alarms beyond a fixed normalised-margin cut set on the *base* arm (so arms are compared on one scale), or the count of reals scored above the base's 99th-percentile real score.
+The frozen definition counts, per cell, the false alarms at the package-0.5 threshold whose normalised real-side margin lies in the worst decile of all reals. On the NSA basis the decile is 814 of 8,142 reals; the fewest false alarms any cell has at its own threshold is 996 (`easiest_reals`, L7, `pool_nsa`, C=64). Whenever the false alarms cover the decile, every worst-decile real is a false alarm and the count is the decile: **815 in all 131 OK cells on the NSA basis, 1,327 in every full-basis reading.** `report.json` records this (`h5_saturation.saturated = true`). The count therefore says nothing about any arm, and the question Nathan asked in P2, whether confidently-wrong false positives are *separately visible*, is answered "not by this definition." This was knowable when the definition was frozen: the spec's own reference table records false-alarm rates of 17.7% and 20.2% at the package-0.5 threshold, both above the 10% decile, so the saturation was predictable on Oct 13 and was not predicted (Claude critique, finding 4). It is left as frozen rather than redefined after the read. A definition that can move, for stage 0.5: the number of false alarms beyond a fixed normalised-margin cut set on the *base* arm (so arms are compared on one scale), or the count of reals scored above the base's 99th-percentile real score.
 
 ## Base reference and self-check
 
@@ -344,19 +381,24 @@ Run preconditions (R8) held: zero `decode_error` rows, zero all-zero embedding r
 1. **The C finding is bigger than the question.** At L7 on `pool_nsa`, package-0.5 goes from 0.2405 at C=1 to 0.2177 at C=256; at L20 from 0.591 to 0.388; on `pool_full` at L7 from 0.3307 to 0.2313 (NSA basis). Every weighting shape in this lane moves the score by less than the C=1 → C=8 step at the same layer. The brief reading worsens by up to 0.011 over the same range. Confirm the disposition: a lead handed to the V2-01 lane, not adopted here.
 2. **132 gated cells against the "four candidates against one gate" cap.** The primary answer is one three-way comparison with a random control; no cell is adopted. Still a departure from the letter of that rule, recorded.
 3. **The cost convention.** It disagrees about C's direction (package readings improve, brief worsens). Adoption stays blocked.
-4. **New: the three readout defects.** Fixed and re-run on Oct 17 with byte-identical scores. Confirm that fixing the code to match the pre-declaration, without touching any band, is acceptable post-read; H5 was deliberately left as frozen.
+4. **New: the nine readout, gate and inference defects** (three found at close-out, six by the Codex audit and the Claude critique of the first commit). Fixed and re-run on Oct 17 with byte-identical scores. Confirm that fixing the code to match the pre-declaration, without touching any band, is acceptable post-read; H5 was deliberately left as frozen.
 5. **New: what stage 0.5 should inherit.** (a) The hypothesis to carry is **easiest-side emphasis**, with hardest as the comparison and random as the control, not hard-negative mining as originally framed. (b) `hardest_reals` on the NSA-only pool is the one lead worth a benchmark row; it reverses when the ASVspoof 2019 rows are in the fit, so the pool is part of the recipe. (c) `focal_g2` should be dropped from stage 0.5's arms. (d) H5 needs the scale-anchored definition above before it is used as a readout. (e) C becomes an explicit axis of any stage-0.5 or stage-1 design, never inherited at 1.0. (f) Speaker-disjoint folds are a prerequisite for anything beyond a diagnostic (Codex #1).
 
 ## Disclosures
 
+- **No pre-run commit exists.** P1 said every recipe, selection rule and band would be committed before any number was read; the script, spec and plan were first committed on Oct 17 (`7ba7faf`), after both runs. The pre-declaration's integrity therefore rests on the file history on disk (the spec's FINAL DESIGN and the plan's Codex dispositions predate run 1's 17:11 start on Oct 13) and on the preserved run-1 outputs, not on a commit, and cannot be independently verified from git (Codex audit round 1, #6). Every confirmation run from here on commits its declaration before it executes.
+- **The inference layer changed after the first read, and this is stated as such.** The first commit's headline read stratum counts; the design of record and the Codex plan review (#2) had specified one aggregate inside shared group-resamples with its uncertainty, per C. Both post-commit reviews flagged it; `aggregate_contrast()` now computes exactly that, and the Verdict is restated on it. The direction of every conclusion is unchanged; what the aggregate adds is that the easiest-side gain, while consistently signed, has a 90% interval whose lower end is within 0.0015 of zero.
+- **The gate changed after the first read, in three ways the pre-declaration already required:** an R1-indeterminate cell is INDETERMINATE and not a pass (one of the first commit's nine passes); R9 degeneracy makes a cell INVALID at validation rather than an ordinary FAIL; the gate validates every checkpoint's fingerprint and refuses a partial grid or an expired deadline. No band moved.
+- **The checkpoint fingerprint changed.** It now hashes the embedding shard contents (not only the manifests) and the source of the fitting-path functions (not the whole script), so a gate or report edit no longer forces a refit while any change to how a cell is fitted or read does. Run 4 recomputed every cell under it.
+- **`experiments/log.csv` carries two rows for this rung.** The 01:13 UTC row records the first commit's gate (9 passes, C-pooled means); the 02:13 UTC row records the final gate (8 passes, per-C aggregate P(better)) and supersedes it. Both stay: the log is append-only.
 - Run 2 happened after run 1's numbers had been read. The fixes change what R7 and R4 *test*, not any score, and the identity check above is the evidence. The deadline file was reset for run 2 (run 1's is preserved with its outputs).
 - The log row's `validation_score` is the reference cell (`none`, L7, `pool_nsa`, C=1, NSA-only basis), because no candidate passed and nothing was adopted; the notes name the basis and all three readings.
 - Codex's eleven plan-review findings were all accepted; the gate and tests implement them (spec, "Codex plan review round 1, disposition"). The stage-1 bandit contract (G1), the one-sided-augmentation gate (G2) and the SNR cap (G4) are pre-declared in the spec but have no code yet; they are stage 0.5 / 1 work.
-- The test suite grew from 82 to 91 tests on Oct 17 (the new tests are named in the defects table). The full suite's one failure at the start of the close-out, `test_build_site.py::test_every_page_has_shell_invariants`, was this lane's: the plan and spec each had more than one top-level heading, so the docs site rendered two `<h1>`s; the extra headings are now `##`.
+- The lane's test file grew from 82 to 94 tests on Oct 17: the eight named in the defects table, the three-seed C2 directional test the break check needed (it had been named in the inventory but never written), and an F4 test that the log row carries the basis and every reading. The full suite's one failure at the start of the close-out, `test_build_site.py::test_every_page_has_shell_invariants`, was this lane's: the plan and spec each had more than one top-level heading, so the docs site rendered two `<h1>`s; the extra headings are now `##`.
 
 ## Appendix A: every cell
 
-Δ is against the `none` cell at the same layer, pool and C; all readings on the NSA-only basis at each cell's own package-0.5 threshold; f0 and f4 are per-fold package-0.5; P(better) ± its Monte-Carlo SE.
+Δ is against the `none` cell at the same layer, pool and C; all readings on the NSA-only basis at each cell's own package-0.5 threshold; f0 and f4 are per-fold package-0.5; P(better) ± its Monte-Carlo SE. Verdicts are the final gate's (PASS, INDETERMINATE, FAIL, BASE, INVALID).
 
 | arm | L | pool | C | pkg-0.5 | pkg-0.3 | brief | EER | f0 | f4 | FA@thr | Δpkg-0.5 vs none | P(better) ± SE | verdict | failed |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -393,9 +435,9 @@ Run preconditions (R8) held: zero `decode_error` rows, zero all-zero embedding r
 | hardest_both | 7 | pool_full | 1 | 0.3732 | 0.2382 | 0.3031 | 8.83% | 0.5080 | 0.3985 | 1874 | +0.0425 | 0.077 ± 0.008 | FAIL | R1,R2,R4a,R6 |
 | hardest_both | 7 | pool_full | 8 | 0.2732 | 0.1980 | 0.2919 | 7.59% | 0.5422 | 0.3594 | 1435 | +0.0165 | 0.199 ± 0.013 | FAIL | R1,R2,R3b,R4a |
 | hardest_both | 7 | pool_full | 64 | 0.2756 | 0.1992 | 0.2994 | 7.61% | 0.5392 | 0.3690 | 1450 | +0.0408 | 0.083 ± 0.009 | FAIL | R1,R2,R3b,R4a,R6 |
-| hardest_both | 7 | pool_nsa | 1 | 0.2330 | 0.1702 | 0.2538 | 6.55% | 0.4011 | 0.3107 | 1335 | -0.0075 | 0.893 ± 0.010 | FAIL | R1 |
-| hardest_both | 7 | pool_nsa | 8 | 0.2049 | 0.1505 | 0.2582 | 5.98% | 0.3860 | 0.2988 | 1033 | -0.0170 | 0.884 ± 0.010 | FAIL | R1 |
-| hardest_both | 7 | pool_nsa | 64 | 0.2019 | 0.1473 | 0.2516 | 5.85% | 0.3869 | 0.2837 | 1135 | -0.0160 | 0.883 ± 0.010 | FAIL | R1 |
+| hardest_both | 7 | pool_nsa | 1 | 0.2330 | 0.1702 | 0.2538 | 6.55% | 0.4011 | 0.3107 | 1335 | -0.0075 | 0.893 ± 0.010 | INDETERMINATE | R1 |
+| hardest_both | 7 | pool_nsa | 8 | 0.2049 | 0.1505 | 0.2582 | 5.98% | 0.3860 | 0.2988 | 1033 | -0.0170 | 0.884 ± 0.010 | INDETERMINATE | R1 |
+| hardest_both | 7 | pool_nsa | 64 | 0.2019 | 0.1473 | 0.2516 | 5.85% | 0.3869 | 0.2837 | 1135 | -0.0160 | 0.883 ± 0.010 | INDETERMINATE | R1 |
 | hardest_both | 8 | pool_full | 1 | 0.4454 | 0.2923 | 0.3113 | 10.91% | 0.5818 | 0.5554 | 2006 | +0.0203 | 0.106 ± 0.010 | FAIL | R1,R2,R4a,R4b |
 | hardest_both | 8 | pool_full | 8 | 0.3185 | 0.2253 | 0.3191 | 8.84% | 0.6020 | 0.5475 | 1592 | -0.0100 | 0.639 ± 0.015 | FAIL | R1,R4a,R4b |
 | hardest_both | 8 | pool_full | 64 | 0.2904 | 0.2110 | 0.3160 | 8.24% | 0.6106 | 0.4996 | 1481 | -0.0064 | 0.643 ± 0.015 | FAIL | R1,R4a |
@@ -418,7 +460,7 @@ Run preconditions (R8) held: zero `decode_error` rows, zero all-zero embedding r
 | easiest_both | 7 | pool_full | 8 | 0.2238 | 0.1688 | 0.3050 | 6.65% | 0.4162 | 0.3865 | 1281 | -0.0330 | 0.743 ± 0.014 | FAIL | R1,R4b |
 | easiest_both | 7 | pool_full | 64 | 0.2171 | 0.1625 | 0.3091 | 6.65% | 0.4196 | 0.3930 | 1210 | -0.0177 | 0.668 ± 0.015 | FAIL | R1,R3b,R4b |
 | easiest_both | 7 | pool_nsa | 1 | 0.2293 | 0.1669 | 0.2474 | 6.59% | 0.4124 | 0.2567 | 1240 | -0.0112 | 0.843 ± 0.012 | FAIL | R1 |
-| easiest_both | 7 | pool_nsa | 8 | 0.1942 | 0.1449 | 0.2516 | 6.00% | 0.4102 | 0.2423 | 1154 | -0.0276 | 0.904 ± 0.009 | PASS |  |
+| easiest_both | 7 | pool_nsa | 8 | 0.1942 | 0.1449 | 0.2516 | 6.00% | 0.4102 | 0.2423 | 1154 | -0.0276 | 0.904 ± 0.009 | INDETERMINATE |  |
 | easiest_both | 7 | pool_nsa | 64 | 0.1886 | 0.1413 | 0.2503 | 5.84% | 0.4096 | 0.2307 | 1080 | -0.0293 | 0.901 ± 0.009 | FAIL | R4a |
 | easiest_both | 8 | pool_full | 1 | 0.4051 | 0.2727 | 0.3026 | 10.20% | 0.5584 | 0.5005 | 2175 | -0.0199 | 0.760 ± 0.014 | FAIL | R1,R4a |
 | easiest_both | 8 | pool_full | 8 | 0.2875 | 0.2057 | 0.3121 | 8.23% | 0.5606 | 0.4987 | 1608 | -0.0410 | 0.747 ± 0.014 | FAIL | R1,R4a |
@@ -461,7 +503,7 @@ Run preconditions (R8) held: zero `decode_error` rows, zero all-zero embedding r
 | hardest_reals | 7 | pool_full | 64 | 0.2722 | 0.1969 | 0.2971 | 7.56% | 0.5323 | 0.4068 | 1500 | +0.0375 | 0.048 ± 0.007 | FAIL | R1,R2,R3b,R4a,R4b,R6 |
 | hardest_reals | 7 | pool_nsa | 1 | 0.2215 | 0.1620 | 0.2509 | 6.28% | 0.3837 | 0.3443 | 1095 | -0.0190 | 0.961 ± 0.006 | PASS |  |
 | hardest_reals | 7 | pool_nsa | 8 | 0.1988 | 0.1482 | 0.2532 | 5.85% | 0.3808 | 0.3368 | 1081 | -0.0231 | 0.965 ± 0.006 | PASS |  |
-| hardest_reals | 7 | pool_nsa | 64 | 0.1914 | 0.1427 | 0.2544 | 5.71% | 0.3799 | 0.3319 | 1001 | -0.0265 | 0.900 ± 0.009 | FAIL | R1 |
+| hardest_reals | 7 | pool_nsa | 64 | 0.1914 | 0.1427 | 0.2544 | 5.71% | 0.3799 | 0.3319 | 1001 | -0.0265 | 0.900 ± 0.009 | INDETERMINATE | R1 |
 | hardest_fakes | 7 | pool_full | 1 | 0.3012 | 0.2175 | 0.3126 | 8.21% | 0.4845 | 0.4166 | 1638 | -0.0295 | 0.649 ± 0.015 | FAIL | R1,R3,R3b,R4a,R4b |
 | hardest_fakes | 7 | pool_full | 8 | 0.2229 | 0.1663 | 0.3047 | 6.76% | 0.4773 | 0.3851 | 1151 | -0.0339 | 0.654 ± 0.015 | FAIL | R1,R4a,R4b |
 | hardest_fakes | 7 | pool_full | 64 | 0.2272 | 0.1643 | 0.3128 | 6.84% | 0.4762 | 0.3987 | 1158 | -0.0075 | 0.527 ± 0.016 | FAIL | R1,R3b,R4a,R4b |
@@ -490,7 +532,7 @@ Run preconditions (R8) held: zero `decode_error` rows, zero all-zero embedding r
 | pilot_quantile | 7 | pool_full | 8 | 0.2274 | 0.1721 | 0.3011 | 6.79% | 0.4648 | 0.3751 | 1269 | -0.0294 | 0.660 ± 0.015 | FAIL | R1 |
 | pilot_quantile | 7 | pool_full | 64 | 0.2255 | 0.1696 | 0.3040 | 6.82% | 0.4830 | 0.3964 | 1205 | -0.0093 | 0.522 ± 0.016 | FAIL | R1,R4a,R4b |
 | pilot_quantile | 7 | pool_nsa | 1 | 0.2626 | 0.1867 | 0.2554 | 7.03% | 0.3933 | 0.3138 | 1385 | +0.0221 | 0.305 ± 0.015 | FAIL | R1,R2,R3b,R6 |
-| pilot_quantile | 7 | pool_nsa | 8 | 0.2122 | 0.1561 | 0.2586 | 6.25% | 0.3895 | 0.3518 | 1109 | -0.0096 | 0.887 ± 0.010 | FAIL | R1 |
+| pilot_quantile | 7 | pool_nsa | 8 | 0.2122 | 0.1561 | 0.2586 | 6.25% | 0.3895 | 0.3518 | 1109 | -0.0096 | 0.887 ± 0.010 | INDETERMINATE | R1 |
 | pilot_quantile | 7 | pool_nsa | 64 | 0.2104 | 0.1546 | 0.2585 | 6.18% | 0.3931 | 0.3493 | 1115 | -0.0075 | 0.852 ± 0.011 | FAIL | R1 |
 
 ## Appendix B: the C sweep, all 64 rows
@@ -597,7 +639,7 @@ The `none` cells of `pool_full` read on both bases. The full basis includes the 
 
 ## Appendix D: mined-set characterisation, every mined cell
 
-Picks pooled over the five outer folds (unique rows in parentheses); shares are of the pooled picks. `–` means the arm mines no rows of that class.
+Picks pooled over the five outer folds (unique rows in parentheses); shares are of the pooled picks; `–` means the arm mines no rows of that class. 102 cells mine rows (the five OK `focal_g2` cells mine nothing).
 
 | arm | L | pool | C | real picks (unique) | top real group (share) | per-fold max | top real speaker (share) | real sources | fake picks (unique) | top fake group (share) | fake generators (top 3) |
 |---|---|---|---|---|---|---|---|---|---|---|---|

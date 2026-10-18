@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -867,8 +868,10 @@ def test_f4_log_row_names_the_basis_and_every_reading(tmp_path):
            "base_reference": {"package05": 0.2405, "package03": 0.1766, "brief": 0.2567,
                               "eer": 0.0686},
            "gate": {"x": {"verdict": "FAIL"}},
-           "contrasts": {"hardest_both_minus_none": {"mean_delta_package05": 0.004},
-                         "easiest_both_minus_none": {"mean_delta_package05": -0.0261}}}  # fmt: skip
+           "contrasts": {"hardest_both_minus_none": {"mean_delta_package05_all_strata": 0.004,
+                                                     "by_C": {"C1": {"p_better": 0.41}}},
+                         "easiest_both_minus_none": {"mean_delta_package05_all_strata": -0.0261,
+                                                     "by_C": {"C1": {"p_better": 0.93}}}}}  # fmt: skip
     f = tmp_path / "log.csv"
     f.write_text(",".join(hn.LOG_COLUMNS) + "\n")
     row = hn.append_log(rep, path=f)
@@ -877,7 +880,8 @@ def test_f4_log_row_names_the_basis_and_every_reading(tmp_path):
     assert row["rung"] == hn.RUNG and row["benchmark_version"] == hn.BENCHMARK_VERSION
     assert row["validation_score"] == 0.2405
     for token in ("NSA-only", "package05=0.2405", "package03=0.1766", "brief=0.2567",
-                  "eer=0.0686", "PASS cells = 0", "exploratory"):
+                  "eer=0.0686", "PASS cells = 0", "exploratory", "C1=0.930", "C1=0.410",
+                  "descriptive, C pooled"):
         assert token in row["notes"], token
     parsed = pd.read_csv(f)
     assert list(parsed.columns) == list(hn.LOG_COLUMNS) and len(parsed) == 1
@@ -885,6 +889,250 @@ def test_f4_log_row_names_the_basis_and_every_reading(tmp_path):
     bad.write_text("timestamp,rung\n")
     with pytest.raises(ValueError, match="header"):
         hn.append_log(rep, path=bad)
+
+
+# --------------------------------------------------------------------------- Codex audit round 1
+def test_e_r1_indeterminate_is_not_a_pass_and_not_r5_eligible():
+    """Codex audit round 1, #2: FINAL DESIGN R1 says a verdict within 2 SE of the 0.90 band is
+    INDETERMINATE, never a pass. The flag alone had let `easiest_both` L7 pool_nsa C=8 PASS at
+    P(better) 0.904."""
+    arm, cell, base, _boot = _pass_args()
+    g = hn.gate_cell(arm, cell, base, {"p_better": 0.904, "p_better_se": 0.009})
+    assert g["R1"] is True and g["R1_indeterminate"] is True
+    assert g["verdict"] == "INDETERMINATE"
+    g = hn.gate_cell(arm, cell, base, {"p_better": 0.893, "p_better_se": 0.010})
+    assert g["verdict"] == "INDETERMINATE", "below the band but within 2 SE is not a clean FAIL either"
+    g = hn.gate_cell(arm, _mined(cell, group_concentration_real=0.9), base,
+                     {"p_better": 0.904, "p_better_se": 0.009})
+    assert g["verdict"] == "FAIL", "any other failed rule still makes it a FAIL"
+    g = hn.gate_cell(arm, cell, base, {"p_better": 0.99, "p_better_se": 0.003})
+    assert g["verdict"] == "PASS"
+
+
+def test_r9_degenerate_reason_covers_constant_scores_and_every_reading():
+    """Codex audit round 1, #4: constant scores have AUC exactly 0.5 and slipped through `auc < 0.5`;
+    package-0.3 was never checked for saturation."""
+    ok = {"auc": 0.9, "package05": 0.3, "package03": 0.2, "brief": 0.26}
+    good = np.array([0.1, 0.9, 0.3, 0.7])
+    assert hn.degenerate_reason(good, [ok]) is None
+    assert hn.degenerate_reason(np.zeros(4), [ok]) == "constant scores"
+    assert hn.degenerate_reason(np.array([0.1, np.nan, 0.3, 0.7]), [ok]) == "non-finite scores"
+    assert "AUC" in hn.degenerate_reason(good, [{**ok, "auc": 0.45}])
+    assert hn.degenerate_reason(good, [{**ok, "package03": 1.0}]) == "package03 saturated at 1.0"
+    assert hn.degenerate_reason(good, [ok, {**ok, "brief": 1.0}]) == "brief saturated at 1.0", (
+        "the secondary basis is checked too")
+
+
+def test_f3_fingerprint_covers_shard_contents_not_just_the_manifest(tmp_path):
+    """Codex audit round 1, #3: a shard rewritten in place with an unchanged manifest must change
+    the fingerprint, or a stale checkpoint would be reused against new embeddings."""
+    root, _X, _y, _fold, _m = _world(tmp_path)
+    arm = hn.ARMS_BY_NAME["hardest_both"]
+    mask = np.ones(10, bool)
+    a = hn.fingerprint(arm, 7, "pool_full", 1.0, mask, root=root)
+    assert a == hn.fingerprint(arm, 7, "pool_full", 1.0, mask, root=root)
+    shard = root / hn.MODEL / "nsa_train_sample_v3" / "shard_00000.npz"
+    z = dict(np.load(shard))
+    z["emb"] = z["emb"].copy()
+    z["emb"][0, 7, 0] += 1.0
+    np.savez(shard, **z)
+    os.utime(shard, ns=(shard.stat().st_atime_ns, shard.stat().st_mtime_ns + 1_000_000))
+    b = hn.fingerprint(arm, 7, "pool_full", 1.0, mask, root=root)
+    assert a != b, "same manifest, different shard bytes, same fingerprint = stale reuse"
+
+
+def test_f3_resume_rule_recomputes_a_stale_or_truncated_checkpoint(tmp_path):
+    """Codex #3 (plan: 'tests cover a stale fingerprint and a truncated file'); Claude critique #5:
+    the Oct 17 resume check json-loaded the file before the per-cell try, so a truncated checkpoint
+    aborted the whole fit. Not reusable means recompute, never abort."""
+    p = tmp_path / "L07_pool_nsa_C1_none.json"
+    hn.atomic_write_json(p, {"fingerprint": "fp", "status": "OK"})
+    assert hn.reusable_checkpoint(p, "fp") is False, "an OK cell without its npz is not reusable"
+    hn.atomic_savez(p.with_suffix(".npz"), oof=np.zeros(2), mask=np.ones(2, bool))
+    assert hn.reusable_checkpoint(p, "fp") is True
+    assert hn.reusable_checkpoint(p, "other") is False, "stale fingerprint"
+    hn.atomic_write_json(p, {"fingerprint": "fp", "status": "INVALID", "reason": "x"})
+    assert hn.reusable_checkpoint(p, "fp") is True, "a deterministic INVALID is reusable"
+    p.write_text(p.read_text()[:20])
+    assert hn.reusable_checkpoint(p, "fp") is False, "truncated JSON is recomputed, not a crash"
+    assert hn.reusable_checkpoint(tmp_path / "missing.json", "fp") is False
+
+
+def test_f3_fingerprint_hashes_the_fitting_path_source():
+    """The fingerprint covers the source of every score-producing function, and only those, so a
+    gate or report edit does not force a refit while a fitting change does."""
+    for name in hn.FINGERPRINT_SOURCES:
+        assert hasattr(hn, name), name
+    for must in ("arm_oof", "select_picks", "inner_oof_margin", "normalised_margin", "fit_lr",
+                 "focal_objective", "shaped_weights", "balanced_weights", "load_layer",
+                 "load_world", "read_cell", "characterise", "degenerate_reason", "package05"):
+        assert must in hn.FINGERPRINT_SOURCES, must
+    for gate_only in ("gate_cell", "stage_gate", "group_bootstrap", "aggregate_contrast",
+                      "stage_report", "log_row"):
+        assert gate_only not in hn.FINGERPRINT_SOURCES, gate_only
+    assert hn.fitting_path_digest() == hn.fitting_path_digest()
+
+
+def test_e_r9_null_reading_after_the_round_trip_is_refused_not_a_crash():
+    """Claude critique #14: clean() writes NaN as null; the gate must refuse it under R9, not raise."""
+    arm, cell, base, boot = _pass_args()
+    rt = json.loads(json.dumps(hn.clean({**cell, "primary": {**cell["primary"],
+                                                            "package05": float("nan")}})))
+    assert rt["primary"]["package05"] is None
+    g = hn.gate_cell(arm, rt, json.loads(json.dumps(hn.clean(base))), boot)
+    assert "R9" in g["failed"] and g["verdict"] == "FAIL"
+    assert hn.degenerate_reason(np.array([0.1, 0.9]), [rt["primary"]]) == "non-finite reading package05"
+
+
+def test_a1_min_cost_is_called_only_inside_the_three_named_wrappers():
+    """Codex #10 and Claude critique #7: the grep gate, pinned as a test. Every `min_cost(` call in
+    the script sits inside brief / package05 / package03; a fourth reading anywhere else fails."""
+    import ast
+    tree = ast.parse((REPO / "scripts" / "v2_hardneg_bakeoff.py").read_text())
+    allowed = {"brief", "package05", "package03"}
+    calls = []
+    for fn in ast.walk(tree):
+        if isinstance(fn, ast.FunctionDef):
+            for node in ast.walk(fn):
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                        and node.func.id == "min_cost"):
+                    calls.append(fn.name)
+    assert sorted(calls) == ["brief", "package03", "package05"], calls
+    assert set(calls) <= allowed
+    # and no module-level call outside any function
+    top = [n for n in ast.walk(ast.Module(body=[b for b in tree.body
+                                                  if not isinstance(b, ast.FunctionDef)],
+                                          type_ignores=[]))
+           if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "min_cost"]
+    assert top == []
+
+
+def test_f3_atomic_savez_writes_whole_or_not_at_all(tmp_path):
+    p = tmp_path / "cell.npz"
+    hn.atomic_savez(p, oof=np.arange(3.0), mask=np.ones(3, bool))
+    z = np.load(p)
+    assert sorted(z.files) == ["mask", "oof"] and not list(tmp_path.glob("*.tmp"))
+
+
+class _FakeDeadline:
+    def __init__(self, expired=False):
+        self.expired = expired
+
+    def left(self):
+        return 0.0 if self.expired else 1e9
+
+
+def _mini_out(tmp_path, monkeypatch, arms=("none", "hardest_both", "random_both"), n_groups=12,
+              per=40, seed=0, degenerate=None, drop=None):
+    """A complete miniature lane: one layer, one pool, one C, a few arms, consistent rows.json,
+    cell JSONs and checkpoints, and the fingerprints the gate must expect."""
+    out = tmp_path / "hardneg"
+    (out / "cells").mkdir(parents=True)
+    shapes = {"none": "none", "hardest_both": "hardest", "random_both": "random",
+              "easiest_both": "easiest"}
+    objs = tuple(hn.Arm(a, shapes[a], "both", layers=(7,)) for a in arms)
+    monkeypatch.setattr(hn, "OUT", out)
+    monkeypatch.setattr(hn, "LAYERS", (7,))
+    monkeypatch.setattr(hn, "POOLS", ("pool_nsa",))
+    monkeypatch.setattr(hn, "C_GRID", (1.0,))
+    monkeypatch.setattr(hn, "ARMS", objs)
+    monkeypatch.setattr(hn, "ARMS_BY_NAME", {a.name: a for a in objs})
+    rng = np.random.default_rng(seed)
+    n = n_groups * per
+    y = np.tile(np.r_[np.zeros(per // 2, int), np.ones(per // 2, int)], n_groups)
+    groups = np.repeat([f"g{i}" for i in range(n_groups)], per)
+    fold = np.arange(n) % 5
+    hn.atomic_write_json(out / "rows.json", {
+        "inner_path": [f"/x/{i}.wav" for i in range(n)], "inner_y": y.tolist(),
+        "inner_fold": fold.tolist(), "inner_source": ["diffssd"] * n,
+        "inner_speaker": groups.tolist(), "inner_group": groups.tolist()})
+    meta = pd.DataFrame({"group": groups, "speaker": groups, "source": "diffssd",
+                         "generator": np.where(y == 1, "gen", "bonafide")})
+    scales = {"none": 1.0, "hardest_both": 0.5, "random_both": 1.0, "easiest_both": 0.7}
+    expected = {}
+    for a in arms:
+        s = y + rng.normal(scale=scales[a], size=n)
+        if degenerate == a:
+            s = np.zeros(n)
+        key = (a, 7, "pool_nsa", 1.0)
+        mask = np.ones(n, bool)
+        picks = {} if a == "none" else {k: np.flatnonzero(fold != k)[:20] for k in range(5)}
+        hn.atomic_savez(hn._npz_path(key), oof=s, mask=mask,
+                        **{f"picks_f{k}": v for k, v in picks.items()})
+        rec = {"arm": a, "layer": 7, "pool": "pool_nsa", "C": 1.0, "fingerprint": f"fp-{a}",
+               "four_layer": True, "params": {}, "primary": hn.read_cell(y, s, fold, meta, mask),
+               "secondary": "N/A - declared in advance",
+               "mined": (hn.characterise(meta, y, {k: {0: 10, 1: 10} for k in picks}, picks)
+                         if picks else {}),
+               "focal_grad_norms": [], "status": "OK"}  # fmt: skip
+        if drop != a:
+            hn.atomic_write_json(out / "cells" / f"L07_pool_nsa_C1_{a}.json", rec)
+        expected[key] = f"fp-{a}"
+    return out, expected, y, groups
+
+
+def test_gate_contrast_is_aggregated_per_c_inside_shared_resamples(tmp_path, monkeypatch):
+    """Codex audit round 1, #1: inference is per C, from an aggregate built inside shared
+    group-resamples; on a single stratum it must coincide with that stratum's own bootstrap."""
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch)
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    assert rep["complete"] and rep["gate_complete"] and not rep.get("incomplete")
+    con = rep["contrasts"]["hardest_both_minus_none"]
+    assert set(con["by_C"]) == {"C1"} and con["by_C"]["C1"]["n_strata"] == 1
+    cell = rep["gate"][str(("hardest_both", 7, "pool_nsa", 1.0))]
+    assert con["by_C"]["C1"]["p_better"] == cell["bootstrap"]["p_better"]
+    assert con["by_C"]["C1"]["median"] == cell["bootstrap"]["median"]
+    assert "mean_delta_package05_all_strata" in con and "DESCRIPTIVE" in con["note"]
+    assert "mean_delta_package05" not in con, "the old C-pooled headline field is gone"
+    assert cell["verdict"] in ("PASS", "INDETERMINATE", "FAIL")
+
+
+def test_gate_refuses_a_stale_checkpoint(tmp_path, monkeypatch):
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch)
+    expected[("hardest_both", 7, "pool_nsa", 1.0)] = "something-else"
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    g = rep["gate"][str(("hardest_both", 7, "pool_nsa", 1.0))]
+    assert g["verdict"] == "INVALID" and "stale" in g["reason"]
+    assert rep["contrasts"]["hardest_both_minus_none"]["n_strata"] == 0
+    assert rep["contrasts"]["hardest_both_minus_none"]["by_C"]["C1"] is None
+
+
+def test_gate_refuses_a_truncated_checkpoint(tmp_path, monkeypatch):
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch)
+    p = hn._npz_path(("hardest_both", 7, "pool_nsa", 1.0))
+    p.write_bytes(p.read_bytes()[:100])
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    g = rep["gate"][str(("hardest_both", 7, "pool_nsa", 1.0))]
+    assert g["verdict"] == "INVALID" and "unreadable" in g["reason"]
+
+
+def test_gate_refuses_an_incomplete_grid_instead_of_gating_it(tmp_path, monkeypatch):
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch, drop="random_both")
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    assert rep["complete"] is False and "incomplete grid" in rep["refused"]
+    assert rep["gate"] == {} and rep["contrasts"] == {}
+    assert rep["missing"] == [str(("random_both", 7, "pool_nsa", 1.0))]
+
+
+def test_gate_marks_a_degenerate_cell_invalid_and_excludes_it_from_contrasts(tmp_path, monkeypatch):
+    """Codex audit round 1, #4: a constant-score cell is INVALID (R9), not a FAIL that still feeds
+    the primary contrast."""
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch, degenerate="hardest_both")
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline())
+    g = rep["gate"][str(("hardest_both", 7, "pool_nsa", 1.0))]
+    assert g["verdict"] == "INVALID" and "constant scores" in g["reason"]
+    assert rep["n_invalid"] == 1
+    assert rep["contrasts"]["hardest_both_minus_none"]["n_strata"] == 0
+
+
+def test_gate_honours_the_persisted_deadline(tmp_path, monkeypatch):
+    """Codex audit round 1, #5 (Codex #8): the gate stops at the deadline, keeps what it has and
+    claims no completeness."""
+    _out, expected, _y, _g = _mini_out(tmp_path, monkeypatch)
+    rep = hn.stage_gate(expected=expected, dl=_FakeDeadline(expired=True))
+    assert rep["incomplete"] is True and rep["gate_complete"] is False
+    assert rep["gate"] == {} and rep["contrasts"] == {}
+    assert "deadline" in rep["incomplete_note"]
 
 
 # --------------------------------------------------------------------------- F. provenance

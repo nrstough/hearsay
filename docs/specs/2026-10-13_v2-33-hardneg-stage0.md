@@ -362,7 +362,20 @@ execution record; the numbers are in the report, and `outputs/` is gitignored.
   readout and gate code (none in a fit, a score or a band). Fixed, tested, and the deterministic
   grid re-run as **run 2** with the committed script; the gate re-run; the C sweep not re-run
   (nothing in the fixes touches it). The byte-identity of run 2's OOF scores against run 1 is the
-  report's "Run record" row (all 132 cells byte-identical in `oof` and `mask`; 131 OK cells identical in every primary reading; the one INVALID cell INVALID for the same reason).
+  report's "Run record" row (all 131 OK cells byte-identical in `oof` and `mask` and identical in every
+  primary reading; the one INVALID cell, which writes no score file, INVALID for the same reason; 132 of
+  132 agree).
+- **Run 3, Sat Oct 17 21:43 EDT, interrupted** after 64 cells (stopped by PID) when the Claude critique
+  arrived with fixes that touch the script, which the whole-file fingerprint would have turned into
+  "stale" checkpoints mid-run. Log kept as `fit_run3_interrupted.log`.
+- **Run 4, Sat Oct 17, 21:43 to 22:12 EDT, final.** After the audit-round-1 fixes, under the
+  source-scoped, shard-hashed fingerprint: 131 computed, 0 reused, 1 INVALID (same cell, same reason),
+  868 s; self-check Spearman 1.0, gap 0.0; the validated gate 21:58 to 22:12 (14.5 min); persisted 3 h
+  deadline not reached. Identity against run 1 as above: 132 of 132 agree. Verdicts: 24 BASE, 93 FAIL,
+  **8 PASS, 6 INDETERMINATE**, 1 INVALID; no R5 survivor.
+
+- **Pre-run commit record: missing** (Codex audit round 1, #6). The declaration was frozen in files on disk
+  on Oct 13 but not committed until Oct 17; recorded as a limitation, see the report's disclosures.
 
 ### Defects found at close-out (details and tests in the report's defects table)
 
@@ -385,9 +398,9 @@ manifests carry no duration column and this lane may not read audio.
 | 1 | Every pre-declared cell present; N/A declared in advance | 132 / 132; `pool_nsa` x full basis N/A by declaration |
 | 2 | Base reproduces the shipped L7 probe under the monotone-invariant check, and the check **blocks** | Spearman 1.0, gap 0.0, both runs; `self_check` raises `SystemExit` |
 | 3 | Zero `decode_error`, zero all-zero rows, full join coverage | Enforced by `load_layer` / `load_world` guards; both runs loaded 23,790 inner rows in `bakeoff/rows.json` order |
-| 4 | Gate verdict computed, survivors named, status under all three readings | Computed for all 132 cells (`outputs/v2/hardneg/report.json`): 24 BASE, 98 FAIL, **9 PASS**, 1 INVALID. No (arm, pool, C) passes R5 (each pass is on one layer, never L20), so **no survivor**; the nine single-layer passes, one of them the random control, are named in the report's gate section with all three readings, fold 0 / fold 4, false alarms and P(better) ± SE. Eight R1 verdicts are indeterminate (within 2 SE of 0.90) and are listed |
-| 5 | Every mining arm reports its characterisation; confidently-wrong FA counted per cell | Characterisation present for all 107 mined cells after the fix; H5 counted but saturated (defect 3) |
-| 6 | Run spec and report written; one `experiments/log.csv` row naming basis and readings | This section; the report; row appended by `v2_hardneg_bakeoff.py log` (appended 2026-10-18T01:13:15+00:00 = Oct 17 21:13 EDT: `validation_score` 0.240507, the reference cell `none` L7 `pool_nsa` C=1 on the NSA-only basis; notes carry the basis, all three readings, EER, cell counts, the PASS count and the two primary contrast means; `benchmark_version` "none (pre-V2-01)") |
+| 4 | Gate verdict computed, survivors named, status under all three readings | Computed for all 132 cells (`outputs/v2/hardneg/report.json`, run 4): 24 BASE, 93 FAIL, **8 PASS, 6 INDETERMINATE**, 1 INVALID. No (arm, pool, C) passes R5 (each pass is on one layer, never L20), so **no survivor**; the eight single-layer passes, one of them the random control, and the six indeterminate cells are named in the report's gate section with all three readings, fold 0 / fold 4, false alarms and P(better) ± SE. The primary answer is the per-C shared-resample aggregate of the four pre-declared contrasts (report, "The primary answer") |
+| 5 | Every mining arm reports its characterisation; confidently-wrong FA counted per cell | Characterisation present for all 102 cells that mine rows after the fix (the five OK `focal_g2` cells mine nothing by construction); H5 counted but saturated (defect 3) |
+| 6 | Run spec and report written; one `experiments/log.csv` row naming basis and readings | This section; the report; rows appended by `v2_hardneg_bakeoff.py log`: 2026-10-18T01:13:15+00:00 (the first commit's gate: 9 passes, C-pooled means) and 2026-10-18T02:13:15+00:00 (the final gate: 8 passes, per-C aggregate P(better) for both primary contrasts), the second superseding the first; both carry `validation_score` 0.240507 (the reference cell `none` L7 `pool_nsa` C=1 on the NSA-only basis), all three readings, EER, cell counts and `benchmark_version` "none (pre-V2-01)". The log is append-only, so the first row stays |
 | 7 | `outputs/v2/research/` byte-identical | 48 MB, no file newer than run 1's start; the test suite's autouse guard covers the directory |
 
 `CLAUDE.md` AI-use disclosure: **conditional not triggered.** The lane uses no new pretrained
@@ -396,17 +409,29 @@ unchanged.
 
 ### Verification before commit (plan Step 9)
 
+Round 1 (commit `7ba7faf`, Oct 17 ~21:20 EDT):
+
 ```text
 uv run pytest tests/test_hardneg.py -q      -> 94 passed (82 at run 1; +12 written at close-out)
-uv run pytest -q                            -> 1234 passed, 3 skipped (needs_weights / MPS, not this lane's), 2 warnings, 6 min 15 s
+uv run pytest -q                            -> 1234 passed, 3 skipped (needs_weights / MPS, not this lane's)
 uv run ruff check .                         -> All checks passed
 grep -nE "9\.3333|min_cost\(|c_fa=4|PI_SYNTH|class_weight=.balanced.*sample_weight" scripts/v2_hardneg_bakeoff.py
-                                            -> hits only at lines 88-102 (the comment and the three named
-                                               wrappers brief / package05 / package03) and the W1 docstring
-                                               at line 221; nowhere else (Codex #10's corrected form)
+                                            -> hits only in the comment and the three named wrappers
+                                               brief / package05 / package03, and the W1 docstring
 git diff --stat docs/prod-chunks.md         -> one hunk, lines 518-523, the V2-33 status block only
 shasum -a 256 splits/*.csv                  -> nsa_folds a607d3ec…, nsa_folds_plus_asv19 7bcd377d…, unchanged
 du -sh outputs/v2/research                  -> 48M; no file newer than run 1's start (find -newer)
+```
+
+Round 2 (after the audit-round-1 fixes and run 4):
+
+```text
+uv run pytest tests/test_hardneg.py -q      -> 108 passed (+14: the audit dispositions' tests)
+uv run pytest -q                            -> 1248 passed, 3 skipped, 2 warnings, 6 min 32 s
+uv run ruff check .                         -> All checks passed
+the min_cost grep gate                      -> now a test: test_a1_min_cost_is_called_only_inside_the_three_named_wrappers
+git diff docs/prod-chunks.md                -> the V2-33 status block only (lines 518-523)
+outputs/v2/research                         -> 48M, untouched through runs 2 to 4
 ```
 
 The docs-site test `tests/test_build_site.py::test_every_page_has_shell_invariants` had been failing
@@ -417,7 +442,81 @@ extra headings are now `##` and the test passes. The five other-lane modified fi
 
 ## Review scorecards
 
-_Claude critique and Codex audit results, filled in post-commit._
+### Codex audit, round 1 (Sat Oct 17, on `5820143`): Overall **Fail**
+
+Artifact: `docs/specs/2026-10-13_v2-33-hardneg-stage0-audit.md` (round 1 copy preserved as
+`…-audit-round1.md`).
+
+| Dimension | Grade | Codex's note |
+|---|---|---|
+| Plan adherence | Fail | Primary analysis and gate differ materially from the final design |
+| Scope discipline | Excellent | Changes stay within lane-owned files |
+| Test coverage | Fail | Passing tests miss required gate behaviour and aggregate inference |
+| Review compliance | Fail | Accepted findings #2, #3 and #8 remain incompletely implemented |
+| Freeze integrity | Acceptable | No freeze hashes; owner statements present; pre-run frozen text cannot be independently verified |
+| Regression check | Acceptable | 1,234 passed recorded; 26 targeted tests and lint verified independently |
+| Documentation | Fail | Report and status propagate an incorrect pass count and unsupported aggregate conclusions |
+| Test sensitivity | Excellent | C2 mutation caught first time across three seeds; mutation absent from history |
+
+**All six findings accepted.** Dispositions, each with its test:
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 1 | The primary contrast averaged all 24 strata, C included, while claiming "C never averaged over"; no replicate-level aggregate or aggregate uncertainty | `aggregate_contrast()`: per C, the (layer, pool) strata are averaged **inside** each shared group-resample (same draw plan and seed as the per-stratum bootstraps), giving P(better), its SE, median, p5/p95 per C. The all-strata mean is kept as `mean_delta_package05_all_strata`, labelled descriptive. Report, status and log row re-stated on the per-C aggregates | `test_gate_contrast_is_aggregated_per_c_inside_shared_resamples` (on one stratum the aggregate must coincide with that stratum's own bootstrap) |
+| 2 | An R1-indeterminate cell could still PASS (`easiest_both` L7 `pool_nsa` C=8 at 0.904) | `gate_cell` returns **INDETERMINATE** when R1 is within 2 SE of the band and no other rule fails; R5 counts PASS only | `test_e_r1_indeterminate_is_not_a_pass_and_not_r5_eligible` |
+| 3 | Fingerprint hashed manifests but not shard contents; npz writes non-atomic; the gate never validated fingerprints nor refused an incomplete grid; a truncated checkpoint JSON aborted the whole fit at resume (Claude critique #5) | `shard_digest()` hashes manifest **and** every shard (cached per process, keyed on size and mtime); the script's own contribution to the fingerprint is now the **source of the fitting-path functions** (`FINGERPRINT_SOURCES`, taken from the file's AST) rather than the whole file, so a gate or report edit no longer forces a refit while a fitting change still does; `atomic_savez()`; `reusable_checkpoint()` treats a stale, truncated or npz-less checkpoint as "recompute", never as an abort; `validate_cells()` at gate time refuses stale (fingerprint mismatch), unreadable / truncated and incomplete-coverage checkpoints as INVALID with the reason; `stage_gate` refuses a partial grid outright (no verdicts, `refused` recorded, exit 2) | `test_f3_fingerprint_covers_shard_contents_not_just_the_manifest`, `test_f3_fingerprint_hashes_the_fitting_path_source`, `test_f3_resume_rule_recomputes_a_stale_or_truncated_checkpoint`, `test_f3_atomic_savez_writes_whole_or_not_at_all`, `test_gate_refuses_a_stale_checkpoint`, `test_gate_refuses_a_truncated_checkpoint`, `test_gate_refuses_an_incomplete_grid_instead_of_gating_it` |
+| 4 | R9 degeneracy was an ordinary FAIL with `status = OK`, still eligible for contrasts; no constant-score refusal; saturation not checked on every reading; a null reading after the JSON round-trip raised `TypeError` in the gate (Claude critique #14) | `degenerate_reason()` centralises R9 (non-finite or null, **constant**, AUC < 0.5, any of the three readings saturated, on every basis); applied at fit (cell written INVALID) and again at gate from the checkpoint; INVALID cells never enter a contrast; `gate_cell` reads every number through a null-safe accessor | `test_r9_degenerate_reason_covers_constant_scores_and_every_reading`, `test_gate_marks_a_degenerate_cell_invalid_and_excludes_it_from_contrasts`, `test_e_r9_null_reading_after_the_round_trip_is_refused_not_a_crash` |
+| 5 | The gate never consulted the persisted deadline | `stage_gate` ticks the deadline before every bootstrap; on expiry it keeps what it has, records `incomplete` and claims no completeness; `main` exits 2 | `test_gate_honours_the_persisted_deadline` |
+| 6 | No pre-run commit of the declaration: the script and spec were first committed Oct 17, after both runs | **Recorded as a limitation**, here and in the report's disclosures. The pre-declaration's integrity rests on the file history on disk and on the preserved run-1 outputs, not on a commit. Any confirmation run (stage 0.5, V2-01 row) commits its declaration before execution | none (process rule) |
+| (Codex #10 / critique #7) | The `min_cost(` grep gate was a manual check, not a test | Pinned as an AST test: every `min_cost` call must sit inside `brief`, `package05` or `package03` | `test_a1_min_cost_is_called_only_inside_the_three_named_wrappers` |
+
+The fixes to #1 to #4 change what the gate and the contrasts *compute*, not any fit, so the grid was
+re-run as **run 3** under the new fingerprint (which the shard digests change) and the OOF scores
+checked against run 1 a third time; the re-gated numbers are in the Results section and the report.
+
+### Claude critique, round 1 (Sat Oct 17, on `5820143`, same rubric): Overall **Fail**
+
+Run as a background agent with the rubric, the commits and the outputs, instructed to recompute
+rather than trust. It verified every number it could recompute in the report against `report.json`
+and the cells (Appendix A, C, the stratum table, the nine-pass table, the contrasts, the rule-fail
+counts, the H3 and mined-set ranges, the C sweep, the base reference, the H5 saturation, the log
+row), reproduced the break check on a scratch copy (3/3 pass, 3/3 fail under the mutation), and
+confirmed the three run-1 defects and their fixes.
+
+| Dimension | Grade | Critique's note |
+|---|---|---|
+| Plan adherence | Fail | R1 "within 2 SE is indeterminate, not a pass" not applied to the verdict; no aggregate shared-resample uncertainty for the primary answer, stratum counts used instead |
+| Scope discipline | Excellent | Write list respected; `prod-chunks.md` one hunk; research dir unchanged |
+| Test coverage | Acceptable | 94 passed; no test that an indeterminate cell is withheld from PASS; no stale / truncated resume test |
+| Review compliance | Acceptable | #3, #8, #10 partially delivered |
+| Freeze integrity | Acceptable | Owner's statement in the owner's voice; pre-commit text not independently verifiable |
+| Regression check | Acceptable | Lane tests, lint, docs-site test pass; one well-formed log row |
+| Documentation | Acceptable | Every recomputed number matches; cosmetic defects (findings 8-12) |
+| Test sensitivity | Excellent | Reproduced; caveat that the gate layer itself had no mutation check |
+
+Findings and dispositions (its numbering):
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Indeterminate R1 still PASSes (`easiest_both` L7 `pool_nsa` C=8 at 0.904); headline is 8 + 1 indeterminate, not 9 | Same as Codex #2; fixed (`INDETERMINATE` verdict, R5 counts PASS only); counts restated after the re-gate |
+| 2 | No aggregate bootstrap with uncertainty; stratum counting substituted. Its own shared-resample aggregate over all 24 strata: easiest − none P(better) 0.993, 95% CI of the mean Δ [−0.038, −0.0005]; hardest − none 0.242 | Same as Codex #1; fixed per C (`aggregate_contrast`), which is the pre-declared unit; the all-strata figure is kept as descriptive. The critique's point that the easiest-side interval nearly touches zero is carried into the report's reading of the result |
+| 3 | "132 of 132 byte-identical" overclaims: the INVALID cell writes no score file, so it is 131 npz plus one INVALID with the same reason | Wording fixed in the report; the commit message of `7ba7faf` cannot be changed and is noted here |
+| 4 | H5 saturation was knowable at freeze time from the spec's own reference FA rates (17.7%, 20.2% > 10%) | Acknowledged in the report's H5 section |
+| 5 | A truncated checkpoint JSON aborted the whole fit at resume; no stale / truncated tests | `reusable_checkpoint()` + tests (see Codex #3 row) |
+| 6 | Deadline not consulted by the gate; partial grid still gated | Same as Codex #5 and #3; fixed |
+| 7 | `min_cost` grep gate not pinned as a test | AST test added |
+| 8 | Report test count 82 → 91 stale | Fixed (94, with the C2 and F4 tests named) |
+| 9 | "107 mined cells" is 102 (five `focal_g2` cells mine nothing) | Fixed in report and spec |
+| 10 | Appendix D one-sided rows mis-rendered | Checked after regeneration from run 4 |
+| 11 | SE range 0.006-0.016 is 0.0054-0.0158 | Fixed (0.005 to 0.016) |
+| 12 | Disclosure conditional and log row confirmed correct | none |
+| 13 | No mutation check on the gate layer; a mutation making `R1_indeterminate` irrelevant was caught by nothing | The new verdict test asserts the verdict, not the flag; a gate-layer mutation check is run and recorded under "Test break check, round 2" |
+| 14 | A null reading after the JSON round-trip raises `TypeError` in `gate_cell` | Null-safe accessor; `degenerate_reason` refuses null readings; test added |
+| 15 | Serial grid instead of the plan's `Parallel` pool; INVALID strata "counted" only implicitly | Justified deviation (one LR fit is 0.05 s); `invalid_reasons` now lists every excluded cell in `report.json` |
+
+### Codex audit, round 2
+
+_Run after the round-1 fixes were committed; recorded below._
 
 ---
 
