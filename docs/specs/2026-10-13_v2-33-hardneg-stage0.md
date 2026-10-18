@@ -609,9 +609,33 @@ Findings and dispositions (its numbering):
 | 11 | Both break checks reproduced | none |
 | 12 | Every regenerated table matches | none |
 
-### Codex audit, round 3
+### Codex audit, round 3 (Sat Oct 17, on `db35a5d`): Overall **Acceptable**
 
-_Run after the round-2 fixes were committed; recorded below._
+Artifact: `docs/specs/2026-10-13_v2-33-hardneg-stage0-audit.md` (also preserved as `…-audit-round3.md`).
+
+| Dimension | Grade | Codex's note |
+|---|---|---|
+| Plan adherence | Acceptable | Final 132-cell design implemented; 64-row C sweep present; pre-run commit requirement missed |
+| Scope discipline | Excellent | Lane-owned files only |
+| Test coverage | Acceptable | 114 lane / 1,254 full-suite recorded; 59 tests and lint verified independently; the diagnostic-split, H5 and duration limitations narrow what is established |
+| Review compliance | **Excellent** | Inspected fixes address every recorded finding, including authoritative masks and unreadable checkpoint JSON |
+| Freeze integrity | Acceptable | No hashes; pre-execution declaration cannot be verified from git |
+| Regression check | Acceptable | All 132 checkpoint fingerprints validate; 131 OOF/mask arrays match run 1; run 4 and 4b reports exactly equal; full suite not re-run in the read-only sandbox |
+| Documentation | **Excellent** | Results match artifacts; diagnostic status, limitations and adoption blockers documented |
+| Test sensitivity | Excellent | Both mutations reproduced in memory and caught; neither in the change's patches |
+
+No new finding. The three commentary items restate disclosed limitations: the missing pre-run
+commit (#6 of round 1), the legacy split with speaker overlap (Codex plan review #1, accepted
+before the run), and the saturated H5 / unavailable duration readouts.
+
+### Why the loop stops here
+
+Codex: Fail (6) → Fail (2) → **Acceptable** (0 new). Claude critique: Fail (15) → **Acceptable**
+(12, all cosmetic or test-strength, all delivered). Every finding from every round has a disposition
+and, where it is code, a test that can fail; the two residual Acceptables are facts about this
+experiment that no further commit can change: the declaration was not committed before the run, and
+the fold file is not speaker-disjoint. Both are recorded as the lane's limitations and as
+prerequisites for stage 0.5 and for the V2-01 row that could close V2-33.
 
 ---
 
