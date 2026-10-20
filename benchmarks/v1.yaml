@@ -29,11 +29,14 @@
   "actDCF": "moved to V2-61",
   "asvspoof5_eval": "not downloaded (V2-30 picks a modern public set)",
   "mlaad_by_family": "needs new MLAAD pulls (models released after 2026-04-18)",
-  "reverb_codec_telephony_shortcrop_cohorts": "not built yet",
-  "sealed_set": "decision pending with Nathan (V2-01)"
+  "reverb_codec_telephony_shortcrop_cohorts": "not built yet"
  },
  "format": "JSON content in a .yaml file (valid YAML 1.2); parse with json",
  "inputs": {
+  "data/nsa/HackGTAnswerKey.tsv": {
+   "kind": "file",
+   "sha256": "953704cf03661d80aafb4b52988d2252579959e5ecaa84d1a2e0f2dd2cbbfd87"
+  },
   "models/fusion_v2/constants.json": {
    "kind": "file",
    "sha256": "0818e83e5ad8ca9b23f8b2b9ee0e36aaa32bebe47257ebfae4bcc2353cbd6405"
@@ -235,12 +238,25 @@
    "role": "report_only",
    "rows": 1671,
    "source": "outputs/manifests/nsa_test.csv (unlabelled)"
+  },
+  "test_key": {
+   "role": "sealed",
+   "rows": 1671,
+   "rule": "docs/prod-chunks.md C.1 rule 3 (Nathan, Oct 20): testing only, never selection, calibration, fitting, mining or threshold choice; read once per phase close via `sealed` and its ledger",
+   "source": "data/nsa/HackGTAnswerKey.tsv (NSA answer key, released 2026-10-20) joined to the test manifest"
   }
+ },
+ "resolved": {
+  "sealed_set": "test_key (the NSA answer key, 2026-10-20); see populations.test_key"
+ },
+ "sealed_ledger": {
+  "authority": "outputs/v2/benchmark/sealed_ledger/",
+  "tracked": "benchmarks/sealed_ledger.jsonl"
  },
  "shipped_tsv": {
   "path": "submissions/CrossExam_predictions.tsv (main checkout)",
   "sha256": "fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607"
  },
  "spec": "docs/specs/2026-10-11_v2-benchmark-fusion.md",
- "version": "v1.1"
+ "version": "v1.2"
 }

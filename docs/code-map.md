@@ -27,9 +27,11 @@ scripts/            CLIs: extract_/train_handcrafted, eval_bundle, extract_embed
                     make_probe_csv, make_folds, extend_folds, score_detector, extract_compression,
                     m5_*, spectra_direction, manifest_*, pull_mlaad, hash_audio, bench_latency,
                     make_constant_csv, inventory*;
-                    v2_benchmark (score / rule / registry / v1-scorecard / adapt-l20), v2_fusion (run / report),
-                    v2_cohort_scores (perturbation-cohort scoring, ask-first compute)
-benchmarks/         v1.yaml (v2 benchmark registry, JSON content), v2_60_candidates.json, holdout_ledger.jsonl
+                    v2_benchmark (score / rule / registry / v1-scorecard / adapt-l20 / sealed), v2_fusion (run / report),
+                    v2_cohort_scores (perturbation-cohort scoring, ask-first compute),
+                    v2_error_atlas (V2-02: the sealed Phase 0 readout joined to the runner's per-file material)
+benchmarks/         v1.yaml (v2 benchmark registry, JSON content), v2_60_candidates.json, holdout_ledger.jsonl,
+                    sealed_ledger.jsonl (rule 3: the NSA answer key's read-once ledger)
 scripts/cloud/      launch.sh, box_chain.sh, reaper.sh, r2_guard.sh, teardown_check.sh, box_codecs.py
 splits/             nsa_folds.csv (20,000 rows), nsa_folds_plus_asv19.csv (27,648), nsa_test_durations.csv (1,671)
 tests/              pytest suite, 301 collected

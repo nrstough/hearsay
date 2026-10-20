@@ -251,6 +251,8 @@ Output: `outputs/v2/benchmark/<name>.json` + a markdown scorecard row. Every rea
 
 - **2026-10-12, Nathan (STOP 3):** "No platt for now it'll overfit and not generalize". C2 drops the per-fold Platt step: C2 = E applied to the shrunk weighted rank. All candidates are scored on the post-E weighted rank. Calibration is deferred to V2-61. Recorded context: the ruling came after an early inner look in which C2 scored 0.376 package-0.5 without Platt and 0.514 with per-fold Platt (C0 0.3390). Other pre-run clarifications (K2–K13) are in `benchmarks/v2_60_candidates.json` and the plan.
 
+- **2026-10-20, Nathan ("the test set should be only for testing"):** the NSA answer key (released Oct 20) is the sealed set, population `test_key`, role `sealed` (new role), 1,671 rows, registry v1.2. Not in `load_populations()`; loaded only by `load_sealed_population()`; read only by `read_sealed()` through its own ledger (`benchmarks/sealed_ledger.jsonl`), phase and reason required, no reference exemption. CLI `sealed (--tsv | --file --name) --phase --reason`. `deferred.sealed_set` → `resolved`. Phase 0 read: the shipped TSV, `docs/reports/2026-10-20_v2-02-error-atlas.md`. The populations table above gains the row `test_key | 1,671 | sealed: read once per phase close`.
+
 ## Codex audit
 
 **Round 1 (Oct 13): Fail** (`docs/specs/2026-10-11_v2-benchmark-fusion-audit.md`). Scope, Freeze integrity and Test sensitivity Excellent; Regression Acceptable (Codex's sandbox could not write a temp dir; the full suite passes locally). Findings and responses:

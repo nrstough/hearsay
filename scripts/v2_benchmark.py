@@ -4,6 +4,7 @@
   uv run python scripts/v2_benchmark.py registry --build | --check [--no-trees]
   uv run python scripts/v2_benchmark.py score --file X.csv --name NAME [--itw ITW.csv] [--holdout] [--force]
   uv run python scripts/v2_benchmark.py rule --rule RULE.json [--holdout] [--force]
+  uv run python scripts/v2_benchmark.py sealed (--tsv SUB.tsv | --file X.csv --name NAME) --phase P --reason "..."
   uv run python scripts/v2_benchmark.py v1-scorecard [--force]
 
 Outputs go to outputs/v2/benchmark/ (shared by every checkout through the outputs/ link).
@@ -44,7 +45,7 @@ COLUMNS = {
 }
 DATA_INPUTS = [
     "splits/nsa_folds.csv", "splits/nsa_test_durations.csv", "outputs/manifests/itw_stress.csv",
-    "outputs/manifests/nsa_test.csv", "outputs/channel/m3_perturb.csv", "outputs/channel/m3_mlaad.csv",
+    "outputs/manifests/nsa_test.csv", B.SEALED_KEY_FILE, "outputs/channel/m3_perturb.csv", "outputs/channel/m3_mlaad.csv",
     "models/fusion_v2/constants.json", "outputs/v2/bakeoff/probes/L20.npz", "outputs/v2/bakeoff/probes/L20.joblib",
     "outputs/v2/bakeoff/rows.json", "outputs/v2/bakeoff/emb_mlaad.npz",
     "outputs/embeddings/wav2vec2-xls-r-300m/itw_stress_v3/manifest.csv",
@@ -62,14 +63,18 @@ POPULATIONS = {
     "itw_cohort": {"role": "report_only", "rows": 2500, "source": "outputs/v2/benchmark/cohorts/itw/<column>.csv"},
     "mlaad": {"role": "report_only", "rows": 572, "source": "outputs/channel/m3_mlaad.csv (spoof only; in-sample for M5)"},
     "test": {"role": "report_only", "rows": B.N_TEST, "source": "outputs/manifests/nsa_test.csv (unlabelled)"},
+    "test_key": {"role": "sealed", "rows": B.N_TEST,
+                 "source": f"{B.SEALED_KEY_FILE} (NSA answer key, released 2026-10-20) joined to the test manifest",
+                 "rule": "docs/prod-chunks.md C.1 rule 3 (Nathan, Oct 20): testing only, never selection, calibration, "
+                         "fitting, mining or threshold choice; read once per phase close via `sealed` and its ledger"},
 }
 DEFERRED = {
     "mlaad_by_family": "needs new MLAAD pulls (models released after 2026-04-18)",
     "asvspoof5_eval": "not downloaded (V2-30 picks a modern public set)",
     "reverb_codec_telephony_shortcrop_cohorts": "not built yet",
-    "sealed_set": "decision pending with Nathan (V2-01)",
     "actDCF": "moved to V2-61",
 }
+RESOLVED = {"sealed_set": "test_key (the NSA answer key, 2026-10-20); see populations.test_key"}
 
 
 def _code_sha() -> str:
@@ -195,6 +200,8 @@ def build_registry(version: str = B.BENCHMARK_VERSION, pending=None) -> dict:
             if not (COHORT_DIR / cohort / f"{col}.csv").exists()
         },
         "deferred": DEFERRED,
+        "resolved": RESOLVED,
+        "sealed_ledger": {"authority": "outputs/v2/benchmark/sealed_ledger/", "tracked": "benchmarks/sealed_ledger.jsonl"},
     }
 
 
@@ -206,6 +213,10 @@ def check(reg: dict, *, trees: bool = True) -> list[str]:
     for k in ("inner", "holdout", "itw", "test"):
         if pops[k].n != reg["populations"][k]["rows"]:
             problems.append(f"population {k}: {pops[k].n} rows, registry says {reg['populations'][k]['rows']}")
+    if "test_key" in reg["populations"]:
+        sealed = B.load_sealed_population()
+        if sealed.n != reg["populations"]["test_key"]["rows"]:
+            problems.append(f"population test_key: {sealed.n} rows, registry says {reg['populations']['test_key']['rows']}")
     return problems
 
 
@@ -611,6 +622,90 @@ def v1_scorecard(boot_n: int = 2000) -> dict:
     return out
 
 
+# ---------------------------------------------------------------------------
+# Sealed set (rule 3): one ledgered read per phase close
+# ---------------------------------------------------------------------------
+
+
+def sealed_readout(pop: B.Population, s: np.ndarray, *, decision_threshold: float, boot_n: int = 2000,
+                   n_worst: int = 50) -> dict:
+    """Everything one sealed read yields, so nothing has to read the labels
+    again: the three readings + EER, FA/miss counts at each reading's own
+    threshold and at the fixed decision threshold, a per-clip bootstrap, and the
+    per-file error list (every miss and false alarm at the decision threshold,
+    plus the n_worst highest-scoring reals and lowest-scoring spoofs)."""
+    y = pop.y
+    names = np.array([Path(k).name for k in pop.keys])
+    real, spoof = y == 0, y == 1
+    fa, miss = real & (s >= decision_threshold), spoof & (s < decision_threshold)
+    # unlabelled rank: share of the whole set scoring strictly below this clip
+    order = np.argsort(np.argsort(s, kind="mergesort"), kind="mergesort")
+    pct = order / max(len(s) - 1, 1)
+
+    def rows(mask, sort_desc):
+        idx = np.flatnonzero(mask)
+        idx = idx[np.argsort(-s[idx] if sort_desc else s[idx], kind="mergesort")]
+        return [{"filename": str(names[i]), "score": float(s[i]), "label": "spoof" if y[i] else "bonafide",
+                 "test_rank_pct": float(pct[i])} for i in idx]
+
+    worst_real = np.flatnonzero(real)[np.argsort(-s[real], kind="mergesort")[:n_worst]]
+    worst_spoof = np.flatnonzero(spoof)[np.argsort(s[spoof], kind="mergesort")[:n_worst]]
+    out = {
+        "n_real": int(real.sum()), "n_spoof": int(spoof.sum()),
+        "pooled": B.readings(y, s),
+        "counts": {k: B.counts_at(y, s, k) for k in B.READINGS},
+        "counts_at_decision": {"threshold": float(decision_threshold), "n_fa": int(fa.sum()), "n_miss": int(miss.sum()),
+                               "p_fa": float(fa.sum() / real.sum()), "p_miss": float(miss.sum() / spoof.sum())},
+        "errors_at_decision": {"false_alarms": rows(fa, True), "misses": rows(miss, False)},
+        "worst": {"real_highest": rows(np.isin(np.arange(len(s)), worst_real), True),
+                  "spoof_lowest": rows(np.isin(np.arange(len(s)), worst_spoof), False)},
+    }
+    if boot_n:
+        out["bootstrap"] = {"stratified": B.bootstrap_ci(y, s, pop.cluster, pop.stratum, n=boot_n)}
+    return out
+
+
+def cmd_sealed(a) -> None:
+    reg = require_registry(trees=False)
+    if "test_key" not in reg["populations"]:
+        raise SystemExit("registry has no test_key population: rebuild it (registry --build) first")
+    pop = B.load_sealed_population()
+    pinned = reg["inputs"].get(B.SEALED_KEY_FILE, {}).get("sha256")
+    if pinned != B.sha256_file(REPO / B.SEALED_KEY_FILE):
+        raise SystemExit(f"{B.SEALED_KEY_FILE} does not match the registry pin")
+    if a.tsv:
+        name = safe_name(a.name or "SHIP_tsv")
+        s = B.submission_scores(a.tsv, pop)
+        sha = B.sha256_file(a.tsv)
+        defn = {"kind": "submission_tsv", "name": name, "sha256": sha}
+        shas = {str(a.tsv): sha}
+        thr = 0.5
+    else:
+        name = safe_name(a.name)
+        sf = B.read_score_file(a.file, name=name)
+        s = B.align(sf, pop)
+        if s is None:
+            raise SystemExit(f"{a.file} has no test rows")
+        defn = B.column_def(name, main_sha(sf))
+        shas = sf.shas
+        thr = 0.0  # logits
+    meta = {"code_sha": _code_sha(), "input_shas": shas, "lane": a.lane, "registry_version": reg["version"]}
+    res = B.read_sealed([defn], lambda: sealed_readout(pop, s, decision_threshold=thr, boot_n=a.boot_n),
+                        ledger=B.HoldoutLedger.sealed_default(), sealed_sha=B.sealed_sha(pop),
+                        phase=a.phase, reason=a.reason, meta=meta)
+    card = {"what": name, "definition": defn, "population": "test_key", "role": "sealed", "phase": a.phase,
+            "reason": a.reason, "sealed_ledger": res["ledger"], "sealed_ledger_count": res["ledger_count"],
+            "ledger_key": res["key"], "benchmark_version": reg["version"], "registry_sha256": B.sha256_file(REGISTRY),
+            "lane": a.lane, "readout": res["readout"]}
+    write_json(OUT / "sealed" / f"{name}.json", card, force=a.force)
+    r, c = res["readout"]["pooled"], res["readout"]["counts_at_decision"]
+    print("| What | Population | brief | package-0.5 | package-0.3 | EER |\n|---|---|---|---|---|---|")
+    print(f"| {name} | test_key (sealed, {res['ledger']}) | {_fmt(r['brief'])} | {_fmt(r['package05'])} | "
+          f"{_fmt(r['package03'])} | {_fmt(r['eer'])} |")
+    print(f"at {c['threshold']}: {c['n_fa']} false alarms / {res['readout']['n_real']} real, "
+          f"{c['n_miss']} misses / {res['readout']['n_spoof']} spoof")
+
+
 def _fmt(v):
     return "NA" if v is None else f"{v:.4f}"
 
@@ -657,6 +752,16 @@ def main(argv=None) -> int:
     ru.add_argument("--holdout", action="store_true")
     ru.add_argument("--force", action="store_true")
     ru.add_argument("--boot-n", type=int, default=2000)
+    se = sub.add_parser("sealed", help="one ledgered read of the sealed NSA test key (rule 3)")
+    src = se.add_mutually_exclusive_group(required=True)
+    src.add_argument("--tsv", help="submission-format TSV (filename, cm-score; 1.0 = synthetic)")
+    src.add_argument("--file", help="Interface v1 score file with a test split (logits)")
+    se.add_argument("--name", help="name for the read (default SHIP_tsv for --tsv; required with --file)")
+    se.add_argument("--phase", required=True, help="the phase this read closes, e.g. 'Phase 0'")
+    se.add_argument("--reason", required=True, help="why this read is taken (at least 20 characters)")
+    se.add_argument("--lane", default="unknown")
+    se.add_argument("--force", action="store_true")
+    se.add_argument("--boot-n", type=int, default=2000)
     v = sub.add_parser("v1-scorecard")
     v.add_argument("--force", action="store_true")
     v.add_argument("--boot-n", type=int, default=2000)
@@ -678,6 +783,10 @@ def main(argv=None) -> int:
         cmd_score(a)
     elif a.cmd == "rule":
         cmd_rule(a)
+    elif a.cmd == "sealed":
+        if a.file and not a.name:
+            raise SystemExit("--name is required with --file")
+        cmd_sealed(a)
     elif a.cmd == "v1-scorecard":
         card = v1_scorecard(a.boot_n)
         write_json(OUT / "v1_scorecard.json", card, force=a.force)

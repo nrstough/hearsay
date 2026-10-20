@@ -33,16 +33,18 @@ def needs_data(f):
     """Marker (selectable with -m needs_data) plus a skip when the exports are absent."""
     return pytest.mark.needs_data(pytest.mark.skipif(not HAVE_DATA, reason="needs the gitignored score exports")(f))
 TRACKED_LEDGER = REPO / "benchmarks/holdout_ledger.jsonl"
+TRACKED_SEALED_LEDGER = REPO / "benchmarks/sealed_ledger.jsonl"
 
 
 @pytest.fixture(autouse=True)
 def _isolated_ledger(tmp_path, monkeypatch):
-    """Every test uses a tmp holdout ledger; the tracked ledger must not change."""
-    before = TRACKED_LEDGER.read_bytes() if TRACKED_LEDGER.exists() else None
+    """Every test uses tmp holdout and sealed ledgers; the tracked ones must not change."""
+    before = [p.read_bytes() if p.exists() else None for p in (TRACKED_LEDGER, TRACKED_SEALED_LEDGER)]
     monkeypatch.setenv("HEARSAY_HOLDOUT_LEDGER", str(tmp_path / "ledger"))
+    monkeypatch.setenv("HEARSAY_SEALED_LEDGER", str(tmp_path / "sealed_ledger"))
     yield
-    after = TRACKED_LEDGER.read_bytes() if TRACKED_LEDGER.exists() else None
-    assert before == after, "a test changed the tracked holdout ledger"
+    after = [p.read_bytes() if p.exists() else None for p in (TRACKED_LEDGER, TRACKED_SEALED_LEDGER)]
+    assert before == after, "a test changed a tracked ledger"
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +86,9 @@ def make_world(tmp_path: Path, seed: int = 0):
     test = pd.DataFrame({"filename": [f"HGT{i}.wav" for i in range(10)],
                          "path": [f"data/nsa/HackGTHearsayTesting/HGT{i}.wav" for i in range(10)]})
     test.to_csv(root / "outputs/manifests/nsa_test.csv", index=False)
+    (root / "data/nsa").mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"filename": test["filename"], "cm-label": ["spoof" if i % 3 == 0 else "bonafide" for i in range(10)]}
+                 ).to_csv(root / B.SEALED_KEY_FILE, sep="\t", index=False)
     pops = B.load_populations(root, main=root, expect=None)
     return root, pops, rng
 
@@ -456,8 +461,9 @@ def test_registry_counts_match():
 def test_deferred_populations_absent_and_listed():
     reg = B.load_registry(VB.REGISTRY)
     assert set(reg["deferred"]) == {"mlaad_by_family", "asvspoof5_eval", "reverb_codec_telephony_shortcrop_cohorts",
-                                    "sealed_set", "actDCF"}
+                                    "actDCF"}
     assert not set(reg["deferred"]) & set(reg["populations"])
+    assert reg["resolved"]["sealed_set"].startswith("test_key")
 
 
 @needs_data
@@ -1451,3 +1457,120 @@ def test_cohort_mps_reservation_waits_for_live_owner_and_reclaims_dead(tmp_path)
 def _no_real_mps_lock(monkeypatch, tmp_path):
     """No test may claim the shared MPS reservation other lanes rely on."""
     monkeypatch.setattr(VC, "MPS_LOCK", tmp_path / "mps" / "MPS.lock")
+
+
+# ---------------------------------------------------------------------------
+# Sealed set (rule 3): the NSA test key
+# ---------------------------------------------------------------------------
+
+
+def test_sealed_population_not_in_bench_and_never_selectable(world):
+    root, pops, _rng = world
+    assert "test_key" not in pops, "the sealed labels must never ride along in load_populations"
+    sealed = B.load_sealed_population(root, main=root)
+    assert sealed.role == "sealed" and sealed.n == 10 and sealed.y.sum() == 4
+    assert set(sealed.keys) == set(pops["test"].keys)
+    with pytest.raises(B.BenchmarkError, match="never used for selection"):
+        B.require_selectable(sealed)
+    assert "sealed" in B.ROLES and VB.POPULATIONS["test_key"]["role"] == "sealed"
+
+
+def test_sealed_key_coverage_and_label_checks(world):
+    root, _pops, _rng = world
+    key = root / B.SEALED_KEY_FILE
+    good = key.read_text()
+    key.write_text(good.replace("HGT1.wav\tbonafide", "HGT99.wav\tbonafide"))
+    with pytest.raises(B.BenchmarkError, match="coverage mismatch"):
+        B.load_sealed_population(root, main=root)
+    key.write_text(good.replace("HGT1.wav\tbonafide", "HGT1.wav\tfake"))
+    with pytest.raises(B.BenchmarkError, match="unknown labels"):
+        B.load_sealed_population(root, main=root)
+    key.write_text(good + "HGT1.wav\tspoof\n")
+    with pytest.raises(B.BenchmarkError, match="duplicate"):
+        B.load_sealed_population(root, main=root)
+
+
+def test_submission_tsv_aligns_by_basename_and_refuses_gaps(world, tmp_path):
+    root, _pops, _rng = world
+    sealed = B.load_sealed_population(root, main=root)
+    names = [Path(k).name for k in sealed.keys]
+    tsv = tmp_path / "sub.tsv"
+    pd.DataFrame({"filename": names[::-1], "cm-score": np.linspace(0, 1, 10)[::-1]}).to_csv(tsv, sep="\t", index=False)
+    s = B.submission_scores(tsv, sealed)
+    assert np.allclose(s, np.linspace(0, 1, 10))
+    pd.DataFrame({"filename": names[:-1], "cm-score": 0.5}).to_csv(tsv, sep="\t", index=False)
+    with pytest.raises(B.BenchmarkError, match="coverage mismatch"):
+        B.submission_scores(tsv, sealed)
+    pd.DataFrame({"filename": names, "cm-score": [1.5] + [0.5] * 9}).to_csv(tsv, sep="\t", index=False)
+    with pytest.raises(B.BenchmarkError, match="probabilities"):
+        B.submission_scores(tsv, sealed)
+
+
+def test_read_sealed_needs_phase_and_reason_and_reads_once(tmp_path):
+    led = B.HoldoutLedger(tmp_path / "s", [tmp_path / "s.jsonl"])
+    calls = []
+    defs = [{"kind": "submission_tsv", "name": "x", "sha256": "0" * 64}]
+    with pytest.raises(B.BenchmarkError, match="phase"):
+        B.read_sealed(defs, dict, ledger=led, sealed_sha="k", phase="", reason="a reason long enough here")
+    with pytest.raises(B.BenchmarkError, match="reason"):
+        B.read_sealed(defs, dict, ledger=led, sealed_sha="k", phase="Phase 0", reason="short")
+    assert not calls and led.count() == 0
+    kw = {"ledger": led, "sealed_sha": "k", "phase": "Phase 0", "reason": "closing phase 0 on the shipped TSV"}
+    r1 = B.read_sealed(defs, lambda: calls.append(1) or {"v": 1}, **kw)
+    r2 = B.read_sealed(defs, lambda: calls.append(1) or {"v": 2}, **kw)
+    assert len(calls) == 1 and r2["readout"] == r1["readout"] == {"v": 1}
+    assert r1["ledger"].startswith("read") and r2["ledger"].startswith("persisted")
+    entry = json.loads((tmp_path / "s" / f"{r1['key']}.json").read_text())
+    assert entry["meta"]["phase"] == "Phase 0" and "shipped" in entry["meta"]["reason"]
+    # the reference exemption of the holdout ledger does not exist here, and the key spaces are disjoint
+    assert B.sealed_key(defs, "k") != B.ledger_key(defs, "k")
+
+
+def test_sealed_ledger_is_separate_from_holdout_ledger(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "x")
+    h, s = B.HoldoutLedger.default(), B.HoldoutLedger.sealed_default()
+    assert h.dir != s.dir and h.jsonl != s.jsonl
+    assert "sealed" in str(s.dir)
+
+
+def test_sealed_readout_lists_errors_at_decision(world):
+    root, _pops, _rng = world
+    sealed = B.load_sealed_population(root, main=root)
+    s = np.where(sealed.y == 1, 0.9, 0.1).astype(float)
+    s[np.flatnonzero(sealed.y == 1)[0]] = 0.2  # one miss
+    s[np.flatnonzero(sealed.y == 0)[0]] = 0.7  # one false alarm
+    r = VB.sealed_readout(sealed, s, decision_threshold=0.5, boot_n=0, n_worst=3)
+    c = r["counts_at_decision"]
+    assert (c["n_fa"], c["n_miss"]) == (1, 1) and r["n_real"] == 6 and r["n_spoof"] == 4
+    assert [e["label"] for e in r["errors_at_decision"]["misses"]] == ["spoof"]
+    assert [e["label"] for e in r["errors_at_decision"]["false_alarms"]] == ["bonafide"]
+    assert len(r["worst"]["real_highest"]) == 3 and r["worst"]["real_highest"][0]["score"] == 0.7
+    assert len(r["worst"]["spoof_lowest"]) == 3 and r["worst"]["spoof_lowest"][0]["score"] == 0.2
+    assert set(r["pooled"]) >= {"brief", "package05", "package03", "eer"}
+
+
+HAVE_KEY = HAVE_DATA and (REPO / B.SEALED_KEY_FILE).exists() and (REPO / "submissions/CrossExam_predictions.tsv").exists()
+
+
+@pytest.mark.needs_data
+@pytest.mark.skipif(not HAVE_KEY, reason="needs the NSA key and the shipped TSV")
+def test_shipped_tsv_reproduces_nsa_draft_number_on_the_key():
+    """NSA's returned draft-review number (0.0733 / EER 3.534%) is the package
+    reading at Pspoof 0.3, not package-0.5 and not the brief. Pure metric check:
+    no ledger (the ledgered read is the Phase 0 close, run once by the CLI)."""
+    sealed = B.load_sealed_population()
+    assert sealed.n == 1671 and (sealed.y == 1).sum() == 480
+    s = B.submission_scores(REPO / "submissions/CrossExam_predictions.tsv", sealed)
+    r = B.readings(sealed.y, s)
+    assert abs(r["package03"] - 0.0733) < 5e-4
+    assert abs(r["eer"] - 0.03534) < 1e-3
+    assert r["package05"] > 0.15 and r["brief"] < 0.06  # the other two readings are not NSA's number
+    assert int(((s >= 0.5) & (sealed.y == 0)).sum()) == 1 and int(((s < 0.5) & (sealed.y == 1)).sum()) == 24
+
+
+@needs_data
+def test_registry_pins_the_key_and_test_key_rows():
+    reg = B.load_registry(VB.REGISTRY)
+    assert reg["populations"]["test_key"]["role"] == "sealed"
+    assert reg["inputs"][B.SEALED_KEY_FILE]["sha256"] == B.sha256_file(REPO / B.SEALED_KEY_FILE)
+    assert B.load_sealed_population().n == reg["populations"]["test_key"]["rows"]

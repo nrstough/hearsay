@@ -293,6 +293,7 @@ New for v2:
    - **Code:** `hearsay.metrics.min_cost(y, s, 0.5, c_fa=1.0, c_miss=4.0)`, identical to `sponsor_min_dcf(y, s, flip=True)` (checked Oct 10). v1 scripts call it "averse".
    - **Always reported alongside:** the package at Pspoof 0.3, `min_cost(y, s, 0.3, c_fa=1.0, c_miss=4.0)` = P_FA + 1.714·P_miss, which other teams say NSA used; and v1's brief reading, `min_cost(y, s)`.
    - **Rule:** a v2 candidate may not regress on any of the three readings beyond its pre-declared tie band.
+   - **Open (Oct 20):** the answer key reproduces NSA's returned 0.0733 under the **Pspoof 0.3** reading exactly, not under package-0.5 (0.1543). NSA's convention is settled from data; whether package-0.3 becomes the primary reading is Nathan's ruling, still owed. Until then every v2 verdict (V2-60, V2-33 stage 0, V2-53) stands as gated on package-0.5 and is not restated.
    - **Why it matters:** the v1 numbers and the hackathon `CLAUDE.md` constants stay as they are for v1's record (pinned by `tests/test_docs_consistency.py`).
 6. **Fusion rank references are nested** (`docs/reports/2026-10-10_v2-fusion-research.md`). An inner-OOF readout ranks each column against the training folds only. Under this rule, v1's shipped rule scores inner 0.1558 brief / 0.3390 package, not the reported 0.1351.
 7. **In-the-Wild is spent as a selection set.** v1's α, its E rule and M5's seat were all chosen on it, and it has been reused since. It stays a readout only. Final v2 adoption needs a fresh sealed population (V2-01).
@@ -356,7 +357,8 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   - All seven reference numbers reproduce; the shipped rule reproduces the shipped TSV to 1e-12.
   - Input contract for other lanes: the run spec's "Interface v1".
   - Perturbation cohorts: holdout and ITW, all six columns, scored Oct 13 (registry v1.1).
-  - Still open: items 3–6 below (MLAAD by family, ASVspoof 5, reverb/codec/telephony/short-crop cohorts) and the sealed set.
+  - **Sealed set resolved (Oct 20): `test_key`**, the NSA answer key (1,671 labels, 1,191 real / 480 spoof) as a role-`sealed` population, registry v1.2, its own ledger (`benchmarks/sealed_ledger.jsonl`), one reader (`read_sealed`, phase + reason required, no exemptions), CLI `v2_benchmark.py sealed`. One Phase 0 read taken: the shipped TSV scores **0.0733 package-0.3** (= NSA's number exactly), 0.1543 package-0.5, 0.0537 brief, EER 3.6%; 1 FA / 24 misses at 0.5. Report `docs/reports/2026-10-20_v2-02-error-atlas.md`.
+  - Still open: items 3–5 below (MLAAD by family, ASVspoof 5, reverb/codec/telephony/short-crop cohorts).
 - **Goal:** One script reports any detector or fused system on a fixed set of populations, under both costs, with confidence intervals.
 - **Why:** v1's three readouts disagreed by 11× and 3× around the one real number (B.6). In-the-Wild is spent as a selection set.
 - **Populations (proposed):**
@@ -376,7 +378,8 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 - **Depends on:** V2-00.
 - **Size:** M.
 
-### V2-02 ⬜ Error atlas of v1
+### V2-02 🟡 Error atlas of v1
+- **Status (Oct 20): the test-set atlas is done on the sealed key's Phase 0 read** (`docs/reports/2026-10-20_v2-02-error-atlas.md`, `scripts/v2_error_atlas.py`, `outputs/v2/error_atlas.csv`); ITW and holdout atlases and listening not done. Findings: the 24 misses are not short, not gated, not band-limited and not E-suppressed; they have lower voiced fraction (0.54 vs 0.71) and more within-clip voice variation (drift min cosine 0.16 vs 0.27). The shipped carrier m1b_v3 ranks 3/24 of them synthetic; Spectra (suppressor only) 18/24 and WavLM Large (unshipped) 16/24; one miss is seen by no column. The one false alarm is a carrier-only positive with Spectra at −2.2, just above the −3 veto. Generator identity is not recoverable (anonymised filenames, no generator in the key). Hypotheses handed to V2-10/11, V2-30, V2-53, V2-60, V2-62; nothing adopted.
 - **Goal:** Know exactly which files v1 gets wrong and what they have in common.
 - **Why:**
   - The 158 ITW misses.

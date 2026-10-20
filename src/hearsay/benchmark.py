@@ -35,8 +35,11 @@ REPO = Path(__file__).resolve().parents[2]
 
 SPLITS = ("inner_oof", "holdout", "test", "itw")
 SPLIT_ALIASES = {"stress": "itw"}
-POP_SPLIT = {"inner": "inner_oof", "holdout": "holdout", "test": "test", "itw": "itw"}
-ROLES = ("selectable", "read_once", "report_only", "in_sample", "reference")
+POP_SPLIT = {"inner": "inner_oof", "holdout": "holdout", "test": "test", "itw": "itw", "test_key": "test"}
+ROLES = ("selectable", "read_once", "report_only", "in_sample", "reference", "sealed")
+# The NSA test key (released 2026-10-20). Rule 3 (docs/prod-chunks.md C.1, Nathan, Oct 20):
+# the sealed set, testing only; read once per phase close through its own ledger.
+SEALED_KEY_FILE = "data/nsa/HackGTAnswerKey.tsv"
 COHORT_KINDS = ("none", "mp3", "noise20", "speed", "shift1")
 
 # name -> (pi_synth, c_fa, c_miss), passed explicitly to min_cost every time.
@@ -379,6 +382,56 @@ def load_populations(root: Path = REPO, *, main=None, expect: dict | None = EXPE
         if len(set(pop.keys)) != pop.n:
             raise BenchmarkError(f"population {k} has duplicate keys")
     return pops
+
+
+def load_sealed_population(root: Path = REPO, *, main=None, key_file: str = SEALED_KEY_FILE) -> Population:
+    """The labelled test set (role 'sealed'): the NSA key joined to the test
+    manifest by filename, exact coverage both ways. Deliberately NOT part of
+    load_populations(): a Bench never holds these labels, so no scorecard,
+    rule or selection path can reach them. Only read_sealed() reads them.
+    Bootstrap clusters are per clip (the key carries no speaker or generator)."""
+    root = Path(root)
+    key = pd.read_csv(root / key_file, sep="\t", dtype=str)
+    if list(key.columns) != ["filename", "cm-label"]:
+        raise BenchmarkError(f"sealed key {key_file}: expected columns filename, cm-label, got {list(key.columns)}")
+    bad = set(key["cm-label"]) - {"bonafide", "spoof"}
+    if bad:
+        raise BenchmarkError(f"sealed key {key_file}: unknown labels {sorted(bad)}")
+    if key["filename"].duplicated().any():
+        raise BenchmarkError(f"sealed key {key_file}: duplicate filenames")
+    test = pd.read_csv(root / "outputs/manifests/nsa_test.csv", dtype=str)
+    have, want = set(key["filename"]), set(test["filename"])
+    if have != want:
+        raise BenchmarkError(f"sealed key {key_file}: coverage mismatch with the test manifest "
+                             f"({len(want - have)} missing, {len(have - want)} extra)")
+    test = test.set_index("filename").reindex(key["filename"])
+    keys = np.array([canonical_key(p, main=main, repo=root) for p in test["path"]])
+    y = (key["cm-label"] == "spoof").astype(int).to_numpy()
+    return Population("test_key", "sealed", keys, y, None, key["filename"].to_numpy(),
+                      np.where(y == 1, "key-spoof", "key-real"))
+
+
+def sealed_sha(pop: Population) -> str:
+    """Identity of the sealed population's labels (keys + y), for ledger keys."""
+    return sha256_json({"keys": list(pop.keys), "y": pop.y.tolist()})
+
+
+def submission_scores(tsv, pop: Population) -> np.ndarray:
+    """Scores from a submission-format TSV (filename, cm-score; 1.0 = synthetic)
+    aligned to a population by basename. Exact coverage, finite, in [0, 1]."""
+    t = pd.read_csv(tsv, sep="\t")
+    if list(t.columns) != ["filename", "cm-score"]:
+        raise BenchmarkError(f"{tsv}: expected columns filename, cm-score, got {list(t.columns)}")
+    if t["filename"].duplicated().any():
+        raise BenchmarkError(f"{tsv}: duplicate filenames")
+    names = [Path(k).name for k in pop.keys]
+    s = t.set_index("filename")["cm-score"].reindex(names).to_numpy(dtype=float)
+    if np.isnan(s).any() or len(t) != pop.n:
+        raise BenchmarkError(f"{tsv}: coverage mismatch with {pop.name} ({int(np.isnan(s).sum())} missing, "
+                             f"{len(t) - pop.n + int(np.isnan(s).sum())} extra)")
+    if not np.isfinite(s).all() or (s < 0).any() or (s > 1).any():
+        raise BenchmarkError(f"{tsv}: scores must be finite probabilities in [0, 1]")
+    return s
 
 
 def align(sf: ScoreFile, pop: Population) -> np.ndarray | None:
@@ -919,6 +972,18 @@ class HoldoutLedger:
         return cls(root / "outputs/v2/benchmark/holdout_ledger",
                    [root / "benchmarks/holdout_ledger.jsonl", root / "outputs/v2/benchmark/holdout_ledger.jsonl"])
 
+    @classmethod
+    def sealed_default(cls, root: Path = REPO) -> HoldoutLedger:
+        """The sealed set's own ledger (same mechanics, separate authority and
+        audit files), so a sealed read can never be confused with a holdout read."""
+        env = os.environ.get("HEARSAY_SEALED_LEDGER")
+        if env and os.environ.get("PYTEST_CURRENT_TEST"):
+            base = Path(env)
+            return cls(base / "authority", [base / "tracked.jsonl", base / "mirror.jsonl"])
+        root = Path(root)
+        return cls(root / "outputs/v2/benchmark/sealed_ledger",
+                   [root / "benchmarks/sealed_ledger.jsonl", root / "outputs/v2/benchmark/sealed_ledger.jsonl"])
+
     def _append(self, event: dict) -> None:
         line = json.dumps(event, sort_keys=True) + "\n"
         for p in self.jsonl:
@@ -1087,3 +1152,37 @@ def read_holdout(rule_defs: list, compute, *, ledger: HoldoutLedger, holdout_sha
     finally:
         ledger.release(key)  # no-op after complete(); frees the lock if compute() raised
     return {"ledger": f"read {key[:12]}", "readout": readout, "ledger_count": ledger.count()}
+
+
+# ---------------------------------------------------------------------------
+# Sealed set (rule 3): the NSA test key, read once per phase close
+# ---------------------------------------------------------------------------
+
+
+def sealed_key(rule_defs: list, sealed_sha_: str) -> str:
+    """Namespaced apart from ledger_key: a sealed read and a holdout read of the
+    same rule set never share a key."""
+    defs = sorted(json.dumps(d, sort_keys=True) for d in rule_defs)
+    return sha256_json({"sealed": sealed_sha_, "rules": defs})
+
+
+def read_sealed(rule_defs: list, compute, *, ledger: HoldoutLedger, sealed_sha: str, phase: str, reason: str,
+                meta: dict | None = None) -> dict:
+    """Run `compute()` on the sealed set at most once per rule set. There is no
+    reference exemption: every read, the shipped TSV's included, is a ledgered
+    phase-close read and must say which phase it closes and why."""
+    if not isinstance(phase, str) or not phase.strip():
+        raise BenchmarkError("a sealed read must name the phase it closes (--phase)")
+    if not isinstance(reason, str) or len(reason.strip()) < 20:
+        raise BenchmarkError("a sealed read must state its reason in at least 20 characters (--reason)")
+    key = sealed_key(rule_defs, sealed_sha)
+    res = ledger.reserve(key, {**(meta or {}), "phase": phase.strip(), "reason": reason.strip()})
+    if res["status"] == "complete":
+        return {"ledger": f"persisted {key[:12]}", "readout": res["entry"]["readout"],
+                "ledger_count": ledger.count(), "key": key}
+    try:
+        readout = compute()
+        ledger.complete(key, readout)
+    finally:
+        ledger.release(key)
+    return {"ledger": f"read {key[:12]}", "readout": readout, "ledger_count": ledger.count(), "key": key}
