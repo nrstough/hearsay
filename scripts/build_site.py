@@ -41,6 +41,12 @@ GITHUB_TREE = GITHUB + "/tree/main/"
 MAC_PREFIX = "/Users/nathanstough/Projects/hearsay/"
 GITIGNORED_ROOTS = ("models/", "outputs/", "data/", "weights/", "submissions/")
 CORPUS_GLOBS = ("README.md", "CLAUDE.md", "docs/**/*.md", ".claude/**/*.md")
+# Reached by the globs but never part of the corpus: the generated site, and the lane
+# worktrees Claude Code keeps under .claude/worktrees/<lane>/ — each one a whole checkout of
+# this repo, so without this every document would be indexed once per open lane (duplicate
+# titles, duplicate exports, and whatever h1 count a lane's older copy happens to have).
+CORPUS_SKIP_PREFIXES = ("docs/site/", ".claude/worktrees/")
+CORPUS_SKIP_DIRS = frozenset({".git", ".venv", "node_modules"})
 INPUT_DIRS = ("source", "img/diagrams")  # inside docs/site/, never generated or deleted
 ALLOWED_TAGS = {
     "span", "p", "em", "strong", "sub", "sup", "code", "br", "table", "colgroup", "col",
@@ -135,12 +141,19 @@ def rel_url(target: str, page_url: str) -> str:
 # ----------------------------------------------------------------------------------------------
 
 
+def in_corpus(rel: str) -> bool:
+    """Whether a repo-relative markdown path belongs in the library corpus."""
+    if rel.startswith(CORPUS_SKIP_PREFIXES):
+        return False
+    return CORPUS_SKIP_DIRS.isdisjoint(rel.split("/")[:-1])
+
+
 def corpus_files() -> list[str]:
     found: set[str] = set()
     for pattern in CORPUS_GLOBS:
         for p in REPO.glob(pattern):
             rel = p.relative_to(REPO).as_posix()
-            if rel.startswith("docs/site/"):
+            if not in_corpus(rel):
                 continue
             if p.is_file():
                 found.add(rel)

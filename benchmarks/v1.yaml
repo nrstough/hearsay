@@ -1,0 +1,262 @@
+{
+ "columns": {
+  "handcrafted_v5": {
+   "file": "outputs/detector_scores/handcrafted_v5.csv",
+   "itw": "outputs/detector_scores/_itw_handcrafted_v5.csv"
+  },
+  "m1b_v3": {
+   "file": "outputs/detector_scores/m1b_v3.csv",
+   "itw": null
+  },
+  "m5_xlsr_ft": {
+   "file": "outputs/detector_scores/m5_xlsr_ft.csv",
+   "itw": "outputs/detector_scores/_itw_m5.csv"
+  },
+  "spectra_aasist": {
+   "file": "outputs/detector_scores/spectra_aasist.csv",
+   "itw": "outputs/spectra/itw_stress/scores.csv"
+  },
+  "wavlm_l": {
+   "file": "outputs/detector_scores/wavlm_l.csv",
+   "itw": null
+  },
+  "xlsr_L20": {
+   "file": "outputs/v2/benchmark/scores/xlsr_L20.csv",
+   "itw": null
+  }
+ },
+ "deferred": {
+  "actDCF": "moved to V2-61",
+  "asvspoof5_eval": "not downloaded (V2-30 picks a modern public set)",
+  "mlaad_by_family": "needs new MLAAD pulls (models released after 2026-04-18)",
+  "reverb_codec_telephony_shortcrop_cohorts": "not built yet"
+ },
+ "format": "JSON content in a .yaml file (valid YAML 1.2); parse with json",
+ "inputs": {
+  "data/nsa/HackGTAnswerKey.tsv": {
+   "kind": "file",
+   "sha256": "953704cf03661d80aafb4b52988d2252579959e5ecaa84d1a2e0f2dd2cbbfd87"
+  },
+  "models/fusion_v2/constants.json": {
+   "kind": "file",
+   "sha256": "0818e83e5ad8ca9b23f8b2b9ee0e36aaa32bebe47257ebfae4bcc2353cbd6405"
+  },
+  "models/hc_selected": {
+   "kind": "tree",
+   "sha256": "eb4188075e7450d543aa734f4a23789f7dd109712d180755d7d57e595dc911f1"
+  },
+  "models/m1_wav2vec2-xls-r-300m_L7_20260926-0521": {
+   "kind": "tree",
+   "sha256": "303a43b0a495bc5545928e153650edc5b13a8957f3aeb09ce7d3ecefdc4a0bc2"
+  },
+  "models/m1_wavlm-large_L9_20260926-1906": {
+   "kind": "tree",
+   "sha256": "700ed435973f9d8f0d9e0451eb3b114f3efa32d862c3b22b24cb18d10bf1328e"
+  },
+  "models/m5_xlsr_ft_20260926-0741/model": {
+   "kind": "tree",
+   "sha256": "ee0a9f8bbf18c2bc50c50e02f51a744250aff0a1749619962a4cbc8e33f8a5e1"
+  },
+  "outputs/channel/m3_mlaad.csv": {
+   "kind": "file",
+   "sha256": "42b0952a6264c7a90d03a6997c2ad6108a5fa002965371fb3b5e393aa43b0a11"
+  },
+  "outputs/channel/m3_perturb.csv": {
+   "kind": "file",
+   "sha256": "380fc058b56b86305883c5b5fbd2bce5af37c7e476c76c77e24ea3ca01b2fc7a"
+  },
+  "outputs/detector_scores/_itw_handcrafted_v5.csv": {
+   "kind": "file",
+   "sha256": "9f4f2881a0463ea9803a1b911e00fafd63ed811c197e2c46d0f1ea0a9c1e106d"
+  },
+  "outputs/detector_scores/_itw_m5.csv": {
+   "kind": "file",
+   "sha256": "9025353f753fb0c328f9ff6f2c7034133d94c233a6b9c6dac47a56bca360d9b5"
+  },
+  "outputs/detector_scores/handcrafted_v5.csv": {
+   "kind": "file",
+   "sha256": "ac3ca7bd1b7deb873540968a39a201abf3a60f39b1825acfc27722b82f36b55d"
+  },
+  "outputs/detector_scores/m1b_v3.csv": {
+   "kind": "file",
+   "sha256": "d578b5b01a64dd56ca1a85b39d8e533bb4085f9f116a9a99d8616db488f7dcc7"
+  },
+  "outputs/detector_scores/m5_xlsr_ft.csv": {
+   "kind": "file",
+   "sha256": "1de2d8f037e6e4d5ae3fbe8681afbff495619cdde788155edd1ceb6761747eba"
+  },
+  "outputs/detector_scores/spectra_aasist.csv": {
+   "kind": "file",
+   "sha256": "84d1dd771fe9be5e94c8b0b2706c538d861682e799b59c804e87479e2ef4cec0"
+  },
+  "outputs/detector_scores/wavlm_l.csv": {
+   "kind": "file",
+   "sha256": "cef08ea6369c8a1014eb47ca6aaead1777c961cbe7ffd2673fd8ad3f6779b390"
+  },
+  "outputs/embeddings/wav2vec2-xls-r-300m/itw_stress_v3/manifest.csv": {
+   "kind": "file",
+   "sha256": "9d4434f4ba265b0e28846b6b519515f630d643bc2616f59e307a3f03c4cbc8b7"
+  },
+  "outputs/manifests/itw_stress.csv": {
+   "kind": "file",
+   "sha256": "463069d6016e094efdcd02da2d55516c63b85249dcac8164c926fc09937ee8c4"
+  },
+  "outputs/manifests/nsa_test.csv": {
+   "kind": "file",
+   "sha256": "071eefaca3448267870afe3ff4fe62be37fa7ff851d52ff0bd86dc9ed60f0db7"
+  },
+  "outputs/spectra/itw_stress/scores.csv": {
+   "kind": "file",
+   "sha256": "869a3297823827cd2a9706cfb245e1748e7588ee601fa2de2c8f3959f106b1cc"
+  },
+  "outputs/v2/bakeoff/emb_itw_mp3.npz": {
+   "kind": "file",
+   "sha256": "b47daa20e9aff5b6bbd3c5b3352c9d9b53da99c3f8d89614992b6baef9434b8d"
+  },
+  "outputs/v2/bakeoff/emb_itw_noise20.npz": {
+   "kind": "file",
+   "sha256": "af396a43cc7398b3e6a753264b1fddb6f81ed8276ac0639980357c5e3a548fb7"
+  },
+  "outputs/v2/bakeoff/emb_itw_none.npz": {
+   "kind": "file",
+   "sha256": "d58912da52ac7bdecc23c662d21d2ea065cddfe9938a30e16b5c360954802b74"
+  },
+  "outputs/v2/bakeoff/emb_itw_shift1.npz": {
+   "kind": "file",
+   "sha256": "8f6decf8a352071b5cec789c26d94dc7a36269999a03b2a5b470cf819ea5e1cf"
+  },
+  "outputs/v2/bakeoff/emb_itw_speed.npz": {
+   "kind": "file",
+   "sha256": "61533c32e1009035193511844b77dadb7384ff336b406c9a123ecd2c13281886"
+  },
+  "outputs/v2/bakeoff/emb_mlaad.npz": {
+   "kind": "file",
+   "sha256": "5aec9fb0266f75bc8e066ef49ab9e01765cf927156b1666595b351d53ea6fdd3"
+  },
+  "outputs/v2/bakeoff/probes/L20.joblib": {
+   "kind": "file",
+   "sha256": "ebe64ed9a6348a465242eb648d3b21ba0771314ab49def25ae3254d388407d17"
+  },
+  "outputs/v2/bakeoff/probes/L20.npz": {
+   "kind": "file",
+   "sha256": "6b9ca5926acffc3548b8a00600c22da119225339b303444ec309f8a8e5aeae41"
+  },
+  "outputs/v2/bakeoff/rows.json": {
+   "kind": "file",
+   "sha256": "fd3cbcb0f4e301ae872b973e5f65f32f8e81a24c91965bb08a6ee3a8dc091285"
+  },
+  "outputs/v2/benchmark/cohorts/holdout/wavlm_l.csv": {
+   "kind": "file",
+   "sha256": "ab1570a29d590ddf3bb336625f921be56ba5e493501059215ae97fa02ca52912"
+  },
+  "outputs/v2/benchmark/cohorts/holdout/xlsr_L20.csv": {
+   "kind": "file",
+   "sha256": "57a252c120485bfb0588c59bd19a7cfccfa823689c3172c766e5d7166a0ed530"
+  },
+  "outputs/v2/benchmark/cohorts/itw/handcrafted_v5.csv": {
+   "kind": "file",
+   "sha256": "3bbb8bc55b8a173fdb6629ea32428e90bb11965074cd16001dc700c237d18dd8"
+  },
+  "outputs/v2/benchmark/cohorts/itw/m1b_v3.csv": {
+   "kind": "file",
+   "sha256": "3db1023435074b66959696fd3cea8bffa3cbb66608d341a04152be422f6735af"
+  },
+  "outputs/v2/benchmark/cohorts/itw/m5_xlsr_ft.csv": {
+   "kind": "file",
+   "sha256": "dc5b46ffe68ce0883e645e97ac4066d97d0dfc9f3d52144ed8b74fc3f6b217ce"
+  },
+  "outputs/v2/benchmark/cohorts/itw/spectra_aasist.csv": {
+   "kind": "file",
+   "sha256": "4a2ba7358cab12ccb90d5a680b9adebc4c6d347db35b3c211346977aa69b5342"
+  },
+  "outputs/v2/benchmark/cohorts/itw/wavlm_l.csv": {
+   "kind": "file",
+   "sha256": "57a71eec8486b6ad5d6c911d95d38403ba5f8509ce3b5ebaec7e1cf5fb234c5a"
+  },
+  "outputs/v2/benchmark/cohorts/itw/xlsr_L20.csv": {
+   "kind": "file",
+   "sha256": "c5fe9c5e9a275523a1cbfc265cd66d8004c8c2526a02ee786d729f4cf7cae083"
+  },
+  "outputs/v2/benchmark/scores/xlsr_L20.csv": {
+   "kind": "file",
+   "sha256": "05958447c1a371d9e4ef88a074bea44985d9717f385f80ca52fdeb32d3825fb7"
+  },
+  "splits/nsa_folds.csv": {
+   "kind": "file",
+   "sha256": "a607d3eccd9a959aea83768ec317502a72b9d242a7efc6c6533336a331ec8037"
+  },
+  "splits/nsa_test_durations.csv": {
+   "kind": "file",
+   "sha256": "7f0391510d08bff5560b841f06dd8c89c4341abdc9f408c8043e07d2e82f3ad7"
+  },
+  "weights/Spectra-AASIST": {
+   "kind": "tree",
+   "sha256": "7144ba60595ad94a20f5f9819f979b05491665f42399e50a2de513bd92949703"
+  },
+  "weights/wav2vec2-xls-r-300m": {
+   "kind": "tree",
+   "sha256": "242d5e8992cd7de008e032fce1205a0547680b1ee0b09a00814c044005b22bd6"
+  },
+  "weights/wavlm-large": {
+   "kind": "tree",
+   "sha256": "eed8dc4875fe0087af62f57fb807e3bb64573a6b0cd4887425444bbb67a85187"
+  }
+ },
+ "pending": {},
+ "populations": {
+  "holdout": {
+   "role": "read_once",
+   "rows": 3858,
+   "source": "splits/nsa_folds.csv fold holdout"
+  },
+  "holdout_cohort": {
+   "role": "report_only",
+   "rows": 2500,
+   "source": "outputs/channel/m3_perturb.csv (+ option-B cohort files)"
+  },
+  "inner": {
+   "role": "selectable",
+   "rows": 16142,
+   "source": "splits/nsa_folds.csv fold 0-4 (nested OOF)"
+  },
+  "itw": {
+   "role": "report_only",
+   "rows": 3000,
+   "source": "outputs/manifests/itw_stress.csv"
+  },
+  "itw_cohort": {
+   "role": "report_only",
+   "rows": 2500,
+   "source": "outputs/v2/benchmark/cohorts/itw/<column>.csv"
+  },
+  "mlaad": {
+   "role": "report_only",
+   "rows": 572,
+   "source": "outputs/channel/m3_mlaad.csv (spoof only; in-sample for M5)"
+  },
+  "test": {
+   "role": "report_only",
+   "rows": 1671,
+   "source": "outputs/manifests/nsa_test.csv (unlabelled)"
+  },
+  "test_key": {
+   "role": "sealed",
+   "rows": 1671,
+   "rule": "docs/prod-chunks.md C.1 rule 3 (Nathan, Oct 20): testing only, never selection, calibration, fitting, mining or threshold choice; read once per phase close via `sealed` and its ledger",
+   "source": "data/nsa/HackGTAnswerKey.tsv (NSA answer key, released 2026-10-20) joined to the test manifest"
+  }
+ },
+ "resolved": {
+  "sealed_set": "test_key (the NSA answer key, 2026-10-20); see populations.test_key"
+ },
+ "sealed_ledger": {
+  "authority": "outputs/v2/benchmark/sealed_ledger/",
+  "tracked": "benchmarks/sealed_ledger.jsonl"
+ },
+ "shipped_tsv": {
+  "path": "submissions/CrossExam_predictions.tsv (main checkout)",
+  "sha256": "fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607"
+ },
+ "spec": "docs/specs/2026-10-11_v2-benchmark-fusion.md",
+ "version": "v1.2"
+}

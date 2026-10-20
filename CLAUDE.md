@@ -52,7 +52,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
 **Model rules**
 - Validate by generator and speaker, not by clip, using nested folds from the fold file.
 - Log every TSV with its validation score.
-- Cap any rung at a few hours.
+- Hackathon only (Sep 25–27): cap any rung at a few hours. After the event (v2), no default cap; a run spec may set its own time box.
 - Keep a clean-only validation score beside any augmented one.
 
 ## Conventions
@@ -87,7 +87,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
 - Never overwrite a submitted TSV. Every submission gets a new file and a new log row.
 - Never train on the validation split (including scalers, calibration, and stacking folds).
 - Ask before renting a cloud GPU.
-- When a time box runs out, stop and report rather than push through.
+- When a run spec sets a time box and it runs out, stop and report rather than push through. v2 work has no default time box (Nathan, Oct 11); report at the end of each part instead.
 - Freeze is Sunday morning (Sep 27): after it, only fixes that unbreak the TSV or the Docker image.
 
 ## Sources of truth
@@ -95,6 +95,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
 - `docs/nsa-challenge.md` and `data/nsa/HEARSAY_HackGT2026_Instructions.pdf`: the NSA brief and instructions. Authoritative on rules and scoring.
 - `docs/plan.md`: the working plan (software-only, rewritten Sep 26).
 - `docs/scoping.md` and `docs/master-doc.md`: historical, pre-rescope background.
+- `docs/prod-chunks.md`: the post-hackathon master doc. It holds the v1 retrospective (frozen at tag `v1`) and the v2 plan as chunks. For v2 work it is the plan of record; `docs/plan.md` stays as the hackathon plan.
 
 Where these and this file disagree, the NSA documents win on rules, `docs/plan.md` wins on plan and scope, and `submissions/log.csv` wins on numbers.
 
@@ -143,6 +144,7 @@ Downloaded before the event to `weights/`; fill in "how used" as each is actuall
 - WavLM Large, `microsoft/wavlm-large` (Hugging Face, Microsoft): the post-draft bake-off challenger (Sat Sep 26). A frozen layer-9 probe on the M1b recipe (`models/m1_wavlm-large_L9_20260926-1906`, `docs/reports/2026-09-26_post-draft-heads.md`), evaluated as a fourth fusion column. It **failed the pre-declared gate**, worsening inner CV (`docs/reports/2026-09-26_post-draft-sweep.md`), and is **not in any shipped artifact**. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT).
 - WavLM Base, `microsoft/wavlm-base` (Hugging Face, Microsoft): downloaded as a bake-off / speed spare; **not used**. No license on the Hugging Face card; WavLM was released through Microsoft's unilm repo (MIT).
 - Spectra-AASIST, `lab260/Spectra-AASIST` (Hugging Face): M3 score stream (`outputs/detector_scores/spectra_aasist.csv`), run off the shelf with no training through the shared band-matched input path, as a second deep score for fusion beside the XLS-R probe. License unclear: repo header says Apache-2.0, model card text says MIT. Output index 0 = spoof, 1 = bonafide.
+- AntiDeepfake backbones, `nii-yamagishilab/*-anti-deepfake` (Hugging Face, NII Yamagishi Lab; arXiv:2506.21090), **CC BY-NC-SA 4.0 (non-commercial and share-alike)**, fetched Oct 13 to the Hugging Face cache on the external Crucial drive (not under `weights/`): v2 lane V2-53. Fetched so far: **mms-300m-anti-deepfake** (revision `7928e119e09f`, 1.18 GiB); **mms-1b-anti-deepfake** (revision `e8574a77b993`, 3.60 GiB); **xls-r-1b-anti-deepfake** (revision `60c965432101`, 3.60 GiB); **xls-r-2b-anti-deepfake** (revision `0c12cfd424f0`, 8.06 GiB). Each is sha256-verified against the Hub's LFS oid at download and re-verified against its identity record at load (`outputs/v2/backbone/*.identity.json`). Ported to `transformers` by a strict key map (`hearsay.antideepfake`) because the released checkpoints carry fairseq tensor names and fairseq 0.12 does not install on our Python 3.12 pin. **Scored zero-shot as a readout only; nothing is trained, and none of these is in any shipped artifact.** Their post-training data includes ASVspoof 2019 LA, DiffSSD, MLAAD, LJSpeech and LibriTTS, so our inner, holdout and MLAAD populations are in-sample for them and In-the-Wild is the only population held out (`docs/specs/2026-10-11_v2-backbone.md`). The share-alike term is a decision owed before anything built on these weights ships.
 - ECAPA-TDNN speaker embeddings, `speechbrain/spkrec-ecapa-voxceleb` (Hugging Face, SpeechBrain), Apache-2.0, fetched Sat Sep 26 to `weights/spkrec-ecapa-voxceleb` (89 MB): the speaker-drift detector (`hearsay.detectors.speaker_drift`, rubric technique 6), loaded from the local directory. Docker must include it.
 
 **Public datasets** (name, source, license, how used)
@@ -150,7 +152,7 @@ Downloaded before the event to `data/`; fill in "how used" as each is actually u
 - ASVspoof 2019 LA (University of Edinburgh DataShare, doi handle 10283/3336), Open Data Commons Attribution License: public shakedown of the M1 pipeline; its train+dev bona fide (40 VCTK speakers) plus a 2.5k A01–A06 anchor are training-only extra rows for M1b and M5 (`splits/nsa_folds_plus_asv19.csv`), never scored or held out.
 - In-the-Wild (Müller et al. 2022; `mueller91/In-The-Wild` on Hugging Face), license listed as CC-BY-SA-4.0 on Hugging Face and Apache-2.0 on deepfake-total.com: held-out stress test only, never trained on.
 - MLAAD (`mueller91/MLAAD` on Hugging Face, gated, non-commercial notice): 6,180 unique English synthetic clips pulled during the event (30 per model across 143 models, plus 300 per model for the ElevenLabs, Gemini and Qwen3 families named on the kickoff slide; the two pulls overlap by 210). Used by M5 as training-only spoof data, capped at 12% of the spoof side per batch and ≤ 120 clips per model, with the OpenVoice / XTTS / ElevenLabs families excluded from the fold models that validate on those generators.
-- NSA HEARSAY data (provided by the sponsor during the event): 1,671-file test set, a resampled LJ Speech subset (real), DiffSSD (synthetic, Purdue), and the ASVspoof5 evaluation code for MinDCF.
+- NSA HEARSAY data (provided by the sponsor during the event): 1,671-file test set, a resampled LJ Speech subset (real), DiffSSD (synthetic, Purdue), and the ASVspoof5 evaluation code for MinDCF. **The test set's answer key** (released Oct 20, 2026; `data/nsa/HackGTAnswerKey.tsv`, 1,191 real / 480 spoof) is v2's sealed set: testing only, read once per phase close through `scripts/v2_benchmark.py sealed` and its ledger (`docs/prod-chunks.md` C.1 rule 3). It reproduces NSA's returned 0.0733 under Pspoof 0.3, Cfa 1, Cmiss 4.
 - Full LJ Speech 1.1 (keithito.com, public domain): 13,100 clips of one speaker; 6,000 in the NSA training sample, the rest training-only extra rows for M5 (the sponsor's resampled subset is under `data/nsa/LJRealResampled`).
 - LibriSpeech dev-clean/test-clean (openslr.org/12, CC BY 4.0): 5,323 multi-speaker bona fide clips; 4,000 of them in the NSA training sample, the rest training-only extra rows for M5.
 

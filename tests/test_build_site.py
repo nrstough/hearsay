@@ -274,6 +274,43 @@ def test_converter_is_fast_on_the_exports(bs):
     assert time.perf_counter() - t0 < 5.0
 
 
+def test_corpus_skips_nested_lane_worktrees_and_vendor_dirs(tmp_path):
+    """Claude Code keeps a whole checkout of this repo per open lane under .claude/worktrees/, so
+    the .claude/**/*.md glob reaches a second (and third) copy of every document. Indexing those
+    duplicated every library title, export and h1 count. Built on a fake repo, not this one, so
+    the check holds whether or not this machine has a lane open."""
+    repo = tmp_path / "repo"
+    (repo / "docs" / "reports").mkdir(parents=True)
+    (repo / ".claude" / "skills" / "p3").mkdir(parents=True)
+    (repo / "README.md").write_text("# HEARSAY\n", encoding="utf-8")
+    (repo / ".claude" / "skills" / "p3" / "SKILL.md").write_text("# p3\n", encoding="utf-8")
+    for i in range(90):
+        (repo / "docs" / "reports" / f"r{i:02d}.md").write_text(f"# R{i}\n", encoding="utf-8")
+    lane = repo / ".claude" / "worktrees" / "some-lane"
+    for rel in ("README.md", "docs/reports/r00.md", ".claude/skills/p3/SKILL.md",
+                "node_modules/pkg/README.md", "docs/site/library/readme.md"):
+        (lane / rel).parent.mkdir(parents=True, exist_ok=True)
+        (lane / rel).write_text("# One\n\n# Two\n", encoding="utf-8")
+    (repo / "docs" / "site" / "library").mkdir(parents=True)
+    (repo / "docs" / "site" / "library" / "readme.md").write_text("# built\n", encoding="utf-8")
+
+    bs = load_module()  # a private instance: this test repoints REPO
+    bs.REPO = repo
+    files = bs.corpus_files()
+    assert "README.md" in files and ".claude/skills/p3/SKILL.md" in files
+    assert not [f for f in files if f.startswith((".claude/worktrees/", "docs/site/"))], files[:5]
+    assert len(files) == 92
+
+    assert bs.in_corpus("docs/plan.md") and bs.in_corpus("CLAUDE.md")
+    for rel in (".claude/worktrees/some-lane/docs/scoping.md", "docs/site/library/readme.html",
+                ".claude/worktrees/x/node_modules/p/readme.md", ".claude/.venv/lib/p/README.md"):
+        assert not bs.in_corpus(rel), rel
+
+
+def test_live_corpus_has_no_nested_checkout_paths(bs):
+    assert all(bs.in_corpus(rel) for rel in bs.corpus_files())
+
+
 # --- links ---------------------------------------------------------------------------------------
 
 
