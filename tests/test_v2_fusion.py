@@ -544,3 +544,10 @@ def test_candidates_pinned_to_predeclaration_any_change_refused(tmp_path):
     same = tmp_path / "same.json"
     same.write_bytes(CAND.read_bytes())
     F.check_candidates(same, SPEC)
+
+
+def test_v2_60_verdict_reading_is_the_predeclared_one_not_the_benchmark_default():
+    """The benchmark default moved to package03 on Oct 20; the closed V2-60 verdict stays on its pre-declaration."""
+    cand = json.loads((REPO / "benchmarks/v2_60_candidates.json").read_text())
+    assert F.PRIMARY == cand["primary_reading"] == "package05"
+    assert B.PRIMARY == "package03"

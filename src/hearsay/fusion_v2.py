@@ -124,7 +124,7 @@ def select_alpha(L, y, fold, tr, target, *, grid=ALPHA_GRID, prior=PRIOR_FAKE) -
     for a in grid:
         s = np.concatenate([blend_cols(X, shrink(w, a, target)) for _, X, _, w in blocks])
         yy = np.concatenate([yb for _, _, yb, _ in blocks])
-        costs[a] = B.reading(yy, s, B.PRIMARY)
+        costs[a] = B.reading(yy, s, PRIMARY)
     return choose_alpha(costs), costs
 
 
@@ -212,6 +212,9 @@ def fit_c2_offinner(L_inner, y, fold, cols, target, *, grid=ALPHA_GRID, prior=PR
 # ---------------------------------------------------------------------------
 
 BASIS = "inner_nested_oof"
+# The V2-60 pre-declaration's primary reading (benchmarks/v2_60_candidates.json "primary_reading").
+# Fixed here so the closed verdict reproduces even though the benchmark default moved to package03 on Oct 20.
+PRIMARY = "package05"
 
 
 def _tt(x: float) -> int:
@@ -237,10 +240,10 @@ def verdict(control: dict, cand: dict, bands: dict, f4_guard: float, *, label_pr
     lose = [k for k in bands if worse[k] > band[k]]
     if lose:
         return {"verdict": "LOSE", "reasons": [f"{k} worse by {worse[k] / 1e4:.4f} > band {bands[k]}" for k in lose]}
-    better = -worse[B.PRIMARY] > band[B.PRIMARY]
+    better = -worse[PRIMARY] > band[PRIMARY]
     f4_ok = _tt(cand["f4_package05"]) <= _tt(control["f4_package05"]) + _tt(f4_guard)
     if not better:
-        reasons.append(f"package05 improvement {-worse[B.PRIMARY] / 1e4:.4f} not > band {bands[B.PRIMARY]}")
+        reasons.append(f"package05 improvement {-worse[PRIMARY] / 1e4:.4f} not > band {bands[PRIMARY]}")
     if not f4_ok:
         reasons.append(f"f4 guard: {cand['f4_package05']:.4f} > control {control['f4_package05']:.4f} + {f4_guard}")
     if better and f4_ok:

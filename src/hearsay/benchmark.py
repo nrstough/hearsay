@@ -48,7 +48,7 @@ READINGS = {
     "package05": (0.5, 1.0, 4.0),
     "package03": (0.3, 1.0, 4.0),
 }
-PRIMARY = "package05"
+PRIMARY = "package03"  # NSA's convention, settled by the answer key (Nathan, Oct 20); was package05 until then
 
 E_COLUMN = "spectra_aasist"
 E_RULE = {"spectra_logit_below": -3.0, "base_above": 0.5, "multiply_by": 0.5}

@@ -485,8 +485,9 @@ def _brute(y, s, pi, cfa, cmiss):
     return best
 
 
-def test_scorecard_primary_is_package05():
-    assert B.PRIMARY == "package05" and B.READINGS["package05"] == (0.5, 1.0, 4.0)
+def test_scorecard_primary_is_package03():
+    assert B.PRIMARY == "package03" and B.READINGS["package03"] == (0.3, 1.0, 4.0)
+    assert B.READINGS["package05"] == (0.5, 1.0, 4.0)
     cand = json.loads((REPO / "benchmarks/v2_60_candidates.json").read_text())
     assert cand["primary_reading"] == "package05"
 

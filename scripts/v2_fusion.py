@@ -219,12 +219,12 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
 
     # ITW, test, cohorts, MLAAD: report-only
     readout["itw"], readout["test"], readout["gaps"] = {}, {}, {}
-    c0_thr_inner = readout["candidates"]["C0"]["inner"]["counts"][B.PRIMARY]["threshold"]
+    c0_thr_inner = readout["candidates"]["C0"]["inner"]["counts"][F.PRIMARY]["threshold"]
     c0_test = bench.score_rule(rules["C0"], "test")["fused"]
     for n, rule in rules.items():
         readout["itw"][n] = itw_block(bench, rule, boot_n)
         t = bench.score_rule(rule, "test")
-        thr = readout["candidates"][n]["inner"]["counts"][B.PRIMARY]["threshold"]
+        thr = readout["candidates"][n]["inner"]["counts"][F.PRIMARY]["threshold"]
         readout["test"][n] = B.agreement_with_shipped(bench.pops["test"].keys, t["fused"], thr, control_fused=c0_test,
                                                       control_threshold=c0_thr_inner) if t["scored"] else {
             "scored": False, "reason": t["reason"]}
@@ -250,7 +250,7 @@ def run(boot_n: int = 2000, *, dry_run: bool = False) -> dict:
                                "itw": VB.cohort_file_shas("itw", itw_frames, reg["inputs"])}
     readout["itw_cohort"] = (VB.cohort_readout(bench, rules, itw_frames, itw_labels) if itw_frames else
                              {"scored": False, "reason": "pending: no ITW cohort files yet (Step 6, ask-first)"})
-    thr = {n: readout["candidates"][n]["inner"]["counts"][B.PRIMARY]["threshold"] for n in rules}
+    thr = {n: readout["candidates"][n]["inner"]["counts"][F.PRIMARY]["threshold"] for n in rules}
     readout["mlaad"] = VB.mlaad_readout(bench, rules, thr)
 
     readout["dry_run"] = dry_run
