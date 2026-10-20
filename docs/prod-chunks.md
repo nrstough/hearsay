@@ -305,7 +305,7 @@ Phase 0  Foundation        V2-00 repo  ─┬─ V2-01 benchmark ─┬─ V2-02
                                         │                   │
 Phase 1  Understand data   V2-10 corpus atlas · V2-11 test-set profile
                                         │
-Phase 2  Understand models V2-20 layer probing · V2-21 XLS-R vs WavLM · V2-22 M5 ablation · V2-23 Spectra anatomy
+Phase 2  Understand models V2-20 layer probing · V2-21 XLS-R vs WavLM · V2-22 M5 ablation · V2-23 Spectra anatomy · V2-24 what sees the misses
                                         │
 Phase 3  Data              V2-30 new data · V2-31 augmentation library · V2-32 data mix · V2-33 hard negatives
                                         │
@@ -320,10 +320,14 @@ Phase 7  Ship              V2-70 explanations · V2-71 release v2 · V2-72 write
 
 Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. Phase 6 waits on at least one Phase 3–5 result.
 
-**Suggested first three:**
-1. V2-0U, understanding v1 first. Then V2-00 + V2-01: nothing else is comparable without them.
-2. V2-02, cheap and it uses only v1's exported scores.
-3. V2-21, the XLS-R vs WavLM question you most want answered.
+**Suggested first three** (Oct 10): V2-0U then V2-00 + V2-01; V2-02; V2-21. _Done or partly done by Oct 20._
+
+**Sequence after the answer key (Nathan, Oct 20).** The atlas (V2-02) showed the 24 test misses are clips the shipped carrier cannot see and that Spectra and WavLM can, and that they are a *style* (low voiced fraction, high within-clip voice variation), not a channel effect. So:
+1. **V2-53 benchmark rows** for WavLM Large and the AntiDeepfake backbones (running Oct 20).
+2. **V2-24** mechanistic probe: what WavLM and Spectra see in the misses that XLS-R layer 7 does not. Decides whether the lever is the probe or the data.
+3. **V2-30** data pull aimed at that style, real and fake.
+4. **V2-33** mining *inside* the new pool (stage 1), with the easiest-side arm as the comparison.
+5. **V2-60** fusion, last, once a column that sees the misses exists; the corroboration rule (V2-62) can go earlier because it is a rule, not a fit.
 
 ---
 
@@ -484,6 +488,21 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 - **Done when:** a written verdict says whether to use it as a column, keep it as a suppressor, or drop it.
 - **Size:** S–M.
 
+### V2-24 ⬜ What sees the misses: a mechanistic probe of the carrier's blind spot
+- **Goal:** Explain, in terms of the models' internals, why the shipped XLS-R layer-7 probe misses the clips that WavLM Large and Spectra rank synthetic, and decide whether the fix is the probe (a layer or a direction XLS-R already has) or the data (nothing in XLS-R separates them).
+- **Why:** V2-02 (`docs/reports/2026-10-20_v2-02-error-atlas.md`): of the 24 test misses, m1b_v3 ranks 3 synthetic, Spectra 18, WavLM 16. The same split appears on In-the-Wild (158 misses, `docs/reports/2026-10-03_layer-bakeoff.md`), which gives a sample size the test set alone cannot. V2-20 found L7+L20 does not confirm as a blend; this asks the question the other way round, starting from the clips.
+- **Populations (no sealed read):** the 24 test misses are named in the Phase 0 readout and may be used as *identities* (no further label use); the In-the-Wild misses and a matched set of caught fakes and reals from ITW and the inner folds carry the statistics. The sealed key is not opened.
+- **Questions:**
+  1. Layer sweep on XLS-R: at which layers, if any, do the miss clips separate from reals (per-layer linear probe on inner, read on the miss set vs caught fakes)? Is there a direction at a later layer that the L7 probe never reads?
+  2. The same sweep on WavLM Large: which layer carries what it sees? Is it the same layer family (early acoustic vs late phonetic) or a different one?
+  3. Activation contrast: miss clips vs caught fakes at L7, projected on the probe's weight vector and on its orthogonal complement. If the signal is in the complement, the probe is reading the wrong direction; if it is absent everywhere, the backbone does not encode it.
+  4. Which input facts predict the gap: voiced fraction, drift min-cosine, duration, bandwidth (from the atlas features), as a shallow tree on "miss vs caught".
+- **Method:** frozen backbones, stored embeddings where they exist (`outputs/embeddings/`, the V2-20 bake-off probes `outputs/v2/bakeoff/`), per-layer logistic probes fitted on inner folds only, CPU/MPS, no training beyond linear probes. Report effect sizes with cluster bootstrap intervals.
+- **Deliverables:** `docs/reports/<date>_v2-24-what-sees-the-misses.md`, probe tables under `outputs/v2/mechinterp/`.
+- **Done when:** a written verdict says one of: (a) XLS-R encodes the separation at layer N or direction D (→ a probe change, tested in V2-20's bake-off form), (b) it does not (→ V2-30 data and V2-53 columns are the only levers), with the ITW-miss evidence beside the test-miss evidence.
+- **Depends on:** V2-02 (done), V2-20's stored probes. V2-53's rows help.
+- **Size:** S–M (about a day).
+
 ## Phase 3: Data
 
 ### V2-30 ⬜ Better data
@@ -492,6 +511,7 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   - v1's real speech is mostly read audiobooks (LJ, LibriSpeech, VCTK).
   - The wild-domain gap (B.6) and the envelope shift (B.5) both point to real speech that's too clean.
   - v1 dropped the wild real corpus because VoxCeleb needs a request form and SpoofCeleb's real speech is enhanced.
+- **Target style (Oct 20, from V2-02):** the test misses are expressive, multi-sentence, pause-rich synthesis (voiced fraction ~0.5 vs 0.7 on the test set; speaker-drift min-cosine ~0.16 vs 0.27), wide-band and clean. No training population has that style, which is why re-weighting (V2-33) and re-fusing (V2-60) could not reach it. The pull must cover it on **both sides**: fakes of that kind (newer MLAAD models, long-form and conversational TTS, recent commercial voices with expressive modes) and real speech of that kind (conversational, podcast, interview; not read sentences), so the model cannot learn "pauses and variation = fake". Profile every new set on the atlas's two features before folding it.
 - **Candidates, each to vet for licence and overlap:**
   - **Real, wild:** VoxCeleb1/2 (request), Common Voice, podcast or broadcast sets, telephone speech.
   - **Spoof, modern:** ASVspoof 5, newer MLAAD releases, codec-based TTS (e.g. CodecFake-style sets), recent commercial voices.
@@ -513,6 +533,7 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   - Promote `src/hearsay/augment.py` to the shared module.
   - Add: speed and pitch, real noise and room-response libraries (e.g. MUSAN-style noise, measured room impulse responses), telephony (incl. AMR where an encoder is available), resampler walls shaped like the test set's.
   - Every model reports clean and augmented scores side by side (existing rule).
+- **Adversarial / RL search over chains (Oct 20):** the RL-driven variant other teams used searched the *augmentation chain* (codec, noise, reverb, speed), not the example set. That search lives here, on top of this library, and targets channel robustness (the noise hole). It is not a fix for the V2-02 misses, which are wide-band and clean: no chain produces a delivery style.
 - **Done when:** M1b, retrained on augmented embeddings, is benchmarked, and the noise cohort improves without the clean score degrading beyond a pre-declared margin.
 - **Depends on:** V2-01. V2-30 is helpful.
 - **Size:** M.
@@ -525,7 +546,8 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   - **Leads handed to V2-01, not adopted:** the easiest-side direction; `hardest_reals` on the NSA-only pool at L7 (reverses with the ASVspoof 2019 rows in the fit); the C curve. Adoption blocked until NSA's cost convention is settled and a speaker-disjoint benchmark row exists.
   - Stage 0.5 needs MPS. Stage 1 needs the drive. Stage 2 needs a GPU. Stage 0.5 should carry the easiest-side hypothesis with hardest as the comparison and random as the control, a scale-anchored H5, C as an explicit axis, and a committed declaration before it runs.
   - Handoff: `docs/handoffs/2026-10-10_v2-hard-negatives-handoff.md`.
-- **Goal:** Train on the examples the current models find hardest under rule 5's metric (P_FA + 4·P_miss, where misses cost 4×): fakes that score real, and real clips that score fake.
+- **Order (Oct 20):** mining selects from a pool, and stage 0 showed the pool we have does not contain the test's failure mode (V2-02). So **V2-30 comes first**, then stage 1 mines inside the enlarged pool, with the easiest-side arm (stage 0's one consistent lead) as the comparison and random as the control. RL over augmentation chains is V2-31's, not this chunk's.
+- **Goal:** Train on the examples the current models find hardest under rule 5's metric (minDCF at Pspoof 0.3, P_FA + 1.714·P_miss): fakes that score real, and real clips that score fake.
 - **Why:**
   - Other teams used it, including an RL-driven variant (organizer feedback, Oct 2026). v1 never did.
   - v1's errors cluster: wild real speech, ElevenLabs, noise (`docs/reports/2026-10-03_layer-bakeoff.md`).
@@ -679,6 +701,7 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
 ### V2-62 ⬜ Orchestrator v2
 - **Goal:** Per-file routing that measurably changes decisions for the better, beyond v1's single suppression rule.
 - **Method:** It either falls out of V2-60's gated mixture, or is an explicit cascade: run expensive models only where cheap ones disagree. Report the ablation like v1's (`scripts/orchestration_ablation.py`).
+- **First rule to test (Oct 20, from V2-02): corroboration.** v1's one test false alarm is a carrier-only positive (m1b_v3 +0.43; handcrafted, M5, WavLM and Spectra all say real; Spectra at −2.2, just above the −3 veto). A positive that no other column corroborates gets damped. It is a rule, not a fit, so it can be pre-declared and tested before V2-60 has new columns; the ablation must show it does not promote misses. V2-61's calibration should express the same thing probabilistically later.
 - **Done when:** the ablation shows routing beats no-routing on the benchmark.
 - **Size:** S–M.
 
