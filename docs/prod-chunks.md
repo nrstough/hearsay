@@ -285,7 +285,7 @@ Carried from v1:
 New for v2:
 1. **v1 is untouchable.** Nothing under tag `v1` changes, and `submissions/` keeps v1's history. v2 experiments log to `experiments/log.csv`, created in V2-00. It has the same columns plus `benchmark_version`. `experiments/log.csv` was created header-only on Oct 10. Each v2 lane appends one row per pre-declared run, with `validation_score` on rule 5's reading and the basis stated in `notes`.
 2. **One benchmark, versioned.** Every v2 number is reported on the V2-01 benchmark, all populations, both costs. A number from anywhere else is a note, not a result.
-3. **A sealed set.** One held-out population is touched only to close a phase (V2-01). In-the-Wild can no longer be that set: v1 used it to *select* the fusion rule, so it is contaminated for selection.
+3. **A sealed set.** One held-out population is touched only to close a phase (V2-01). In-the-Wild can no longer be that set: v1 used it to *select* the fusion rule, so it is contaminated for selection. **Ruling (Nathan, Oct 20): the NSA test key (released Oct 20, 1,671 labels) is the sealed set. It is for testing only: never for selection, calibration, fitting, mining or threshold choice. Read once per phase close through the ledger.** It reproduces NSA's 0.0733 at Pspoof 0.3 / Cfa 1 / Cmiss 4 (see rule 5).
 4. **Understanding before building.** Phases 1–2 exist so that Phases 3–6 change one thing at a time for a stated reason.
 5. **The selection metric is NSA's shipped minDCF function** (Nathan, Oct 10: "It's the min DCF function").
    - **Source:** `data/nsa/HackGTMinDCF/asvspoof5/evaluation-package/calculate_metrics.py:16-21`, with Pspoof 0.5, Cmiss 1 on a rejected bona fide clip, and Cfa 4 on an accepted spoof.
