@@ -62,7 +62,21 @@ Per-fold package-0.3 on inner (fold → generators: 0 grad_tts + unit_speech, 1 
 - **The Phase 1 candidate for a sealed read**, if Nathan wants one taken: the 2B model (or the 1B if 2B's rows disappoint), read once, with the in-sample caveat written into the ledger reason. The read would tell us whether the test set behaves like ITW (held out) or like the holdout (memorised) for these models, which is itself the most useful fact about them.
 - **For V2-24:** the AntiDeepfake models and Spectra see what the carrier misses; WavLM sees some of it and pays for it with false alarms. The probe question is what layer and direction carry that, in a backbone we can train on our own data without the licence and contamination problems.
 
-## 5. Files
+## 5. The Phase 1 sealed read (Nathan, Oct 20/21: "do all of those")
+
+One ledgered read of the sealed key (`benchmarks/sealed_ledger.jsonl` key `0b0896292e5d`, phase "Phase 1", lane v2-53): the 2B column's test logits, read once to learn whether the test set behaves like In-the-Wild (held out) or like the holdout (in-sample) for it. Readout `outputs/v2/benchmark/sealed/xlsr_2b_antideepfake.json`. Nothing selected or fitted.
+
+| What | brief | package-0.5 | **package-0.3** | EER | 90% band (package-0.3) |
+|---|---|---|---|---|---|
+| xls-r-2b-anti-deepfake, zero-shot | 0.0558 | 0.1342 | **0.0628** | 2.55% | 0.040–0.086 |
+| v1 shipped TSV (Phase 0 read) | 0.0537 | 0.1543 | 0.0733 | 3.53% | 0.047–0.096 |
+
+- **The test set behaves like neither.** 0.0628 sits between the 2B's ITW (0.022) and its holdout (0.001): the key is not memorised by the model, and it is not as easy for it as In-the-Wild. The 7× ITW advantage over the shipped rule becomes **14% on the key**, and the two 90% bands overlap. On the key alone the 2B is not a clear win over v1.
+- **Its errors are nearly disjoint from v1's.** At logit 0 the 2B makes 16 misses and 10 false alarms (v1 at 0.5: 24 and 1). It catches **22 of v1's 24 misses** and misses 14 clips v1 caught; its false alarms do not include v1's one. Six of v1's 24 misses are still among the 2B's 50 lowest-ranked spoofs. The 2B's worst spoofs are confidently wrong: its 7 lowest-ranked fakes sit at test-rank percentiles 0.000–0.040, i.e. it calls them the most real clips in the set.
+- **What that means for the next lanes.** Two columns with complementary errors is the fusion case V2-60 was waiting for, and it is the one adoption question the sealed read cannot answer: a fused rule would have to be chosen on the benchmark (inner, ITW) and read once on the key at the next phase close, not tuned to this one. The 2B's confidently-wrong fakes are a V2-24-shaped question too (what does v1 see in them that the 2B does not), and V2-30's pool should cover whatever generator they are.
+- Sealed ledger count is now 2 (Phase 0: v1; Phase 1: 2B).
+
+## 6. Files
 
 | What | Where |
 |---|---|
@@ -72,4 +86,5 @@ Per-fold package-0.3 on inner (fold → generators: 0 grad_tts + unit_speech, 1 
 | Holdout ledger | `benchmarks/holdout_ledger.jsonl` (four new reads, lane v2-53: `58ac4647960b`, `018576dc2c3f`, `b2ced457d80b`, `2837507bf7d6`) |
 | Chain log | `outputs/v2/backbone/logs/chain.log`, per-run logs beside it |
 | Assembler + tests | `scripts/v2_backbone_to_benchmark.py`, `tests/test_v2_backbone_to_benchmark.py` |
-| Log rows | `experiments/log.csv`, rung `V2-53-rows` |
+| Sealed read | `outputs/v2/benchmark/sealed/xlsr_2b_antideepfake.json`; `benchmarks/sealed_ledger.jsonl` key `0b0896292e5d` |
+| Log rows | `experiments/log.csv`, rungs `V2-53-rows`, `V2-53-sealed` |
