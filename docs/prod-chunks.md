@@ -521,7 +521,7 @@ Phases 1 and 2 can run in parallel. Phases 3 and 4 can too, once V2-01 exists. P
   - Grouping goes by generator and speaker in the fold file.
   - MLAAD is non-commercial, which matters if v2 is ever a product.
 - **Done when:** at least one wild real corpus and one modern spoof corpus are in manifests, profiled, and folded.
-- **Status (Oct 20): vetting half done, nothing downloaded** (`docs/reports/2026-10-20_v2-30-data-vetting.md`). MLAAD has no English folder newer than our Sep 25 pull (143 of 143 held; we hold 6,180 of 143,000 clips, read-sentence style, so deepening adds generators not delivery). Recommend: real = MSP-Podcast (academic licence, institution signs; start now; AMI is the no-wait fallback); spoof = MLAAD deepen on the expressive models + AffectDF (CC BY-NC, 8 speakers, preprint). All three non-commercial. Profile voiced fraction and drift min-cosine on 300-clip samples before folding; the folding half is still open.
+- **Status (Oct 20): vetting half done, nothing downloaded** (`docs/reports/2026-10-20_v2-30-data-vetting.md`). MLAAD has no English folder newer than our Sep 25 pull (143 of 143 held; we hold 6,180 of 143,000 clips, read-sentence style, so deepening adds generators not delivery). Recommend: real = AMI (CC BY 4.0, no wait; MSP-Podcast ruled out Oct 21, it needs an institution to sign and Nathan has none); spoof = MLAAD deepen on the expressive models + AffectDF (CC BY-NC, 8 speakers, preprint). All three non-commercial. Profile voiced fraction and drift min-cosine on 300-clip samples before folding; the folding half is still open.
 - **Size:** M.
 
 ### V2-31 ⬜ Augmentation library (shared, symmetric)
