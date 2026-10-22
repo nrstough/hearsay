@@ -12,6 +12,14 @@
    "file": "outputs/detector_scores/m5_xlsr_ft.csv",
    "itw": "outputs/detector_scores/_itw_m5.csv"
   },
+  "mms_1b_antideepfake": {
+   "file": "outputs/v2/benchmark/scores/mms-1b-anti-deepfake.csv",
+   "itw": "outputs/v2/benchmark/scores/_itw_mms-1b-anti-deepfake.csv"
+  },
+  "mms_300m_antideepfake": {
+   "file": "outputs/v2/benchmark/scores/mms-300m-anti-deepfake.csv",
+   "itw": "outputs/v2/benchmark/scores/_itw_mms-300m-anti-deepfake.csv"
+  },
   "spectra_aasist": {
    "file": "outputs/detector_scores/spectra_aasist.csv",
    "itw": "outputs/spectra/itw_stress/scores.csv"
@@ -19,6 +27,14 @@
   "wavlm_l": {
    "file": "outputs/detector_scores/wavlm_l.csv",
    "itw": null
+  },
+  "xlsr_1b_antideepfake": {
+   "file": "outputs/v2/benchmark/scores/xls-r-1b-anti-deepfake.csv",
+   "itw": "outputs/v2/benchmark/scores/_itw_xls-r-1b-anti-deepfake.csv"
+  },
+  "xlsr_2b_antideepfake": {
+   "file": "outputs/v2/benchmark/scores/xls-r-2b-anti-deepfake.csv",
+   "itw": "outputs/v2/benchmark/scores/_itw_xls-r-2b-anti-deepfake.csv"
   },
   "xlsr_L20": {
    "file": "outputs/v2/benchmark/scores/xlsr_L20.csv",
@@ -177,6 +193,38 @@
    "kind": "file",
    "sha256": "c5fe9c5e9a275523a1cbfc265cd66d8004c8c2526a02ee786d729f4cf7cae083"
   },
+  "outputs/v2/benchmark/scores/_itw_mms-1b-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "589014abb6fe08e85f60cae6d6ef8ad8b3f1972edbbeba05c56dcb1ddaf5b3a5"
+  },
+  "outputs/v2/benchmark/scores/_itw_mms-300m-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "ecfad29ea72659a3f53b859a89de9116f55f40b75fe7a55097d55de44f542f7c"
+  },
+  "outputs/v2/benchmark/scores/_itw_xls-r-1b-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "d8887f32a5b4795ce7cf464a82af2c86a74fee59c9e1ac17371bb980345e9ba3"
+  },
+  "outputs/v2/benchmark/scores/_itw_xls-r-2b-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "7290980fa13bf2037a72e56a2281116e76ddb21b3987acb1670e53e00febeb38"
+  },
+  "outputs/v2/benchmark/scores/mms-1b-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "bfeb659a54689d0f8a537e183ac132de07e50c3742e9c948da0239dd5f3e07b2"
+  },
+  "outputs/v2/benchmark/scores/mms-300m-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "7601bc68276f2e2b9095ed1c9a5b9527ce28450a1dc4ba0655faa594a0764b97"
+  },
+  "outputs/v2/benchmark/scores/xls-r-1b-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "46416e9ee50d4b8ffcffe38125a4c1fe0f0612b8a45e034d847f94fff9e06359"
+  },
+  "outputs/v2/benchmark/scores/xls-r-2b-anti-deepfake.csv": {
+   "kind": "file",
+   "sha256": "ccae9986579dfe9be9c6d40187b4dac5344c1f70da2786269a2addf83d5523a4"
+  },
   "outputs/v2/benchmark/scores/xlsr_L20.csv": {
    "kind": "file",
    "sha256": "05958447c1a371d9e4ef88a074bea44985d9717f385f80ca52fdeb32d3825fb7"
@@ -258,5 +306,5 @@
   "sha256": "fb7830762691d04d8be938f8e2615e349c998cdfd72c58e94d02385d57368607"
  },
  "spec": "docs/specs/2026-10-11_v2-benchmark-fusion.md",
- "version": "v1.2"
+ "version": "v1.3"
 }

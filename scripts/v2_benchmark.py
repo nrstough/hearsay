@@ -42,7 +42,18 @@ COLUMNS = {
                        "itw": "outputs/spectra/itw_stress/scores.csv"},
     "wavlm_l": {"file": "outputs/detector_scores/wavlm_l.csv", "itw": None},
     "xlsr_L20": {"file": "outputs/v2/benchmark/scores/xlsr_L20.csv", "itw": None},
+    # V2-53 (Oct 20): the AntiDeepfake backbones, zero-shot, assembled by scripts/v2_backbone_to_benchmark.py.
+    # Inner, holdout and MLAAD are IN-SAMPLE for these four (their training table); ITW is held out.
+    "mms_300m_antideepfake": {"file": "outputs/v2/benchmark/scores/mms-300m-anti-deepfake.csv",
+                              "itw": "outputs/v2/benchmark/scores/_itw_mms-300m-anti-deepfake.csv"},
+    "xlsr_1b_antideepfake": {"file": "outputs/v2/benchmark/scores/xls-r-1b-anti-deepfake.csv",
+                             "itw": "outputs/v2/benchmark/scores/_itw_xls-r-1b-anti-deepfake.csv"},
+    "mms_1b_antideepfake": {"file": "outputs/v2/benchmark/scores/mms-1b-anti-deepfake.csv",
+                            "itw": "outputs/v2/benchmark/scores/_itw_mms-1b-anti-deepfake.csv"},
+    "xlsr_2b_antideepfake": {"file": "outputs/v2/benchmark/scores/xls-r-2b-anti-deepfake.csv",
+                             "itw": "outputs/v2/benchmark/scores/_itw_xls-r-2b-anti-deepfake.csv"},
 }
+IN_SAMPLE_COLUMNS = {"mms_300m_antideepfake", "xlsr_1b_antideepfake", "mms_1b_antideepfake", "xlsr_2b_antideepfake"}
 DATA_INPUTS = [
     "splits/nsa_folds.csv", "splits/nsa_test_durations.csv", "outputs/manifests/itw_stress.csv",
     "outputs/manifests/nsa_test.csv", B.SEALED_KEY_FILE, "outputs/channel/m3_perturb.csv", "outputs/channel/m3_mlaad.csv",

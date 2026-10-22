@@ -1,0 +1,131 @@
+{
+ "name": "V2-60b: fixed v1 + 2B rank-blend ceiling (readout, pre-declared)",
+ "date": "2026-10-21",
+ "purpose": "The ceiling a conditions-gated blend (V2-60 design of record, Oct 21) has to beat: fixed-weight rank blends of the shipped v1 rule and the xls-r-2b-anti-deepfake zero-shot column, whose errors are nearly disjoint on the sealed key (docs/reports/2026-10-20_v2-53-benchmark-rows.md section 5).",
+ "status": "READOUT, NOT A SELECTION. Inner folds are in-sample for the 2B column (DiffSSD, LJ Speech, LibriTTS in its training table), so inner rankings favour it by construction; In-the-Wild is held out for every column but is spent as a selection set (rule 7). No candidate is adopted from this readout. Adoption of any blend or gate waits for V2-24's feature list, the benchmark, and one sealed read at the Phase 6 close. The sealed key is not read here.",
+ "columns": [
+  "m1b_v3",
+  "handcrafted_v5",
+  "m5_xlsr_ft",
+  "xlsr_2b_antideepfake"
+ ],
+ "in_sample_columns": [
+  "xlsr_2b_antideepfake"
+ ],
+ "e_column": "spectra_aasist",
+ "e_rule": {
+  "spectra_logit_below": -3.0,
+  "base_above": 0.5,
+  "multiply_by": 0.5
+ },
+ "refs": "nested",
+ "populations_read": [
+  "inner (nested OOF, 16,142)",
+  "itw (3,000, report-only)",
+  "test (unlabelled: share above inner threshold, Spearman vs shipped TSV)"
+ ],
+ "populations_not_read": [
+  "holdout (ledgered; not spent on a readout)",
+  "test_key (sealed)"
+ ],
+ "primary_reading": "package03",
+ "readings": {
+  "brief": [
+   0.3,
+   4.0,
+   1.0
+  ],
+  "package05": [
+   0.5,
+   1.0,
+   4.0
+  ],
+  "package03": [
+   0.3,
+   1.0,
+   4.0
+  ]
+ },
+ "descriptive_bands": {
+  "package03": 0.03,
+  "brief": 0.02,
+  "package05": 0.05,
+  "note": "V2-60's tie bands, used only to label cells 'better / within band / worse' vs B0; no WIN/LOSE verdict is issued"
+ },
+ "cells_of_interest": [
+  "ITW package-0.3 per candidate with 90% speaker-cluster bootstrap",
+  "inner fold 4 (ElevenLabs) package-0.3, the one inner fold where the 2B is not near zero and B0 led it (0.107 vs 0.115)",
+  "without-E row for each candidate",
+  "test share above inner threshold and Spearman vs the shipped TSV"
+ ],
+ "control": "B0",
+ "candidates": {
+  "B0": {
+   "kind": "fixed",
+   "role": "control",
+   "weights": {
+    "m1b_v3": 0.6,
+    "handcrafted_v5": 0.2,
+    "m5_xlsr_ft": 0.2,
+    "xlsr_2b_antideepfake": 0.0
+   },
+   "e": true,
+   "note": "the shipped v1 rule (A3 w0.2 + E)"
+  },
+  "B1": {
+   "kind": "fixed",
+   "weights": {
+    "m1b_v3": 0.45,
+    "handcrafted_v5": 0.15,
+    "m5_xlsr_ft": 0.15,
+    "xlsr_2b_antideepfake": 0.25
+   },
+   "e": true,
+   "note": "v1 rule x 0.75 + 2B x 0.25"
+  },
+  "B2": {
+   "kind": "fixed",
+   "weights": {
+    "m1b_v3": 0.3,
+    "handcrafted_v5": 0.1,
+    "m5_xlsr_ft": 0.1,
+    "xlsr_2b_antideepfake": 0.5
+   },
+   "e": true,
+   "note": "v1 rule x 0.5 + 2B x 0.5"
+  },
+  "B3": {
+   "kind": "fixed",
+   "weights": {
+    "m1b_v3": 0.15,
+    "handcrafted_v5": 0.05,
+    "m5_xlsr_ft": 0.05,
+    "xlsr_2b_antideepfake": 0.75
+   },
+   "e": true,
+   "note": "v1 rule x 0.25 + 2B x 0.75"
+  },
+  "B4": {
+   "kind": "fixed",
+   "weights": {
+    "m1b_v3": 0.0,
+    "handcrafted_v5": 0.0,
+    "m5_xlsr_ft": 0.0,
+    "xlsr_2b_antideepfake": 1.0
+   },
+   "e": true,
+   "note": "2B alone, with the frozen E step"
+  },
+  "B5": {
+   "kind": "fixed",
+   "weights": {
+    "m1b_v3": 0.5,
+    "xlsr_2b_antideepfake": 0.5
+   },
+   "e": true,
+   "note": "carrier + 2B only, no handcrafted, no M5: is the rest of v1 still earning its seat?"
+  }
+ },
+ "runner": "scripts/v2_benchmark.py rule --rule benchmarks/v2_60b/<name>.json (no --holdout)",
+ "declared_before_any_read": true
+}

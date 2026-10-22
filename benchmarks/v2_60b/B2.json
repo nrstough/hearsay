@@ -1,0 +1,11 @@
+{
+ "name": "V2_60b_B2",
+ "weights": {
+  "m1b_v3": 0.3,
+  "handcrafted_v5": 0.1,
+  "m5_xlsr_ft": 0.1,
+  "xlsr_2b_antideepfake": 0.5
+ },
+ "e": true,
+ "refs": "nested"
+}

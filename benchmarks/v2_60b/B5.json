@@ -1,0 +1,9 @@
+{
+ "name": "V2_60b_B5",
+ "weights": {
+  "m1b_v3": 0.5,
+  "xlsr_2b_antideepfake": 0.5
+ },
+ "e": true,
+ "refs": "nested"
+}
