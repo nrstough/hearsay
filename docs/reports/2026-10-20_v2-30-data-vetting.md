@@ -4,7 +4,7 @@
 
 ## Bottom line
 
-- **Recommended first pull:** one real corpus, **MSP-Podcast** (start the institutional agreement today; it is the long pole), and two spoof sources, **MLAAD (deepen, not widen)** and **AffectDF**. Fallback real corpus if the agreement stalls: **AMI** (immediate, CC BY 4.0).
+- **Recommended first pull (revised Oct 21):** one real corpus, **AMI** headset mix (immediate, CC BY 4.0), and two spoof sources, **MLAAD (deepen, not widen)** and **AffectDF**. MSP-Podcast fits the style best but needs an institution to sign its data-transfer agreement, and Nathan has no institution (ruled out Oct 21), so it is out. If AMI fails the profile, next real candidates are the CC-BY slices of YODAS / Emilia-YODAS (no true speaker ids; YouTube codec chain). Open question: AffectDF redistributes MSP-Podcast-derived reals; whether using those rows is allowed without the MSP agreement is unverified, so profile and use its spoof side first and treat its reals as unusable until the AffectDF card's terms are read.
 - **MLAAD has nothing new for us.** Its newest commit is 2026-08-28; our English pull was 2026-09-25 (manifest mtimes 22:29 and 22:35), and the 143 English model folders on the Hub are exactly the 143 we hold. The handoff's "Apr 18 pull" is wrong; the cutoff is Sep 25. What we hold is 6,180 of 143,000 English clips (1,000 per model; 45.5 GB for all of `fake/en`). So MLAAD can only be *deepened* on the expressive generators.
 - **Style gap in MLAAD itself.** MLAAD fakes are TTS of M-AILABS audiobook sentences: our 6,180 clips have mean 7.4 s, median 7.1 s, 1.6% over 15 s. Even the right generators (ElevenLabs v3, Gemini, Qwen3, VibeVoice, SoulX-Podcast...) are asked to read single book sentences, not to produce multi-sentence pause-rich delivery. More MLAAD adds generators' timbre, not the delivery style. This is why AffectDF is on the list, and why profiling before folding is mandatory.
 - **Licence position:** all three recommended sources are non-commercial (MLAAD CC BY-NC 4.0; AffectDF CC BY-NC 4.0; MSP-Podcast academic licence). v2 trained on them cannot be a product without separate commercial licences. MLAAD is already that constraint; this adds two more of the same kind.
@@ -54,12 +54,15 @@ If a corpus is on the list, any AntiDeepfake-derived column is in-sample for it,
 
 ## Recommendation
 
-**Real, one corpus: MSP-Podcast.**
+**Real, one corpus: AMI** (MSP-Podcast is out: it needs an institution to sign; the text below on MSP-Podcast is kept as the vetting record).
+
+- AMI: CC BY 4.0, self-service, ~100 h of conversational multi-party meetings with speaker ids, outside the AntiDeepfake list. Risks: not expressive; short overlapping turns need annotation-based segmentation; clean close-talk headset chain with a distinct room signature (shortcut against synthetic sets, to be laundered symmetrically). Profile first; the pass criteria below decide whether it enters the pool.
+
+**(Record) MSP-Podcast, the style-best option, unavailable:**
 
 - Why: spontaneous, emotionally varied wide-band podcast speech with true speaker ids, outside the AntiDeepfake list, and it is the real side AffectDF was built around.
 - Licence risk: academic licence, institution signs, non-commercial; terms text was not retrievable from a primary page, so read the PDF form before signing. Redistribution is likely barred, so it stays on the Crucial drive and is never put in a Docker image.
 - Shortcut risk: web-podcast MP3 history on the real side only; pauses >= 0.3 s are cut, so it may under-represent the pause-rich style. Mitigation: symmetric codec laundering (V2-31) and the profile below *before* folding.
-- Fallback: **AMI** headset mix, because it needs no signature (CC BY 4.0). Its risk is a meeting-room signature and short overlapping turns, and it is not "expressive".
 
 **Spoof, two sources:**
 
@@ -72,7 +75,7 @@ If a corpus is on the list, any AntiDeepfake-derived column is in-sample for it,
 
 Goal: show, per candidate, whether it contains the atlas style (voiced fraction ~0.54, drift min-cosine ~0.16, versus 0.71 and 0.27 on the test set overall) on **both** sides, so the model cannot learn "pauses = fake".
 
-1. **Sample.** 300 clips per corpus per side (MSP-Podcast ~300 reals; AffectDF ~150 spoof + ~150 real; MLAAD expressive subset ~300 beyond what we hold; AMI ~300 segments). Pull the minimum (a few shards or files) into a scratch directory on the Crucial drive, `-I` Python reading it, delete after. Stratify by speaker and generator; cap clips per speaker and per generator.
+1. **Sample.** 300 clips per corpus per side (AMI ~300 segments; AffectDF ~150 spoof + ~150 real; MLAAD expressive subset ~300 beyond what we hold). Pull the minimum (a few shards or files) into a scratch directory on the Crucial drive, `-I` Python reading it, delete after. Stratify by speaker and generator; cap clips per speaker and per generator.
 2. **Decode once to the production boundary:** 16 kHz mono through `hearsay.audio`, then the deep path's `prepare_segment` band match, so the features see what the detectors see.
 3. **Measure.** `hearsay.detectors.speech_gate.analyze(x)["voiced_frac"]` and `hearsay.detectors.speaker_drift.analyze(x)["cos_min"]` (also `drift`), plus duration. Join as in `scripts/v2_error_atlas.py`. Compare to the test-set reference (all 1,671, and the 24 misses) and to our current populations (NSA sample, ASV19, MLAAD held, In-the-Wild).
 4. **Duration control.** Cos-min depends on window count; compare at test-like durations (`splits/nsa_test_durations.csv`): crop or concatenate to match before reading it, otherwise longer clips look more drifty.
