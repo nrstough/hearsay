@@ -19,6 +19,10 @@ src/hearsay/
   submission.py     score_files, write_submission (TSV, never overwrites), append_log, preflight
   spectra.py        Spectra-AASIST loader and scorer (M0-era version only)
   m5_bundle.py, m5_data.py, m5_model.py    M5 fine-tune lane library
+  augment.py        M5 laundering augmentation (noise, band-limit, reverb, gain+clip, RawBoost, trim jitter)
+  pipeline.py       end-to-end inference for one clip: Models, FusionConstants (shipped rule: fusion_v2),
+                    analyze_clip, routing log, explanation JSON; used by scripts/run_pipeline.py and api.py
+  api.py            FastAPI wrapper over pipeline.analyze_clip for the demo UI (/analyze, /results, /health)
   detectors/        contract (base.py), shared learned base (_learned.py), handcrafted, compression,
                     container, enf, splice, engineered.py (single import point)
 scripts/            CLIs: extract_/train_handcrafted, eval_bundle, extract_embeddings, train_probe,
@@ -27,7 +31,7 @@ scripts/            CLIs: extract_/train_handcrafted, eval_bundle, extract_embed
                     make_constant_csv, inventory*
 scripts/cloud/      launch.sh, box_chain.sh, reaper.sh, r2_guard.sh, teardown_check.sh, box_codecs.py
 splits/             nsa_folds.csv (20,000 rows), nsa_folds_plus_asv19.csv (27,648), nsa_test_durations.csv (1,671)
-tests/              pytest suite, 301 collected
+tests/              pytest suite, 864 collected (Oct 24; see "Tests: what pins what" for the count method)
 docs/               STATUS.md, architecture.md, plan.md, nsa-challenge.md, handoffs/, reports/, specs/, consults/
 models/ outputs/ weights/ data/ submissions/    gitignored artifacts and logs
 ```
@@ -175,6 +179,7 @@ Gotchas
 | scripts/m5_train.py | the trainer, one fold or full model, wall-clock-fixed steps, exports OOF/holdout/test scores | main:60, band_match after augment:104, --cpu-smoke:218, CUDA check:230, build_model:312 |
 | scripts/m5_score.py | CPU inference path: manifest or file list -> path/score/logit/flag .csv | score_paths:30, decode flag:36-38, main:49, --max-s:58 |
 | scripts/m5_assemble.py | assembles pulled runs into exported scores + meta.json with the M1 gate decision | newest_m1_dir:41, find_runs:54, _m1b_comparison:68, --m1-itw-pfa:119, have_all_folds:133-137, oof assert:147, holdout/test asserts:151-152, itw comparison:190-204, gate block:205, holdout_passed:208, gate rule text:212-214 |
+| src/hearsay/augment.py | class-blind laundering augmentation for M5 (numpy/scipy only), plus the trainer's fixed holdout perturbation slice | add_noise:42, band_limit:50, reverb:55, gain_clip:67, rawboost_conv:71, trim_jitter:87, Augmenter:109, holdout_slice:170 |
 | scripts/cloud/launch.sh | rents one cloud instance, budget-guards, provisions, starts box_chain.sh; self-destroys on early failure | budget guard:33, NEED:39, COMMIT:40, refuse:41-42, cleanup trap:62 |
 | scripts/cloud/box_chain.sh | runs on the instance: setup -> JOBS -> DONE, heartbeats STATUS to R2, polls for NEXT | fail():15, EXIT trap:16, run_jobs:30, NEXT poll:60-70 |
 | scripts/cloud/reaper.sh | local watchdog: polls STATUS in R2, destroys on DONE/FAIL/stall/deadline, appends the ledger | caffeinate note:4, DEADLINE/STALL_MIN:11-12, main loop:21, ledger append:45, never-exit-while-active:50-55 |
@@ -215,6 +220,8 @@ Gotchas
 | Path | Purpose | Key entry points |
 |---|---|---|
 | src/hearsay/spectra.py | loads the Spectra-AASIST checkpoint from weights/Spectra-AASIST and produces synth_logit per clip; M0-era version only (63 lines) | WIN/HOP:26-27, load_spectra:30, spectra_logits:54, synth_logit:62 |
+| src/hearsay/pipeline.py | end-to-end inference for one clip: decode once, every engineered detector plus the deep scorers, fuse with persisted constants, non-speech gate, AnalyzeResponse | CONSTANTS_V0/V1/V2_PATH:73-75, DEFAULT_CONSTANTS_PATH (fusion_v2):77, FusionConstants:133, Models:392, routing_log:599, final_score:656, analyze_clip:677, refuse:774 |
+| src/hearsay/api.py | FastAPI app over pipeline.analyze_clip for the demo UI; not on the scoring path | app:57, settings:82, get_models:108, GET /health:148, GET /results:169, GET /results/{filename}:179, POST /analyze:201 |
 | src/hearsay/metrics.py | EER, minDCF (oracle and sponsor-code variants), act_dcf, report() | C_FA/C_MISS/PI_SYNTH:29-31, eer:34, cost_at:45, min_cost:54, bayes_llr_threshold:62, decision_logit:67, sponsor_min_dcf:78, report:99 |
 | src/hearsay/submission.py | score every test file in fixed order, write a validated never-overwritten TSV, append the log | LOG_COLUMNS:29-31, score_files:44, bare except:60, write_submission:73, score_max:80, FileExistsError:86, read-back asserts:107-109, append_log:113, AUDIO_EXT:136, list_test_files:139, preflight:148 |
 | scripts/spectra_direction.py | frozen direction guard: AUC >= 0.5 and spoof median > bonafide median; optional diagnostic Platt | main:45, direction fail:88-89, Platt fit:92-108, slope assert:95 |
@@ -338,6 +345,12 @@ Gotchas
 5. Check ScoredFiles.flags / n_flagged and the sidecar's flag column before trusting the TSV.
 
 ## Tests: what pins what
+
+Count (Oct 24): 864 tests in 33 modules. Method: `pytest --collect-only -q` with torch, torchaudio,
+transformers and speechbrain replaced at import time by stub modules, so the four modules that import
+torch at the top (test_m5_model, test_m5_scores, test_repair_decode_errors, test_spectra; 75 tests)
+also collect. Without torch, plain `pytest --collect-only -q --continue-on-collection-errors` collects
+789 and reports those four modules as collection errors. Collecting counts tests; it does not run them.
 
 | Test | Pins |
 |---|---|

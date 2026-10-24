@@ -68,7 +68,7 @@ from hearsay.detectors.speech_gate import BLOCK_TOP, FAILURE_TOP, apply_default_
 from hearsay.metrics import PI_SYNTH, sigmoid
 
 REPO = Path(__file__).resolve().parents[2]
-# The shipped rule's file is fusion_v1 (DEFAULT_CONSTANTS_PATH); CONSTANTS_PATH keeps naming the
+# The shipped rule's file is fusion_v2 (DEFAULT_CONSTANTS_PATH); CONSTANTS_PATH keeps naming the
 # fusion_v0 file, which docker/build.sh stages beside it and tests/test_docker_image.py pins.
 CONSTANTS_V0_PATH = REPO / "models" / "fusion_v0" / "constants.json"
 CONSTANTS_V1_PATH = REPO / "models" / "fusion_v1" / "constants.json"
