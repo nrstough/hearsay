@@ -235,6 +235,7 @@ class Converter:
         self.mermaid_blocks: list[str] = []
         self.mermaid_embed = None  # callable(text) -> html, set by the site builder
         self._ph: list[str] = []
+        self._seen_h1 = False
 
     # --- block level ---------------------------------------------------------------------
 
@@ -327,6 +328,12 @@ class Converter:
         return j + 1
 
     def _heading(self, level: int, text: str) -> str:
+        # one <h1> per page: a later top-level heading (e.g. the block `next dev` appends to
+        # CLAUDE.md) renders one level down
+        if level == 1:
+            if self._seen_h1:
+                level = 2
+            self._seen_h1 = True
         base = slugify(text) or "section"
         count = self.slugs.get(base, 0)
         self.slugs[base] = count + 1

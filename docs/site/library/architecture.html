@@ -71,7 +71,7 @@
 <tr><td>Detector contract, <code>safe_run</code>, registry</td><td><code>src/hearsay/detectors/base.py</code></td><td>built</td><td>main (changes need every detector owner)</td></tr>
 <tr><td>Metric (minDCF, EER, both sponsor-code readings)</td><td><code>src/hearsay/metrics.py</code></td><td>built</td><td>main</td></tr>
 <tr><td>Fold file</td><td><code>splits/nsa_folds.csv</code> (<code>scripts/make_folds.py</code>); training-only extension <code>splits/nsa_folds_plus_asv19.csv</code> (<code>scripts/extend_folds.py</code>)</td><td>built, frozen</td><td>main</td></tr>
-<tr><td>Segment preparation for deep detectors</td><td><code>src/hearsay/embed.py</code> (<code>prepare_segment</code>, <code>normalize_windows</code>, <code>test_duration_sampler</code>)</td><td>built</td><td>main</td></tr>
+<tr><td>Segment preparation for deep detectors</td><td><code>src/hearsay/segment.py</code> (<code>prepare_segment</code>, <code>normalize_windows</code>, <code>test_duration_sampler</code>; torch-free, shared with the CPU detectors, re-exported by <code>src/hearsay/embed.py</code>)</td><td>built</td><td>main</td></tr>
 <tr><td>M1 embeddings + probe + TSV</td><td><code>scripts/extract_embeddings.py</code>, <code>train_probe.py</code>, <code>make_probe_csv.py</code>, <code>src/hearsay/probe.py</code></td><td>built</td><td>main</td></tr>
 <tr><td>M3 Spectra-AASIST stream</td><td><code>src/hearsay/spectra.py</code>, <code>scripts/spectra_direction.py</code>; <code>scripts/score_spectra.py</code> to come</td><td>in flight</td><td>M3</td></tr>
 <tr><td>M5 fine-tune (bundle, model, trainer, scorer, assembler)</td><td><code>src/hearsay/m5_{bundle,data,model}.py</code>, <code>scripts/m5_*.py</code>, <code>scripts/cloud/</code> to come</td><td>in flight</td><td>M5 (vast.ai only)</td></tr>
@@ -288,7 +288,7 @@
 
 <footer class="page-footer">
 <p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
-<p>Generated from <code>docs/architecture.md</code> <span class="hash">af0e31ba983b</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+<p>Generated from <code>docs/architecture.md</code> <span class="hash">0329818376d0</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
 </footer>
 </main>
 </div>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff — host the demo app on a Vultr VM for Hrushi's video (Sat Sep 26, 2026, ~22:20) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/handoffs/2026-09-26_vultr-hosting-handoff.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/handoffs/2026-09-26_vultr-hosting-handoff.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#context">Context</a></li><li><a href="#working-branch--worktree">Working branch / worktree</a></li><li><a href="#environment--setup">Environment / setup</a></li><li><a href="#what-to-do-next">What to do next</a></li><li><a href="#important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</a></li><li><a href="#analytical-notes">Analytical notes</a></li><li><a href="#pointers">Pointers</a></li></ul></details>
+<h1 id="handoff--host-the-demo-app-on-a-vultr-vm-for-hrushis-video-sat-sep-26-2026-2220">Handoff — host the demo app on a Vultr VM for Hrushi's video (Sat Sep 26, 2026, ~22:20)</h1>
+<p><strong>Purpose of this chat:</strong> put the wired frontend and the pipeline API on one public Ubuntu VM on Vultr so Hrushi can record the demo video against real scores, without changing the model, the TSV or the UI. Target: a URL that serves the app on port 80, with uploads scored by the shipped rule, the three demo presets, the submitted-run batch view and the TSV export. Tear the VM down after the video.</p>
+<h2 id="context">Context</h2>
+<ul>
+<li>The frontend (Next.js at the repo root) is wired to the real pipeline as of <code>7f870ca</code>: its route handlers call the FastAPI service <code>hearsay.api</code> server-side (<code>HEARSAY_API_URL</code>, default <code>http://127.0.0.1:8000</code>), read <code>submissions/CrossExam_predictions.tsv</code> and the runner's per-file JSON (<code>HEARSAY_RESULTS</code>), and serve demo presets from <code>demo/results/</code>. No CORS is needed: the browser only talks to the Next app. Run instructions: <code>demo/README.md</code>.</li>
+<li>The model is frozen and verified: a full 1,671-file re-run from audio matched the submitted file (Spearman 1.0, max 9.3e-4, 0 flips; <code>submissions/log.csv</code>, 22:52 row). Nothing in this task may change <code>models/</code>, <code>weights/</code>, <code>submissions/</code> or the scoring code.</li>
+<li>The repo is public: https://github.com/nrstough/hearsay (main at <code>4258d33</code> or later; includes Hrushi's guided tour <code>7d89a75</code> and the docs site).</li>
+<li>The Docker image (<code>hearsay:20260926-0916</code>) runs the batch runner with the fallback rule and has no M5 checkpoint or API server; it is not the hosting path. Host from a checkout instead.</li>
+<li><strong>Gitignored assets the API needs, copied from the Mac</strong> (about 3.3 GB; the WavLM weights are not needed):</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Path</th><th>Size</th><th>Why</th>
+</tr></thead>
+<tbody>
+<tr><td><code>weights/wav2vec2-xls-r-300m/</code></td><td>1.2 GB</td><td>XLS-R backbone for the probe and the M5 head</td></tr>
+<tr><td><code>weights/Spectra-AASIST/</code></td><td>1.3 GB</td><td>Spectra-AASIST (suppression step)</td></tr>
+<tr><td><code>weights/spkrec-ecapa-voxceleb/</code></td><td>85 MB</td><td>speaker-drift evidence</td></tr>
+<tr><td><code>models/m1_wav2vec2-xls-r-300m_L7_20260926-0521/</code></td><td>36 KB</td><td>the shipped probe</td></tr>
+<tr><td><code>models/hc_lgbm_20260926-055451/</code> + symlink <code>models/hc_selected -&gt; hc_lgbm_20260926-055451</code></td><td>4.4 MB</td><td>handcrafted bundle</td></tr>
+<tr><td><code>models/m5_xlsr_ft_20260926-0741/</code></td><td>631 MB</td><td>M5 checkpoint (hash-checked by the runner)</td></tr>
+<tr><td><code>models/fusion_v2/</code>, <code>models/fusion_v1/</code></td><td>1.6 MB</td><td>the shipped rule and the fallback</td></tr>
+<tr><td><code>outputs/runner/v2_full/results/</code></td><td>33 MB</td><td>per-file JSON for the batch view (optional; without it the batch view shows scores only)</td></tr>
+<tr><td><code>submissions/CrossExam_predictions.tsv</code></td><td>56 KB</td><td>the submitted file, for the batch view and the export</td></tr>
+</tbody>
+</table></div>
+<ul>
+<li>Resource needs measured on the Mac: API peak memory about 4 GB with M5 loaded; 1.3 s per file with 6 threads on an M3 Pro, so expect 3–6 s per upload on a 4-vCPU cloud VM after a 30–60 s model load on the first request. Next production build about 300 MB of <code>node_modules</code> plus <code>.next</code>.</li>
+<li><strong>Cost and approval:</strong> a Vultr Cloud Compute instance with 4 vCPU / 8 GB RAM / 80 GB or more disk (about $0.07/h, hourly billed). CPU only; no GPU. Nathan approved hosting for the video; destroy the instance afterwards and record the spend in <code>docs/reports/cloud-expense-ledger.md</code>.</li>
+<li><strong>Security:</strong> the API has no authentication. Bind it to 127.0.0.1 and expose only the Next app through nginx on port 80. Anyone with the URL can upload audio for scoring during the demo window; that is acceptable for a short-lived demo box, not for a permanent host. No secrets go in the repo; if an HF token is needed for anything, it lives in <code>/etc/hearsay.env</code> on the box only.</li>
+</ul>
+<h2 id="working-branch--worktree">Working branch / worktree</h2>
+<p>Local: <code>main</code> in <code>~/Projects/hearsay</code> on the Mac, in sync with origin at <code>4258d33</code> plus <code>bd94e39</code> (log row). On the VM: a fresh clone of <code>main</code>. This task adds only <code>docs/reports/2026-09-26_vultr-hosting.md</code> (what was deployed, the URL, the spend) and, if useful, <code>deploy/vultr/</code> with the nginx and systemd units used. Stage only those; never <code>git add -A</code>; the oversight chat pushes.</p>
+<h2 id="environment--setup">Environment / setup</h2>
+<p>On the Mac (source of the assets), from the repo root:</p>
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; ls weights/wav2vec2-xls-r-300m weights/Spectra-AASIST weights/spkrec-ecapa-voxceleb models/m5_xlsr_ft_20260926-0741/model models/fusion_v2/constants.json &gt;/dev/null &amp;&amp; echo assets present</code></pre>
+<p>On the VM (Ubuntu 24.04), after <code>ssh root@&lt;ip&gt;</code>:</p>
+<pre><code class="language-bash">apt-get update &amp;&amp; apt-get install -y ffmpeg nginx git curl build-essential &amp;&amp; curl -LsSf https://astral.sh/uv/install.sh | sh &amp;&amp; curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &amp;&amp; apt-get install -y nodejs</code></pre>
+<h2 id="what-to-do-next">What to do next</h2>
+<ol>
+<li><strong>Create the VM</strong> in the Vultr console or CLI: Cloud Compute, Ubuntu 24.04, 4 vCPU / 8 GB / 80+ GB (a 2 vCPU / 4 GB box will swap when M5 loads), region near Hrushi, SSH key added. Note the IP. Ask Nathan for the account if this chat does not have it; do not create a second instance.</li>
+<li><strong>Clone and install</strong> as a non-root user <code>hearsay</code>: <code>git clone https://github.com/nrstough/hearsay &amp;&amp; cd hearsay &amp;&amp; uv sync &amp;&amp; cp .env.example .env &amp;&amp; npm ci &amp;&amp; npm run build</code>. <code>uv sync</code> pulls CPU torch (about 2 GB of wheels); <code>npm run build</code> was verified on the Mac (see the build log note below).</li>
+<li><strong>Copy the assets from the Mac</strong> (one rsync per row of the table, or one command with <code>--relative</code>):
+<pre><code class="language-bash">cd ~/Projects/hearsay &amp;&amp; rsync -avz --relative --copy-links weights/wav2vec2-xls-r-300m weights/Spectra-AASIST weights/spkrec-ecapa-voxceleb models/m1_wav2vec2-xls-r-300m_L7_20260926-0521 models/hc_lgbm_20260926-055451 models/hc_selected models/m5_xlsr_ft_20260926-0741 models/fusion_v2 models/fusion_v1 outputs/runner/v2_full/results submissions/CrossExam_predictions.tsv hearsay@&lt;ip&gt;:~/hearsay/</code></pre>
+<p>About 3.3 GB; 10–30 minutes depending on the uplink. <code>--copy-links</code> turns the <code>hc_selected</code> symlink into a directory copy, which the runner accepts. Check <code>models/hc_selected/meta.json</code> exists on the box afterwards.</p></li>
+<li><strong>Smoke the API on the box</strong> before wiring nginx: <code>HEARSAY_RESULTS=outputs/runner/v2_full uv run uvicorn hearsay.api:app --host 127.0.0.1 --port 8000</code> in one shell, then <code>curl -s -F file=@demo/synthetic_apple_tts_samantha.wav localhost:8000/analyze | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['probability_synthetic'], d['verdict'], d['fusion']['detail']['final'])"</code> → <code>0.9979 synthetic A3_w0.2_E</code> (the Mac gave 0.9979; a CPU-vs-CPU difference under 1e-3 is expected, a different verdict is not). <code>curl localhost:8000/health</code> must show <code>fusion: fusion_v2/constants.json</code> and four scorers.</li>
+<li><strong>Run both as systemd services</strong> (units under <code>deploy/vultr/</code>, commit them): <code>hearsay-api.service</code> (<code>ExecStart=/home/hearsay/.local/bin/uv run uvicorn hearsay.api:app --host 127.0.0.1 --port 8000</code>, <code>Environment=HEARSAY_RESULTS=outputs/runner/v2_full OMP_NUM_THREADS=4 HF_HUB_OFFLINE=1</code>, <code>WorkingDirectory=/home/hearsay/hearsay</code>, <code>Restart=always</code>) and <code>hearsay-web.service</code> (<code>ExecStart=/usr/bin/npm start -- --port 3000</code>, <code>Environment=HEARSAY_API_URL=http://127.0.0.1:8000 NODE_ENV=production</code>, same working directory). Warm the API once with a demo upload so the first video take does not wait 60 s.</li>
+<li><strong>nginx</strong> on port 80 proxying to 127.0.0.1:3000 with <code>client_max_body_size 100m</code> and <code>proxy_read_timeout 300s</code> (a first upload can take a minute while models load). No route to :8000 from outside. Optional: <code>certbot</code> if a domain is pointed at the box; the demo works over plain http.</li>
+<li><strong>Verify from outside</strong>, exactly what the video will show: open <code>http://&lt;ip&gt;/</code>, confirm the three presets load with 0.001 / 0.998 / 0.998, click "Load the submitted 1,671-file run" (457 above 0.5, minDCF 0.0733 in the benchmark card), upload <code>demo/real_in_the_wild_28886.wav</code> from a laptop and get 0.001 real, export the TSV and check <code>shasum -a 256</code> starts <code>fb783076</code>. Take screenshots for the report.</li>
+<li><strong>Hand the URL to Hrushi</strong> with three notes: pull main before any UI change; the tour copy still carries unmeasured numbers (minDCF 0.1983, EER 4.82%, 48 kHz, 16 kHz roll-off, 60.014 Hz ENF, "Intercept #0042", a 2-hour timeline, "8 sensors", an "AI specialist") that must be fixed in <code>src/components/GuidedTour.tsx</code> before filming, then rebuilt on the box (<code>git pull &amp;&amp; npm run build &amp;&amp; systemctl restart hearsay-web</code>); the API scores in 3–6 s per upload, so leave the spinner in the take.</li>
+<li><strong>Write</strong> <code>docs/reports/2026-09-26_vultr-hosting.md</code>: instance spec and region, URL, the smoke results, the spend, the teardown time. Add the spend line to <code>docs/reports/cloud-expense-ledger.md</code>. <strong>Destroy the instance</strong> when Hrushi confirms the footage is in, and record that.</li>
+</ol>
+<h2 id="important--tests--at-risk-artifacts-make-sure-these-survive">IMPORTANT — tests &amp; at-risk artifacts (make sure these survive)</h2>
+<ul>
+<li>Test on the box: <code>uv run pytest -q tests/test_api.py tests/test_pipeline.py</code> (hermetic parts pass without data; data-marked tests skip); <code>npm run build</code> exit 0.</li>
+<li>Parity on the box (the one number that matters): the demo upload in step 4 must return <code>0.9979 synthetic A3_w0.2_E</code>, and the real demo clip <code>0.0012 real</code>. If either verdict differs, stop: an asset is missing or wrong (check <code>models/hc_selected</code>, the M5 hashes in <code>models/fusion_v2/constants.json</code> against <code>models/m5_xlsr_ft_20260926-0741/model/hashes.json</code>, and <code>HF_HUB_OFFLINE</code>).</li>
+<li>At-risk: nothing new is created on the Mac. On the box everything is a copy; destroying the VM loses nothing. The only records are the report and the ledger line, both tracked.</li>
+<li>Do not copy <code>data/</code>, <code>outputs/</code> beyond the results dump, or <code>weights/wavlm-*</code> (unused, 1.6 GB).</li>
+<li>In flight, other lanes: README polish until Sunday ~05:00; the Sunday 05:00 preflight and direction check on the final file (not this lane's); Hrushi's tour-copy fix.</li>
+</ul>
+<h2 id="analytical-notes">Analytical notes</h2>
+<ul>
+<li>The app never computes a score: <code>src/lib/hearsay.ts</code> adapts the API's JSON; <code>src/app/api/forensic/*</code> are thin. If the API is down, uploads show an error and the presets still work.</li>
+<li><code>HEARSAY_RESULTS</code> is optional; without it the batch view lists TSV scores with "per-file explanation not on this machine".</li>
+<li>Ports: 80 public (nginx) → 3000 (Next, localhost) → 8000 (API, localhost). Keep 3000 and 8000 closed in the Vultr firewall.</li>
+<li>Memory: API about 4 GB resident with M5; Node about 0.5 GB; leave 2 GB headroom → 8 GB box.</li>
+<li>Threads: set <code>OMP_NUM_THREADS</code> to the vCPU count; the runner caps at 6.</li>
+<li>Score direction 1.0 = synthetic everywhere; the UI labels "Authentic" below 0.5.</li>
+</ul>
+<h2 id="pointers">Pointers</h2>
+<ul>
+<li><code>demo/README.md</code> (run commands, presets, sources), <code>docs/handoffs/2026-09-26_frontend-contract.md</code> (contract v0 and the rewire note), <code>src/hearsay/api.py</code> (env vars, endpoints), <code>src/app/api/forensic/*/route.ts</code>, <code>docs/reports/2026-09-26_runner-docker.md</code> (timings, memory), <code>docs/reports/cloud-expense-ledger.md</code>, <code>CLAUDE.md</code> (rules: ask before renting, secrets in <code>.env</code>, never push without approval).</li>
+</ul>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/handoffs/2026-09-26_vultr-hosting-handoff.md</code> <span class="hash">a7921460e964</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

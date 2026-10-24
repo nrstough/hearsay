@@ -39,7 +39,7 @@
 <p class="page-kicker">The library</p>
 
 <p class="lead lead-small">Rendered from <code>CLAUDE.md</code>; the markdown file is the record.</p>
-<details class="toc"><summary>On this page</summary><ul><li><a href="#what-hearsay-is">What HEARSAY is</a></li><li><a href="#team-and-ownership">Team and ownership</a></li><li><a href="#detector-contract">Detector contract</a></li><li><a href="#model-ladder-and-model-rules">Model ladder and model rules</a></li><li><a href="#conventions">Conventions</a></li><li><a href="#working-rules-for-claude-code">Working rules for Claude Code</a></li><li><a href="#sources-of-truth">Sources of truth</a></li><li><a href="#pre-event-work">Pre-event work</a></li><li><a href="#ai-use-disclosure">AI use disclosure</a></li><li><a href="#when-a-teammate-opens-this-repo">When a teammate opens this repo</a></li></ul></details>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#what-hearsay-is">What HEARSAY is</a></li><li><a href="#team-and-ownership">Team and ownership</a></li><li><a href="#detector-contract">Detector contract</a></li><li><a href="#model-ladder-and-model-rules">Model ladder and model rules</a></li><li><a href="#conventions">Conventions</a></li><li><a href="#working-rules-for-claude-code">Working rules for Claude Code</a></li><li><a href="#sources-of-truth">Sources of truth</a></li><li><a href="#pre-event-work">Pre-event work</a></li><li><a href="#ai-use-disclosure">AI use disclosure</a></li><li><a href="#when-a-teammate-opens-this-repo">When a teammate opens this repo</a></li><li><a href="#this-is-not-the-nextjs-you-know">This is NOT the Next.js you know</a></li></ul></details>
 <h1 id="hearsay">HEARSAY</h1>
 <h2 id="what-hearsay-is">What HEARSAY is</h2>
 <p>HEARSAY is a software-only audio authentication system, built at HackGT 13 (Sep 25–27, 2026) for the NSA HEARSAY challenge.</p>
@@ -129,8 +129,8 @@
 <li>Doc layout: run specs in <code>docs/specs/</code>, plan files and reports in <code>docs/reports/</code>, handoffs in <code>docs/handoffs/</code>, consult records in <code>docs/consults/</code>. No feature-spec layer.</li>
 <li>Codex review: <code>.claude/review-plan.sh &lt;plan.md&gt;</code> and <code>.claude/review-audit.sh &lt;run-spec.md&gt;</code>, with HEARSAY rubrics in <code>.claude/codex-*-prompt.md</code>. Requires the Codex CLI; without it, the plan-review Claude critique is the gate.</li>
 <li>Known setup gotcha: the installed torchaudio (2.11) cannot <code>torchaudio.load()</code> files without the separate <code>torchcodec</code> package, which is not installed. <code>soundfile</code> and <code>librosa</code> load audio fine.</li>
-<li>Known gotcha: <code>scripts/extract_embeddings.py</code> records a transient decode failure as 1 s of zeros with <code>flag = decode_error</code> in the shard and the set's <code>manifest.csv</code>; <code>hearsay.probe.load_embeddings</code> ignores the flag, so the zeros train and score silently (99 of 32,319 WavLM rows, 0.31%, under memory pressure, seen with three WavLM processes on the 18 GB Mac, Sat Sep 26 evening). Check the flag column after any extraction under load; <code>scripts/repair_decode_errors.py</code> re-embeds only the flagged rows, and its <code>--verify-only</code> mode checks a finished set against its twin. The shipped M1b v3 sets (<code>nsa_train_sample_v3</code>, <code>asv19_addon_v3</code>, <code>nsa_test_v3</code>, <code>itw_stress_v3</code>) were checked and carry no such rows.</li>
-<li>Known setup gotcha: LightGBM and torch each ship their own <code>libomp.dylib</code>; importing both in one process on macOS segfaults or hangs (either order). Only <code>scripts/train_handcrafted.py</code> imports lightgbm; bundles store the dumped trees and <code>hearsay.trees</code> runs them in numpy, so detectors, tests and the orchestrator never import it. A test pins this.</li>
+<li>Known gotcha: <code>scripts/extract_embeddings.py</code> records a transient decode failure as 1 s of zeros with <code>flag = decode_error</code> in the shard and the set's <code>manifest.csv</code>; left unread, the zeros would train and score silently (99 of 32,319 WavLM rows, 0.31%, under memory pressure, seen with three WavLM processes on the 18 GB Mac, Sat Sep 26 evening). <code>hearsay.probe.load_embeddings</code> used to ignore the flag; it now refuses such a set by default, raising a <code>ValueError</code> that names the flagged rows, and loads it only with <code>allow_decode_errors=True</code>. <code>scripts/repair_decode_errors.py</code> re-embeds only the flagged rows, and its <code>--verify-only</code> mode checks a finished set against its twin. The shipped M1b v3 sets (<code>nsa_train_sample_v3</code>, <code>asv19_addon_v3</code>, <code>nsa_test_v3</code>, <code>itw_stress_v3</code>) were checked and carry no such rows.</li>
+<li>Known setup gotcha: LightGBM and torch each ship their own <code>libomp.dylib</code>; importing both in one process on macOS segfaults or hangs (either order). Only <code>scripts/train_handcrafted.py</code> imports lightgbm, which sits in the <code>train</code> dependency group (<code>uv sync --group train</code>) rather than the main dependencies; bundles store the dumped trees and <code>hearsay.trees</code> runs them in numpy, so detectors, tests and the orchestrator never import it. A test pins this.</li>
 </ul>
 <h2 id="working-rules-for-claude-code">Working rules for Claude Code</h2>
 <ul>
@@ -152,7 +152,7 @@
 <p>Done before the coding window opened at 8:00 pm Friday, Sep 25, 2026. Copy into Devpost.</p>
 <ul>
 <li>Created the repository scaffold: <code>pyproject.toml</code>, <code>.python-version</code>, <code>.gitignore</code>, and empty directories (<code>data/</code>, <code>weights/</code>, <code>docs/</code>, <code>submissions/</code>, <code>scripts/</code>, <code>src/hearsay/</code>).</li>
-<li>Installed the Python dependencies (torch, torchaudio, transformers, huggingface_hub, librosa, soundfile, numpy, scipy, scikit-learn, lightgbm, pandas, pydub, ffmpeg-python) into a uv-managed virtualenv, and confirmed ffmpeg is installed. Added pytest and ruff as dev dependencies.</li>
+<li>Installed the Python dependencies (torch, torchaudio, transformers, huggingface_hub, librosa, soundfile, numpy, scipy, scikit-learn, lightgbm, pandas, pydub, ffmpeg-python) into a uv-managed virtualenv, and confirmed ffmpeg is installed. pydub and ffmpeg-python were never used (decoding calls FFmpeg directly) and have since been dropped from <code>pyproject.toml</code>. Added pytest and ruff as dev dependencies.</li>
 <li>Downloaded pretrained weights and public datasets into the gitignored <code>weights/</code> and <code>data/</code> directories (event rules allow pre-event downloads): the models and datasets listed under AI use disclosure. Nothing was trained or run on them before the event.</li>
 <li>Copied general-purpose Claude Code skills (plan-review, p3, handoff, consult, diagnose, validate-training-data, test-runner, doc-sync, zoom-out) into <code>.claude/skills/</code> and added HEARSAY-specific notes to them.</li>
 <li>Copied the Codex plan-review and audit scripts into <code>.claude/</code> and added HEARSAY-specific checks to their rubrics.</li>
@@ -180,6 +180,7 @@
 <li>the channel-robustness rung (Sat Sep 26, 12:25–13:30): the λ̂ estimate of the test set's wild-domain weight (<code>scripts/channel_lambda.py</code>), the codec diagnosis of the 7.2 kHz wall (<code>scripts/channel_codec.py</code>), the M3 leakage probes through the shipped fusion rule (<code>scripts/m3_probes.py</code>), their hermetic tests (<code>tests/test_channel_robustness.py</code>) and the report (<code>docs/reports/2026-09-26_channel-robustness.md</code>); reviewed by Codex (plan) and a Claude critique</li>
 <li>the post-draft heads lane (Sat Sep 26, 17:19–): the frozen WavLM Large probe on the M1b v3 recipe and its <code>wavlm_l</code> export, the decode-repair and set-verification tool (<code>scripts/repair_decode_errors.py</code>, <code>tests/test_repair_decode_errors.py</code>), the miss-tail and rank-agreement diagnostics (<code>scripts/heads_diagnostics.py</code>), the run spec and report (<code>docs/specs/2026-09-26_post-draft-heads.md</code>, <code>docs/reports/2026-09-26_post-draft-heads.md</code>); reviewed by a Claude critique and Codex (audit)</li>
 <li>the post-draft gate lane (Sat Sep 26, 17:20–): the pre-declared candidate manifest and seven-rule gate with its pre-data clarifications and Nathan's rulings (<code>docs/reports/2026-09-26_post-draft-manifest.md</code>), the final-name copy of the shipped TSV (sleep equals ship), <code>scripts/fuse_sweep_v3.py</code> with the W4 fresh-evidence bake-off (perturbation cohort plus speaker-cluster bootstrap) and its tests (<code>tests/test_fuse_sweep_v3.py</code>), the run spec and the locked table (<code>docs/specs/2026-09-26_post-draft-gate-sweep.md</code>, <code>docs/reports/2026-09-26_post-draft-sweep.md</code>); reviewed by Codex (plan) and a Claude critique</li>
+<li>the Vultr hosting lane (Sat Sep 26, 22:20–): the demo host for Hrushi's video, one Ubuntu 24.04 Cloud Compute box (<code>deploy/vultr/</code>: bootstrap, the CPU-torch venv recipe taken from the Dockerfile because <code>uv.lock</code> resolves torch to the CUDA build on Linux, asset rsync, systemd units, nginx, warm-up and parity smoke), verified from outside against the Mac's demo numbers and the submitted TSV's hash, and the report (<code>docs/reports/2026-09-26_vultr-hosting.md</code>); Nathan created the instance in the console and destroys it after the video</li>
 <li>the documents: <code>docs/plan.md</code>, <code>docs/architecture.md</code>, <code>docs/code-map.md</code>, <code>docs/STATUS.md</code>, every report, run spec, handoff and consult record under <code>docs/</code>, this disclosure, and <code>README.md</code></li>
 <li>an oversight session (Sat Sep 26) that relayed the team's decisions between lanes, reviewed commits and kept <code>docs/STATUS.md</code> current</li>
 </ul></li>
@@ -213,7 +214,7 @@ Downloaded before the event to <code>data/</code>; fill in "how used" as each is
 </ul>
 <p><strong>Frameworks and libraries</strong></p>
 <ul>
-<li>PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, SpeechBrain (ECAPA speaker embeddings), librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, pydub, ffmpeg-python, FFmpeg.</li>
+<li>PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, SpeechBrain (ECAPA speaker embeddings), librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, FFmpeg. pydub and ffmpeg-python were installed before the event but never used, and are no longer dependencies.</li>
 </ul>
 <p><strong>What we built vs. what AI did</strong></p>
 <p>The short version: the team decided what to build and why, and Claude Code built it. Every design decision below is recorded with its reason in <code>docs/plan.md</code>, <code>docs/architecture.md</code> or a report; every line of application code, every test and every document was written by Claude Code sessions under the team's direction and reviewed by the team and by Codex. Nothing on the scoring path calls a hosted model.</p>
@@ -258,11 +259,16 @@ Downloaded before the event to <code>data/</code>; fill in "how used" as each is
 <tr><td><code>/zoom-out</code></td><td>Getting a map of an unfamiliar part of the code (e.g. someone else's detector).</td></tr>
 </tbody>
 </table></div>
+<p>&lt;!-- BEGIN:nextjs-agent-rules --&gt;</p>
+<h2 id="this-is-not-the-nextjs-you-know">This is NOT the Next.js you know</h2>
+<p>This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in <code>node_modules/next/dist/docs/</code> (resolved from this file's directory; in monorepos the <code>next</code> package may not be visible from the repo root) before writing any code. Heed deprecation notices.</p>
+<p>This block is written and re-added by <code>next dev</code> — verify at <code>node_modules/next/dist/server/lib/generate-agent-files.js</code>. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.</p>
+<p>&lt;!-- END:nextjs-agent-rules --&gt;</p>
 </article>
 
 <footer class="page-footer">
 <p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
-<p>Generated from <code>CLAUDE.md</code> <span class="hash">e7bf425534d7</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+<p>Generated from <code>CLAUDE.md</code> <span class="hash">9fce36e53f8c</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
 </footer>
 </main>
 </div>

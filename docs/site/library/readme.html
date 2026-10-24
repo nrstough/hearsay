@@ -43,6 +43,7 @@
 <h1 id="hearsay">HEARSAY</h1>
 <p>HEARSAY is our entry to the NSA HEARSAY challenge at HackGT 13 (Sep 25–27, 2026). You give it an audio file in any format. It returns the probability that the voice is synthetic (0.0 real, 1.0 synthetic) and a per-file report that says which detectors ran, what each one found, and how the final number was put together.</p>
 <p>It is a software pipeline and nothing else: one decode path, ten detectors behind one contract, and a fusion rule chosen by a selection rule we wrote down before looking at any result. The deliverable is <code>CrossExam_predictions.tsv</code> and this README. An offline Docker image that reproduces the pipeline is kept as reproducibility evidence; NSA said on Saturday it is not required.</p>
+<p><strong>Documentation site:</strong> <a href="https://nrstough.github.io/hearsay/site/">nrstough.github.io/hearsay/site</a>, the same material as a set of pages, also rendered as a PDF at <a href="https://github.com/nrstough/hearsay/blob/main/docs/HEARSAY_CrossExam_documentation.pdf" title="on GitHub">docs/HEARSAY_CrossExam_documentation.pdf</a>.</p>
 <p><strong>Where to look next:</strong> <a href="status.html">docs/STATUS.md</a> for the live state, <a href="architecture.html">docs/architecture.md</a> for diagrams of every component, <a href="code-map.html">docs/code-map.md</a> for where the code lives, and <a href="https://github.com/nrstough/hearsay/tree/main/docs/reports" title="on GitHub">docs/reports/</a> for the experiment write-ups every number below comes from.</p>
 <hr>
 <h2 id="how-it-decides">How it decides</h2>
@@ -93,7 +94,7 @@ probability_synthetic = 0.0348  -&gt; real</code></pre>
 <tr><td>M1b alone (the best single detector we trained)</td><td>0.301</td><td>0.072</td><td>0.343</td><td>same report</td></tr>
 </tbody>
 </table></div>
-<p><strong>On NSA's test set, the number that counts, the shipped rule scored minDCF 0.0733 (EER 3.53%).</strong> NSA returned it at the draft review (<code>docs/reports/2026-09-26_sponsor-questions.md</code>; <code>submissions/log.csv</code>, 15:40 row). That is 11× worse than our holdout and 3× better than In-the-Wild (<a href="#validation">Validation</a> has the full comparison).</p>
+<p><strong>On NSA's test set, the number that counts, the shipped rule scored minDCF 0.0733 (EER 3.53%).</strong> NSA returned it at the draft review (<code>docs/reports/2026-09-26_sponsor-questions.md</code>; <code>submissions/log.csv</code>, 15:40 row). That is 11× worse than our holdout and 3× better than In-the-Wild (<a href="#validation">Validation</a> has the full comparison). The final submission, sent to NSA at 00:09 on Sunday, is the same file byte for byte: <code>submissions/CrossExam_predictions.tsv</code>, sha256 <code>fb783076…</code> (<code>submissions/log.csv</code>, FINAL row).</p>
 <p>The full per-detector and per-rule tables are in <a href="#numbers">Numbers</a>.</p>
 <hr>
 <h2 id="approach-and-architecture">Approach and architecture</h2>
@@ -251,7 +252,10 @@ probability_synthetic = 0.0348  -&gt; real</code></pre>
 <li><strong>Leading silence:</strong> LibriSpeech starts with about 0.37 s of silence, test clips 0.06 s. Closed by trimming both.</li>
 <li><strong>Tiling:</strong> repeat-padding short test clips put a seam only in test data. Closed by length parity.</li>
 <li><strong>Container:</strong> every test file is 16 kHz PCM WAV with the same FFmpeg tag. Closed by one decode path.</li>
-<li><strong>The 7.2 kHz wall:</strong> closed by band matching. We later checked whether the wall is a codec, so we could reproduce it more faithfully in training. It isn't: across 34 MP3 and AAC settings none matched it better than our own Kaiser low-pass (the closest was 3% nearer on distance and worse on spectral holes). It is a smooth low-pass, like a resampler's anti-alias filter, so the planned symmetric codec refit never ran.</li>
+<li><strong>The 7.2 kHz wall:</strong> closed by band matching. We later checked whether the wall is a codec, so we could reproduce it more faithfully in training. It isn't: across 34 MP3 and AAC settings none matched it better than our own Kaiser low-pass (the closest was 3% nearer on distance and worse on spectral holes). It is a smooth low-pass, like a resampler's anti-alias filter, so the planned symmetric codec refit never ran.
+<ul>
+<li>Test files pass two low-passes (NSA's and our band match) and training clips one, so the test files' 7–8 kHz floor is deeper. We measured whether that moves any detector. On the same 500 holdout clips, a second pass on the training side shifted each detector's 95th-percentile logit by 13–53% of its pre-declared margin. The fused holdout minDCF moved from 0.012 to 0.016 (limit 0.037), and no verdict flipped at 0.5. Closed as measured, no response. The wall's shape was not probed: on test files the 6.8–7.25 kHz transition band sits about 9 dB lower than our second pass makes it (<code>docs/reports/2026-09-26_channel-robustness.md</code>, stopband follow-up; <code>outputs/channel/stopband.json</code>).</li>
+</ul></li>
 </ul></li>
 <li><strong>The container is the label.</strong> LibriSpeech is FLAC, LJ is 22 kHz WAV, and DiffSSD's ElevenLabs and PlayHT are MP3. PlayHT's MP3s carry the exact encoder tag (<code>Lavf58.29.100</code>) that all 1,671 test files carry. A learned metadata model would score perfectly on our holdout (PlayHT) for the wrong reason, then call the whole test set PlayHT. The container detector returns a constant 0.5 on this test set by design.</li>
 <li><strong>Compression forensics sees the pipeline, not the class.</strong> With codec history equalized, class holdout minDCF is 0.90 (<code>models/cmp_selected/meta.json</code>), and it calls 81% of the test set synthetic, because the test set reads as laundered throughout (mean P(laundered) 0.62). It stays as evidence.</li>
@@ -291,6 +295,7 @@ probability_synthetic = 0.0348  -&gt; real</code></pre>
 <li><strong>Letting Spectra promote files would recover 76 of the 158 misses</strong> (counted at the In-the-Wild-optimal threshold) with no added In-the-Wild false alarms (F), and loosening its suppression threshold improves every proxy (F). We did neither. The evidence is In-the-Wild, a set Spectra's authors evaluated on, and changing a rule set in advance because its alternatives look good afterwards is what the rule exists to prevent.</li>
 <li><strong>Not run tonight:</strong> delta-only features (column pruning failed every time), averaging M5's fold models (it would leak out-of-fold rows, and the checkpoints aren't on disk), and new feature families (each one a research lane).</li>
 </ul></li>
+<li><strong>A silent failure mode in the embedding extractor.</strong> It records a failed decode as one second of zeros, flagged in the set's <code>manifest.csv</code>, but the probe loader ignored the flag, so a flagged row would train and score as silence. The loader now refuses a set with flagged rows unless called with <code>allow_decode_errors=True</code>. Under memory pressure during the WavLM extraction, 99 of 32,319 rows (0.31%) hit it. The flagged rows were re-embedded (<code>scripts/repair_decode_errors.py</code>), and the shipped M1b sets were checked and carry none. Lesson: read the flag column after any extraction run under load (<code>docs/reports/2026-09-26_post-draft-heads.md</code>; CLAUDE.md, known gotchas).</li>
 <li><strong>Our first estimate of how wild the test set is was wrong.</strong> It said λ̂ = 0.947 with a classifier AUC of 0.99, and read "wild" as "codec-processed". One feature did the work: a whole-spectrogram noise-floor percentile that landed in the 7–8 kHz stopband. It was measuring the test files' double low-pass, not the recording channel: one MP3 round-trip moved 91% of our clean clips to "wild". Dropping that feature, under the rule we had already declared for columns above 7 kHz, gave 0.51 (MP3 control 91% → 9%). It is the same kind of shortcut as the 7.2 kHz wall, a band no training clip has, read through a feature that didn't look like a band feature.</li>
 </ul>
 <hr>
@@ -342,9 +347,11 @@ probability_synthetic = 0.0348  -&gt; real</code></pre>
 <h3 id="setup">Setup</h3>
 <p>Requires <a href="https://docs.astral.sh/uv/">uv</a> and FFmpeg (<code>brew install uv ffmpeg</code>).</p>
 <pre><code class="language-bash">uv sync</code></pre>
+<p>LightGBM is only needed to retrain the handcrafted and compression detectors (<code>scripts/train_handcrafted.py</code>); it lives in the <code>train</code> dependency group, so add it with <code>uv sync --group train</code>. Inference runs the dumped trees in numpy and never imports it.</p>
 <pre><code class="language-bash">cp .env.example .env</code></pre>
 <pre><code class="language-bash">uv run pytest -q</code></pre>
 <pre><code class="language-bash">uv run ruff check .</code></pre>
+<p><strong>On a Linux CPU box, don't run plain <code>uv sync</code>.</strong> There <code>uv.lock</code> resolves torch to the CUDA build and pulls several GB of <code>nvidia-*</code> / <code>cuda-*</code> packages a CPU cannot use. Run <code>bash deploy/vultr/venv.sh</code> from the repo root instead. It is the Dockerfile's recipe as a script: it installs the locked packages with <code>--no-deps</code>, skips LightGBM (training only), and takes torch 2.14.0 and torchaudio 2.11.0 from the PyTorch CPU index (<code>docs/reports/2026-09-26_vultr-hosting.md</code>).</p>
 <p>Data, weights, model directories and submission TSVs are gitignored; only <code>submissions/log.csv</code> is tracked. Expected layout: the NSA test set at <code>data/nsa/HackGTHearsayTesting/</code>, the template at <code>data/nsa/HearsayScoreKey4TeamX.tsv</code>, pretrained weights under <code>weights/</code>, trained bundles under <code>models/</code> (the probe <code>m1_wav2vec2-xls-r-300m_L7_20260926-0521</code>, <code>hc_selected</code>, the M5 checkpoint <code>m5_xlsr_ft_20260926-0741/</code>, <code>fusion_v2/constants.json</code>, and <code>fusion_v1/constants.json</code> for the previous rule). <a href="status.html">docs/STATUS.md</a> lists every dataset and where it comes from.</p>
 <h3 id="score-a-directory-on-the-mac">Score a directory on the Mac</h3>
 <pre><code class="language-bash">uv run python scripts/run_pipeline.py --in data/nsa/HackGTHearsayTesting --out outputs/runner/final --template data/nsa/HearsayScoreKey4TeamX.tsv --team CrossExam --fusion models/fusion_v2/constants.json</code></pre>
@@ -397,6 +404,7 @@ tests/                  pytest suite (hermetic; data- and weight-dependent tests
 scripts/                extraction, training, fusion, runner, cloud and ops scripts
 docker/                 build, entrypoint, smoke, parity and asset-manifest scripts
 docs/                   plan, architecture, code map, reports/, specs/, consults/, handoffs/
+docs/site/              the documentation site (GitHub Pages from main:/docs), PDF render beside it
 submissions/            log.csv (tracked) and submission TSVs (ignored)
 data/ weights/ models/  local only
 .claude/                Claude Code skills and review scripts shared by the team</code></pre>
@@ -436,12 +444,12 @@ data/ weights/ models/  local only
 </tbody>
 </table></div>
 <h3 id="frameworks-and-tools">Frameworks and tools</h3>
-<p>PyTorch and torchaudio (BSD), Hugging Face transformers and huggingface_hub (Apache-2.0), SpeechBrain (Apache-2.0), librosa (ISC), soundfile (BSD-3-Clause), NumPy, SciPy, scikit-learn and pandas (BSD-3-Clause), LightGBM (MIT, training only), pydub (MIT), ffmpeg-python (Apache-2.0), FFmpeg (LGPL/GPL), FastAPI (MIT) and uvicorn (BSD-3-Clause) for the local API, pytest and ruff for tests and lint, uv for environments, Docker with Colima for the image, vast.ai A100s and Cloudflare R2 for the M5 runs.</p>
+<p>PyTorch and torchaudio (BSD), Hugging Face transformers and huggingface_hub (Apache-2.0), SpeechBrain (Apache-2.0), librosa (ISC), soundfile (BSD-3-Clause), NumPy, SciPy, scikit-learn and pandas (BSD-3-Clause), LightGBM (MIT, training only, in the <code>train</code> dependency group), FFmpeg (LGPL/GPL), FastAPI (MIT) and uvicorn (BSD-3-Clause) for the local API, pytest and ruff for tests and lint, uv for environments, Docker with Colima for the image, vast.ai A100s and Cloudflare R2 for the M5 runs. pydub and ffmpeg-python were installed before the event but never used (decoding calls FFmpeg directly); they are no longer dependencies.</p>
 </article>
 
 <footer class="page-footer">
 <p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
-<p>Generated from <code>README.md</code> <span class="hash">937c075556d3</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+<p>Generated from <code>README.md</code> <span class="hash">51befcbdfd7a</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
 </footer>
 </main>
 </div>

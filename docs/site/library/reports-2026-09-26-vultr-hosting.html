@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hosting the demo app on a Vultr VM for the video (Sat Sep 26, 2026, 23:03–) · HEARSAY</title>
+<meta name="description" content="Rendered from docs/reports/2026-09-26_vultr-hosting.md ; the markdown file is the record.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202020'/%3E%3Cpath d='M7 20c3-9 6-9 9 0s6 9 9 0' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../editorial.css">
+
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body data-section="library" data-search-index="../search-index.js">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true"></span>HEARSAY <span class="brand-sub">audio authentication, documented</span></a>
+<div class="header-tools">
+<form class="search" role="search" onsubmit="return false"><label class="sr" for="q">Search the site</label><input id="q" type="search" placeholder="Search…" autocomplete="off"></form>
+<a class="gh" href="https://github.com/nrstough/hearsay" title="Repository on GitHub (private until the team makes it public)">GitHub</a>
+<button type="button" class="menu-toggle" aria-controls="site-nav" aria-expanded="false">Menu</button>
+</div>
+</header>
+<div class="search-results" id="search-results" aria-live="polite" hidden></div>
+<div class="layout">
+<div id="site-nav" class="nav-wrap"><nav class="site-nav" aria-label="Site">
+<div class="nav-section"><a class="nav-title" href="../index.html">The story</a>
+</div>
+<div class="nav-section"><a class="nav-title" href="../specs/index.html">Systems and subsystems</a>
+</div>
+<div class="nav-section current-section"><a class="nav-title" href="index.html">The library</a>
+<ul><li><a href="index.html#top">Top-level documents</a></li><li><a href="index.html#reports">Reports and plan reviews</a></li><li><a href="index.html#specs">Run specs and audits</a></li><li><a href="index.html#handoffs">Handoffs</a></li><li><a href="index.html#consults">Consult records</a></li><li><a href="index.html#method">Working method (skills and review rubrics)</a></li></ul>
+</div>
+<div class="nav-section"><a class="nav-title" href="../about.html">About this site</a>
+</div>
+</nav></div>
+<main id="main" class="content">
+<article>
+<p class="page-kicker">The library</p>
+
+<p class="lead lead-small">Rendered from <code>docs/reports/2026-09-26_vultr-hosting.md</code>; the markdown file is the record.</p>
+<details class="toc"><summary>On this page</summary><ul><li><a href="#instance">Instance</a></li><li><a href="#what-runs-on-it">What runs on it</a></li><li><a href="#timings-regular-tier-4-vcpu">Timings (regular-tier 4 vCPU)</a></li><li><a href="#parity-smoke-deployvultrsmokesh-on-the-box-2320-edt">Parity smoke (deploy/vultr/smoke.sh, on the box, 23:20 EDT)</a></li><li><a href="#verified-from-outside-the-mac-2322-edt">Verified from outside (the Mac, 23:22 EDT)</a></li><li><a href="#notes-handed-to-hrushi-with-the-url">Notes handed to Hrushi with the URL</a></li><li><a href="#spend-and-teardown">Spend and teardown</a></li></ul></details>
+<h1 id="hosting-the-demo-app-on-a-vultr-vm-for-the-video-sat-sep-26-2026-2303">Hosting the demo app on a Vultr VM for the video (Sat Sep 26, 2026, 23:03–)</h1>
+<p><strong>What:</strong> the wired frontend and the pipeline API on one public Ubuntu box, so Hrushi can record the demo against real scores. The model, the TSV and the UI are unchanged; the box is a copy of <code>main</code> plus the gitignored assets, and is destroyed after the video. Handoff: <code>docs/handoffs/2026-09-26_vultr-hosting-handoff.md</code>. Deploy files: <code>deploy/vultr/</code> (README there gives the order of operations).</p>
+<h2 id="instance">Instance</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th><th></th>
+</tr></thead>
+<tbody>
+<tr><td>Provider / label</td><td>Vultr Cloud Compute, <code>hearsay-demo</code> (id <code>d8c2e85c-d73e-4ebe-82eb-2b10776ea617</code>)</td></tr>
+<tr><td>Plan</td><td><code>vc2-4c-8gb</code>: 4 vCPU, 8 GB RAM, 160 GB SSD, shared CPU (the High Performance AMD tier was not taken; the regular tier was fast enough, see timings)</td></tr>
+<tr><td>Region</td><td>Atlanta (AMER)</td></tr>
+<tr><td>Image</td><td>Ubuntu 24.04.5 LTS x64</td></tr>
+<tr><td>Network</td><td>public IPv4 only, <code>64.177.49.133</code>; ufw allows 22 and 80; 3000 and 8000 bind to 127.0.0.1 and are unreachable from outside (checked from the Mac)</td></tr>
+<tr><td>Price</td><td>$40/mo, $0.055/h, no backups, no DDoS add-on</td></tr>
+<tr><td>Created</td><td>2026-09-27 03:03 UTC (Sat Sep 26, 23:03 EDT), by Nathan in the console with the <code>nathan-laptop</code> SSH key</td></tr>
+</tbody>
+</table></div>
+<p><strong>URL for the video:</strong> <code>http://64.177.49.133/</code> (plain http; no domain, no TLS).</p>
+<h2 id="what-runs-on-it">What runs on it</h2>
+<p>nginx :80 → <code>next start</code> on 127.0.0.1:3000 → <code>uvicorn hearsay.api:app</code> on 127.0.0.1:8000, all as systemd units under <code>deploy/vultr/</code> (<code>hearsay-web</code>, <code>hearsay-api</code>, and <code>hearsay-warm</code>, a oneshot that scores one demo clip after every API start so the models are resident before the first take). Checkout: <code>main</code> at <code>bd94e39</code>, user <code>hearsay</code>, <code>/home/hearsay/hearsay</code>. Assets rsynced from the Mac (2.44 GB sent, 3.47 GB on disk with the symlinked bundle copied): the three weight sets, the M1b probe, the handcrafted bundle, the M5 checkpoint, <code>fusion_v1</code> and <code>fusion_v2</code>, the 1,671 per-file JSONs and the submitted TSV. No secrets on the box; <code>/etc/hearsay.env</code> is not present (nothing needs it).</p>
+<p><strong>Python environment.</strong> The handoff's <code>uv sync</code> would have been wrong on Linux: <code>uv.lock</code> resolves torch to <code>2.14.0</code> from PyPI with the CUDA tree as Linux-only dependencies (<code>cuda-toolkit</code>, <code>nvidia-*</code>), several GB that a CPU box cannot use. <code>deploy/vultr/venv.sh</code> uses the Dockerfile's recipe instead: export the lock without torch, torchaudio and lightgbm, install with <code>--no-deps</code>, then torch/torchaudio from the PyTorch CPU index. Result on the box: <code>torch 2.14.0+cpu</code>. The units call <code>.venv/bin/uvicorn</code> directly rather than <code>uv run</code>, which would try to re-sync the CUDA lock. Worth a line in the README's setup section for anyone reproducing on Linux outside Docker.</p>
+<h2 id="timings-regular-tier-4-vcpu">Timings (regular-tier 4 vCPU)</h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Step</th><th>Time</th>
+</tr></thead>
+<tbody>
+<tr><td>bootstrap (apt, Node 22, swap, user, uv, clone, venv with CPU torch, <code>npm ci</code> + <code>npm run build</code>, units, nginx, ufw)</td><td>under 2 min wall clock (datacenter link; 395 npm packages in 9 s, Next compiled clean)</td></tr>
+<tr><td>asset rsync from the Mac</td><td>5.5 min at 7.5 MB/s average (10 MB/s steady)</td></tr>
+<tr><td>model load (health <code>model_load_seconds</code>)</td><td>8.9 s</td></tr>
+<tr><td>first upload including the load (warm-up unit)</td><td>23.9 s</td></tr>
+<tr><td>upload after warm-up, through nginx and Next</td><td>3.6–3.7 s per clip</td></tr>
+<tr><td>API resident memory with M5 loaded</td><td>3.1 GB (box: 7.7 GB RAM, 8 GB swap, 0 used)</td></tr>
+</tbody>
+</table></div>
+<p>Tests on the box: <code>pytest tests/test_api.py tests/test_pipeline.py</code> → 85 passed, 9 skipped (the data-marked ones), 15 s.</p>
+<h2 id="parity-smoke-deployvultrsmokesh-on-the-box-2320-edt">Parity smoke (<code>deploy/vultr/smoke.sh</code>, on the box, 23:20 EDT)</h2>
+<p>Health: <code>fusion: fusion_v2/constants.json</code>, scorers <code>['m1b_v3', 'handcrafted_v5', 'm5_xlsr_ft', 'spectra_aasist']</code>, <code>n_results: 1671</code>, git <code>bd94e39</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Clip</th><th>Box</th><th>Mac (<code>demo/README.md</code>)</th>
+</tr></thead>
+<tbody>
+<tr><td><code>synthetic_apple_tts_samantha.wav</code></td><td>0.9979 synthetic, <code>A3_w0.2_E</code></td><td>0.9979 synthetic</td></tr>
+<tr><td><code>real_in_the_wild_28886.wav</code></td><td>0.0012 real, <code>A3_w0.2_E</code></td><td>0.0012 real</td></tr>
+<tr><td><code>synthetic_in_the_wild_5518.wav</code></td><td>0.9979 synthetic, <code>A3_w0.2_E</code></td><td>0.9979 synthetic</td></tr>
+</tbody>
+</table></div>
+<p>All three match to four decimals under the shipped rule. Through nginx: <code>GET /</code> 200; <code>/api/forensic/presets</code> returns 3; <code>/api/forensic/export-tsv</code> sha256 starts <code>fb783076</code>; <code>/api/forensic/batch</code> reports 1,671 / 1,671, minDCF 0.0733, EER 3.53%, source "NSA draft review of the submitted file".</p>
+<h2 id="verified-from-outside-the-mac-2322-edt">Verified from outside (the Mac, 23:22 EDT)</h2>
+<ul>
+<li><code>http://64.177.49.133/</code> loads in 0.26 s; the first preset shows 0.001 Authentic, the other two <code>p=0.998</code>; the benchmark card shows 0.0733 / 3.53% / 0.0065 / 0.228 and "Shipped rule: A3 w0.2 + E".</li>
+<li>"Load the submitted 1,671-file run" fills the queue ("View All (1671)") with HGT files and their scores.</li>
+<li>Uploading <code>demo/real_in_the_wild_28886.wav</code> from the Mac through the public URL: <code>overallScore 0.0012</code>, <code>decision BONA_FIDE</code>, 3.6 s.</li>
+<li>"Export .TSV" from the public URL is byte-identical to <code>submissions/CrossExam_predictions.tsv</code> (<code>cmp</code> clean; sha256 <code>fb783076…</code>).</li>
+<li>Ports 3000 and 8000 time out from outside.</li>
+<li>Screenshot: <code>docs/img/vultr-hosting/2026-09-26_demo-landing.png</code> (headless Chrome, 1440×1000).</li>
+</ul>
+<h2 id="notes-handed-to-hrushi-with-the-url">Notes handed to Hrushi with the URL</h2>
+<ol>
+<li>Pull <code>main</code> before any UI change. Redeploy: <code>ssh hearsay@64.177.49.133 'cd hearsay &amp;&amp; git pull --ff-only &amp;&amp; npm run build'</code> then <code>ssh root@64.177.49.133 systemctl restart hearsay-web</code>.</li>
+<li>The guided-tour copy still carries unmeasured numbers that must be fixed in <code>src/components/GuidedTour.tsx</code> before filming and rebuilt on the box: minDCF 0.1983 (the modal shows it on load), EER 4.82%, 48 kHz, 16 kHz roll-off, 60.014 Hz ENF, "Intercept #0042", a 2-hour timeline, "8 sensors", an "AI specialist". The dashboard proper shows the measured numbers.</li>
+<li>Uploads take 3–4 s on this box; leave the spinner in the take. The first upload after a restart takes about 25 s (the warm-up unit normally absorbs this).</li>
+</ol>
+<h2 id="spend-and-teardown">Spend and teardown</h2>
+<p>Hourly at $0.055; the console showed $0.06 accrued at 23:20 EDT. Ledger row added at start (<code>docs/reports/cloud-expense-ledger.md</code>); the destroy row with the total is added at teardown. <strong>Teardown:</strong> Destroy in the Vultr console when Hrushi confirms the footage is in, then append the row. Nothing on the box is unique: the deploy files are committed, the assets live on the Mac.</p>
+<p><em>Teardown: pending.</em></p>
+</article>
+
+<footer class="page-footer">
+<p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
+<p>Generated from <code>docs/reports/2026-09-26_vultr-hosting.md</code> <span class="hash">1ab924bd714b</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+</footer>
+</main>
+</div>
+<script src="../site.js"></script>
+</body>
+</html>
