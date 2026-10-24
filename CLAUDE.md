@@ -79,7 +79,7 @@ Every detector builds against `src/hearsay/detectors/base.py`.
 - Codex review: `.claude/review-plan.sh <plan.md>` and `.claude/review-audit.sh <run-spec.md>`, with HEARSAY rubrics in `.claude/codex-*-prompt.md`. Requires the Codex CLI; without it, the plan-review Claude critique is the gate.
 - Known setup gotcha: the installed torchaudio (2.11) cannot `torchaudio.load()` files without the separate `torchcodec` package, which is not installed. `soundfile` and `librosa` load audio fine.
 - Known gotcha: `scripts/extract_embeddings.py` records a transient decode failure as 1 s of zeros with `flag = decode_error` in the shard and the set's `manifest.csv`; left unread, the zeros would train and score silently (99 of 32,319 WavLM rows, 0.31%, under memory pressure, seen with three WavLM processes on the 18 GB Mac, Sat Sep 26 evening). `hearsay.probe.load_embeddings` used to ignore the flag; it now refuses such a set by default, raising a `ValueError` that names the flagged rows, and loads it only with `allow_decode_errors=True`. `scripts/repair_decode_errors.py` re-embeds only the flagged rows, and its `--verify-only` mode checks a finished set against its twin. The shipped M1b v3 sets (`nsa_train_sample_v3`, `asv19_addon_v3`, `nsa_test_v3`, `itw_stress_v3`) were checked and carry no such rows.
-- Known setup gotcha: LightGBM and torch each ship their own `libomp.dylib`; importing both in one process on macOS segfaults or hangs (either order). Only `scripts/train_handcrafted.py` imports lightgbm; bundles store the dumped trees and `hearsay.trees` runs them in numpy, so detectors, tests and the orchestrator never import it. A test pins this.
+- Known setup gotcha: LightGBM and torch each ship their own `libomp.dylib`; importing both in one process on macOS segfaults or hangs (either order). Only `scripts/train_handcrafted.py` imports lightgbm, which sits in the `train` dependency group (`uv sync --group train`) rather than the main dependencies; bundles store the dumped trees and `hearsay.trees` runs them in numpy, so detectors, tests and the orchestrator never import it. A test pins this.
 
 ## Working rules for Claude Code
 
@@ -103,7 +103,7 @@ Where these and this file disagree, the NSA documents win on rules, `docs/plan.m
 Done before the coding window opened at 8:00 pm Friday, Sep 25, 2026. Copy into Devpost.
 
 - Created the repository scaffold: `pyproject.toml`, `.python-version`, `.gitignore`, and empty directories (`data/`, `weights/`, `docs/`, `submissions/`, `scripts/`, `src/hearsay/`).
-- Installed the Python dependencies (torch, torchaudio, transformers, huggingface_hub, librosa, soundfile, numpy, scipy, scikit-learn, lightgbm, pandas, pydub, ffmpeg-python) into a uv-managed virtualenv, and confirmed ffmpeg is installed. Added pytest and ruff as dev dependencies.
+- Installed the Python dependencies (torch, torchaudio, transformers, huggingface_hub, librosa, soundfile, numpy, scipy, scikit-learn, lightgbm, pandas, pydub, ffmpeg-python) into a uv-managed virtualenv, and confirmed ffmpeg is installed. pydub and ffmpeg-python were never used (decoding calls FFmpeg directly) and have since been dropped from `pyproject.toml`. Added pytest and ruff as dev dependencies.
 - Downloaded pretrained weights and public datasets into the gitignored `weights/` and `data/` directories (event rules allow pre-event downloads): the models and datasets listed under AI use disclosure. Nothing was trained or run on them before the event.
 - Copied general-purpose Claude Code skills (plan-review, p3, handoff, consult, diagnose, validate-training-data, test-runner, doc-sync, zoom-out) into `.claude/skills/` and added HEARSAY-specific notes to them.
 - Copied the Codex plan-review and audit scripts into `.claude/` and added HEARSAY-specific checks to their rubrics.
@@ -160,7 +160,7 @@ Downloaded before the event to `data/`; fill in "how used" as each is actually u
 - ExifTool, for metadata forensics. _Not used: ffprobe (FFmpeg) covered the embedded fields, and the test set carries none beyond one encoder tag._
 
 **Frameworks and libraries**
-- PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, SpeechBrain (ECAPA speaker embeddings), librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, pydub, ffmpeg-python, FFmpeg.
+- PyTorch, torchaudio, Hugging Face transformers and huggingface_hub, SpeechBrain (ECAPA speaker embeddings), librosa, soundfile, NumPy, SciPy, scikit-learn, LightGBM, pandas, FFmpeg. pydub and ffmpeg-python were installed before the event but never used, and are no longer dependencies.
 
 **What we built vs. what AI did**
 

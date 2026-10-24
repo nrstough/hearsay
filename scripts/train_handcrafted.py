@@ -19,6 +19,9 @@ contract detector prepares test audio the same way.
 
 Usage: uv run python scripts/train_handcrafted.py --train nsa_train_sample_v3 \
     --folds splits/nsa_folds.csv [--test nsa_test_v3] [--out-name handcrafted]
+
+LightGBM is in the `train` dependency group, not the main dependencies: `uv sync --group train`
+(or `uv run --group train python scripts/train_handcrafted.py ...`).
 """
 
 from __future__ import annotations

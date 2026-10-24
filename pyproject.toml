@@ -14,10 +14,7 @@ dependencies = [
     "numpy",
     "scipy",
     "scikit-learn",
-    "lightgbm",
     "pandas",
-    "pydub",
-    "ffmpeg-python",
     "speechbrain>=1.1.1",
     "fastapi>=0.141.1",
     "uvicorn>=0.54.0",
@@ -35,6 +32,11 @@ package = true
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.9",
+]
+# scripts/train_handcrafted.py only (`uv sync --group train`); inference runs the dumped trees
+# in numpy (hearsay.trees) and never imports lightgbm
+train = [
+    "lightgbm",
 ]
 
 [tool.pytest.ini_options]

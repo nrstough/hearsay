@@ -315,6 +315,8 @@ Requires [uv](https://docs.astral.sh/uv/) and FFmpeg (`brew install uv ffmpeg`).
 uv sync
 ```
 
+LightGBM is only needed to retrain the handcrafted and compression detectors (`scripts/train_handcrafted.py`); it lives in the `train` dependency group, so add it with `uv sync --group train`. Inference runs the dumped trees in numpy and never imports it.
+
 ```bash
 cp .env.example .env
 ```
@@ -435,4 +437,4 @@ We used AI coding assistants heavily, and we say so plainly. The full disclosure
 
 ### Frameworks and tools
 
-PyTorch and torchaudio (BSD), Hugging Face transformers and huggingface_hub (Apache-2.0), SpeechBrain (Apache-2.0), librosa (ISC), soundfile (BSD-3-Clause), NumPy, SciPy, scikit-learn and pandas (BSD-3-Clause), LightGBM (MIT, training only), pydub (MIT), ffmpeg-python (Apache-2.0), FFmpeg (LGPL/GPL), FastAPI (MIT) and uvicorn (BSD-3-Clause) for the local API, pytest and ruff for tests and lint, uv for environments, Docker with Colima for the image, vast.ai A100s and Cloudflare R2 for the M5 runs.
+PyTorch and torchaudio (BSD), Hugging Face transformers and huggingface_hub (Apache-2.0), SpeechBrain (Apache-2.0), librosa (ISC), soundfile (BSD-3-Clause), NumPy, SciPy, scikit-learn and pandas (BSD-3-Clause), LightGBM (MIT, training only, in the `train` dependency group), FFmpeg (LGPL/GPL), FastAPI (MIT) and uvicorn (BSD-3-Clause) for the local API, pytest and ruff for tests and lint, uv for environments, Docker with Colima for the image, vast.ai A100s and Cloudflare R2 for the M5 runs. pydub and ffmpeg-python were installed before the event but never used (decoding calls FFmpeg directly); they are no longer dependencies.
