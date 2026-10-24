@@ -1,11 +1,12 @@
 """Re-embed rows that an extraction flagged `decode_error`, and verify a finished embedding set.
 
 A segment-mode extraction replaces a clip that FFmpeg failed to decode with 1 s of zeros and
-flags the row (shard `flag` and manifest.csv; `hearsay.probe.load_embeddings` does not read the
-flag). Under heavy parallel load (three WavLM extractions sharing the 18 GB Mac, Sat Sep 26)
-FFmpeg failed transiently on files that decode fine on retry. Both modes re-run exactly the
-extractor's segment path (scripts/extract_embeddings.py): the crop length stored in the shard,
-seed = extract_meta seed + row, prepare_segment (band match on) -> embed_segment -> fp16.
+flags the row (shard `flag` and manifest.csv; `hearsay.probe.load_embeddings` refuses a set with
+flagged rows unless allow_decode_errors=True). Under heavy parallel load (three WavLM
+extractions sharing the 18 GB Mac, Sat Sep 26) FFmpeg failed transiently on files that decode
+fine on retry. Both modes re-run exactly the extractor's segment path
+(scripts/extract_embeddings.py): the crop length stored in the shard, seed = extract_meta seed +
+row, prepare_segment (band match on) -> embed_segment -> fp16.
 
 repair (default): refuses unless the set is finished (manifest.csv present, shards cover every
 row) and --manifest lists the same paths. Identity check first: --verify unflagged rows (drawn

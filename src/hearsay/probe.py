@@ -23,10 +23,27 @@ from hearsay.metrics import decision_logit, sigmoid
 REPO = Path(__file__).resolve().parents[2]
 
 
-def load_embeddings(model: str, name: str) -> tuple[np.ndarray, pd.DataFrame]:
-    """(N, n_layers, dim) float32 in manifest row order, plus the manifest."""
+def load_embeddings(
+    model: str, name: str, allow_decode_errors: bool = False,
+) -> tuple[np.ndarray, pd.DataFrame]:  # fmt: skip
+    """(N, n_layers, dim) float32 in manifest row order, plus the manifest.
+
+    scripts/extract_embeddings.py embeds zeros in place of a clip FFmpeg failed to decode and
+    flags the row `decode_error` in manifest.csv; such rows would train and score silently, so
+    a set that has any raises ValueError naming them unless `allow_decode_errors=True`.
+    scripts/repair_decode_errors.py re-embeds them."""
     d = REPO / "outputs" / "embeddings" / model / name
     m = pd.read_csv(d / "manifest.csv")
+    if not allow_decode_errors and "flag" in m.columns:
+        bad = np.flatnonzero((m["flag"] == "decode_error").to_numpy())
+        if bad.size:
+            shown = ", ".join(f"{r} ({m.path.iloc[r]})" for r in bad[:10])
+            more = f" and {bad.size - 10} more" if bad.size > 10 else ""
+            raise ValueError(
+                f"{model}/{name}: {bad.size} row(s) flagged decode_error (embeddings of zeros, "
+                f"not of the clip): rows {shown}{more}. Re-embed them with "
+                "scripts/repair_decode_errors.py, or pass allow_decode_errors=True to load anyway."
+            )
     shards = sorted(d.glob("shard_*.npz"))
     zs = [np.load(p) for p in shards]
     rows = np.concatenate([z["row"] for z in zs])
