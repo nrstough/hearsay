@@ -8,7 +8,8 @@ Read first: docs/STATUS.md (one-page state), docs/architecture.md (component dia
 ```
 src/hearsay/
   audio.py          decode/resample (ffmpeg -> 16 kHz mono float32), windows(), trim_silence()
-  embed.py          frozen SSL embedding: v1 window path, v2 prepare_segment + embed_segment
+  embed.py          frozen SSL embedding: v1 window path, v2 embed_segment (torch imported lazily)
+  segment.py        torch-free input prep: prepare_segment, normalize_windows, test_duration_sampler
   probe.py          M1 logistic probe on one SSL layer (load_embeddings, oof_scores, Probe)
   handcrafted.py    v3 75-feature extractor, band_limit (NSA 7.25 kHz wall), _crop, ctx for v4 families
   hc_v4.py          v4 feature families registry FAMILIES (lfcc, phase, cqcc, modulation, breath, jitter)
@@ -118,7 +119,8 @@ Gotchas
 | Path | Purpose | Key entry points |
 |---|---|---|
 | src/hearsay/audio.py | single decode path plus windowing and silence trimming shared by every rung | load_audio:22, ffmpeg cmd:27-32, DecodeError raise:36, NaN zeroing:41, windows:74, tile padding:82, trim_silence:91, min_keep guard:106 |
-| src/hearsay/embed.py | frozen backbone embedding: v1 windows averaged, v2 single prepared segment | REPO:18, MAX_SEGMENT_S:19, TEST_DURATIONS:20, load_backbone:28, clip_windows:32, normalize_windows:36, embed_windows:44, embed_clip:55, test_duration_sampler:71, prepare_segment:79, embed_segment:107 |
+| src/hearsay/embed.py | frozen backbone embedding: v1 windows averaged, v2 single prepared segment; torch and transformers imported inside the functions; re-exports the hearsay.segment helpers | segment re-exports:20-25, REPO:27, TEST_DURATIONS:28, default_device:31, load_backbone:37, embed_windows:43, embed_clip:57, test_duration_sampler (wrapper on embed.TEST_DURATIONS):65, embed_segment:71 |
+| src/hearsay/segment.py | torch-free input path shared by the deep lanes and the CPU detectors (handcrafted._crop, compression) | REPO:21, TEST_DURATIONS:22, MAX_SEGMENT_S:23, clip_windows:26, normalize_windows:30, test_duration_sampler:46, prepare_segment:57 |
 | src/hearsay/probe.py | standardized logistic regression on one layer, grouped CV, Platt calibration | load_embeddings:26, cv_groups:38, make_clf:43, oof_scores:49, PredefinedSplit branch:58, Probe fields:65-73, llr:79, p_synthetic:86, p_decision:90, save:94, load:99 |
 | scripts/extract_embeddings.py | bulk, sharded, resumable extraction to outputs/embeddings/<model>/<name>/ | main:43, crop draw:70, extract_meta.json:71-73, shard loop:78-132, skip-existing:81-86, segment branch:87-111, per-row seed:90, window branch:112-132, manifest write:134-136 |
 | scripts/train_probe.py | per-layer grouped CV, Platt, refit, score val once, write models/m1_<model>_L<layer>_<stamp>/ | main:32, --folds branch:46-60, --max-train:56-58, layer loop:70-75, extract_meta read:81-85, val block:87-106, auc assert:89, --stress:108-121, meta val:126 |
@@ -132,7 +134,7 @@ Where to add
 
 - Decode args (resample rate etc.): src/hearsay/audio.py:27-32 only; every consumer goes through load_audio. Changing SR (src/hearsay/__init__.py:3) requires re-extracting all embeddings.
 - A new embedding mode: add a field to the Probe dataclass (src/hearsay/probe.py:65-73) and a branch in scripts/make_probe_csv.py:61, which currently switches on probe.segment.
-- prepare_segment band_match flag (src/hearsay/embed.py:80): callers that already band-limited (handcrafted._crop, src/hearsay/handcrafted.py:62) pass band_match=False. MAX_SEGMENT_S (embed.py:19) caps v2 segments; changing it invalidates probes trained under the old cap.
+- prepare_segment band_match flag (src/hearsay/segment.py:59): callers that already band-limited (handcrafted._crop, src/hearsay/handcrafted.py:62) pass band_match=False. MAX_SEGMENT_S (segment.py:23) caps v2 segments; changing it invalidates probes trained under the old cap.
 - Extra training corpora: scripts/extend_folds.py:34-40 builds group = source + ':' + (generator if spoof else speaker) and assigns fold ids '0'..'k-1' as strings, never 'holdout'. Verify a new corpus needs band matching or is already band-limited (src/hearsay/handcrafted.py:26-30) or the probe may learn the wall as a cue.
 - Generalization check: scripts/train_probe.py:108-121 `--stress` loads a never-fit-on embedding set and reports minDCF/EER at its own threshold and at the train-OOF Bayes threshold (line 114); it never refits.
 - Resumable extraction: scripts/extract_embeddings.py:81-86 skips existing shard_XXXXX.npz; rerun the same command to resume.
@@ -141,7 +143,7 @@ Invariants you must keep
 
 - All train/test/live audio passes through load_audio (src/hearsay/audio.py:1-4); trim_silence never returns less than min_keep_s = 1.0 s (audio.py:106).
 - embed_clip and the bulk window path produce identical features (tests/test_audio_and_submission.py:179).
-- prepare_segment order is band -> trim -> crop -> cap (embed.py:82-85, 96-104); it never pads or tiles a short clip (tests/test_audio_and_submission.py:270). scripts/extract_embeddings.py and scripts/make_probe_csv.py must call it identically or train/test features diverge.
+- prepare_segment order is band -> trim -> crop -> cap (segment.py:70-79); it never pads or tiles a short clip (tests/test_audio_and_submission.py:270). scripts/extract_embeddings.py and scripts/make_probe_csv.py must call it identically or train/test features diverge.
 - load_embeddings asserts every manifest row is covered exactly once (src/hearsay/probe.py:34) and reorders by row (line 35); a partial extraction fails loudly.
 - CV, layer selection and Platt fit touch only train (or non-holdout fold rows); val is scored once (scripts/train_probe.py:87-106); `assert auc > 0.5` at line 89.
 - With a fold file, oof_scores uses PredefinedSplit (src/hearsay/probe.py:58-59), never a fresh StratifiedGroupKFold.
@@ -152,7 +154,7 @@ Invariants you must keep
 Gotchas
 
 - windows() tiles short clips (src/hearsay/audio.py:82-83); prepare_segment never does. The same manifest extracted with and without --segment yields structurally different statistics.
-- Two different per-row randomness schemes: crop lengths come from one shared RNG stream in test_duration_sampler (embed.py:76) drawn once per manifest row in order (scripts/extract_embeddings.py:70), while the crop offset uses default_rng(args.seed + r) (embed.py:102, extract_embeddings.py:90). Manifest row order changes crops. Any rescoring script must reproduce both.
+- Two different per-row randomness schemes: crop lengths come from one shared RNG stream in test_duration_sampler (segment.py:53) drawn once per manifest row in order (scripts/extract_embeddings.py:70), while the crop offset uses default_rng(args.seed + r) (segment.py:77, extract_embeddings.py:90). Manifest row order changes crops. Any rescoring script must reproduce both.
 - Resuming after changing --seed, --crop, --win-s or --max-windows silently mixes settings across shards (scripts/extract_embeddings.py:81-86, 134-136); delete stale shards or use a new --name.
 - If extract_meta.json is missing, train_probe silently defaults probe.segment=False (scripts/train_probe.py:81-85).
 - cv_groups (src/hearsay/probe.py:38) is used only on the non-fold path of train_probe; the --folds path uses the fold file's group column.

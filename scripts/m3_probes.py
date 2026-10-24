@@ -277,7 +277,7 @@ def run_scoring(rows: pd.DataFrame, kinds: tuple[str, ...], name: str, threads: 
 
 
 def _test_durs() -> np.ndarray:
-    from hearsay.embed import TEST_DURATIONS
+    from hearsay.segment import TEST_DURATIONS
 
     return pd.read_csv(TEST_DURATIONS).duration_s.to_numpy(float)
 

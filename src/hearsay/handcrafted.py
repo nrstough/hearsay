@@ -3,7 +3,7 @@
 Per clip: load_audio -> segment -> RMS-normalize (level is a corpus shortcut, never a
 feature) -> features. Duration, peak and absolute level are deliberately excluded.
 
-Segment (v2, the default `crop_mode="segment"`): `hearsay.embed.prepare_segment`, the exact
+Segment (v2, the default `crop_mode="segment"`): `hearsay.segment.prepare_segment`, the exact
 trim / random-crop / 8 s cap the deep detector (M1 v2) sees, so fusion compares the two on the
 same audio. Training clips are cropped to lengths drawn from the NSA test-duration
 distribution (`crop_s`, offset drawn from `seed`); test clips are scored whole, with no crop.
@@ -59,7 +59,7 @@ def _crop(
     if band_match:
         x = band_limit(x)
     if crop_mode == "segment":
-        from hearsay.embed import prepare_segment  # imports torch; lazy so v1 stays light
+        from hearsay.segment import prepare_segment  # torch-free; same path as hearsay.embed
 
         x = prepare_segment(x, crop_s, seed, band_match=False)  # band match handled above
     elif crop_mode == "first4s":

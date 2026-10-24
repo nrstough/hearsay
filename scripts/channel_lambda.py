@@ -364,7 +364,7 @@ def rows() -> pd.DataFrame:
     # Duration-matched copies of the two reference domains (test-length crops, seeded per clip):
     # whole clips run to the 8 s cap while test clips median 3.4 s, and length enters the block
     # and percentile statistics.
-    from hearsay.embed import test_duration_sampler
+    from hearsay.segment import test_duration_sampler
 
     draw = test_duration_sampler(0)
     dm = pd.concat([clean, wild], ignore_index=True).copy()

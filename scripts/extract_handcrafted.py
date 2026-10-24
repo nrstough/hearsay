@@ -9,7 +9,7 @@ Usage:
         --name nsa_test_v2 --workers 6
 
 Crop lengths are drawn exactly as scripts/extract_embeddings.py --segment --crop test --seed S
-draws them: hearsay.embed.test_duration_sampler(S), one draw per manifest row in order, and the
+draws them: hearsay.segment.test_duration_sampler(S), one draw per manifest row in order, and the
 per-row crop-offset seed is S + row. So the handcrafted and deep detectors see the same audio.
 --crop-mode first4s reproduces v1 (first 4 s after the silence trim).
 
@@ -43,7 +43,7 @@ def main() -> None:
                     help="test: random crop to NSA test-duration lengths (training manifests)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--crop-mode", choices=CROP_MODES, default="segment",
-                    help="segment = hearsay.embed.prepare_segment (v2); first4s = v1")
+                    help="segment = hearsay.segment.prepare_segment (v2); first4s = v1")
     ap.add_argument("--band-match", action=argparse.BooleanOptionalAction, default=True,
                     help="apply hearsay.handcrafted.band_limit (NSA test-set roll-off; v3)")
     ap.add_argument("--families", default="",
@@ -60,7 +60,7 @@ def main() -> None:
 
     m = pd.read_csv(args.manifest)
     if args.crop == "test":
-        from hearsay.embed import test_duration_sampler
+        from hearsay.segment import test_duration_sampler
 
         draw = test_duration_sampler(args.seed)
         crop_s = [draw() for _ in range(len(m))]

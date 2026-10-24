@@ -52,7 +52,7 @@ def main() -> None:
     if args.limit:
         m = m.iloc[: args.limit].reset_index(drop=True)
     if args.crop == "test":
-        from hearsay.embed import test_duration_sampler
+        from hearsay.segment import test_duration_sampler
 
         draw = test_duration_sampler(args.seed)
         crop_s = [draw() for _ in range(len(m))]

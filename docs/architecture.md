@@ -31,7 +31,7 @@ Since 08:35 the runner (`scripts/run_pipeline.py`) is the whole path: audio → 
 | Detector contract, `safe_run`, registry | `src/hearsay/detectors/base.py` | built | main (changes need every detector owner) |
 | Metric (minDCF, EER, both sponsor-code readings) | `src/hearsay/metrics.py` | built | main |
 | Fold file | `splits/nsa_folds.csv` (`scripts/make_folds.py`); training-only extension `splits/nsa_folds_plus_asv19.csv` (`scripts/extend_folds.py`) | built, frozen | main |
-| Segment preparation for deep detectors | `src/hearsay/embed.py` (`prepare_segment`, `normalize_windows`, `test_duration_sampler`) | built | main |
+| Segment preparation for deep detectors | `src/hearsay/segment.py` (`prepare_segment`, `normalize_windows`, `test_duration_sampler`; torch-free, shared with the CPU detectors, re-exported by `src/hearsay/embed.py`) | built | main |
 | M1 embeddings + probe + TSV | `scripts/extract_embeddings.py`, `train_probe.py`, `make_probe_csv.py`, `src/hearsay/probe.py` | built | main |
 | M3 Spectra-AASIST stream | `src/hearsay/spectra.py`, `scripts/spectra_direction.py`; `scripts/score_spectra.py` to come | in flight | M3 |
 | M5 fine-tune (bundle, model, trainer, scorer, assembler) | `src/hearsay/m5_{bundle,data,model}.py`, `scripts/m5_*.py`, `scripts/cloud/` to come | in flight | M5 (vast.ai only) |
