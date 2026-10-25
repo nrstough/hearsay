@@ -3,8 +3,17 @@ name: p3
 description: "Execute an approved plan — code, test, commit"
 user_invocable: true
 ---
+<!-- GLOBAL-SKILL:BEGIN (synced from ~/.claude/skills, do not edit inside) -->
 
 # /p3 — Execute
+
+**Repo additions:** if the current repo has `.claude/skills/p3/SKILL.md` containing
+`GLOBAL-SKILL:BEGIN`/`END` markers, also follow everything in that file *outside* the
+markers. It holds this project's additions to this skill and wins where they conflict.
+(If you are already reading that file, there is nothing extra to load.) A repo copy
+without markers is ignored. **Path rule:** wherever this skill names
+`~/.claude/ownership-checks.md`, use the repo's `.claude/ownership-checks.md` if the
+global file doesn't exist (cloud sessions).
 
 Execute an already-approved implementation plan. The plan should exist as a durable
 markdown file (this project's plan directory — commonly `.claude/plans/` or `docs/reports/`)
@@ -20,6 +29,14 @@ and have been reviewed by the user.
    `scripts.test`, `Makefile` `test` target, `pyproject.toml` / `pytest.ini`,
    `Cargo.toml`, `go.mod`). If no test command exists, say so explicitly in the results
    rather than silently skipping regression.
+5. **Ownership checks** (read `~/.claude/ownership-checks.md`). Find the plan's run spec
+   and read its `**Stakes:**` line and `## Owner's statement`.
+   - No Stakes line: triage now (§1) and add it to the plan file.
+   - HIGH with no Owner's statement (the plan was approved outside `/plan-review`):
+     give the plain-English summary (§4), then run the Owner's statement gate (§2) on the
+     plan before starting. Record the sentences verbatim in the plan file under
+     `## Owner's statement`.
+   This all happens before execution starts. The no-questions rule applies after it.
 
 ## Execute
 
@@ -29,10 +46,13 @@ Complete ALL planned steps without stopping:
 - Run the full regression suite (the command resolved in pre-flight)
 - Update affected documentation (doc-sync)
 - Commit with conventional commit prefix
+- **HIGH: test break check** (ownership-checks §3) after the commit. A decorative test is
+  fixed, committed, and re-checked before you report results.
 
 ## Present results
 
 - Test results (pass/fail counts)
+- Break check result line (HIGH)
 - Any deviations from plan and why
 - Issues encountered
 
@@ -41,6 +61,14 @@ Complete ALL planned steps without stopping:
 - Go step by step. Do not skip or reorder without documenting why.
 - Do NOT stop to ask questions after starting. Only exception: scope-level blocker.
 - If tests fail, fix and re-run before committing. Document the fix as a deviation.
+
+<!-- GLOBAL-SKILL:END -->
+
+## HEARSAY additions
+
+This project's additions to the shared skill above, moved here verbatim from the old copy. Each says which part of the skill it belongs to.
+
+**Applies to: Rules (project rules for every execution)**
 
 ## HEARSAY rules (project-specific)
 

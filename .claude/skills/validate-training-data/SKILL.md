@@ -3,8 +3,17 @@ name: validate-training-data
 description: "Validate an ML training dataset or manifest before training — label distribution and imbalance, feature/tensor integrity (shape, range, NaNs, all-zero rows), sequence-length stats, split leakage, and metadata/asset consistency. Use when the user says 'validate the training data', 'check the dataset', 'is this manifest clean', 'why is the model degenerate', or a new dataset/manifest has just been produced."
 user_invocable: true
 ---
+<!-- GLOBAL-SKILL:BEGIN (synced from ~/.claude/skills, do not edit inside) -->
 
 # /validate-training-data — Dataset / manifest validation
+
+**Repo additions:** if the current repo has `.claude/skills/validate-training-data/SKILL.md` containing
+`GLOBAL-SKILL:BEGIN`/`END` markers, also follow everything in that file *outside* the
+markers. It holds this project's additions to this skill and wins where they conflict.
+(If you are already reading that file, there is nothing extra to load.) A repo copy
+without markers is ignored. **Path rule:** wherever this skill names
+`~/.claude/ownership-checks.md`, use the repo's `.claude/ownership-checks.md` if the
+global file doesn't exist (cloud sessions).
 
 The job is to catch the data problems that produce a confidently broken model, **before**
 the training run spends money. Every check reports numbers, not adjectives.
@@ -17,7 +26,7 @@ no arguments, resolve the newest dataset artifact and say which one you picked.
 1. Read `CLAUDE.md` / `AGENTS.md` and the training docs for where datasets live and which
    manifest is canonical. Regenerable data often lives **outside the repo** (an external
    drive, object storage) — resolve the real path rather than reading a stale local copy.
-2. Find the artifact: manifest JSON/JSONL, parquet or .csv tables, a TFRecord/webdataset shard set,
+2. Find the artifact: manifest JSON/JSONL, parquet/CSV, a TFRecord/webdataset shard set,
    or a label directory.
 3. **Derive the schema from the data**, then state it back: record count, fields per
    record, feature shape/dtype, label vocabulary, group/split keys. Confirm it matches
@@ -26,21 +35,9 @@ no arguments, resolve the newest dataset artifact and say which one you picked.
    but the manifest lacks is a crash-at-epoch-0.
 4. Note which records are **hand-curated ground truth** vs **draft / auto-labeled**.
    Draft labels are not ground truth and must never be counted as such in the report.
-
-**HEARSAY specifics:**
-- The split key is the **generator** (TTS / voice-conversion system). No generator may
-  appear in both train and validation — clip-level splits are invalid for this project.
-  Also check speaker and source-recording overlap across splits.
-- Everything the model sees must be **16 kHz mono**. Report the sample-rate / channel /
-  codec histogram **per class** — if fakes and reals differ in native format, the model
-  can learn the codec instead of the voice (a leak, not a signal). Same for duration and
-  leading/trailing silence per class.
-- Compare our real/fake ratio with whatever is known about the NSA set, and report it.
-- Augmented data (laundering: codec/telephony round-trips, noise, simulated replay/RIR,
-  band-limiting) is tracked separately; the clean-only validation set must stay clean.
-  Also compare duration and peak level per class against the NSA test inventory.
-- The validation split is never trained on. Flag any path where it could leak into
-  training (feature scalers, calibration, stacking folds).
+5. **Stakes triage** (read `~/.claude/ownership-checks.md`). A model whose output feeds
+   scoring or user-facing results is HIGH, which is the usual case. A throwaway
+   experiment can be LOW.
 
 ## Checks
 
@@ -108,6 +105,13 @@ what to do about them.
 
 Close with a **train / don't-train verdict** and the blocking items, ranked.
 
+**Verdict gate.** The train decision is the user's. Lead with the plain-English summary
+(ownership-checks §4): what is wrong with the data, if anything, and what training on it
+would do to the model. Then the user states, in their own words, **the decision and why**,
+plus (HIGH) **the most likely way the data is still wrong**. That risk becomes a check in
+the training run's evaluation. Save the report with `## Owner's statement` (verbatim) to
+the project's reports dir if it has one, so the training run spec can cite it.
+
 ## Rules
 
 1. **Numbers, always.** "Some clips are short" is not a finding; "412/4,092 (10.1%) under
@@ -120,3 +124,26 @@ Close with a **train / don't-train verdict** and the blocking items, ranked.
 5. Don't modify the dataset. Propose the quarantine/fix list; the user decides.
 6. If the artifact is large, sample — and state the sample size and method, so nobody
    mistakes a sampled rate for an exact count.
+
+<!-- GLOBAL-SKILL:END -->
+
+## HEARSAY additions
+
+This project's additions to the shared skill above, moved here verbatim from the old copy. Each says which part of the skill it belongs to.
+
+**Applies to: Step 0 — Resolve the artifact and its schema (inspect, don't assume)**
+
+**HEARSAY specifics:**
+- The split key is the **generator** (TTS / voice-conversion system). No generator may
+  appear in both train and validation — clip-level splits are invalid for this project.
+  Also check speaker and source-recording overlap across splits.
+- Everything the model sees must be **16 kHz mono**. Report the sample-rate / channel /
+  codec histogram **per class** — if fakes and reals differ in native format, the model
+  can learn the codec instead of the voice (a leak, not a signal). Same for duration and
+  leading/trailing silence per class.
+- Compare our real/fake ratio with whatever is known about the NSA set, and report it.
+- Augmented data (laundering: codec/telephony round-trips, noise, simulated replay/RIR,
+  band-limiting) is tracked separately; the clean-only validation set must stay clean.
+  Also compare duration and peak level per class against the NSA test inventory.
+- The validation split is never trained on. Flag any path where it could leak into
+  training (feature scalers, calibration, stacking folds).

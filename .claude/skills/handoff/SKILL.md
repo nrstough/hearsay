@@ -3,8 +3,17 @@ name: handoff
 description: "Generate a self-contained handoff prompt to start a NEW chat that continues this project's work. Inspects current state (branch, worktree, uncommitted/at-risk artifacts, recent commits/results) and writes a ready-to-paste prompt covering the new chat's purpose, context, next steps, and — critically — the important tests + where run data lives (run data gets LOST when a job dir is cleaned). Use whenever the user says 'write a handoff', 'hand this off', 'prompt for a new chat', 'continue this in a new session', 'wrap up for next time', or is ending a work session and wants the next chat to pick up cleanly with nothing lost."
 user_invocable: true
 ---
+<!-- GLOBAL-SKILL:BEGIN (synced from ~/.claude/skills, do not edit inside) -->
 
 # /handoff — New-chat handoff prompt
+
+**Repo additions:** if the current repo has `.claude/skills/handoff/SKILL.md` containing
+`GLOBAL-SKILL:BEGIN`/`END` markers, also follow everything in that file *outside* the
+markers. It holds this project's additions to this skill and wins where they conflict.
+(If you are already reading that file, there is nothing extra to load.) A repo copy
+without markers is ignored. **Path rule:** wherever this skill names
+`~/.claude/ownership-checks.md`, use the repo's `.claude/ownership-checks.md` if the
+global file doesn't exist (cloud sessions).
 
 Produce a **ready-to-paste prompt for a fresh chat** that continues the current work with zero context loss.
 
@@ -20,23 +29,13 @@ Why this matters: run data, uncommitted outputs, and test state are the things t
 
 If the handoff dir already holds handoffs, read the newest one and match its shape.
 
-**HEARSAY:** handoffs live in `docs/handoffs/`. There is no archive location for large
-artifacts except the external drive (`/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/`) —
-mark `data/`, `weights/`, `models/`, `outputs/`, and any submission TSV "NOT archived"
-unless someone has copied them there. Note: `submissions/*` is **gitignored** (only
-`submissions/log.csv` is tracked), so submitted TSVs are always at-risk artifacts.
-
 ## Step 1 — Inspect state (read it; don't guess)
 - **Branch + worktree:** `git branch --show-current`, and note which worktree you're in (`pwd`; `git worktree list` if the project uses them).
 - **Uncommitted / at-risk:** `git status --short` — anything uncommitted is at risk.
 - **Recent commits:** `git log --oneline -8`.
 - **At-risk artifacts:** run outputs, result JSONs, datasets, models living in job-tmp (`$CLAUDE_JOB_DIR/tmp`, `~/.claude/jobs/*/tmp`), a scratchpad dir, or anywhere regenerable-but-not-committed. Record their **paths** and whether they're **archived**. These are exactly what gets lost — a job-dir cleanup deletes them silently.
 - **In-flight work:** background jobs, cloud/remote runs, scheduled tasks, open PRs — anything that will still be running after this chat ends, plus how the next chat checks on it.
-- **HEARSAY status:** the current ladder rung (M0, M1, D-track, M3, M5, M4, K, DOC), the
-  last few rows of `submissions/log.csv`, the path of the newest **valid** TSV, the best
-  validation minDCF (clean-only and augmented, on the outer holdout), and hours left
-  before 8 AM Sunday. Flag any pending detector-contract change and which owners it
-  affects.
+- **Pipeline state (if mid `/plan-review`, `/workflow-review`, or any skill using `~/.claude/ownership-checks.md`, including a `/consult` whose response is still `UNREVIEWED`):** the phase reached, the **stakes classification** (LOW/HIGH, reason, any user override), every **Owner's statement** sentence given so far, copied **verbatim**, and, for HIGH, whether the test break check has run and its result. Before 3a writes the run spec, the Owner's statement exists only in this conversation, so the handoff is its only copy.
 
 ## Step 2 — Capture the tests (non-negotiable)
 For the work in flight, list the tests/validation that matter:
@@ -60,6 +59,15 @@ Use this structure (adapt content, keep the sections):
 ## Working branch / worktree
 <branch> in <worktree>; <clean | N uncommitted>
 
+## Pipeline state (only if mid a skill with ownership checks)
+- Phase: <P1 drafted | P1 frozen | P2 frozen | plan approved | executing | auditing>
+- Stakes: <LOW | HIGH> — <reason> <(user override: …)>
+- Owner's statement (verbatim, do not edit):
+  - P1 what it does: "<…>"  /  most likely wrong: "<…>"
+  - P2 what it does: "<…>"  /  most likely wrong: "<…>"
+- Break check (HIGH): <not yet run | CAUGHT | NOT CAUGHT → fix pending>
+A phase counts as frozen ONLY if its Owner's statement is recorded above. If it is missing, run that phase's freeze gate again; do not take "frozen" on this handoff's word.
+
 ## Environment / setup
 <the exact commands to get a working session: env activation, bootstrap script, env vars>
 
@@ -75,10 +83,6 @@ Use this structure (adapt content, keep the sections):
 ## Analytical notes
 <key metrics, recent findings, gotchas, where data/models live>
 
-## HEARSAY status
-Rung: <M?> · Latest valid TSV: <path> · Val minDCF (outer holdout): clean <x> / augmented <y>
-Time left to 8 AM Sun: <h> · Detector-contract changes pending: <none | field → owners>
-
 ## Pointers
 <relevant records / specs / memory files to read first>
 ```
@@ -87,3 +91,31 @@ Time left to 8 AM Sun: <h> · Detector-contract changes pending: <none | field �
 - Save to `{handoff-dir}/<YYYY-MM-DD>_<slug>-handoff.md`.
 - Present the full prompt text in-chat for copy-paste.
 - **Reuse the current worktree/branch** — do NOT spin up a new branch/worktree for a handoff, unless the project's own rules say otherwise. If the handoff records anything doc-worthy beyond itself, follow the project's doc-sync rule.
+
+<!-- GLOBAL-SKILL:END -->
+
+## HEARSAY additions
+
+This project's additions to the shared skill above, moved here verbatim from the old copy. Each says which part of the skill it belongs to.
+
+**Applies to: Step 0 — Resolve where handoffs live (automatic)**
+
+**HEARSAY:** handoffs live in `docs/handoffs/`. There is no archive location for large
+artifacts except the external drive (`/Volumes/Crucial P3 NVME Gen 3 2TB/hearsay/`) —
+mark `data/`, `weights/`, `models/`, `outputs/`, and any submission TSV "NOT archived"
+unless someone has copied them there. Note: `submissions/*` is **gitignored** (only
+`submissions/log.csv` is tracked), so submitted TSVs are always at-risk artifacts.
+
+**Applies to: Step 1 — Inspect state (read it; don't guess)**
+
+- **HEARSAY status:** the current ladder rung (M0, M1, D-track, M3, M5, M4, K, DOC), the
+  last few rows of `submissions/log.csv`, the path of the newest **valid** TSV, the best
+  validation minDCF (clean-only and augmented, on the outer holdout), and hours left
+  before 8 AM Sunday. Flag any pending detector-contract change and which owners it
+  affects.
+
+**Applies to: Step 3 — the handoff template (add this section after "Analytical notes")**
+
+## HEARSAY status
+Rung: <M?> · Latest valid TSV: <path> · Val minDCF (outer holdout): clean <x> / augmented <y>
+Time left to 8 AM Sun: <h> · Detector-contract changes pending: <none | field → owners>

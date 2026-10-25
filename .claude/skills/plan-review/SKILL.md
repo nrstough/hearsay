@@ -3,17 +3,41 @@ name: plan-review
 description: "Full change pipeline — P1, P2, Spec + Plan (native + Codex-reviewed), Execute with doc propagation"
 user_invocable: true
 ---
+<!-- GLOBAL-SKILL:BEGIN (synced from ~/.claude/skills, do not edit inside) -->
 
 # /plan-review — Full Change Pipeline
+
+**Repo additions:** if the current repo has `.claude/skills/plan-review/SKILL.md` containing
+`GLOBAL-SKILL:BEGIN`/`END` markers, also follow everything in that file *outside* the
+markers. It holds this project's additions to this skill and wins where they conflict.
+(If you are already reading that file, there is nothing extra to load.) A repo copy
+without markers is ignored. **Path rule:** wherever this skill names
+`~/.claude/ownership-checks.md`, use the repo's `.claude/ownership-checks.md` if the
+global file doesn't exist (cloud sessions).
 
 Four phases, three user stops.
 
 ```
-P1 (problem) → user freezes
-P2 (tests + doc impact) → user freezes ("freeze" or "freeze deep")
-Write specs → Plan (standard or deep + Codex-reviewed) → user approves
-Execute → tests → commit → Codex audit → present results
+P1 (stakes triage + problem) → freeze gate → user freezes
+P2 (tests + doc impact) → freeze gate → user freezes ("freeze" or "freeze deep")
+Write specs → Plan (standard or deep + Codex-reviewed) → user approves (HIGH: core-logic summary first)
+Execute → tests → commit → break check (HIGH) → Claude critique → Codex audit → present results
 ```
+
+## Ownership checks (why the extra friction exists)
+
+The failure this guards against: the AI drafts P1 and P2, the user freezes them without
+engaging, and the pipeline runs with nobody owning the decisions. **Read
+`~/.claude/ownership-checks.md` before P1**: it defines the checks; this skill says where
+they happen. Three checks put friction only where it matters:
+
+1. **Stakes triage** (start of P1) — LOW or HIGH. Decides how much of the rest applies.
+2. **Freeze gate** (P1 and P2) — the user states the phase in their own words before it
+   can freeze. Saved verbatim as the **Owner's statement** in the run spec.
+3. **Test break check** (HIGH only, post-commit) — prove the key test can actually fail.
+
+Plus, for HIGH changes, a plain-English core-logic summary at STOP 3. None of these are
+optional, and none may be satisfied on the user's behalf.
 
 ## When to use this vs `/workflow-review`
 
@@ -27,32 +51,9 @@ P1/P2/spec discipline, but the reviewed deliverable is a multi-agent `Workflow` 
 If the user says "just fix it", "quick fix", or the change is clearly trivial (one-line,
 typo, config), skip the full pipeline. Make a short checklist, code it, test it, commit it.
 
-## HEARSAY localization (project-specific — read before Phase 0)
-
-- **When to use it here:** any rung or change expected to take more than an hour
-  (CLAUDE.md working rule). Under an hour → relief valve.
-- **Budget:** the build ends 8 AM Sunday (Sep 27); see the timeline and hard cutoffs in
-  `docs/plan.md`. Every P1 names the rung (M0, M1, D-track, M3, M5, M4, K, DOC), a **time
-  box** (a few hours max per rung), and the stop point. When the box runs out, stop and
-  report — do not push through.
-- **Always have a valid TSV:** from M1 onward, no plan may leave the repo unable to emit a
-  valid `teamName_predictions.tsv`. Every execution that touches the scoring pipeline ends
-  with a fresh valid TSV **and** a new row in `submissions/log.csv` (timestamp, rung,
-  outer-holdout minDCF, submission path), or names the blocker. Never overwrite a
-  previously submitted TSV.
-- **Freeze on Sunday morning (Sep 27):** no new plan-review runs start that cannot land
-  before the freeze. After the freeze, only TSV- or Docker-breaking fixes, via the relief
-  valve.
-- **Detector contract:** a change to `DetectorResult` / `ClipContext` / `safe_run`
-  (`src/hearsay/detectors/base.py`) must say so in P1 and name the detector owners it
-  affects (CLAUDE.md team table). Contract fields do not change silently.
-- **Model rules (every rung):** validate by generator and speaker via the fold file, not
-  by clip; never train on the validation split; log every TSV with its validation score;
-  keep a clean-only validation score alongside any augmented one.
-- **Sources of truth:** `docs/nsa-challenge.md` + the NSA instructions (rules, scoring) and
-  `docs/plan.md` (plan and scope) are the super docs; `docs/scoping.md` and
-  `docs/master-doc.md` are historical.
-- **Cloud GPU:** ask before renting one (M5 is GPU-only; cap about $75).
+The relief valve is for changes that would triage **LOW**. If a "quick fix" touches HIGH
+territory (see Stakes triage), say so in one line and recommend the full pipeline; the
+user may still insist, and then you proceed.
 
 ---
 
@@ -73,14 +74,6 @@ fallback below.
 | **Full test command** | `CLAUDE.md` → `package.json` `scripts.test` → `Makefile` `test` → `pyproject.toml`/`pytest.ini` → `Cargo.toml` → `go.mod` | none — say so explicitly rather than silently skipping regression |
 | **Codex scripts** | `<repo>/.claude/review-plan.sh` and `review-audit.sh` if present | `~/.claude/review-plan.sh`, `~/.claude/review-audit.sh` |
 
-HEARSAY: this repo ships `.claude/review-plan.sh`, `.claude/review-audit.sh`, and HEARSAY-
-localized rubrics (`.claude/codex-review-prompt.md`, `.claude/codex-audit-prompt.md`), so
-the project copies are the ones to use. They need the Codex CLI installed and logged in
-(`codex --version`). If a teammate has no Codex CLI, say so at P1; the Claude critique loop
-(Phase 4, step 1) stands in as the gate and the plan is presented without a Codex review.
-Plan files go in `docs/reports/`, run specs in `docs/specs/`; this project has no feature-
-spec layer — collapse to run specs plus the super docs.
-
 If a project has no doc layers at all, collapse to a single run spec and say so in P2 —
 do NOT invent a three-layer doc tree for a project that doesn't have one.
 
@@ -89,18 +82,43 @@ do NOT invent a three-layer doc tree for a project that doesn't have one.
 ## Phase 1 — Problem & Approach
 
 1. Confirm the working branch AND worktree (`git branch --show-current` + `pwd`)
-2. Discuss the problem with the user:
+2. **Stakes triage** (ownership-checks §1). Put it on the first line of P1, with a
+   one-line reason. Unsure means HIGH; only the user can downgrade. If the P2 inventory
+   or plan exploration shows a LOW change reaches HIGH territory, reclassify upward.
+3. Discuss the problem with the user:
    - What is the problem?
    - What existing docs are relevant?
    - What is the approach, in plain English?
-3. You may read files, explore, research — but do NOT write any files yet
-4. Present P1 to the user (including the Phase 0 resolved conventions)
+4. You may read files, explore, research — but do NOT write any files yet
+5. Present P1 to the user (stakes line first, then the Phase 0 resolved conventions)
 
-### >>> STOP 1: User freezes P1 <<<
+### >>> STOP 1: Freeze gate, then the user freezes P1 <<<
 
-Wait for "freeze". Then move to Phase 2.
+Run the **freeze gate** below. Once the user's sentences pass, **show the complete P1
+in-message** — stakes, conventions, problem, approach, decisions carried in, the Owner's
+statement verbatim, and the risks fed forward — so the user reads the whole thing as it
+will be saved. P1 is frozen only when the user confirms that full view. Then move to
+Phase 2. (2026-10-10, user directive: the user must see the entire P1 before it freezes,
+not just the gate exchange.)
 
 **P1 rules:** Plain English, no implementation details, no test details.
+
+### Freeze gate (used at STOP 1 and STOP 2)
+
+The Owner's statement gate (ownership-checks §2), applied to a phase:
+
+1. **What this phase does.** P1: the problem and the approach. P2: what the tests will prove.
+2. **Most likely way it is wrong** (HIGH only). P1: how the approach could be the wrong
+   fix. P2: a failure the tests could miss.
+
+Specific to this pipeline:
+- **Feed the risk forward.** The P1 risk becomes a required row in the P2 failure-mode
+  inventory. The P2 risk must map to a named test before P2 freezes; add the test if
+  it is missing.
+- No files exist yet, so carry the sentences in the conversation and write them into
+  the run spec in 3a.
+- At STOP 2 the user also says "freeze" or "freeze deep". If they give only the
+  sentences, ask which mode.
 
 ---
 
@@ -113,6 +131,8 @@ Wait for "freeze". Then move to Phase 2.
    - Enumerate, per component/stage the change touches, **all the things that could
      go wrong** — then derive the tests from that inventory. The inventory appears in
      P2 itself (a failure-mode → test table per stage), not just the test names.
+   - **The owner's P1 risk** ("most likely way it is wrong", HIGH only) is a required
+     row with at least one test.
    - **Map every historical bug class in the touched area to at least one test.**
      Search the project's bug log, run specs, and memory for what has ALREADY bitten in
      this area (decode/orientation bugs, silent stale artifacts, cascading transforms,
@@ -128,25 +148,6 @@ Wait for "freeze". Then move to Phase 2.
    - **Scale test count to code size**: a new subsystem warrants a per-stage
      failure-mode table and typically dozens of tests; "5 tests for a new module" is
      an automatic P2 rejection.
-   - **HEARSAY standing failure modes** — every P2 in this project must address each of
-     these (a test, a measurement, or an explicit one-line waiver saying why it doesn't
-     apply to this change):
-     1. **Laundering, telephony and replay in the test set** — the brief lists transcoded,
-        band-limited, noised and replayed fakes; report a clean-only score beside any
-        augmented one and measure on an augmented validation slice. Physical replay is not
-        covered (no hardware; simulated RIR only) — say so rather than claim it.
-     2. **Overfitting to known generators or speakers** — validation must hold out whole
-        generator and speaker groups via the fold file (grouped, nested); a gain that only
-        appears on seen groups is not a gain.
-     3. **Class imbalance and prior** — about 70% of test files are real (π_synth = 0.3);
-        check class counts per fold, class-balanced training, and whether a decision flips
-        between the metric readings in `docs/plan.md` (including the sponsor-code reading).
-     4. **Shortcuts** — duration, peak level, silence, container fields, the single LJ
-        speaker; check per-feature AUC against the label and compare clean vs transcoded
-        before trusting a gain.
-     5. **Format conversion errors in the loader** — sample rate, channel count,
-        int/float scaling, codec decoder padding, clipping. Everything must arrive as
-        16 kHz mono; pin it with fixture clips in each input format we expect (incl. MP4).
 2. Then specify:
    - What specific tests validate the change? (exact commands)
    - What are acceptance criteria? (pass/fail definitions)
@@ -155,11 +156,17 @@ Wait for "freeze". Then move to Phase 2.
    - **Run spec** (`{run-spec-dir}/{CHANGE_NAME}.md`): Always created. The design doc for THIS change. Frozen after commit — never modify a previous run spec.
    - **Feature master spec** (`{feature-spec-dir}/{FEATURE_NAME}.md`): The living truth for the feature being changed. Created if it doesn't exist, updated if it does.
    - **Super master docs**: Updated if the change affects flow, architecture, or shipped status.
-4. Present P2 to the user — include which docs will be created/updated
+4. For HIGH changes, name the **break-check candidate**: the one test most tied to the
+   core logic, which the post-commit test break check will mutate against.
+5. Present P2 to the user — include which docs will be created/updated
 
-### >>> STOP 2: User freezes P2 <<<
+### >>> STOP 2: Freeze gate, then the user freezes P2 <<<
 
-Wait for "freeze" or "freeze deep". Then move to Phase 3.
+Run the **freeze gate** (see Phase 1). Once the sentences pass, **show the complete P2
+in-message** — the failure-mode table, every test with its command, acceptance criteria,
+the doc list, the break-check candidate, and the Owner's statement verbatim — so the
+user reads it whole before freezing. P2 is frozen only when the user confirms that full
+view and has said "freeze" or "freeze deep". Then move to Phase 3.
 
 - **"freeze"** — standard planning (single-agent exploration → plan)
 - **"freeze deep"** — deep planning (parallel multi-agent exploration + critique agent → plan)
@@ -174,7 +181,15 @@ After P2 freeze, do ALL of the following without stopping:
 
 ### 3a. Write specs (automatic — no user stop)
 
-1. Create the **run spec** (`{run-spec-dir}/{CHANGE_NAME}.md`) — problem, solution, what will change
+1. Create the **run spec** (`{run-spec-dir}/{CHANGE_NAME}.md`). It holds the frozen P1
+   and P2 **as shown to the user at STOP 1 and STOP 2** (problem, approach, failure-mode
+   table, tests, doc list), the Owner's statements, and the technical spec of what will
+   change. It must contain:
+   - `**Stakes:** LOW | HIGH — <reason>` (plus any user override and why)
+   - `## Owner's statement` with `### P1` and `### P2` subsections holding the user's
+     freeze-gate sentences **verbatim**, labelled "What it does" and "Most likely way it
+     is wrong" (the second omitted for LOW)
+   - For HIGH: `## Test break check` with the chosen test, to be filled in post-commit
 2. Create or update the **feature spec** (`{feature-spec-dir}/{FEATURE_NAME}.md`)
 3. Update **super docs** if affected
 
@@ -214,9 +229,11 @@ After P2 freeze, do ALL of the following without stopping:
 
 ### >>> STOP 3: Present plan + Codex review to user <<<
 
-3. Present EVERY step of the plan to the user — not a summary, the complete plan
-4. Present the Codex review findings and how they were addressed
-5. **STOP. Do NOT proceed to execution.** Wait for explicit approval ("go ahead", "implement", "do it")
+3. **HIGH changes: lead with a core-logic summary** (ownership-checks §4), before the
+   plan. If it doesn't match the P1 Owner's statement, say so here.
+4. Present EVERY step of the plan to the user — not a summary, the complete plan
+5. Present the Codex review findings and how they were addressed
+6. **STOP. Do NOT proceed to execution.** Wait for explicit approval ("go ahead", "implement", "do it")
 
 **Plan rules:** The plan describes HOW and IN WHAT ORDER, with specific line numbers and code patterns. Codex reviews for implementation gaps, missing edge cases, stale file paths. Codex review runs ONLY on plans — never on specs or feature docs. The plan lives as a durable file in the plan dir; the **run spec is the persistent audit record** of what was planned. The Codex audit checks adherence against the run spec, not the plan file.
 
@@ -249,6 +266,12 @@ Codex is rate-limited, so spend the cheap Claude pass on the obvious/avoidable f
 reserve Codex for the final grade. (This ordering came from a real run where Codex burned 2
 quota-limited rounds on things a Claude critique caught for free.)
 
+0. **Test break check — HIGH changes only, once per run, after tests pass.** Follow
+   ownership-checks §3 exactly. Use the break-check candidate named in P2; if the
+   implementation made a different test the better fit, switch and say why in one line.
+   A decorative test is a finding: fix, commit, and re-check before the critique starts.
+   Record the result in the run spec's `## Test break check`.
+
 1. **Claude pre-audit critique — loop until Acceptable.** Launch a Claude critique agent
    (`general-purpose`) that grades the change the way the Codex audit does — and instruct it
    to be **maximally adversarial**: assume the implementer cut corners, and **bias toward
@@ -259,15 +282,21 @@ quota-limited rounds on things a Claude critique caught for free.)
      resolves — project `.claude/` first, else `~/.claude/`; the SAME rubric it feeds Codex,
      NOT the lighter plan-oriented `codex-review-prompt.md`), the run spec, the plan +
      `*-review.md`, and the diff (`git diff <base>...HEAD`).
-   - It emits the 7-dimension scorecard — Plan adherence, Scope discipline, Test coverage,
-     Review compliance, Freeze integrity, Regression check, Documentation, Overall (= worst) —
-     and must VERIFY each finding in the code (`file:line`), not take the docs' word. Require
-     specifically:
+   - It emits the 8-dimension scorecard — Plan adherence, Scope discipline, Test coverage,
+     Review compliance, Freeze integrity, Regression check, Documentation, Test sensitivity,
+     Overall (= worst) — and must VERIFY each finding in the code (`file:line`), not take
+     the docs' word. Require specifically:
      - **Test coverage** — enumerate EVERY acceptance criterion in the run spec and confirm
        each maps to a test that actually exercises it; an untested criterion is a Fail.
      - **Plan adherence** — verify each design decision (D1, D2, …) is implemented AS STATED,
        including its **edge / fallback path** (fallback engines, nil/empty inputs, boundary
        values), not just the happy path. Actively try to break each new / changed function.
+     - **Freeze integrity** — the run spec has a Stakes line and an `## Owner's statement`
+       with P1 and P2 entries. This pipeline always triages, so a missing classification
+       or statement is a Fail here (not N/A as the generic rubric allows).
+     - **Test sensitivity** — for HIGH, the break-check record exists, the mutation was
+       realistic and in the core logic, the test is the one most tied to it, and the
+       mutation appears in no commit (`git log -p <base>..HEAD`).
    - **Fix every finding** (code/docs/tests), commit, and **re-run the critique, looping
      until Overall is Acceptable** (or only non-blocking risks remain). Continue the SAME
      agent via `SendMessage` so it re-checks its own prior findings.
@@ -295,6 +324,7 @@ quota-limited rounds on things a Claude critique caught for free.)
 ### Present results
 
 - Test results (pass/fail counts)
+- Break check result line (HIGH), including any fix-and-recheck rounds
 - Codex audit/scorecard results (REQUIRED — if missing, explain why)
 - Audit findings fixed (list what was found and how it was resolved)
 - Any deviations from plan and why
@@ -324,10 +354,10 @@ Run specs are frozen after commit — never modify a previous run spec. Feature 
 
 | Phase | What happens | User says |
 |-------|-------------|-----------|
-| P1 | Problem discussed (+ resolved conventions) | "freeze" |
-| P2 | Tests + doc impact discussed | "freeze" or "freeze deep" |
-| Specs + Plan | Specs written, plan + Codex review presented | "go ahead" |
-| Execute | Results + audit presented | direction |
+| P1 | Stakes triage + problem discussed (+ resolved conventions) | Owner's statement (what it does; + most likely way it's wrong if HIGH), then frozen |
+| P2 | Tests + doc impact discussed | Owner's statement, plus "freeze" or "freeze deep" |
+| Specs + Plan | Specs written; HIGH: core-logic summary; plan + Codex review presented | "go ahead" |
+| Execute | Results + break check (HIGH) + audit presented | direction |
 
 Three stops. Everything between stops is automatic.
 
@@ -342,6 +372,76 @@ Three stops. Everything between stops is automatic.
 - **The run spec is the audit artifact** — the Codex audit checks plan adherence and review compliance against the run spec. The plan file persists alongside it.
 - **Run specs are frozen after commit** — never modify a previous run spec
 - **NEVER skip the plan presentation stop.** The user MUST see and approve the full plan before execution.
+- **Stakes triage is never skipped; unsure means HIGH.** Only the user can downgrade.
+- **A bare "freeze" / "looks good" never passes a freeze gate.** The Owner's statement is the user's own words, saved verbatim, never written for them.
+- **The break-check mutation never leaves its scratch worktree.** Delete the worktree afterwards.
 - **Codex post-commit audit is REQUIRED** — never skip it. If it fails after retry, hard stop and report.
 - **Audit findings are automatically fixed** — do not present findings and wait. Fix them immediately (code, docs, tests), commit, re-audit, then present the final results.
 - **NEVER push without user approval.**
+
+<!-- GLOBAL-SKILL:END -->
+
+## HEARSAY additions
+
+This project's additions to the shared skill above, moved here verbatim from the old copy. Each says which part of the skill it belongs to.
+
+**Applies to: everything below — read before Phase 0**
+
+## HEARSAY localization (project-specific — read before Phase 0)
+
+- **When to use it here:** any rung or change expected to take more than an hour
+  (CLAUDE.md working rule). Under an hour → relief valve.
+- **Budget:** the build ends 8 AM Sunday (Sep 27); see the timeline and hard cutoffs in
+  `docs/plan.md`. Every P1 names the rung (M0, M1, D-track, M3, M5, M4, K, DOC), a **time
+  box** (a few hours max per rung), and the stop point. When the box runs out, stop and
+  report — do not push through.
+- **Always have a valid TSV:** from M1 onward, no plan may leave the repo unable to emit a
+  valid `teamName_predictions.tsv`. Every execution that touches the scoring pipeline ends
+  with a fresh valid TSV **and** a new row in `submissions/log.csv` (timestamp, rung,
+  outer-holdout minDCF, submission path), or names the blocker. Never overwrite a
+  previously submitted TSV.
+- **Freeze on Sunday morning (Sep 27):** no new plan-review runs start that cannot land
+  before the freeze. After the freeze, only TSV- or Docker-breaking fixes, via the relief
+  valve.
+- **Detector contract:** a change to `DetectorResult` / `ClipContext` / `safe_run`
+  (`src/hearsay/detectors/base.py`) must say so in P1 and name the detector owners it
+  affects (CLAUDE.md team table). Contract fields do not change silently.
+- **Model rules (every rung):** validate by generator and speaker via the fold file, not
+  by clip; never train on the validation split; log every TSV with its validation score;
+  keep a clean-only validation score alongside any augmented one.
+- **Sources of truth:** `docs/nsa-challenge.md` + the NSA instructions (rules, scoring) and
+  `docs/plan.md` (plan and scope) are the super docs; `docs/scoping.md` and
+  `docs/master-doc.md` are historical.
+- **Cloud GPU:** ask before renting one (M5 is GPU-only; cap about $75).
+
+**Applies to: Phase 0 — Resolve project conventions (automatic, no user stop)**
+
+HEARSAY: this repo ships `.claude/review-plan.sh`, `.claude/review-audit.sh`, and HEARSAY-
+localized rubrics (`.claude/codex-review-prompt.md`, `.claude/codex-audit-prompt.md`), so
+the project copies are the ones to use. They need the Codex CLI installed and logged in
+(`codex --version`). If a teammate has no Codex CLI, say so at P1; the Claude critique loop
+(Phase 4, step 1) stands in as the gate and the plan is presented without a Codex review.
+Plan files go in `docs/reports/`, run specs in `docs/specs/`; this project has no feature-
+spec layer — collapse to run specs plus the super docs.
+
+**Applies to: Phase 2 — Test Design & Doc Impact**
+
+   - **HEARSAY standing failure modes** — every P2 in this project must address each of
+     these (a test, a measurement, or an explicit one-line waiver saying why it doesn't
+     apply to this change):
+     1. **Laundering, telephony and replay in the test set** — the brief lists transcoded,
+        band-limited, noised and replayed fakes; report a clean-only score beside any
+        augmented one and measure on an augmented validation slice. Physical replay is not
+        covered (no hardware; simulated RIR only) — say so rather than claim it.
+     2. **Overfitting to known generators or speakers** — validation must hold out whole
+        generator and speaker groups via the fold file (grouped, nested); a gain that only
+        appears on seen groups is not a gain.
+     3. **Class imbalance and prior** — about 70% of test files are real (π_synth = 0.3);
+        check class counts per fold, class-balanced training, and whether a decision flips
+        between the metric readings in `docs/plan.md` (including the sponsor-code reading).
+     4. **Shortcuts** — duration, peak level, silence, container fields, the single LJ
+        speaker; check per-feature AUC against the label and compare clean vs transcoded
+        before trusting a gain.
+     5. **Format conversion errors in the loader** — sample rate, channel count,
+        int/float scaling, codec decoder padding, clipping. Everything must arrive as
+        16 kHz mono; pin it with fixture clips in each input format we expect (incl. MP4).
