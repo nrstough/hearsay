@@ -2,20 +2,31 @@
 name: diagnose
 description: Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce → minimise → hypothesise → instrument → fix → regression-test. Use when user says "diagnose this" / "debug this", reports a bug, says something is broken/throwing/failing, or describes a performance regression.
 ---
+<!-- GLOBAL-SKILL:BEGIN (synced from ~/.claude/skills, do not edit inside) -->
 
 # Diagnose
 
+**Repo additions:** if the current repo has `.claude/skills/diagnose/SKILL.md` containing
+`GLOBAL-SKILL:BEGIN`/`END` markers, also follow everything in that file *outside* the
+markers. It holds this project's additions to this skill and wins where they conflict.
+(If you are already reading that file, there is nothing extra to load.) A repo copy
+without markers is ignored. **Path rule:** wherever this skill names
+`~/.claude/ownership-checks.md`, use the repo's `.claude/ownership-checks.md` if the
+global file doesn't exist (cloud sessions).
+
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
-When exploring the codebase, build a clear mental model of the relevant modules. If the project happens to have a domain glossary or architectural decision records (ADRs) in the area you're touching, read them — they save time. Otherwise just rely on the code.
+## Ownership checks
 
-**HEARSAY:** the natural seams are the pipeline stages in CLAUDE.md (ingest/loader →
-orchestrator → detector (`safe_run`) → fusion → TSV writer) — build the feedback loop at the boundary where
-the wrong value first appears. Keep a tiny fixture set of 16 kHz mono clips (plus the same
-clips in mp3/m4a/48 kHz/stereo) for loader bugs, which are the most likely class here
-(sample rate, channels, int/float scaling, decoder padding). Diagnosis is time-boxed like
-any rung: when the box runs out, stop and report what the loop showed. Never "fix" a
-validation drop by touching the validation split.
+Read `~/.claude/ownership-checks.md` at the start. In this skill:
+- **Stakes triage** when you start Phase 1, based on the code the bug lives in.
+- **Owner's statement gate** before the fix is applied (Phase 5). It blocks, even though
+  the hypothesis checkpoint in Phase 3 does not.
+- **Break check:** the regression test failing before the fix *is* the break check, as
+  long as you actually watched it fail. Record it.
+- **Plain-English summary** of the cause and the fix before the gate (HIGH).
+
+When exploring the codebase, build a clear mental model of the relevant modules. If the project happens to have a domain glossary or architectural decision records (ADRs) in the area you're touching, read them — they save time. Otherwise just rely on the code.
 
 ## Phase 1 — Build a feedback loop
 
@@ -104,6 +115,12 @@ A correct seam is one where the test exercises the **real bug pattern** as it oc
 
 **If no correct seam exists, that itself is the finding.** Note it. The codebase architecture is preventing the bug from being locked down. Flag this for the next phase.
 
+**Owner's statement gate (before the fix).** For HIGH, first give the plain-English
+summary (ownership-checks §4): what is broken, why, and what the fix changes. Then ask the
+user, in their own words, for **what the bug is** and (HIGH) **the most likely way this fix
+is wrong**. Turn that risk into a test or a check, and say which. This gate does not get
+skipped when the user is AFK; wait for it.
+
 If a correct seam exists:
 
 1. Turn the minimised repro into a failing test at that seam.
@@ -111,6 +128,10 @@ If a correct seam exists:
 3. Apply the fix.
 4. Watch it pass.
 5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.
+
+Steps 2–4 are this skill's break check: record `Break check: <test> vs fix reverted → CAUGHT`.
+If the test was written after the fix instead, then for HIGH run ownership-checks §3 with
+"revert the fix" as the mutation.
 
 ## Phase 6 — Cleanup + post-mortem
 
@@ -121,5 +142,22 @@ Required before declaring done:
 - [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
 - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
 - [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
+- [ ] The stakes line, the Owner's statement (verbatim) and the break-check line are in the commit message body (or the run spec, if one exists)
 
 **Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to the `/improve-codebase-architecture` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+
+<!-- GLOBAL-SKILL:END -->
+
+## HEARSAY additions
+
+This project's additions to the shared skill above, moved here verbatim from the old copy. Each says which part of the skill it belongs to.
+
+**Applies to: Phase 1 — Build a feedback loop (where to put it in this project)**
+
+**HEARSAY:** the natural seams are the pipeline stages in CLAUDE.md (ingest/loader →
+orchestrator → detector (`safe_run`) → fusion → TSV writer) — build the feedback loop at the boundary where
+the wrong value first appears. Keep a tiny fixture set of 16 kHz mono clips (plus the same
+clips in mp3/m4a/48 kHz/stereo) for loader bugs, which are the most likely class here
+(sample rate, channels, int/float scaling, decoder padding). Diagnosis is time-boxed like
+any rung: when the box runs out, stop and report what the loop showed. Never "fix" a
+validation drop by touching the validation split.

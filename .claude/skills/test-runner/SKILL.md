@@ -3,8 +3,17 @@ name: test-runner
 description: "Run the project's test suite the way the project actually runs it, then diagnose every failure down to a root cause in the source. Use when the user says 'run the tests', 'run the suite', 'why is this test failing', 'check for regressions', or asks for a pass/fail count."
 user_invocable: true
 ---
+<!-- GLOBAL-SKILL:BEGIN (synced from ~/.claude/skills, do not edit inside) -->
 
 # /test-runner — Run and diagnose the suite
+
+**Repo additions:** if the current repo has `.claude/skills/test-runner/SKILL.md` containing
+`GLOBAL-SKILL:BEGIN`/`END` markers, also follow everything in that file *outside* the
+markers. It holds this project's additions to this skill and wins where they conflict.
+(If you are already reading that file, there is nothing extra to load.) A repo copy
+without markers is ignored. **Path rule:** wherever this skill names
+`~/.claude/ownership-checks.md`, use the repo's `.claude/ownership-checks.md` if the
+global file doesn't exist (cloud sessions).
 
 Any arguments passed to this skill scope the run (a file, a marker, a keyword filter).
 With no arguments, run the full suite.
@@ -38,14 +47,6 @@ Resolution order for the environment:
 
 State the resolved command and interpreter in your report. If the project has **no** test
 command, say so explicitly rather than inventing one.
-
-**HEARSAY:** the environment is the uv-managed `.venv` (Python 3.12, pinned in
-`.python-version`); run things with `uv run …` from the repo root. The test command is
-`uv run pytest` (config in `pyproject.toml`, tests in `tests/`; loader/submission,
-metrics, detector-contract and doc-consistency suites). If pytest ever collects nothing
-(exit code 5), report that as "no tests", not as a pass. Markers: `needs_data`, `needs_weights`, `slow`. Tests
-that need datasets or weights (gitignored, not on every teammate's laptop) must be marked
-and reported as "skipped because gated", never as passes.
 
 ## Step 1 — Collect before you run
 
@@ -82,6 +83,14 @@ For each failure:
 **Never change a test to make it pass** outside the stale-test case above. If you cannot
 state the contract move in one sentence, debug the failure instead.
 
+**Stale tests in HIGH territory** (core logic, scoring, model output, user-facing results,
+data handling; see `~/.claude/ownership-checks.md`): the one sentence must come from the
+**user**, not from you. Show the old contract and the new one in plain English, then ask
+them to state the contract move in their own words, plus the most likely way the old test
+was right. Don't touch the test until that passes, and put their sentence verbatim in the
+commit message. A **real-regression fix** in HIGH territory gets the same gate before it
+is applied, and the test break check after it is committed.
+
 ## Output format
 
 ```
@@ -105,3 +114,19 @@ worktree, and — if the project has a known-good baseline count — the delta a
 3. Distinguish "skipped because gated" from "skipped because broken".
 4. If a pre-existing failure is unrelated to the current work, say so — and still count it.
 5. If the run was partial (scoped, or cut short), label the numbers as partial.
+
+<!-- GLOBAL-SKILL:END -->
+
+## HEARSAY additions
+
+This project's additions to the shared skill above, moved here verbatim from the old copy. Each says which part of the skill it belongs to.
+
+**Applies to: Step 0 — Resolve the environment and the command (never assume)**
+
+**HEARSAY:** the environment is the uv-managed `.venv` (Python 3.12, pinned in
+`.python-version`); run things with `uv run …` from the repo root. The test command is
+`uv run pytest` (config in `pyproject.toml`, tests in `tests/`; loader/submission,
+metrics, detector-contract and doc-consistency suites). If pytest ever collects nothing
+(exit code 5), report that as "no tests", not as a pass. Markers: `needs_data`, `needs_weights`, `slow`. Tests
+that need datasets or weights (gitignored, not on every teammate's laptop) must be marked
+and reported as "skipped because gated", never as passes.

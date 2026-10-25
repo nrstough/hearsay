@@ -3,8 +3,17 @@ name: doc-sync
 description: "Audit the project's documentation against the actual code and flag drift — stale CLI flags, wrong test counts, missing/renamed modules, outdated dependencies, resolved-but-still-open bugs, and stale status anchors in CLAUDE.md / auto-memory. Use when the user says 'doc sync', 'check the docs', 'are the docs stale', after a commit or merge, or before trusting a doc in a new session."
 user_invocable: true
 ---
+<!-- GLOBAL-SKILL:BEGIN (synced from ~/.claude/skills, do not edit inside) -->
 
 # /doc-sync — Documentation drift check
+
+**Repo additions:** if the current repo has `.claude/skills/doc-sync/SKILL.md` containing
+`GLOBAL-SKILL:BEGIN`/`END` markers, also follow everything in that file *outside* the
+markers. It holds this project's additions to this skill and wins where they conflict.
+(If you are already reading that file, there is nothing extra to load.) A repo copy
+without markers is ignored. **Path rule:** wherever this skill names
+`~/.claude/ownership-checks.md`, use the repo's `.claude/ownership-checks.md` if the
+global file doesn't exist (cloud sessions).
 
 You are a documentation consistency checker. You **find** drift and report it with exact
 edits; you do not silently rewrite docs unless the user asks you to apply the fixes.
@@ -16,13 +25,6 @@ With no arguments, run every applicable check below.
 
 1. Read `CLAUDE.md` / `AGENTS.md` — if the project names its docs or ships a doc map
    (`docs/DOC_MAP.md` or similar), **that list is authoritative**; use it and stop guessing.
-   **HEARSAY:** the doc set is `CLAUDE.md`, `docs/plan.md`, `docs/nsa-challenge.md`,
-   `README.md`, and anything in `docs/` (`scoping.md`/`master-doc.md` are historical). Headline numbers are verified against `submissions/log.csv`, not
-   against prose. Two CLAUDE.md sections are copied into Devpost and must be current:
-   **Pre-event work** (only what was really done before 8 pm Friday) and **AI use
-   disclosure** — every pretrained model, checkpoint, and public dataset referenced in
-   code must be listed there. Also check the detector contract in CLAUDE.md against
-   `src/hearsay/detectors/base.py`, and run `uv run pytest tests/test_docs_consistency.py`.
 2. Otherwise build the list yourself:
    ```bash
    ls README* CONTRIBUTING* CHANGELOG* 2>/dev/null
@@ -127,3 +129,19 @@ If nothing is stale, say so in one line: `✅ Docs in sync with the checked scop
    respect the frozen-doc convention: dated note, never a rewrite).
 6. For a large or cross-cutting sweep, launch the `doc-sync-checker` agent (the project's
    own if it has one, else the global one) and report its table.
+
+<!-- GLOBAL-SKILL:END -->
+
+## HEARSAY additions
+
+This project's additions to the shared skill above, moved here verbatim from the old copy. Each says which part of the skill it belongs to.
+
+**Applies to: Step 0 — Resolve the doc set (do this first, don't assume)**
+
+   **HEARSAY:** the doc set is `CLAUDE.md`, `docs/plan.md`, `docs/nsa-challenge.md`,
+   `README.md`, and anything in `docs/` (`scoping.md`/`master-doc.md` are historical). Headline numbers are verified against `submissions/log.csv`, not
+   against prose. Two CLAUDE.md sections are copied into Devpost and must be current:
+   **Pre-event work** (only what was really done before 8 pm Friday) and **AI use
+   disclosure** — every pretrained model, checkpoint, and public dataset referenced in
+   code must be listed there. Also check the detector contract in CLAUDE.md against
+   `src/hearsay/detectors/base.py`, and run `uv run pytest tests/test_docs_consistency.py`.
