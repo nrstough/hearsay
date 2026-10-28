@@ -33,6 +33,9 @@ RUN uv export --frozen --no-dev --no-hashes --no-emit-project \
 COPY weights/wav2vec2-xls-r-300m ./weights/wav2vec2-xls-r-300m
 COPY weights/Spectra-AASIST ./weights/Spectra-AASIST
 COPY weights/spkrec-ecapa-voxceleb ./weights/spkrec-ecapa-voxceleb
+# The M5 checkpoint that the default rule, fusion_v2, weights and whose hashes it records, in its
+# own layer; the runner's default --m5 is models/m5_shipped (scripts/run_pipeline.py default_m5).
+COPY docker/build/m5_shipped ./models/m5_shipped
 COPY docker/build/models ./models
 
 # Code (editable install so hearsay.*.REPO resolves to /app; PYTHONPATH is the fallback).

@@ -69,7 +69,7 @@ scripts/            CLIs: extract_/train_handcrafted, eval_bundle, extract_embed
                     make_constant_csv, inventory*
 scripts/cloud/      launch.sh, box_chain.sh, reaper.sh, r2_guard.sh, teardown_check.sh, box_codecs.py
 splits/             nsa_folds.csv (20,000 rows), nsa_folds_plus_asv19.csv (27,648), nsa_test_durations.csv (1,671)
-tests/              pytest suite, 876 collected (Oct 28; see "Tests: what pins what" for the count method)
+tests/              pytest suite, 877 collected (Oct 28; see "Tests: what pins what" for the count method)
 docs/               STATUS.md, architecture.md, plan.md, nsa-challenge.md, handoffs/, reports/, specs/, consults/
 models/ outputs/ weights/ data/ submissions/    gitignored artifacts and logs</code></pre>
 <h2 id="handcrafted-features-d-track-feature-engineering-lane">Handcrafted features (D-track feature-engineering lane)</h2>
@@ -398,11 +398,11 @@ models/ outputs/ weights/ data/ submissions/    gitignored artifacts and logs</c
 <li>Check ScoredFiles.flags / n_flagged and the sidecar's flag column before trusting the TSV.</li>
 </ol>
 <h2 id="tests-what-pins-what">Tests: what pins what</h2>
-<p>Count (Oct 28): 876 tests in 33 modules. Method: <code>pytest --collect-only -q</code> with torch, torchaudio,
+<p>Count (Oct 28): 877 tests in 33 modules. Method: <code>pytest --collect-only -q</code> with torch, torchaudio,
 transformers and speechbrain replaced at import time by stub modules, so the four modules that import
 torch at the top (test_m5_model, test_m5_scores, test_repair_decode_errors, test_spectra; 75 tests)
 also collect. Without torch, plain <code>pytest --collect-only -q --continue-on-collection-errors</code> collects
-801 and reports those four modules as collection errors. Collecting counts tests; it does not run them.</p>
+802 and reports those four modules as collection errors. Collecting counts tests; it does not run them.</p>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Test</th><th>Pins</th>
@@ -471,7 +471,7 @@ also collect. Without torch, plain <code>pytest --collect-only -q --continue-on-
 
 <footer class="page-footer">
 <p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
-<p>Generated from <code>docs/code-map.md</code> <span class="hash">5f5830915c10</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+<p>Generated from <code>docs/code-map.md</code> <span class="hash">3717539e60e2</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
 </footer>
 </main>
 </div>

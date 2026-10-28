@@ -2,14 +2,18 @@
 # Build the linux/amd64 HEARSAY image (run spec D3, D12). Stages the shipped model bundles into
 # docker/build/models/ with symlinks resolved (cp -RL): the probe under its real name (the
 # runner's default PROBE_DIR), models/hc_selected, models/cmp_selected and every
-# models/fusion_*/constants.json (the runner's default is fusion_v1). Records BUILD_INFO and the git sha, tags hearsay:<stamp> and
-# hearsay:latest. Env: PROBE_DIR, IMAGE (default hearsay). --print-args: resolve only.
+# models/fusion_*/constants.json (the runner's default is fusion_v2, which weights M5), and the M5
+# checkpoint (the one fusion_v2 records) into docker/build/m5_shipped/; the Dockerfile copies it to
+# models/m5_shipped, the runner's default --m5. Records BUILD_INFO and the git sha, tags
+# hearsay:<stamp> and hearsay:latest. Env: PROBE_DIR, M5_DIR, IMAGE (default hearsay).
+# --print-args: resolve only.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${REPO_ROOT:-$(cd "$HERE/.." && pwd)}"
 cd "$REPO"
 
 PROBE_DIR="${PROBE_DIR:-models/m1_wav2vec2-xls-r-300m_L7_20260926-0521}"
+M5_DIR="${M5_DIR:-models/m5_xlsr_ft_20260926-0741/model}"  # hearsay.pipeline.M5_DIR
 IMAGE="${IMAGE:-hearsay}"
 
 resolve() {  # print the real path of $1 (symlinks followed) or fail loudly
@@ -21,11 +25,13 @@ resolve() {  # print the real path of $1 (symlinks followed) or fail loudly
 PROBE_REAL="$(resolve "$PROBE_DIR")"
 HC_REAL="$(resolve models/hc_selected)"
 CMP_REAL="$(resolve models/cmp_selected)"
+M5_REAL="$(resolve "$M5_DIR")"
 FUSION_DIRS=()
 for d in models/fusion_*; do [ -f "$d/constants.json" ] && FUSION_DIRS+=("$d"); done
 [ -f "$PROBE_REAL/probe.joblib" ] || { echo "build.sh: $PROBE_REAL has no probe.joblib" >&2; exit 1; }
 [ -f "$HC_REAL/model.joblib" ] || { echo "build.sh: $HC_REAL has no model.joblib" >&2; exit 1; }
 [ -f "$CMP_REAL/model.joblib" ] || { echo "build.sh: $CMP_REAL has no model.joblib" >&2; exit 1; }
+[ -f "$M5_REAL/hashes.json" ] || { echo "build.sh: $M5_REAL has no hashes.json (not an M5 checkpoint)" >&2; exit 1; }
 [ "${#FUSION_DIRS[@]}" -ge 1 ] || { echo "build.sh: no models/fusion_*/constants.json (scripts/fuse.py writes them)" >&2; exit 1; }
 
 # Disk guard: the Colima VM disk is a sparse file on whichever drive hosts ~/.colima (a virtual
@@ -43,10 +49,12 @@ STAMP="$(date +%Y%m%d-%H%M)"
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DIRTY="$([ -n "$(git status --porcelain 2>/dev/null)" ] && echo dirty || echo clean)"
 FUSION_NAMES="$(printf '%s,' "${FUSION_DIRS[@]##*/}")"; FUSION_NAMES="${FUSION_NAMES%,}"
-BUILD_INFO="sha=$SHA $DIRTY stamp=$STAMP probe=$(basename "$PROBE_REAL") hc=$(basename "$HC_REAL") cmp=$(basename "$CMP_REAL") fusion=$FUSION_NAMES"
+M5_NAME="$(basename "$M5_REAL")"  # m5_xlsr_ft_<stamp>/model is named by its parent, as Models.m5_name does
+if [ "$M5_NAME" = model ]; then M5_NAME="$(basename "$(dirname "$M5_REAL")")"; fi
+BUILD_INFO="sha=$SHA $DIRTY stamp=$STAMP probe=$(basename "$PROBE_REAL") hc=$(basename "$HC_REAL") cmp=$(basename "$CMP_REAL") m5=$M5_NAME fusion=$FUSION_NAMES"
 
 if [ "${1:-}" = "--print-args" ]; then
-  echo "PROBE_REAL=$PROBE_REAL"; echo "HC_REAL=$HC_REAL"; echo "CMP_REAL=$CMP_REAL"
+  echo "PROBE_REAL=$PROBE_REAL"; echo "HC_REAL=$HC_REAL"; echo "CMP_REAL=$CMP_REAL"; echo "M5_REAL=$M5_REAL"
   echo "FUSION_DIRS=${FUSION_DIRS[*]}"; echo "BUILD_INFO=$BUILD_INFO"; exit 0
 fi
 
@@ -63,6 +71,7 @@ cp -RL "$PROBE_REAL" "docker/build/models/$(basename "$PROBE_REAL")"
 cp -RL "$HC_REAL" docker/build/models/hc_selected
 cp -RL "$CMP_REAL" docker/build/models/cmp_selected
 for d in "${FUSION_DIRS[@]}"; do mkdir -p "docker/build/models/${d##*/}" && cp "$d/constants.json" "docker/build/models/${d##*/}/constants.json"; done
+cp -RL "$M5_REAL" docker/build/m5_shipped  # its own Dockerfile layer, so a bundle change leaves it cached
 echo "build.sh: $BUILD_INFO"
 docker buildx build --platform linux/amd64 --load \
   --build-arg BUILD_INFO="$BUILD_INFO" --build-arg GIT_SHA="$SHA" \

@@ -374,6 +374,7 @@ probability_synthetic = 0.0348  -&gt; real</code></pre>
 </table></div>
 <h3 id="reproduce-in-docker-offline-cpu-linuxamd64-not-a-graded-deliverable">Reproduce in Docker (offline, CPU, linux/amd64; not a graded deliverable)</h3>
 <p>NSA told us on Saturday (~12:00) that the image is not required; the deliverable is the TSV and this README. We kept the image as evidence that the pipeline runs offline from a clean build. <strong>The recorded image runs the previous rule, <code>e_on_a</code>, not the shipped <code>A3_w0.2_E</code></strong>: it does not contain the M5 checkpoint.</p>
+<p><strong>Oct 28, 2026 (unverified).</strong> <code>docker/build.sh</code> now also stages the M5 checkpoint that <code>fusion_v2</code> records (<code>models/m5_xlsr_ft_20260926-0741/model</code>; override with <code>M5_DIR</code>) as <code>docker/build/m5_shipped</code>, and the Dockerfile copies it to <code>models/m5_shipped</code>, where the runner's default <code>--m5</code> looks. Before this, a rebuild produced an image whose runner refused to start under its own default rule, because <code>fusion_v2</code> weights M5 and there was no <code>models/m5_shipped/hashes.json</code>. No image has been built from this change: it was made where neither the weights nor a Docker daemon were available, so only the hermetic checks in <code>tests/test_docker_image.py</code> cover it. The recorded image below is unchanged and still runs the previous rule.</p>
 <pre><code class="language-bash">bash docker/build.sh</code></pre>
 <pre><code class="language-bash">docker run --network none -v &lt;test_dir&gt;:/data:ro -v &lt;out_dir&gt;:/out -v &lt;path&gt;/HearsayScoreKey4TeamX.tsv:/tmpl/key.tsv:ro -e HEARSAY_TEMPLATE=/tmpl/key.tsv -e HEARSAY_TEAM=CrossExam hearsay:20260926-0916</code></pre>
 <p>This is the run line from <code>docs/specs/2026-09-26_k-docker-image.md</code>; it writes <code>&lt;out_dir&gt;/CrossExam_predictions.tsv</code> scored with the previous rule. Our team is Cross Exam. The runner's default team name is <code>HEARSAY</code>, so always pass <code>HEARSAY_TEAM</code>; it is read at run time, so changing it needs no rebuild.</p>
@@ -449,7 +450,7 @@ data/ weights/ models/  local only
 
 <footer class="page-footer">
 <p>Created by Nathan, Hrushi &amp; Tharakesh.</p>
-<p>Generated from <code>README.md</code> <span class="hash">59fe10f1db3c</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
+<p>Generated from <code>README.md</code> <span class="hash">15f7a5cbfe52</span>. The markdown is the record. <a href="../about.html">About this site</a>.</p>
 </footer>
 </main>
 </div>

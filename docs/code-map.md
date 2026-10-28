@@ -31,7 +31,7 @@ scripts/            CLIs: extract_/train_handcrafted, eval_bundle, extract_embed
                     make_constant_csv, inventory*
 scripts/cloud/      launch.sh, box_chain.sh, reaper.sh, r2_guard.sh, teardown_check.sh, box_codecs.py
 splits/             nsa_folds.csv (20,000 rows), nsa_folds_plus_asv19.csv (27,648), nsa_test_durations.csv (1,671)
-tests/              pytest suite, 876 collected (Oct 28; see "Tests: what pins what" for the count method)
+tests/              pytest suite, 877 collected (Oct 28; see "Tests: what pins what" for the count method)
 docs/               STATUS.md, architecture.md, plan.md, nsa-challenge.md, handoffs/, reports/, specs/, consults/
 models/ outputs/ weights/ data/ submissions/    gitignored artifacts and logs
 ```
@@ -346,11 +346,11 @@ Gotchas
 
 ## Tests: what pins what
 
-Count (Oct 28): 876 tests in 33 modules. Method: `pytest --collect-only -q` with torch, torchaudio,
+Count (Oct 28): 877 tests in 33 modules. Method: `pytest --collect-only -q` with torch, torchaudio,
 transformers and speechbrain replaced at import time by stub modules, so the four modules that import
 torch at the top (test_m5_model, test_m5_scores, test_repair_decode_errors, test_spectra; 75 tests)
 also collect. Without torch, plain `pytest --collect-only -q --continue-on-collection-errors` collects
-801 and reports those four modules as collection errors. Collecting counts tests; it does not run them.
+802 and reports those four modules as collection errors. Collecting counts tests; it does not run them.
 
 | Test | Pins |
 |---|---|

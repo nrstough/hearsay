@@ -117,6 +117,29 @@ def test_b6_copy_destinations_match_the_loaders():
     assert DOCKERFILE.index("COPY src ./src") < DOCKERFILE.index("assets.py freeze")
 
 
+def test_b6_m5_checkpoint_is_staged_where_the_runner_looks(tmp_path):
+    # the default rule (fusion_v2) weights M5, and the runner refuses to start without the
+    # checkpoint whose hashes the file records: build.sh stages pipeline.M5_DIR as m5_shipped and
+    # the image puts it where the runner's default --m5 looks
+    from hearsay import pipeline
+
+    m5_rel = pipeline.M5_DIR.relative_to(pipeline.REPO).as_posix()
+    assert f'M5_DIR="${{M5_DIR:-{m5_rel}}}"' in BUILD
+    assert 'cp -RL "$M5_REAL" docker/build/m5_shipped' in BUILD
+    assert "COPY docker/build/m5_shipped ./models/m5_shipped" in DOCKERFILE
+    runner = _load(REPO / "scripts" / "run_pipeline.py", "run_pipeline_mod")
+    shipped = tmp_path / "app" / "models" / "m5_shipped"
+    shipped.mkdir(parents=True)
+    (shipped / "hashes.json").write_text("{}")
+    assert runner.default_m5(tmp_path / "app") == shipped
+    # its own layer after the weights and before the small bundles, so a bundle edit keeps it cached
+    order = ("COPY weights/spkrec-ecapa-voxceleb", "COPY docker/build/m5_shipped",
+             "COPY docker/build/models ./models", "COPY src ./src")
+    assert [DOCKERFILE.index(o) for o in order] == sorted(DOCKERFILE.index(o) for o in order)
+    # the shipped-asset manifest freezes all of models/, so the checkpoint is checked at start
+    assert re.search(r"--dirs models\s", DOCKERFILE[DOCKERFILE.index("assets.py freeze"):])
+
+
 # --- B7-B9: docker/ scripts -----------------------------------------------------------------
 
 
@@ -151,19 +174,24 @@ def _fake_tree(root: Path) -> None:
     for v in ("fusion_v0", "fusion_v1"):
         (root / "models" / v).mkdir()
         (root / "models" / v / "constants.json").write_text("{}")
+    (root / "models" / "m5_xlsr_ft_x" / "model").mkdir(parents=True)
+    (root / "models" / "m5_xlsr_ft_x" / "model" / "hashes.json").write_text("{}")
     os.symlink("hc_lgbm_x", root / "models" / "hc_selected")
     os.symlink("cmp_lgbm_x", root / "models" / "cmp_selected")
 
 
 def test_b7_build_resolves_symlinked_bundles(tmp_path):
     _fake_tree(tmp_path)
-    env = {**os.environ, "REPO_ROOT": str(tmp_path), "PROBE_DIR": "models/m1_real", "MIN_FREE_GB": "0"}
+    env = {**os.environ, "REPO_ROOT": str(tmp_path), "PROBE_DIR": "models/m1_real",
+           "M5_DIR": "models/m5_xlsr_ft_x/model", "MIN_FREE_GB": "0"}
     r = subprocess.run(["bash", str(REPO / "docker" / "build.sh"), "--print-args"], env=env,
                        capture_output=True, text=True, check=False, cwd=tmp_path)
     assert r.returncode == 0, r.stderr
     assert f"HC_REAL={tmp_path.resolve() / 'models' / 'hc_lgbm_x'}" in r.stdout, r.stdout
     assert f"CMP_REAL={tmp_path.resolve() / 'models' / 'cmp_lgbm_x'}" in r.stdout
     assert "hc=hc_lgbm_x" in r.stdout and "probe=m1_real" in r.stdout
+    assert f"M5_REAL={tmp_path.resolve() / 'models' / 'm5_xlsr_ft_x' / 'model'}" in r.stdout
+    assert "m5=m5_xlsr_ft_x" in r.stdout, "a checkpoint dir named `model` is recorded by its parent"
     assert "fusion=fusion_v0,fusion_v1" in r.stdout and "FUSION_DIRS=models/fusion_v0 models/fusion_v1" in r.stdout
     # dangling symlink: loud failure, no build
     (tmp_path / "models" / "hc_selected").unlink()
@@ -171,9 +199,16 @@ def test_b7_build_resolves_symlinked_bundles(tmp_path):
     r = subprocess.run(["bash", str(REPO / "docker" / "build.sh"), "--print-args"], env=env,
                        capture_output=True, text=True, check=False, cwd=tmp_path)
     assert r.returncode != 0 and "hc_selected" in r.stderr
-    # the disk guard refuses a build (even a dry run) below MIN_FREE_GB
     (tmp_path / "models" / "hc_selected").unlink()
     os.symlink("hc_lgbm_x", tmp_path / "models" / "hc_selected")
+    # an M5 dir without hashes.json is no checkpoint the runner would load: loud failure, no build
+    hashes = tmp_path / "models" / "m5_xlsr_ft_x" / "model" / "hashes.json"
+    hashes.unlink()
+    r = subprocess.run(["bash", str(REPO / "docker" / "build.sh"), "--print-args"], env=env,
+                       capture_output=True, text=True, check=False, cwd=tmp_path)
+    assert r.returncode != 0 and "has no hashes.json" in r.stderr
+    hashes.write_text("{}")
+    # the disk guard refuses a build (even a dry run) below MIN_FREE_GB
     env["MIN_FREE_GB"] = "100000"
     r = subprocess.run(["bash", str(REPO / "docker" / "build.sh"), "--print-args"], env=env,
                        capture_output=True, text=True, check=False, cwd=tmp_path)

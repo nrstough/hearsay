@@ -358,6 +358,8 @@ uv run python scripts/run_pipeline.py --in data/nsa/HackGTHearsayTesting --out o
 
 NSA told us on Saturday (~12:00) that the image is not required; the deliverable is the TSV and this README. We kept the image as evidence that the pipeline runs offline from a clean build. **The recorded image runs the previous rule, `e_on_a`, not the shipped `A3_w0.2_E`**: it does not contain the M5 checkpoint.
 
+**Oct 28, 2026 (unverified).** `docker/build.sh` now also stages the M5 checkpoint that `fusion_v2` records (`models/m5_xlsr_ft_20260926-0741/model`; override with `M5_DIR`) as `docker/build/m5_shipped`, and the Dockerfile copies it to `models/m5_shipped`, where the runner's default `--m5` looks. Before this, a rebuild produced an image whose runner refused to start under its own default rule, because `fusion_v2` weights M5 and there was no `models/m5_shipped/hashes.json`. No image has been built from this change: it was made where neither the weights nor a Docker daemon were available, so only the hermetic checks in `tests/test_docker_image.py` cover it. The recorded image below is unchanged and still runs the previous rule.
+
 ```bash
 bash docker/build.sh
 ```

@@ -3,7 +3,7 @@
 # up a template dropped beside the audio, verify the shipped assets, then exec the main chat's
 # runner (scripts/run_pipeline.py) with /data and /out. Env the runner itself reads:
 #   HEARSAY_TEAM (default HEARSAY)  HEARSAY_TEMPLATE (path inside the container)
-#   HEARSAY_RULE (zmean | stack_nonlj, default zmean)
+#   HEARSAY_RULE (e_on_a | zmean | stack_nonlj, default e_on_a: A3_w0.2_E in the default fusion_v2)
 # Env this script reads: OMP_NUM_THREADS (default min(nproc, cgroup cpu quota, 6); the runner caps
 # torch at 6 too, and the cap here keeps numpy/numba from oversubscribing on a big box).
 # Extra arguments are passed through to the runner (e.g. --limit 50 --compare-tsv /ref/x.tsv).
@@ -39,5 +39,5 @@ if [ -f /app/assets.json ]; then
 fi
 [ -d /data ] || { echo "hearsay: /data is not mounted" >&2; exit 2; }
 echo "hearsay: build=$(cat /app/BUILD_INFO 2>/dev/null || echo unknown) threads=$OMP_NUM_THREADS" \
-     "team=${HEARSAY_TEAM:-HEARSAY} rule=${HEARSAY_RULE:-zmean} template=${HEARSAY_TEMPLATE:-none}"
+     "team=${HEARSAY_TEAM:-HEARSAY} rule=${HEARSAY_RULE:-e_on_a} template=${HEARSAY_TEMPLATE:-none}"
 exec python /app/scripts/run_pipeline.py --in /data --out /out --threads "$OMP_NUM_THREADS" --require-offline "$@"
