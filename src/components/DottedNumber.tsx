@@ -10,7 +10,7 @@ interface DottedNumberProps {
 
 /**
  * Renders digits in the Doto dot-matrix font while rendering
- * punctuation, currency symbols, and mathematical signs in Author typography.
+ * punctuation, currency symbols, and mathematical signs in the sans font (Satoshi, `font-sans`).
  */
 export function DottedNumber({
   value,
