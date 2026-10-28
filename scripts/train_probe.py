@@ -16,6 +16,7 @@ import argparse
 import json
 import time
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -39,12 +40,15 @@ def main() -> None:
     ap.add_argument("--stress", help="eval-only embedding set (e.g. In-the-Wild): never fit on")
     ap.add_argument("--c", type=float, default=1.0)
     ap.add_argument("--pi-synth", type=float, default=0.3, help="NSA prior (70/30 real/synth)")
+    ap.add_argument("--allow-decode-errors", action="store_true",
+                    help="load sets with decode_error rows (zeros, not the clip); default refuses")
     args = ap.parse_args()
+    load = partial(load_embeddings, allow_decode_errors=args.allow_decode_errors)
 
     t0 = time.time()
     folds = None
     if args.folds:
-        parts = [load_embeddings(args.model, n) for n in args.train.split(",")]
+        parts = [load(args.model, n) for n in args.train.split(",")]
         X = np.concatenate([p[0] for p in parts])
         m = pd.concat([p[1] for p in parts], ignore_index=True)
         f = pd.read_csv(args.folds).set_index("path")
@@ -60,8 +64,8 @@ def main() -> None:
         groups = mtr.group.to_numpy()
     else:
         assert args.val, "--val or --folds is required"
-        Xtr, mtr = load_embeddings(args.model, args.train)
-        Xva, mva = load_embeddings(args.model, args.val)
+        Xtr, mtr = load(args.model, args.train)
+        Xva, mva = load(args.model, args.val)
         groups = cv_groups(mtr)
     ytr, yva = (mtr.label == "spoof").to_numpy(int), (mva.label == "spoof").to_numpy(int)
     print(f"train {Xtr.shape} spoof={ytr.mean():.2f}  val {Xva.shape} spoof={yva.mean():.2f}")
@@ -112,7 +116,7 @@ def main() -> None:
 
     stress = {}
     if args.stress:
-        Xs, ms = load_embeddings(args.model, args.stress)
+        Xs, ms = load(args.model, args.stress)
         ys = (ms.label == "spoof").to_numpy(int)
         ss = probe.llr(Xs)
         oof_llr = probe.platt_a * oof + probe.platt_b

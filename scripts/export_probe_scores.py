@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -40,10 +41,13 @@ def main() -> None:
     ap.add_argument("--test", required=True)
     ap.add_argument("--stress")
     ap.add_argument("--c", type=float, default=1.0)
+    ap.add_argument("--allow-decode-errors", action="store_true",
+                    help="load sets with decode_error rows (zeros, not the clip); default refuses")
     args = ap.parse_args()
+    load = partial(load_embeddings, allow_decode_errors=args.allow_decode_errors)
 
     probe = Probe.load(args.probe)
-    parts = [load_embeddings(probe.backbone, n) for n in args.train.split(",")]
+    parts = [load(probe.backbone, n) for n in args.train.split(",")]
     X = np.concatenate([p[0] for p in parts])[:, probe.layer]
     m = pd.concat([p[1] for p in parts], ignore_index=True)
     m = m.join(pd.read_csv(args.folds).set_index("path")[["fold"]], on="path")
@@ -60,11 +64,11 @@ def main() -> None:
     keep = set(pd.read_csv(args.keep_folds).path)
     rows = rows[rows.path.isin(keep)]
 
-    Xt, mt = load_embeddings(probe.backbone, args.test)
+    Xt, mt = load(probe.backbone, args.test)
     out = [rows, pd.DataFrame({"path": mt.path, "fold": "", "split": "test",
                                "logit": probe.llr(Xt)})]  # fmt: skip
     if args.stress:
-        Xs, ms = load_embeddings(probe.backbone, args.stress)
+        Xs, ms = load(probe.backbone, args.stress)
         out.append(pd.DataFrame({"path": ms.path, "fold": "", "split": "itw",
                                  "logit": probe.llr(Xs)}))  # fmt: skip
     df = pd.concat(out, ignore_index=True)

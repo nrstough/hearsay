@@ -31,7 +31,7 @@ scripts/            CLIs: extract_/train_handcrafted, eval_bundle, extract_embed
                     make_constant_csv, inventory*
 scripts/cloud/      launch.sh, box_chain.sh, reaper.sh, r2_guard.sh, teardown_check.sh, box_codecs.py
 splits/             nsa_folds.csv (20,000 rows), nsa_folds_plus_asv19.csv (27,648), nsa_test_durations.csv (1,671)
-tests/              pytest suite, 864 collected (Oct 24; see "Tests: what pins what" for the count method)
+tests/              pytest suite, 876 collected (Oct 28; see "Tests: what pins what" for the count method)
 docs/               STATUS.md, architecture.md, plan.md, nsa-challenge.md, handoffs/, reports/, specs/, consults/
 models/ outputs/ weights/ data/ submissions/    gitignored artifacts and logs
 ```
@@ -125,9 +125,9 @@ Gotchas
 | src/hearsay/audio.py | single decode path plus windowing and silence trimming shared by every rung | load_audio:22, ffmpeg cmd:27-32, DecodeError raise:36, NaN zeroing:41, windows:74, tile padding:82, trim_silence:91, min_keep guard:106 |
 | src/hearsay/embed.py | frozen backbone embedding: v1 windows averaged, v2 single prepared segment; torch and transformers imported inside the functions; re-exports the hearsay.segment helpers | segment re-exports:20-25, REPO:27, TEST_DURATIONS:28, default_device:31, load_backbone:37, embed_windows:43, embed_clip:57, test_duration_sampler (wrapper on embed.TEST_DURATIONS):65, embed_segment:71 |
 | src/hearsay/segment.py | torch-free input path shared by the deep lanes and the CPU detectors (handcrafted._crop, compression) | REPO:21, TEST_DURATIONS:22, MAX_SEGMENT_S:23, clip_windows:26, normalize_windows:30, test_duration_sampler:46, prepare_segment:57 |
-| src/hearsay/probe.py | standardized logistic regression on one layer, grouped CV, Platt calibration | load_embeddings:26 (refuses decode_error rows unless allow_decode_errors=True:37), cv_groups:55, make_clf:60, oof_scores:67, PredefinedSplit branch:75, Probe fields:85-93, llr:95, p_synthetic:102, p_decision:106, save:110, load:116 |
+| src/hearsay/probe.py | standardized logistic regression on one layer, grouped CV, Platt calibration | load_embeddings:26 (refuses decode_error rows unless allow_decode_errors=True:37; the CLIs that call it pass that only with --allow-decode-errors), cv_groups:55, make_clf:60, oof_scores:67, PredefinedSplit branch:75, Probe fields:85-93, llr:95, p_synthetic:102, p_decision:106, save:110, load:116 |
 | scripts/extract_embeddings.py | bulk, sharded, resumable extraction to outputs/embeddings/<model>/<name>/ | main:43, crop draw:70, extract_meta.json:71-73, shard loop:78-132, skip-existing:81-86, segment branch:87-111, per-row seed:90, window branch:112-132, manifest write:134-136 |
-| scripts/train_probe.py | per-layer grouped CV, Platt, refit, score val once, write models/m1_<model>_L<layer>_<stamp>/ | main:32, --folds branch:46-60, --max-train:56-58, layer loop:70-75, extract_meta read:81-85, val block:87-106, auc assert:89, --stress:108-121, meta val:126 |
+| scripts/train_probe.py | per-layer grouped CV, Platt, refit, score val once, write models/m1_<model>_L<layer>_<stamp>/ | main:33, --allow-decode-errors:43 (bound into every load at line 46), --folds branch:50-64, --max-train:59-62, layer loop:74-78, extract_meta read:85-94, val block:96-115, auc assert:98, --stress:117-130, meta val:139 |
 | scripts/make_probe_csv.py | score every test file with a saved probe, write submission TSV + sidecar, log | main:40, shift:55-57, score closure:60, segment branch:61, raw append:66, fb:74, preflight:75, raw.clear:76, raw_col:85-86 |
 | scripts/make_folds.py | base outer-holdout + k inner folds grouped by generator/speaker | group_key:28, main:36, holdout selection:50-58, generator assert:51, min-per-class assert:69, straddle assert:71, columns:74, known limits:77-78 |
 | scripts/extend_folds.py | append training-only rows into inner folds without touching holdout | main:23, group key + fold assign:34-40, overlap assert:41, straddle assert:43, holdout count:48 |
@@ -140,7 +140,7 @@ Where to add
 - A new embedding mode: add a field to the Probe dataclass (src/hearsay/probe.py:65-73) and a branch in scripts/make_probe_csv.py:61, which currently switches on probe.segment.
 - prepare_segment band_match flag (src/hearsay/segment.py:59): callers that already band-limited (handcrafted._crop, src/hearsay/handcrafted.py:62) pass band_match=False. MAX_SEGMENT_S (segment.py:23) caps v2 segments; changing it invalidates probes trained under the old cap.
 - Extra training corpora: scripts/extend_folds.py:34-40 builds group = source + ':' + (generator if spoof else speaker) and assigns fold ids '0'..'k-1' as strings, never 'holdout'. Verify a new corpus needs band matching or is already band-limited (src/hearsay/handcrafted.py:26-30) or the probe may learn the wall as a cue.
-- Generalization check: scripts/train_probe.py:108-121 `--stress` loads a never-fit-on embedding set and reports minDCF/EER at its own threshold and at the train-OOF Bayes threshold (line 114); it never refits.
+- Generalization check: scripts/train_probe.py:117-130 `--stress` loads a never-fit-on embedding set and reports minDCF/EER at its own threshold and at the train-OOF Bayes threshold (line 123); it never refits.
 - Resumable extraction: scripts/extract_embeddings.py:81-86 skips existing shard_XXXXX.npz; rerun the same command to resume.
 
 Invariants you must keep
@@ -148,8 +148,8 @@ Invariants you must keep
 - All train/test/live audio passes through load_audio (src/hearsay/audio.py:1-4); trim_silence never returns less than min_keep_s = 1.0 s (audio.py:106).
 - embed_clip and the bulk window path produce identical features (tests/test_audio_and_submission.py:179).
 - prepare_segment order is band -> trim -> crop -> cap (segment.py:70-79); it never pads or tiles a short clip (tests/test_audio_and_submission.py:270). scripts/extract_embeddings.py and scripts/make_probe_csv.py must call it identically or train/test features diverge.
-- load_embeddings asserts every manifest row is covered exactly once (src/hearsay/probe.py:51) and reorders by row (line 52); a partial extraction fails loudly. A set whose manifest.csv flags any row decode_error raises ValueError naming the rows (line 37) unless allow_decode_errors=True.
-- CV, layer selection and Platt fit touch only train (or non-holdout fold rows); val is scored once (scripts/train_probe.py:87-106); `assert auc > 0.5` at line 89.
+- load_embeddings asserts every manifest row is covered exactly once (src/hearsay/probe.py:51) and reorders by row (line 52); a partial extraction fails loudly. A set whose manifest.csv flags any row decode_error raises ValueError naming the rows (line 37) unless allow_decode_errors=True. On the command line, scripts/train_probe.py, scripts/export_probe_scores.py and scripts/tsv_from_embeddings.py pass it only with `--allow-decode-errors` (off by default), for every set they read.
+- CV, layer selection and Platt fit touch only train (or non-holdout fold rows); val is scored once (scripts/train_probe.py:96-115); `assert auc > 0.5` at line 98.
 - With a fold file, oof_scores uses PredefinedSplit (src/hearsay/probe.py:58-59), never a fresh StratifiedGroupKFold.
 - make_folds: every fold has >= --min-per-class per class (scripts/make_folds.py:69), no group straddles folds (line 71), output columns are exactly path,label,generator,speaker,source,group,fold (line 74). extend_folds: no path overlap with base (scripts/extend_folds.py:41), no group straddles folds (line 43), holdout count unchanged (line 48).
 - write_submission never overwrites (src/hearsay/submission.py:85-86) and validates range, uniqueness and length.
@@ -160,7 +160,7 @@ Gotchas
 - windows() tiles short clips (src/hearsay/audio.py:82-83); prepare_segment never does. The same manifest extracted with and without --segment yields structurally different statistics.
 - Two different per-row randomness schemes: crop lengths come from one shared RNG stream in test_duration_sampler (segment.py:53) drawn once per manifest row in order (scripts/extract_embeddings.py:70), while the crop offset uses default_rng(args.seed + r) (segment.py:77, extract_embeddings.py:90). Manifest row order changes crops. Any rescoring script must reproduce both.
 - Resuming after changing --seed, --crop, --win-s or --max-windows silently mixes settings across shards (scripts/extract_embeddings.py:81-86, 134-136); delete stale shards or use a new --name.
-- If extract_meta.json is missing, train_probe silently defaults probe.segment=False (scripts/train_probe.py:81-85).
+- If extract_meta.json is missing, train_probe silently defaults probe.segment=False (scripts/train_probe.py:90-94).
 - cv_groups (src/hearsay/probe.py:38) is used only on the non-fold path of train_probe; the --folds path uses the fold file's group column.
 - The sidecar llr column is NaN for rows flagged decode_error or score_error (scripts/make_probe_csv.py:85-86); fb (line 74) is sigmoid(shift), the prior-only posterior, not 0.5 in general.
 - band_limit's _FIR cache (src/hearsay/handcrafted.py:40) is built once per process; changing BAND_MATCH (line 39) needs a restart.
@@ -346,11 +346,11 @@ Gotchas
 
 ## Tests: what pins what
 
-Count (Oct 24): 864 tests in 33 modules. Method: `pytest --collect-only -q` with torch, torchaudio,
+Count (Oct 28): 876 tests in 33 modules. Method: `pytest --collect-only -q` with torch, torchaudio,
 transformers and speechbrain replaced at import time by stub modules, so the four modules that import
 torch at the top (test_m5_model, test_m5_scores, test_repair_decode_errors, test_spectra; 75 tests)
 also collect. Without torch, plain `pytest --collect-only -q --continue-on-collection-errors` collects
-789 and reports those four modules as collection errors. Collecting counts tests; it does not run them.
+801 and reports those four modules as collection errors. Collecting counts tests; it does not run them.
 
 | Test | Pins |
 |---|---|
@@ -361,7 +361,7 @@ also collect. Without torch, plain `pytest --collect-only -q --continue-on-colle
 | tests/test_enf_detector.py, test_splice_detector.py, test_container_detector.py, test_compression_detector.py | each detector's scoring/evidence on synthetic inputs via ClipContext.from_array; fixed score sets; tag rule matching; compression wiring to a saved bundle |
 | tests/test_engineered_registry.py | LEARNED/RULE_BASED/NAMES partition; importing engineered registers exactly five detectors |
 | tests/test_audio_and_submission.py | embed_clip == bulk path within 1e-3 (line 179, needs weights); prepare_segment never tiles, deterministic, 8 s cap (line 270); band_limit reproduces the 7.25 kHz wall (line 294); trim_silence level-independent and safe (line 256); normalize_windows removes level and offset (line 222); test_duration_sampler in [3.0, 14.0] s with median in (3.2, 3.7) (line 284, skipped without splits/nsa_test_durations.csv). No separate test_embed.py exists. |
-| tests/test_probe.py | load_embeddings on a temp embedding set: clean set loads in row order, a manifest without a flag column loads, decode_error rows are refused and named (truncated after 10), allow_decode_errors=True loads the set unchanged |
+| tests/test_probe.py | load_embeddings on a temp embedding set: clean set loads in row order, a manifest without a flag column loads, decode_error rows are refused and named (truncated after 10), allow_decode_errors=True loads the set unchanged; train_probe, export_probe_scores and tsv_from_embeddings refuse a flagged set by default, pass allow_decode_errors=True only with --allow-decode-errors, and route every load through that flag |
 | tests/test_m5_model.py | M5Net forward on a fixed tiny model; save_m5/load_m5 hash round-trip |
 | tests/test_m5_bundle.py | write_clip peak clamp, pcm_sha256 length, prepare_clip peak scaling |
 | tests/test_m5_manifest.py, test_m5_crops.py, test_m5_codecs.py, test_m5_scores.py | manifest fold/exclusion rules; crop/collate/LengthMixer; codec round-trip; assemble report shape incl. score_duration_spearman_bonafide (test_m5_scores.py:106). Not read in the finder pass. |

@@ -17,6 +17,7 @@ import argparse
 import math
 import os
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -39,10 +40,13 @@ def main() -> None:
     ap.add_argument("--val-eer", default="")
     ap.add_argument("--notes", default="")
     ap.add_argument("--skip-preflight", action="store_true")
+    ap.add_argument("--allow-decode-errors", action="store_true",
+                    help="load a set with decode_error rows (zeros, not the clip); default refuses")
     args = ap.parse_args()
+    load = partial(load_embeddings, allow_decode_errors=args.allow_decode_errors)
 
     probe = Probe.load(args.probe)
-    X, m = load_embeddings(probe.backbone, args.embeddings)
+    X, m = load(probe.backbone, args.embeddings)
     shift = math.log(args.pi_synth / (1 - args.pi_synth))
     llr = probe.llr(X)
     by_name = pd.Series(sigmoid(llr + shift), index=[os.path.basename(p) for p in m.path])
