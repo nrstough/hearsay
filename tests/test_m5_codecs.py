@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -59,9 +61,14 @@ def test_b5_script_selects_class_blind_and_writes_manifest(tmp_path):
         rows.append({"id": f"c{i}", "file": f, "label": "spoof" if i % 2 else "bonafide",
                      "fold": "holdout" if i % 10 == 0 else str(i % 5), "train_scope": scope})
     pd.DataFrame(rows).to_csv(bundle / "manifest.csv", index=False)
-    r = subprocess.run(["uv", "run", "python", str(CLOUD / "box_codecs.py"), "--bundle", str(bundle),
+    # this interpreter, not `uv run` (which syncs the whole project into .venv first: the CUDA
+    # torch build on Linux); src/ on the child's path as pytest puts it on ours
+    pytest.importorskip("hearsay.m5_bundle", reason="box_codecs.py imports hearsay.m5_bundle")
+    path = (str(CLOUD.parents[1] / "src"), os.environ.get("PYTHONPATH"))
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in path if p)}
+    r = subprocess.run([sys.executable, str(CLOUD / "box_codecs.py"), "--bundle", str(bundle),
                         "--frac", "0.5", "--workers", "2", "--codecs", "mp3,mulaw"],
-                       capture_output=True, text=True, cwd=CLOUD.parents[1], check=False)
+                       capture_output=True, text=True, cwd=CLOUD.parents[1], env=env, check=False)
     assert r.returncode == 0, r.stderr[-2000:]
     cm = pd.read_csv(bundle / "codecs" / "codec_manifest.csv")
     m = pd.read_csv(bundle / "manifest.csv").set_index("id")
